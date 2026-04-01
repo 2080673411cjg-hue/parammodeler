@@ -1,0 +1,1998 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ParamModelerDock</class>
+ <widget class="QDockWidget" name="ParamModelerDock">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>669</width>
+    <height>764</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Parametric Modeler</string>
+  </property>
+  <widget class="QWidget" name="dockWidgetContents">
+   <layout class="QVBoxLayout" name="mainVerticalLayout">
+    <item>
+     <widget class="QTabWidget" name="tabWidget">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="tabManualModeling">
+       <attribute name="title">
+        <string>参数化建模</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayoutTab1">
+        <property name="spacing">
+         <number>0</number>
+        </property>
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QScrollArea" name="scrollAreaTab1">
+          <property name="widgetResizable">
+           <bool>true</bool>
+          </property>
+          <widget class="QWidget" name="scrollContentsTab1">
+           <property name="geometry">
+            <rect>
+             <x>0</x>
+             <y>0</y>
+             <width>618</width>
+             <height>956</height>
+            </rect>
+           </property>
+           <layout class="QVBoxLayout" name="verticalLayoutScrollTab1">
+            <item>
+             <widget class="QGroupBox" name="groupBoxPrimitive">
+              <property name="title">
+               <string>基元类型</string>
+              </property>
+              <layout class="QFormLayout" name="formLayoutPrimitive">
+               <item row="0" column="0">
+                <widget class="QLabel" name="labelPrimitive">
+                 <property name="text">
+                  <string>基元：</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QComboBox" name="comboPrimitive">
+                 <item>
+                  <property name="text">
+                   <string>Cuboid</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>Cylinder</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>LHouse</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>ConeCylinder</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>GabledRoof</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>PyramidRoof</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>TruncatedPyramidRoof</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>HalfCylinderRoof</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>穹顶圆柱</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>凹陷长方体</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>非对称人字形屋顶房屋</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>四段式圆塔形</string>
+                  </property>
+                 </item>
+                 <item>
+                  <property name="text">
+                   <string>双人字屋顶房屋</string>
+                  </property>
+                 </item>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="groupBoxTransform">
+              <property name="title">
+               <string>位姿（Transform）</string>
+              </property>
+              <layout class="QFormLayout" name="formLayoutTransform">
+               <item row="0" column="0">
+                <widget class="QLabel" name="labelTX">
+                 <property name="text">
+                  <string>平移 X：</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="0" column="1">
+                <widget class="QLineEdit" name="lineEditTX"/>
+               </item>
+               <item row="1" column="0">
+                <widget class="QLabel" name="labelTY">
+                 <property name="text">
+                  <string>平移 Y：</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="1" column="1">
+                <widget class="QLineEdit" name="lineEditTY"/>
+               </item>
+               <item row="2" column="0">
+                <widget class="QLabel" name="labelTZ">
+                 <property name="text">
+                  <string>平移 Z：</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="2" column="1">
+                <widget class="QLineEdit" name="lineEditTZ"/>
+               </item>
+               <item row="3" column="0">
+                <widget class="QLabel" name="labelRX">
+                 <property name="text">
+                  <string>旋转 X：</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="3" column="1">
+                <widget class="QLineEdit" name="lineEditRX"/>
+               </item>
+               <item row="4" column="0">
+                <widget class="QLabel" name="labelRY">
+                 <property name="text">
+                  <string>旋转 Y：</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="4" column="1">
+                <widget class="QLineEdit" name="lineEditRY"/>
+               </item>
+               <item row="5" column="0">
+                <widget class="QLabel" name="labelRZ">
+                 <property name="text">
+                  <string>旋转 Z：</string>
+                 </property>
+                </widget>
+               </item>
+               <item row="5" column="1">
+                <widget class="QLineEdit" name="lineEditRZ"/>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="QGroupBox" name="groupBoxParameters">
+              <property name="title">
+               <string>模型参数</string>
+              </property>
+              <layout class="QVBoxLayout" name="layoutParameters">
+               <item>
+                <widget class="QStackedWidget" name="stackedWidgetParams">
+                 <property name="currentIndex">
+                  <number>0</number>
+                 </property>
+                 <widget class="QWidget" name="pageCuboid">
+                  <layout class="QFormLayout" name="formLayout">
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="horizontalLayout">
+                     <item>
+                      <widget class="QSlider" name="sliderCWidth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxCWidth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelDepth">
+                     <property name="text">
+                      <string>深度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="horizontalLayout_2">
+                     <item>
+                      <widget class="QSlider" name="sliderCDepth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxCDepth"/>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="labelHeight">
+                     <property name="text">
+                      <string>高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <layout class="QHBoxLayout" name="horizontalLayout_3">
+                     <item>
+                      <widget class="QSlider" name="sliderCHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxCHeight"/>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelWidth">
+                     <property name="text">
+                      <string>宽度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                 <widget class="QWidget" name="pageCylinder">
+                  <layout class="QFormLayout" name="formCylinder">
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelCylRadius">
+                     <property name="text">
+                      <string>半径：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="layoutCylRadius">
+                     <item>
+                      <widget class="QSlider" name="sliderCylRadius">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxCylRadius">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                       <property name="value">
+                        <double>0.000000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelCylHeight">
+                     <property name="text">
+                      <string>高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="layoutCylHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderCylHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxCylHeight">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                       <property name="value">
+                        <double>0.000000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </widget>
+                 <widget class="QWidget" name="pageLHouse">
+                  <layout class="QFormLayout" name="formLHouse">
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelLMainWidth">
+                     <property name="text">
+                      <string>主体宽度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="layoutAWidth">
+                     <item>
+                      <widget class="QSlider" name="sliderLMainWidth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxLMainWidth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelLMainDepth">
+                     <property name="text">
+                      <string>主体深度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="layoutADepth">
+                     <item>
+                      <widget class="QSlider" name="sliderLMainDepth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxLMainDepth"/>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="labelLWingWidth">
+                     <property name="text">
+                      <string>L臂宽度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <layout class="QHBoxLayout" name="layoutBWidth">
+                     <item>
+                      <widget class="QSlider" name="sliderLWingWidth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxLWingWidth"/>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="labelLWingDepth">
+                     <property name="text">
+                      <string>L臂深度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <layout class="QHBoxLayout" name="layoutBDepth">
+                     <item>
+                      <widget class="QSlider" name="sliderLWingDepth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxLWingDepth"/>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="4" column="0">
+                    <widget class="QLabel" name="labelLHeight">
+                     <property name="text">
+                      <string>整体高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="1">
+                    <layout class="QHBoxLayout" name="layoutLHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderLHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxLHeight"/>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </widget>
+                 <widget class="QWidget" name="pageConeCylinder">
+                  <layout class="QFormLayout" name="formConeCyl">
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelConeCylRadius">
+                     <property name="text">
+                      <string>底面半径：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="layoutConeCylRadius">
+                     <item>
+                      <widget class="QSlider" name="sliderConeCylRadius">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxConeCylRadius"/>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelConeCylCylHeight">
+                     <property name="text">
+                      <string>圆柱高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="layoutConeCylCylHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderConeCylCylHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxConeCylCylHeight"/>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="labelConeCylConeHeight">
+                     <property name="text">
+                      <string>圆锥高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <layout class="QHBoxLayout" name="layoutConeCylConeHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderConeCylConeHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxConeCylConeHeight"/>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </widget>
+                 <widget class="QWidget" name="pageGabledRoof">
+                  <layout class="QFormLayout" name="formLayout_3">
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelGRWidth">
+                     <property name="text">
+                      <string>底宽：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="layoutGRWidth">
+                     <item>
+                      <widget class="QSlider" name="sliderGRWidth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxGRWidth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelGRDepth">
+                     <property name="text">
+                      <string>底深：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="layoutGRDepth">
+                     <item>
+                      <widget class="QSlider" name="sliderGRDepth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxGRDepth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="labelGRHeightWall">
+                     <property name="text">
+                      <string>墙高：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <layout class="QHBoxLayout" name="layoutGRHeightWall">
+                     <item>
+                      <widget class="QSlider" name="sliderGRHeightWall">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxGRHeightWall">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="labelGRHeightRoof">
+                     <property name="text">
+                      <string>屋顶高：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <layout class="QHBoxLayout" name="layoutGRHeightRoof">
+                     <item>
+                      <widget class="QSlider" name="sliderGRHeightRoof">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxGRHeightRoof">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </widget>
+                 <widget class="QWidget" name="pagePyramidRoof">
+                  <layout class="QFormLayout" name="formLayout_4">
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelPRWidth">
+                     <property name="text">
+                      <string>底宽：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="layoutPRWidth">
+                     <item>
+                      <widget class="QSlider" name="sliderPRWidth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxPRWidth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelPRDepth">
+                     <property name="text">
+                      <string>底深：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="layoutPRDepth">
+                     <item>
+                      <widget class="QSlider" name="sliderPRDepth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxPRDepth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="labelPRHeightWall">
+                     <property name="text">
+                      <string>墙高：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <layout class="QHBoxLayout" name="layoutPRHeightWall">
+                     <item>
+                      <widget class="QSlider" name="sliderPRHeightWall">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxPRHeightWall">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="labelPRHeightRoof">
+                     <property name="text">
+                      <string>屋顶高：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <layout class="QHBoxLayout" name="layoutPRHeightRoof">
+                     <item>
+                      <widget class="QSlider" name="sliderPRHeightRoof">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxPRHeightRoof">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </widget>
+                 <widget class="QWidget" name="pageTPRoof">
+                  <layout class="QFormLayout" name="formLayout_TPR">
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelTPRBottomWidth">
+                     <property name="text">
+                      <string>底宽：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="layoutTPRBottomWidth">
+                     <item>
+                      <widget class="QSlider" name="sliderTPRBottomWidth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxTPRBottomWidth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelTPRBottomDepth">
+                     <property name="text">
+                      <string>底深：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="layoutTPRBottomDepth">
+                     <item>
+                      <widget class="QSlider" name="sliderTPRBottomDepth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxTPRBottomDepth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="labelTPRTopWidth">
+                     <property name="text">
+                      <string>顶宽：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <layout class="QHBoxLayout" name="layoutTPRTopWidth">
+                     <item>
+                      <widget class="QSlider" name="sliderTPRTopWidth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxTPRTopWidth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="labelTPRTopDepth">
+                     <property name="text">
+                      <string>顶深：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <layout class="QHBoxLayout" name="layoutTPRTopDepth">
+                     <item>
+                      <widget class="QSlider" name="sliderTPRTopDepth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxTPRTopDepth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="4" column="0">
+                    <widget class="QLabel" name="labelTPRHeightWall">
+                     <property name="text">
+                      <string>墙高：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="1">
+                    <layout class="QHBoxLayout" name="layoutTPRHeightWall">
+                     <item>
+                      <widget class="QSlider" name="sliderTPRHeightWall">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxTPRHeightWall">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="5" column="0">
+                    <widget class="QLabel" name="labelTPRHeightRoof">
+                     <property name="text">
+                      <string>屋顶高：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="1">
+                    <layout class="QHBoxLayout" name="layoutTPRHeightRoof">
+                     <item>
+                      <widget class="QSlider" name="sliderTPRHeightRoof">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxTPRHeightRoof">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </widget>
+                 <widget class="QWidget" name="pageHalfCylinderRoof">
+                  <layout class="QFormLayout" name="formLayout_HCR">
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelHCRWidth">
+                     <property name="text">
+                      <string>底部宽度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="layoutHCRWidth">
+                     <item>
+                      <widget class="QSlider" name="sliderHCRWidth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxHCRWidth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelHCRDepth">
+                     <property name="text">
+                      <string>底部深度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="layoutHCRDepth">
+                     <item>
+                      <widget class="QSlider" name="sliderHCRDepth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxHCRDepth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="labelHCRHeightWall">
+                     <property name="text">
+                      <string>墙体高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <layout class="QHBoxLayout" name="layoutHCRHeightWall">
+                     <item>
+                      <widget class="QSlider" name="sliderHCRHeightWall">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxHCRHeightWall">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="labelHCRRadius">
+                     <property name="text">
+                      <string>拱顶半径：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <layout class="QHBoxLayout" name="layoutHCRRadius">
+                     <item>
+                      <widget class="QSlider" name="sliderHCRRadius">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxHCRRadius">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </widget>
+                 <widget class="QWidget" name="pageCylinderHemisphere">
+                  <layout class="QFormLayout" name="formLayout_7">
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelCylHemiRadius">
+                     <property name="text">
+                      <string>圆柱半径：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="layoutCylHemiRadius">
+                     <item>
+                      <widget class="QSlider" name="sliderCylHemiRadius">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxCylHemiRadius">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelCylHemiHeight">
+                     <property name="text">
+                      <string>圆柱高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="layoutCylHemiHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderCylHemiHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxCylHemiHeight">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="labelCylHemiDomeHeight">
+                     <property name="text">
+                      <string>穹顶高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <layout class="QHBoxLayout" name="layoutCylHemiDomeHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderCylHemiDomeHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxCylHemiDomeHeight">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="labelCylHemiBulge">
+                     <property name="text">
+                      <string>穹顶鼓包程度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <layout class="QHBoxLayout" name="layoutCylHemiBulge">
+                     <item>
+                      <widget class="QSlider" name="sliderCylHemiBulge">
+                       <property name="maximum">
+                        <number>1</number>
+                       </property>
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxCylHemiBulge">
+                       <property name="maximum">
+                        <double>1.000000000000000</double>
+                       </property>
+                       <property name="singleStep">
+                        <double>0.010000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </widget>
+                 <widget class="QWidget" name="pageIndentedCuboid">
+                  <layout class="QFormLayout" name="formLayout_8">
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelICWidth">
+                     <property name="text">
+                      <string>外部长方体宽度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="layoutICWidth">
+                     <item>
+                      <widget class="QSlider" name="sliderICWidth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxICWidth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelICDepth">
+                     <property name="text">
+                      <string>外部长方体深度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="layoutICDepth">
+                     <item>
+                      <widget class="QSlider" name="sliderICDepth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxICDepth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="labelICHeight">
+                     <property name="text">
+                      <string>外部长方体高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <layout class="QHBoxLayout" name="layoutICHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderICHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxICHeight">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="labelICInnerWidth">
+                     <property name="text">
+                      <string>凹陷长方体宽度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <layout class="QHBoxLayout" name="layoutICInnerWidth">
+                     <item>
+                      <widget class="QSlider" name="sliderICInnerWidth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxICInnerWidth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="4" column="0">
+                    <widget class="QLabel" name="labelICInnerDepth">
+                     <property name="text">
+                      <string>凹陷长方体深度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="1">
+                    <layout class="QHBoxLayout" name="layoutICInnerDepth">
+                     <item>
+                      <widget class="QSlider" name="sliderICInnerDepth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxICInnerDepth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="5" column="0">
+                    <widget class="QLabel" name="labelICInnerHeight">
+                     <property name="text">
+                      <string>凹陷长方体高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="1">
+                    <layout class="QHBoxLayout" name="layoutICInnerHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderICInnerHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxICInnerHeight">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="6" column="0">
+                    <widget class="QLabel" name="labelICOffsetX">
+                     <property name="text">
+                      <string>相对外壳左侧的偏移：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="6" column="1">
+                    <layout class="QHBoxLayout" name="layoutICOffsetX">
+                     <item>
+                      <widget class="QSlider" name="sliderICOffsetX">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxICOffsetX">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="7" column="0">
+                    <widget class="QLabel" name="labelICOffsetY">
+                     <property name="text">
+                      <string>相对外壳前侧的偏移：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="7" column="1">
+                    <layout class="QHBoxLayout" name="layoutICOffsetY">
+                     <item>
+                      <widget class="QSlider" name="sliderICOffsetY">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxICOffsetY">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </widget>
+                 <widget class="QWidget" name="pageAsymmetricGableHouse">
+                  <layout class="QFormLayout" name="formLayout_9">
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelAGHWidth">
+                     <property name="text">
+                      <string>房屋宽度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="layoutAGHWidth">
+                     <item>
+                      <widget class="QSlider" name="sliderAGHWidth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxAGHWidth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelAGHDepth">
+                     <property name="text">
+                      <string>房屋深度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="layoutAGHDepth">
+                     <item>
+                      <widget class="QSlider" name="sliderAGHDepth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxAGHDepth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="labelAGHHeightWall">
+                     <property name="text">
+                      <string>墙体高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <layout class="QHBoxLayout" name="layoutAGHHeightWall">
+                     <item>
+                      <widget class="QSlider" name="sliderAGHHeightWall">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxAGHHeightWall">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="labelAGHRoofHeight">
+                     <property name="text">
+                      <string>屋顶高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <layout class="QHBoxLayout" name="layoutAGHRoofHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderAGHRoofHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxAGHRoofHeight">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="4" column="0">
+                    <widget class="QLabel" name="labelAGHRidgeLength">
+                     <property name="text">
+                      <string>屋脊长度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="1">
+                    <layout class="QHBoxLayout" name="layoutAGHRidgeLength">
+                     <item>
+                      <widget class="QSlider" name="sliderAGHRidgeLength">
+                       <property name="value">
+                        <number>0</number>
+                       </property>
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxAGHRidgeLength">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="5" column="0">
+                    <widget class="QLabel" name="labelAGHRidgeOffset">
+                     <property name="text">
+                      <string>屋脊偏移：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="1">
+                    <layout class="QHBoxLayout" name="layoutAGHRidgeOffset">
+                     <item>
+                      <widget class="QSlider" name="sliderAGHRidgeOffset">
+                       <property name="minimum">
+                        <number>0</number>
+                       </property>
+                       <property name="maximum">
+                        <number>99</number>
+                       </property>
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxAGHRidgeOffset">
+                       <property name="minimum">
+                        <double>-50.000000000000000</double>
+                       </property>
+                       <property name="maximum">
+                        <double>50.000000000000000</double>
+                       </property>
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </widget>
+                 <widget class="QWidget" name="pageFourStageRoundTower">
+                  <layout class="QFormLayout" name="formLayout_10">
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelFTBaseRadius">
+                     <property name="text">
+                      <string>底部圆柱半径：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="layoutFTBaseRadius">
+                     <item>
+                      <widget class="QSlider" name="sliderFTBaseRadius">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxFTBaseRadius">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelFTBaseHeight">
+                     <property name="text">
+                      <string>底部圆柱高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="layoutFTBaseHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderFTBaseHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxFTBaseHeight">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="labelFTMiddleHeight">
+                     <property name="text">
+                      <string>中部过渡高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <layout class="QHBoxLayout" name="layoutFTMiddleHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderFTMiddleHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxFTMiddleHeight">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="labelFTMiddleTopRadius">
+                     <property name="text">
+                      <string>中部顶部半径：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <layout class="QHBoxLayout" name="layoutFTMiddleTopRadius">
+                     <item>
+                      <widget class="QSlider" name="sliderFTMiddleTopRadius">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxFTMiddleTopRadius">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="4" column="0">
+                    <widget class="QLabel" name="labelFTMiddleBulge">
+                     <property name="text">
+                      <string>中部鼓包系数：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="1">
+                    <layout class="QHBoxLayout" name="layoutFTMiddleBulge">
+                     <item>
+                      <widget class="QSlider" name="sliderFTMiddleBulge">
+                       <property name="maximum">
+                        <number>1</number>
+                       </property>
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxFTMiddleBulge">
+                       <property name="maximum">
+                        <double>0.600000000000000</double>
+                       </property>
+                       <property name="singleStep">
+                        <double>0.010000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="5" column="0">
+                    <widget class="QLabel" name="labelFTConeHeight">
+                     <property name="text">
+                      <string>顶部圆锥高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="1">
+                    <layout class="QHBoxLayout" name="layoutFTConeHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderFTConeHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxFTConeHeight">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </widget>
+                 <widget class="QWidget" name="pageTwoGableHouses">
+                  <layout class="QFormLayout" name="formLayout_11">
+                   <item row="0" column="0">
+                    <widget class="QLabel" name="labelTGWidth1">
+                     <property name="text">
+                      <string>房屋1宽度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="0" column="1">
+                    <layout class="QHBoxLayout" name="layoutTGWidth1">
+                     <item>
+                      <widget class="QSlider" name="sliderTGWidth1">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxTGWidth1">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="1" column="0">
+                    <widget class="QLabel" name="labelTGWidth2">
+                     <property name="text">
+                      <string>房屋2宽度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="1" column="1">
+                    <layout class="QHBoxLayout" name="layoutTGWidth2">
+                     <item>
+                      <widget class="QSlider" name="sliderTGWidth2">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxTGWidth2">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="2" column="0">
+                    <widget class="QLabel" name="labelTGDepth">
+                     <property name="text">
+                      <string>房屋深度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="2" column="1">
+                    <layout class="QHBoxLayout" name="layoutTGDepth">
+                     <item>
+                      <widget class="QSlider" name="sliderTGDepth">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxTGDepth">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="3" column="0">
+                    <widget class="QLabel" name="labelTGHeightWall">
+                     <property name="text">
+                      <string>房屋高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="3" column="1">
+                    <layout class="QHBoxLayout" name="layoutTGHeightWall">
+                     <item>
+                      <widget class="QSlider" name="sliderTGHeightWall">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxTGHeightWall">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="4" column="0">
+                    <widget class="QLabel" name="labelTGRoofHeight">
+                     <property name="text">
+                      <string>屋顶高度：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="4" column="1">
+                    <layout class="QHBoxLayout" name="layoutTGRoofHeight">
+                     <item>
+                      <widget class="QSlider" name="sliderTGRoofHeight">
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxTGRoofHeight">
+                       <property name="singleStep">
+                        <double>0.100000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                   <item row="5" column="0">
+                    <widget class="QLabel" name="labelTGAngle">
+                     <property name="text">
+                      <string>两房屋夹角：</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item row="5" column="1">
+                    <layout class="QHBoxLayout" name="layoutTGAngle">
+                     <item>
+                      <widget class="QSlider" name="sliderTGAngle">
+                       <property name="maximum">
+                        <number>180</number>
+                       </property>
+                       <property name="orientation">
+                        <enum>Qt::Horizontal</enum>
+                       </property>
+                      </widget>
+                     </item>
+                     <item>
+                      <widget class="QDoubleSpinBox" name="spinBoxTGAngle">
+                       <property name="minimum">
+                        <double>1.000000000000000</double>
+                       </property>
+                       <property name="maximum">
+                        <double>179.000000000000000</double>
+                       </property>
+                       <property name="singleStep">
+                        <double>1.000000000000000</double>
+                       </property>
+                       <property name="value">
+                        <double>1.000000000000000</double>
+                       </property>
+                      </widget>
+                     </item>
+                    </layout>
+                   </item>
+                  </layout>
+                 </widget>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </item>
+            <item>
+             <widget class="PreviewGLWidget" name="previewWidget">
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>280</height>
+               </size>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="horizontalLayoutButtons">
+              <item>
+               <widget class="QToolButton" name="toolButtonExport">
+                <property name="text">
+                 <string>导出</string>
+                </property>
+                <property name="popupMode">
+                 <enum>QToolButton::InstantPopup</enum>
+                </property>
+                <property name="toolButtonStyle">
+                 <enum>Qt::ToolButtonTextBesideIcon</enum>
+                </property>
+                <property name="minimumHeight">
+                 <number>36</number>
+                </property>
+                <property name="minimumWidth">
+                 <number>110</number>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="horizontalSpacer">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tabInverseModeling">
+       <attribute name="title">
+        <string>分类与参数反演</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_tab2">
+        <item>
+         <widget class="QGroupBox" name="groupInputData">
+          <property name="title">
+           <string>输入数据</string>
+          </property>
+          <layout class="QVBoxLayout" name="layoutInputData">
+           <item>
+            <widget class="QPushButton" name="btnLoadPointCloud">
+             <property name="text">
+              <string>加载点云 / OBJ</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="labelInputInfo">
+             <property name="text">
+              <string>未加载数据</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="groupPrimitiveClassify">
+          <property name="title">
+           <string>基元类型识别</string>
+          </property>
+          <layout class="QVBoxLayout" name="layoutPrimitiveClassify">
+           <item>
+            <widget class="QPushButton" name="btnClassifyPrimitive">
+             <property name="text">
+              <string>自动识别基元类型</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="labelPrimitiveType">
+             <property name="text">
+              <string>识别结果：未识别</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="groupInverseParams">
+          <property name="title">
+           <string>参数反演</string>
+          </property>
+          <layout class="QVBoxLayout" name="layoutInverseParams">
+           <item>
+            <widget class="QPushButton" name="btnInverseParams">
+             <property name="text">
+              <string>开始参数反演</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QTableWidget" name="tableInverseParams">
+             <property name="selectionBehavior">
+              <enum>QAbstractItemView::SelectRows</enum>
+             </property>
+             <property name="rowCount">
+              <number>0</number>
+             </property>
+             <property name="columnCount">
+              <number>2</number>
+             </property>
+             <attribute name="horizontalHeaderVisible">
+              <bool>true</bool>
+             </attribute>
+             <column>
+              <property name="text">
+               <string>参数名</string>
+              </property>
+             </column>
+             <column>
+              <property name="text">
+               <string>参数值</string>
+              </property>
+             </column>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="groupVerifyExport">
+          <property name="title">
+           <string>结果验证与导出</string>
+          </property>
+          <layout class="QHBoxLayout" name="layoutVerifyExport">
+           <item>
+            <widget class="QPushButton" name="btnRebuildFromParams">
+             <property name="text">
+              <string>用反演参数重建模型</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnExportInverseJSON">
+             <property name="text">
+              <string>导出反演参数 JSON</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PreviewGLWidget</class>
+   <extends>QOpenGLWidget</extends>
+   <header>previewglwidget.h</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>
