@@ -51,7 +51,7 @@
              <x>0</x>
              <y>0</y>
              <width>618</width>
-             <height>956</height>
+             <height>964</height>
             </rect>
            </property>
            <layout class="QVBoxLayout" name="verticalLayoutScrollTab1">
@@ -1833,12 +1833,6 @@
                 </property>
                 <property name="toolButtonStyle">
                  <enum>Qt::ToolButtonTextBesideIcon</enum>
-                </property>
-                <property name="minimumHeight">
-                 <number>36</number>
-                </property>
-                <property name="minimumWidth">
-                 <number>110</number>
                 </property>
                </widget>
               </item>

@@ -222,9 +222,10 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   connect( ui->sliderTGHeightWall, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTGRoofHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTGAngle,      &QSlider::valueChanged, this, schedulePreview );
-  // 切换基元时立刻刷新
-  connect( ui->comboPrimitive, &QComboBox::currentTextChanged,
-           this, [this]( const QString & ) { onUpdatePreview(); } );
+  // 切换基元时切换参数页面
+  connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, &ParamModelerDock::onPrimitiveChanged );
+  // 切换基元时立刻刷新预览
+  connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, [this]( const QString & ) { onUpdatePreview(); } );
 }
 
 ParamModelerDock::~ParamModelerDock()
