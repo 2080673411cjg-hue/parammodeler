@@ -1,4 +1,5 @@
-# ParamModeler — QGIS 参数化建模插件
+# 哈哈
+
 
 A QGIS plugin for parametric 3D building primitive modeling, real-time preview, and multi-format export.
 
