@@ -24,8 +24,7 @@
 #include "buildmesh.h"
 #include "exportpointcloud.h"
 
-#include <QDesktopServices>
-#include <QUrl>
+
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QFileDialog>
@@ -473,11 +472,29 @@ void ParamModelerDock::onExportRebuiltJSON()
 
 
 // ========================================================================
+// 导出前检验：检查当前参数是否能生成有效网格
+// ========================================================================
+static bool checkMeshValid( const QString &primitiveType, ParamModelerDock *dock )
+{
+    MeshData mesh = BuildMesh::build( primitiveType, dock );
+    if ( mesh.isEmpty() )
+    {
+        QMessageBox::warning( dock, QObject::tr( "无法导出" ),
+            QObject::tr( "当前参数无法生成有效模型，请先调整参数直到预览区域显示出模型再导出。" ) );
+        return false;
+    }
+    return true;
+}
+
+// ========================================================================
 // 导出 OBJ
 // ========================================================================
 void ParamModelerDock::onExportOBJClicked()
 {
-	// 1. 选择保存路径
+    QString primitiveType = ui->comboPrimitive->currentText();
+    if ( !checkMeshValid( primitiveType, this ) ) return;
+
+    // 1. 选择保存路径
     QString fileName = QFileDialog::getSaveFileName(
         this,
         tr("保存 OBJ 文件"),
@@ -488,13 +505,10 @@ void ParamModelerDock::onExportOBJClicked()
     if (fileName.isEmpty())
         return;
 
-    // 2. 当前基元类型
-    QString primitiveType = ui->comboPrimitive->currentText();
-
-    // 3. 调用模块化 OBJ 导出
+    // 2. 调用模块化 OBJ 导出
     bool ok = ExportOBJ::exportOBJ(fileName, primitiveType, this);
 
-    // 4. 提示信息
+    // 3. 提示信息
     if (ok)
     {
         QMessageBox::information(
@@ -517,19 +531,23 @@ void ParamModelerDock::onExportOBJClicked()
 // ========================================================================
 void ParamModelerDock::onExportJSONClicked()
 {
-  ExportJSON::writeJSON(this);
+    QString primitiveType = ui->comboPrimitive->currentText();
+    if ( !checkMeshValid( primitiveType, this ) ) return;
+    ExportJSON::writeJSON(this);
 }
 // ========================================================================
 // 导出点云
 // ========================================================================
 void ParamModelerDock::onExportPLYClicked()
 {
+    QString primitiveType = ui->comboPrimitive->currentText();
+    if ( !checkMeshValid( primitiveType, this ) ) return;
+
     QString fileName = QFileDialog::getSaveFileName(
         this, tr("保存点云文件"), "", tr("PLY Files (*.ply)") );
     if ( fileName.isEmpty() ) return;
 
-    QString prim = ui->comboPrimitive->currentText();
-    ExportPointCloud::exportPLY( fileName, prim, this );
+    ExportPointCloud::exportPLY( fileName, primitiveType, this );
 }
 // ========================================================================
 // 导出Mesh
@@ -581,29 +599,7 @@ void ParamModelerDock::onExportMeshClicked()
 
     QMessageBox::information(this, tr("导出成功"), tr("Mesh 已导出为 STL。"));
 }
-// ====================== 直接加载模型到 QGIS 3D 场景 (QGIS 3.44 简化版) ======================
-void ParamModelerDock::onLoadToQGIS3D()
-{
-    QString primitiveType = ui->comboPrimitive->currentText();
 
-    // 导出 OBJ 到临时文件夹
-    QString fileName = QFileDialog::getSaveFileName(
-        this, tr("导出 OBJ 并打开所在文件夹"), "", tr("OBJ Files (*.obj)") );
-    if ( fileName.isEmpty() ) return;
-
-    bool ok = ExportOBJ::exportOBJ( fileName, primitiveType, this );
-    if ( !ok ) return;
-
-    // 打开文件所在文件夹
-    QFileInfo fi( fileName );
-    QDesktopServices::openUrl( QUrl::fromLocalFile( fi.absolutePath() ) );
-
-    QMessageBox::information(
-        this, tr("导出成功"),
-        tr("OBJ 文件已保存到：\n%1\n\n"
-           "已打开文件所在文件夹。\n"
-           "请在 QGIS 中手动加载该文件到三维场景。").arg( fileName ) );
-}
 // ============================================================
 // 预览刷新：根据当前基元和参数重建网格，推送给 PreviewGLWidget
 // ============================================================

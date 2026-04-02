@@ -120,7 +120,6 @@ private slots:
   void onExportJSONClicked();
   void onExportPLYClicked();
 		void onExportMeshClicked();
-		void onLoadToQGIS3D();
 
   // 基元切换槽函数
   void onPrimitiveChanged(const QString &prim);
