@@ -38,8 +38,18 @@
 #include <QMenu>
 #include <QAction>
 
-
+#include <QgsVectorLayer.h>
+#include <QgsFeature.h>
+#include <QgsGeometry.h>
+#include <QgsPolygon.h>
+#include <QgsLineString.h>
+#include <QgsPoint.h>
+#include <QgsProject.h>
+#include <QMatrix4x4>
 #include <QDir>
+#include <QgsPolygon3DSymbol.h>
+#include <QgsVectorLayer3DRenderer.h>
+#include <qgis.h>
 
 //slider和spinBox的绑定函数
 static void bindSliderSpin(QSlider* slider, QDoubleSpinBox* spin, double multiplier, double maxVal = 100.0, double minVal = 0.0)
@@ -143,6 +153,9 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   QAction *actJSON = m_exportMenu->addAction(tr("导出 JSON 参数 (*.json)"));
   QAction *actPLY = m_exportMenu->addAction(tr("导出点云 PLY (*.ply)"));
 		QAction *actMesh = m_exportMenu->addAction(tr("导出 Mesh 文件 (*.stl)"));
+				// 新增：直接加载到 QGIS 3D
+		QAction *actTo3D = m_exportMenu->addAction(tr("直接加载到 QGIS 3D 场景"));
+		connect(actTo3D, &QAction::triggered, this, &ParamModelerDock::onLoadToQGIS3D);
   connect(actOBJ,  &QAction::triggered, this, &ParamModelerDock::onExportOBJClicked);
   connect(actJSON, &QAction::triggered, this, &ParamModelerDock::onExportJSONClicked);
   connect(actPLY,  &QAction::triggered, this, &ParamModelerDock::onExportPLYClicked);
@@ -682,3 +695,88 @@ double ParamModelerDock::tgDepth() const { return ui->spinBoxTGDepth->value(); }
 double ParamModelerDock::tgWallHeight() const { return ui->spinBoxTGHeightWall->value(); }
 double ParamModelerDock::tgRoofHeight() const { return ui->spinBoxTGRoofHeight->value(); }
 double ParamModelerDock::tgAngle() const { return ui->spinBoxTGAngle->value(); }
+
+
+// ====================== 直接加载模型到 QGIS 3D 场景（OBJ方式） ======================
+void ParamModelerDock::onLoadToQGIS3D()
+{
+    QString primitiveType = ui->comboPrimitive->currentText();
+
+    // 生成网格（复用 ExportOBJ 里的去重逻辑，直接用原始 mesh 也可以）
+    MeshData mesh = BuildMesh::build(primitiveType, this);
+    if (mesh.isEmpty()) {
+        QMessageBox::warning(this, tr("错误"), tr("无法生成模型，请检查参数"));
+        return;
+    }
+
+    // 读取位姿参数
+    double tx = poseTranslateX(), ty = poseTranslateY(), tz = poseTranslateZ();
+    double rx = poseRotateX(),    ry = poseRotateY(),    rz = poseRotateZ();
+    bool hasPose = (tx||ty||tz||rx||ry||rz);
+
+    QMatrix4x4 mat;
+    if (hasPose) {
+        mat.setToIdentity();
+        mat.translate(tx, ty, tz);
+        mat.rotate(rz, 0, 0, 1);
+        mat.rotate(ry, 0, 1, 0);
+        mat.rotate(rx, 1, 0, 0);
+    }
+
+    // 创建内存图层
+    QString layerName = QString("%1 (ParamModeler)").arg(primitiveType);
+    QgsVectorLayer *layer = new QgsVectorLayer(
+    "PolygonZ?crs=EPSG:3857", layerName, "memory");
+
+    if (!layer->isValid()) {
+        QMessageBox::warning(this, tr("错误"), tr("创建内存图层失败"));
+        delete layer;
+        return;
+    }
+
+    // 把每3个索引对应的三角面塞成一个 QgsFeature
+    QgsFeatureList features;
+    int triCount = mesh.indices.size() / 3;
+
+    for (int i = 0; i < triCount; i++) {
+        QVector3D v0 = mesh.vertices[mesh.indices[i*3    ]];
+        QVector3D v1 = mesh.vertices[mesh.indices[i*3 + 1]];
+        QVector3D v2 = mesh.vertices[mesh.indices[i*3 + 2]];
+
+        if (hasPose) {
+            v0 = mat.map(v0);
+            v1 = mat.map(v1);
+            v2 = mat.map(v2);
+        }
+
+        QgsPolygon *poly = new QgsPolygon();
+        QgsLineString *ring = new QgsLineString();
+        ring->setPoints(QgsPointSequence()
+            << QgsPoint(v0.x(), v0.y(), v0.z())
+            << QgsPoint(v1.x(), v1.y(), v1.z())
+            << QgsPoint(v2.x(), v2.y(), v2.z())
+            << QgsPoint(v0.x(), v0.y(), v0.z()));  // 闭合
+        poly->setExteriorRing(ring);
+
+        QgsFeature feat;
+        feat.setGeometry(QgsGeometry(poly));
+        features.append(feat);
+    }
+
+    layer->dataProvider()->addFeatures(features);
+				// 启用几何体Z值作为高程
+				QgsPolygon3DSymbol *symbol3D = new QgsPolygon3DSymbol();
+				symbol3D->setAltitudeClamping(Qgis::AltitudeClamping::Absolute);
+    symbol3D->setAltitudeBinding(Qgis::AltitudeBinding::Vertex);
+
+				QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
+				renderer3D->setSymbol(symbol3D);
+				layer->setRenderer3D(renderer3D);
+    QgsProject::instance()->addMapLayer(layer);
+
+    QMessageBox::information(this, tr("加载成功"),
+        tr("已加载到图层面板！\n"
+           "图层：%1\n三角面数：%2\n\n"
+           "打开 视图 → 新建3D地图视图 即可查看")
+        .arg(layerName).arg(triCount));
+}

@@ -39,6 +39,7 @@ target_link_libraries(plugin_parammodeler
   qgis_gui
 		Qt5::OpenGL
   opengl32
+		qgis_3d
 )
 ########################################################
 # Install
