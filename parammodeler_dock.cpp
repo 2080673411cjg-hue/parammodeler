@@ -569,48 +569,41 @@ void ParamModelerDock::onExportMeshClicked()
     file.close();
     QMessageBox::information(this, tr("导出成功"), tr("Mesh 已导出为 STL。"));
 }
-// ====================== 直接加载模型到 QGIS 3D 场景（OBJ方式） ======================
+// ========直接加载模型到 QGIS 3D 场景===========
 void ParamModelerDock::onLoadToQGIS3D()
 {
   QString primitiveType = ui->comboPrimitive->currentText();
 
-  // 生成网格（复用 ExportOBJ 里的去重逻辑，直接用原始 mesh 也可以）
   MeshData mesh = BuildMesh::build( primitiveType, this );
   if ( mesh.isEmpty() )
   {
     QMessageBox::warning( this, tr( "错误" ), tr( "无法生成模型，请检查参数" ) );
     return;
   }
-
   // 读取位姿参数
-  double tx = poseTranslateX(), ty = poseTranslateY(), tz = poseTranslateZ();
-  double rx = poseRotateX(), ry = poseRotateY(), rz = poseRotateZ();
-  bool hasPose = ( tx || ty || tz || rx || ry || rz );
-
+  double tx = poseTranslateX();
+  double ty = poseTranslateY();
+  double tz = poseTranslateZ();
+  double rx = poseRotateX();
+  double ry = poseRotateY();
+  double rz = poseRotateZ();
+  // 创建变换矩阵（ZYX 顺序）
   QMatrix4x4 mat;
-  if ( hasPose )
-  {
-    mat.setToIdentity();
-    mat.translate( tx, ty, tz );
-    mat.rotate( rz, 0, 0, 1 );
-    mat.rotate( ry, 0, 1, 0 );
-    mat.rotate( rx, 1, 0, 0 );
-  }
-
-  // 创建内存图层
+  mat.setToIdentity();
+  mat.translate( tx, ty, tz );
+  mat.rotate( rz, 0, 0, 1 ); // 先 Z
+  mat.rotate( ry, 0, 1, 0 ); // 再 Y
+  mat.rotate( rx, 1, 0, 0 ); // 最后 X
   QString layerName = QString( "%1 (ParamModeler)" ).arg( primitiveType );
-  QgsVectorLayer *layer = new QgsVectorLayer(
-    "PolygonZ?crs=EPSG:3857", layerName, "memory"
-  );
+  QgsVectorLayer *layer = new QgsVectorLayer( "PolygonZ?crs=EPSG:3857", layerName, "memory" );
 
-  if ( !layer->isValid() )
+  if ( !layer || !layer->isValid() )
   {
     QMessageBox::warning( this, tr( "错误" ), tr( "创建内存图层失败" ) );
     delete layer;
     return;
   }
 
-  // 把每3个索引对应的三角面塞成一个 QgsFeature
   QgsFeatureList features;
   int triCount = mesh.indices.size() / 3;
 
@@ -619,17 +612,14 @@ void ParamModelerDock::onLoadToQGIS3D()
     QVector3D v0 = mesh.vertices[mesh.indices[i * 3]];
     QVector3D v1 = mesh.vertices[mesh.indices[i * 3 + 1]];
     QVector3D v2 = mesh.vertices[mesh.indices[i * 3 + 2]];
-
-    if ( hasPose )
-    {
-      v0 = mat.map( v0 );
-      v1 = mat.map( v1 );
-      v2 = mat.map( v2 );
-    }
-
+    // 应用位姿
+    v0 = mat.map( v0 );
+    v1 = mat.map( v1 );
+    v2 = mat.map( v2 );
     QgsPolygon *poly = new QgsPolygon();
     QgsLineString *ring = new QgsLineString();
-    ring->setPoints( QgsPointSequence() << QgsPoint( v0.x(), v0.y(), v0.z() ) << QgsPoint( v1.x(), v1.y(), v1.z() ) << QgsPoint( v2.x(), v2.y(), v2.z() ) << QgsPoint( v0.x(), v0.y(), v0.z() ) ); // 闭合
+    ring->setPoints( QgsPointSequence() << QgsPoint( v0.x(), v0.y(), v0.z() ) << QgsPoint( v1.x(), v1.y(), v1.z() ) << QgsPoint( v2.x(), v2.y(), v2.z() ) << QgsPoint( v0.x(), v0.y(), v0.z() ) );
+
     poly->setExteriorRing( ring );
 
     QgsFeature feat;
@@ -638,24 +628,26 @@ void ParamModelerDock::onLoadToQGIS3D()
   }
 
   layer->dataProvider()->addFeatures( features );
-  // 启用几何体Z值作为高程
+  // 3D 渲染设置
   QgsPolygon3DSymbol *symbol3D = new QgsPolygon3DSymbol();
   symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
   symbol3D->setAltitudeBinding( Qgis::AltitudeBinding::Vertex );
-
   QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
   renderer3D->setSymbol( symbol3D );
   layer->setRenderer3D( renderer3D );
-  QgsProject::instance()->addMapLayer( layer );
-		// 自动打开3D视图（如果还没有就新建一个）
-		QList<Qgs3DMapCanvas *> canvases = mIface->mapCanvases3D();
-		if (canvases.isEmpty()) {
-						mIface->createNewMapCanvas3D("ParamModeler 3D");
-		}
 
-  QMessageBox::information( this, tr( "加载成功" ), tr( "已加载到图层面板！\n"
-                                                        "图层：%1\n三角面数：%2\n\n"
-                                                        "打开 视图 → 新建3D地图视图 即可查看" )
+  QgsProject::instance()->addMapLayer( layer );
+  // 自动新建 3D 视图
+  if ( mIface->mapCanvases3D().isEmpty() )
+  {
+    mIface->createNewMapCanvas3D( tr( "ParamModeler 3D" ) );
+  }
+
+  QMessageBox::information( this, tr( "加载成功" ), tr( "模型已加载到图层面板！\n\n"
+                                                        "图层：%1\n"
+                                                        "三角面数：%2\n\n"
+                                                        "位姿（平移 + ZYX 旋转）已正确应用\n\n"
+                                                        "提示：请将 3D 视图设为「浮动」状态，避免插件界面被压缩。" )
                                                       .arg( layerName )
                                                       .arg( triCount ) );
 }
@@ -740,4 +732,3 @@ double ParamModelerDock::tgDepth() const { return ui->spinBoxTGDepth->value(); }
 double ParamModelerDock::tgWallHeight() const { return ui->spinBoxTGHeightWall->value(); }
 double ParamModelerDock::tgRoofHeight() const { return ui->spinBoxTGRoofHeight->value(); }
 double ParamModelerDock::tgAngle() const { return ui->spinBoxTGAngle->value(); }
-
