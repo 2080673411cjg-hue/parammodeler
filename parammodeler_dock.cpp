@@ -14,43 +14,53 @@
  *   (at your option) any later version.                                   *
  *                                                                         *
  ***************************************************************************/
-
+// 1. 本地项目自定义头文件 (核心业务逻辑)
 #include "parammodeler_dock.h"
 #include "ui_parammodeler_dock.h"
-#include "qgisinterface.h"
-#include "exportjson.h"
-#include "exportobj.h"
 #include "previewglwidget.h"
 #include "buildmesh.h"
+#include "exportjson.h"
+#include "exportobj.h"
 #include "exportpointcloud.h"
 
+// 2. Qt 核心与界面框架 (文件、内存、基本 UI)
 #include <QFileInfo>
-#include <QMessageBox>
-#include <QFileDialog>
+#include <QDir>
 #include <QFile>
 #include <QTextStream>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QVector3D>
-#include <QVBoxLayout>
-#include <cmath>
+#include <QMatrix4x4>
+#include <QMessageBox>
+#include <QFileDialog>
 #include <QMenu>
 #include <QAction>
+#include <QVBoxLayout>
 
-#include <QgsVectorLayer.h>
+// 3. QGIS 基础与地理要素处理
+#include <qgis.h>
+#include <qgisinterface.h>
+#include <QgsProject.h>
 #include <QgsFeature.h>
 #include <QgsGeometry.h>
-#include <QgsPolygon.h>
-#include <QgsLineString.h>
 #include <QgsPoint.h>
-#include <QgsProject.h>
-#include <QMatrix4x4>
-#include <QDir>
-#include <QgsPolygon3DSymbol.h>
-#include <QgsVectorLayer3DRenderer.h>
-#include <qgis.h>
-#include <Qgs3DMapCanvas.h>
+#include <QgsLineString.h>
+#include <QgsPolygon.h>
 
+// 4. QGIS 图层与渲染系统 (2D/3D)
+#include <QgsVectorLayer.h>
+#include <qgspointcloudlayer.h>       // 专门用于处理 LAS/LAZ 点云
+#include <qgssymbol.h>               // 用于创建点/面符号
+#include <QgsSingleSymbolRenderer.h>  // 用于设置图层渲染样式
+#include <QgsPolygon3DSymbol.h>      // 用于 3D 材质属性
+#include <QgsVectorLayer3DRenderer.h>// 3D 渲染器
+#include <Qgs3DMapCanvas.h>          // 3D 画布交互
+#include <QgsPoint3DSymbol.h>
+#include "qgscoordinatereferencesystem.h"
+#include "qgspointcloud3dsymbol.h"
+#include "qgspointcloudlayer3drenderer.h"
+#include "qgsmapcanvas.h"
 //slider和spinBox的绑定函数
 static void bindSliderSpin(QSlider* slider, QDoubleSpinBox* spin, double multiplier, double maxVal = 100.0, double minVal = 0.0)
 {
@@ -98,16 +108,16 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderGRDepth,      ui->spinBoxGRDepth,      100.0 );
   bindSliderSpin( ui->sliderGRHeightWall, ui->spinBoxGRHeightWall, 100.0 );
   bindSliderSpin( ui->sliderGRHeightRoof, ui->spinBoxGRHeightRoof, 100.0 );
-	bindSliderSpin(ui->sliderPRWidth,      ui->spinBoxPRWidth,      100.0);		// --- PyramidRoof (金字塔房屋) 绑定 ---
-	bindSliderSpin(ui->sliderPRDepth,      ui->spinBoxPRDepth,      100.0);
-	bindSliderSpin(ui->sliderPRHeightWall, ui->spinBoxPRHeightWall, 100.0);
-	bindSliderSpin(ui->sliderPRHeightRoof, ui->spinBoxPRHeightRoof, 100.0);
+		bindSliderSpin(ui->sliderPRWidth,      ui->spinBoxPRWidth,      100.0);		// --- PyramidRoof (金字塔房屋) 绑定 ---
+		bindSliderSpin(ui->sliderPRDepth,      ui->spinBoxPRDepth,      100.0);
+		bindSliderSpin(ui->sliderPRHeightWall, ui->spinBoxPRHeightWall, 100.0);
+		bindSliderSpin(ui->sliderPRHeightRoof, ui->spinBoxPRHeightRoof, 100.0);
   bindSliderSpin( ui->sliderTPRBottomWidth, ui->spinBoxTPRBottomWidth, 100.0 );		// --- TPRoof (棱台房屋) 绑定 ---
   bindSliderSpin( ui->sliderTPRBottomDepth, ui->spinBoxTPRBottomDepth, 100.0 );
-	bindSliderSpin(ui->sliderTPRTopWidth,   ui->spinBoxTPRTopWidth,   100.0);
-	bindSliderSpin(ui->sliderTPRTopDepth,   ui->spinBoxTPRTopDepth,   100.0);
-	bindSliderSpin(ui->sliderTPRHeightWall, ui->spinBoxTPRHeightWall, 100.0);
-	bindSliderSpin(ui->sliderTPRHeightRoof, ui->spinBoxTPRHeightRoof, 100.0);
+		bindSliderSpin(ui->sliderTPRTopWidth,   ui->spinBoxTPRTopWidth,   100.0);
+		bindSliderSpin(ui->sliderTPRTopDepth,   ui->spinBoxTPRTopDepth,   100.0);
+		bindSliderSpin(ui->sliderTPRHeightWall, ui->spinBoxTPRHeightWall, 100.0);
+		bindSliderSpin(ui->sliderTPRHeightRoof, ui->spinBoxTPRHeightRoof, 100.0);
   bindSliderSpin( ui->sliderHCRWidth,      ui->spinBoxHCRWidth,      100.0 );  // --- HalfCylinderRoof (半圆柱屋顶) 绑定 ---
   bindSliderSpin( ui->sliderHCRDepth,      ui->spinBoxHCRDepth,      100.0 );
   bindSliderSpin( ui->sliderHCRHeightWall, ui->spinBoxHCRHeightWall, 100.0 );
@@ -147,13 +157,17 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   QAction *actOBJ = m_exportMenu->addAction(tr("导出 OBJ 文件 (*.obj)"));
   QAction *actJSON = m_exportMenu->addAction(tr("导出 JSON 参数 (*.json)"));
   QAction *actPLY = m_exportMenu->addAction(tr("导出点云 PLY (*.ply)"));
-	QAction *actMesh = m_exportMenu->addAction(tr("导出 Mesh 文件 (*.stl)"));
-	QAction *actTo3D = m_exportMenu->addAction(tr("直接加载到 QGIS 3D 场景"));
-  connect( actTo3D, &QAction::triggered, this, &ParamModelerDock::onLoadToQGIS3D ); // 直接加载到 QGIS 3D
+	 QAction *actMesh = m_exportMenu->addAction(tr("导出 Mesh 文件 (*.stl)"));
+		m_exportMenu->addSeparator();
+	 QAction *actTo3D = m_exportMenu->addAction(tr("直接加载到 QGIS 3D 场景"));
+		QAction *actLoadPC = m_exportMenu->addAction(tr("加载外部点云到 3D 视图"));
+  connect( actTo3D, &QAction::triggered, this, &ParamModelerDock::onLoadToQGIS3D ); 
+		connect(actLoadPC, &QAction::triggered, this, &ParamModelerDock::onLoadExternalPointCloud);
+		
   connect(actOBJ,  &QAction::triggered, this, &ParamModelerDock::onExportOBJClicked);
   connect(actJSON, &QAction::triggered, this, &ParamModelerDock::onExportJSONClicked);
   connect(actPLY,  &QAction::triggered, this, &ParamModelerDock::onExportPLYClicked);
-	connect(actMesh, &QAction::triggered, this, &ParamModelerDock::onExportMeshClicked);
+ 	connect(actMesh, &QAction::triggered, this, &ParamModelerDock::onExportMeshClicked);
   // 关联菜单到 ToolButton
   ui->toolButtonExport->setMenu(m_exportMenu);
   ui->toolButtonExport->setPopupMode(QToolButton::InstantPopup);
@@ -650,6 +664,160 @@ void ParamModelerDock::onLoadToQGIS3D()
                                                         "提示：请将 3D 视图设为「浮动」状态，避免插件界面被压缩。" )
                                                       .arg( layerName )
                                                       .arg( triCount ) );
+}
+// ====================== 加载外部点云到 QGIS 3D 视图 ======================
+void ParamModelerDock::onLoadExternalPointCloud()
+{
+  QString filePath = QFileDialog::getOpenFileName(
+    this, tr( "选择点云文件" ), "", tr( "点云文件 (*.ply *.las *.laz *.xyz *.txt)" )
+  );
+
+  if ( filePath.isEmpty() )
+    return;
+
+  QFileInfo fi( filePath );
+  QString layerName = QString( "外部点云 - %1" ).arg( fi.fileName() );
+  QString suffix = fi.suffix().toLower();
+
+  QgsMapLayer *pcLayer = nullptr;
+
+  if ( suffix == "ply" )
+  {
+    // ===== PLY：直接读取XYZ，转成内存PointZ图层 =====
+    QFile plyFile( filePath );
+    if ( !plyFile.open( QIODevice::ReadOnly | QIODevice::Text ) )
+    {
+      QMessageBox::warning( this, tr( "错误" ), tr( "无法打开PLY文件" ) );
+      return;
+    }
+
+    QTextStream in( &plyFile );
+
+    // 跳过header，读取顶点数
+    int vertexCount = 0;
+    while ( !in.atEnd() )
+    {
+      QString line = in.readLine().trimmed();
+      if ( line.startsWith( "element vertex" ) )
+        vertexCount = line.split( " " ).last().toInt();
+      if ( line == "end_header" )
+        break;
+    }
+
+    if ( vertexCount == 0 )
+    {
+      QMessageBox::warning( this, tr( "错误" ), tr( "PLY文件格式错误或无顶点数据" ) );
+      plyFile.close();
+      return;
+    }
+
+    // 创建内存PointZ图层
+    QgsVectorLayer *vl = new QgsVectorLayer(
+      "PointZ?crs=EPSG:3857", layerName, "memory"
+    );
+
+    // 设置3D渲染器
+    QgsPoint3DSymbol *symbol3D = new QgsPoint3DSymbol();
+    symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
+    symbol3D->setShape( Qgis::Point3DShape::Sphere );
+
+    // 设置球体半径为0.1（很小，看起来像点云）
+    QVariantMap props;
+    props["radius"] = 0.1;
+    symbol3D->setShapeProperties( props );
+
+    QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
+    renderer3D->setSymbol( symbol3D );
+    vl->setRenderer3D( renderer3D );
+
+    // 读取点坐标，每1000个批量提交
+    QgsFeatureList features;
+    features.reserve( 1000 );
+    int count = 0;
+
+    while ( !in.atEnd() && count < vertexCount )
+    {
+      QString line = in.readLine().trimmed();
+      if ( line.isEmpty() )
+        continue;
+      QStringList parts = line.split( " ", Qt::SkipEmptyParts );
+      if ( parts.size() < 3 )
+        continue;
+
+      double x = parts[0].toDouble();
+      double y = parts[1].toDouble();
+      double z = parts[2].toDouble();
+
+      QgsFeature feat;
+      feat.setGeometry( QgsGeometry( new QgsPoint( x, y, z ) ) );
+      features.append( feat );
+      count++;
+
+      if ( features.size() >= 1000 )
+      {
+        vl->dataProvider()->addFeatures( features );
+        features.clear();
+      }
+    }
+    if ( !features.isEmpty() )
+      vl->dataProvider()->addFeatures( features );
+
+    plyFile.close();
+    pcLayer = vl;
+  }
+  else if ( suffix == "las" || suffix == "laz" )
+  {
+    // ===== LAS/LAZ：用PDAL加载，强制设CRS和3D渲染器 =====
+    QgsPointCloudLayer *pcl = new QgsPointCloudLayer( filePath, layerName, "pdal" );
+
+    if ( pcl && pcl->isValid() )
+    {
+      pcl->setCrs( QgsCoordinateReferenceSystem( "EPSG:3857" ) );
+
+      QgsSingleColorPointCloud3DSymbol *symbol = new QgsSingleColorPointCloud3DSymbol();
+      symbol->setSingleColor( QColor( 255, 255, 0 ) );
+      QgsPointCloudLayer3DRenderer *renderer3D = new QgsPointCloudLayer3DRenderer();
+      renderer3D->setSymbol( symbol );
+      pcl->setRenderer3D( renderer3D );
+    }
+    pcLayer = pcl;
+  }
+  else
+  {
+    QMessageBox::warning( this, tr( "不支持" ), tr( "暂不支持该格式：%1" ).arg( suffix ) );
+    return;
+  }
+
+  if ( !pcLayer || !pcLayer->isValid() )
+  {
+    QMessageBox::warning( this, tr( "加载失败" ), tr( "图层无效，路径：%1" ).arg( filePath ) );
+    if ( pcLayer )
+      delete pcLayer;
+    return;
+  }
+
+  QgsProject::instance()->addMapLayer( pcLayer );
+
+  // 让2D地图缩放到点云范围，3D相机跟过去
+  mIface->mapCanvas()->setExtent( pcLayer->extent() );
+  mIface->mapCanvas()->refresh();
+
+  // 自动打开3D视图
+  if ( mIface->mapCanvases3D().isEmpty() )
+  {
+    Qgs3DMapCanvas *canvas3D = mIface->createNewMapCanvas3D( "ParamModeler 3D" );
+    if ( canvas3D )
+    {
+      QDockWidget *dock = qobject_cast<QDockWidget *>( canvas3D->parent() );
+      if ( dock )
+      {
+        dock->setFloating( true );
+        dock->resize( 800, 600 );
+      }
+    }
+  }
+
+QMessageBox::information( this, tr( "加载成功" ), tr( "点云已加载！\n图层：%1\n\n可在3D视图中与模型叠加对比。" ).arg( layerName ) );
 }
 // ============================================================
 // 预览刷新：根据当前基元和参数重建网格，推送给 PreviewGLWidget
