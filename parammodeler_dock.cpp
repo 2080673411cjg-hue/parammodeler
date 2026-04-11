@@ -61,6 +61,10 @@
 #include "qgspointcloud3dsymbol.h"
 #include "qgspointcloudlayer3drenderer.h"
 #include "qgsmapcanvas.h"
+#include "qgspointcloudindex.h"
+#include "qgspointcloudblock.h"
+#include "qgspointcloudattribute.h"
+#include "qgspointclouddataprovider.h"
 //slider和spinBox的绑定函数
 static void bindSliderSpin(QSlider* slider, QDoubleSpinBox* spin, double multiplier, double maxVal = 100.0, double minVal = 0.0)
 {
@@ -767,20 +771,107 @@ void ParamModelerDock::onLoadExternalPointCloud()
   }
   else if ( suffix == "las" || suffix == "laz" )
   {
-    // ===== LAS/LAZ：用PDAL加载，强制设CRS和3D渲染器 =====
-    QgsPointCloudLayer *pcl = new QgsPointCloudLayer( filePath, layerName, "pdal" );
+    // ===== LAS/LAZ：通过QGIS点云索引读取XYZ，转成内存PointZ图层 =====
 
-    if ( pcl && pcl->isValid() )
+    // 先用QgsPointCloudLayer加载，拿到index
+    QgsPointCloudLayer *tmpLayer = new QgsPointCloudLayer( filePath, "tmp", "pdal" );
+    if ( !tmpLayer || !tmpLayer->isValid() )
     {
-      pcl->setCrs( QgsCoordinateReferenceSystem( "EPSG:3857" ) );
-
-      QgsSingleColorPointCloud3DSymbol *symbol = new QgsSingleColorPointCloud3DSymbol();
-      symbol->setSingleColor( QColor( 255, 255, 0 ) );
-      QgsPointCloudLayer3DRenderer *renderer3D = new QgsPointCloudLayer3DRenderer();
-      renderer3D->setSymbol( symbol );
-      pcl->setRenderer3D( renderer3D );
+      QMessageBox::warning( this, tr( "错误" ), tr( "无法加载LAS文件：%1" ).arg( filePath ) );
+      delete tmpLayer;
+      return;
     }
-    pcLayer = pcl;
+
+    QgsPointCloudIndex index = tmpLayer->dataProvider()->index();
+    if ( !index.isValid() )
+    {
+      QMessageBox::warning( this, tr( "错误" ), tr( "点云索引无效" ) );
+      delete tmpLayer;
+      return;
+    }
+
+    // 创建内存PointZ图层
+    QgsVectorLayer *vl = new QgsVectorLayer(
+      "PointZ?crs=EPSG:3857", layerName, "memory"
+    );
+
+    // 设置3D渲染器（和PLY一样）
+    QgsPoint3DSymbol *symbol3D = new QgsPoint3DSymbol();
+    symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
+    symbol3D->setShape( Qgis::Point3DShape::Sphere );
+    QVariantMap props;
+    props["radius"] = 0.1;
+    symbol3D->setShapeProperties( props );
+    QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
+    renderer3D->setSymbol( symbol3D );
+    vl->setRenderer3D( renderer3D );
+
+    // 准备请求：只读XYZ
+    QgsPointCloudAttributeCollection attrs;
+    attrs.push_back( QgsPointCloudAttribute( "X", QgsPointCloudAttribute::Int32 ) );
+    attrs.push_back( QgsPointCloudAttribute( "Y", QgsPointCloudAttribute::Int32 ) );
+    attrs.push_back( QgsPointCloudAttribute( "Z", QgsPointCloudAttribute::Int32 ) );
+    QgsPointCloudRequest request;
+    request.setAttributes( attrs );
+
+    // scale和offset用于把整数坐标转成真实坐标
+    QgsVector3D scale = index.scale();
+    QgsVector3D offset = index.offset();
+
+    // BFS遍历八叉树所有节点
+    QgsFeatureList features;
+    features.reserve( 1000 );
+    QList<QgsPointCloudNodeId> queue;
+    queue.append( index.root() );
+
+    while ( !queue.isEmpty() )
+    {
+      QgsPointCloudNodeId nodeId = queue.takeFirst();
+
+      // 加入子节点
+      QgsPointCloudNode node = index.getNode( nodeId );
+      for ( const QgsPointCloudNodeId &child : node.children() )
+        queue.append( child );
+
+      // 读取节点数据
+      std::unique_ptr<QgsPointCloudBlock> block = index.nodeData( nodeId, request );
+      if ( !block )
+        continue;
+
+      const char *data = block->data();
+      int pointCount = block->pointCount();
+      int recordSize = block->pointRecordSize();
+
+      // 解析每个点的XYZ（Int32）
+      for ( int i = 0; i < pointCount; i++ )
+      {
+        const char *ptr = data + i * recordSize;
+
+        qint32 ix = *reinterpret_cast<const qint32 *>( ptr );
+        qint32 iy = *reinterpret_cast<const qint32 *>( ptr + 4 );
+        qint32 iz = *reinterpret_cast<const qint32 *>( ptr + 8 );
+
+        double x = ix * scale.x() + offset.x();
+        double y = iy * scale.y() + offset.y();
+        double z = iz * scale.z() + offset.z();
+
+        QgsFeature feat;
+        feat.setGeometry( QgsGeometry( new QgsPoint( x, y, z ) ) );
+        features.append( feat );
+
+        if ( features.size() >= 1000 )
+        {
+          vl->dataProvider()->addFeatures( features );
+          features.clear();
+        }
+      }
+    }
+
+    if ( !features.isEmpty() )
+      vl->dataProvider()->addFeatures( features );
+
+    delete tmpLayer;
+    pcLayer = vl;
   }
   else
   {
