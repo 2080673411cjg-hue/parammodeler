@@ -653,7 +653,7 @@ void ParamModelerDock::onLoadToQGIS3D()
   QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
   renderer3D->setSymbol( symbol3D );
   layer->setRenderer3D( renderer3D );
-
+  removeLayerByName( layerName );
   QgsProject::instance()->addMapLayer( layer );
   // 自动新建 3D 视图
   if ( mIface->mapCanvases3D().isEmpty() )
@@ -886,7 +886,7 @@ void ParamModelerDock::onLoadExternalPointCloud()
       delete pcLayer;
     return;
   }
-
+  removeLayerByName( layerName );
   QgsProject::instance()->addMapLayer( pcLayer );
 
   // 让2D地图缩放到点云范围，3D相机跟过去
@@ -909,6 +909,20 @@ void ParamModelerDock::onLoadExternalPointCloud()
   }
 
 QMessageBox::information( this, tr( "加载成功" ), tr( "点云已加载！\n图层：%1\n\n可在3D视图中与模型叠加对比。" ).arg( layerName ) );
+}
+// 加载前先检查工程里有没有同名图层的私有函数
+void ParamModelerDock::removeLayerByName( const QString &name )
+{
+    const QMap<QString, QgsMapLayer *> layers =
+        QgsProject::instance()->mapLayers();
+    for ( auto it = layers.begin(); it != layers.end(); ++it )
+    {
+        if ( it.value()->name() == name )
+        {
+            QgsProject::instance()->removeMapLayer( it.value()->id() );
+            break;
+        }
+    }
 }
 // ============================================================
 // 预览刷新：根据当前基元和参数重建网格，推送给 PreviewGLWidget

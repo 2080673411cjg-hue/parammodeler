@@ -142,11 +142,13 @@ private:
   QString m_inputDataPath;
 
   // ===== 导出菜单 =====
-  QMenu *m_exportMenu = nullptr;        // ← 这里正确
+  QMenu *m_exportMenu = nullptr;        
 
   // ===== 预览 =====
   PreviewGLWidget *m_previewWidget = nullptr;
   QTimer          *m_previewTimer  = nullptr;
+		
+		void removeLayerByName( const QString &name );  //加载前先检查工程里有没有同名图层的私有函数
 
 };
 
