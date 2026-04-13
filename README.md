@@ -1,7 +1,6 @@
 # 哈哈
 
-
-A QGIS plugin for parametric 3D building primitive modeling, real-time preview, and multi-format export.
+A QGIS plugin for parametric 3D building primitive modeling, real-time preview, multi-format export, and point cloud comparison.
 
 ---
 
@@ -13,13 +12,15 @@ A QGIS plugin for parametric 3D building primitive modeling, real-time preview, 
 - **实时三维预览**：调整参数滑块时预览区域同步刷新，支持鼠标拖拽旋转和滚轮缩放
 - **位姿参数**：支持平移（tx/ty/tz）和旋转（rx/ry/rz，ZYX欧拉角），导出时自动应用变换
 - **多格式导出**：OBJ、JSON 参数文件、PLY 点云
+- **一键加载到 QGIS 3D 场景**：将参数化模型直接加载到 QGIS 3D 视图，无需手动导入文件
 
 ### Tab2：分类与参数反演（开发中）
 
-- 加载点云 / OBJ 数据
+- 加载外部点云（PLY / LAS / LAZ），自动显示在 QGIS 3D 场景中
+- 与参数化模型叠加对照
 - 自动识别基元类型（开发中）
 - 参数反演（开发中）
-- 反演结果导出
+- 反演结果导出（开发中）
 
 ---
 
@@ -74,6 +75,27 @@ A QGIS plugin for parametric 3D building primitive modeling, real-time preview, 
 
 ---
 
+## QGIS 3D 场景加载
+
+### 参数化模型加载
+点击「导出 ▼」→「直接加载到 QGIS 3D 场景」，插件将：
+1. 根据当前参数生成模型网格
+2. 创建内存矢量图层（PolygonZ），每个三角面作为一个要素
+3. 自动设置 3D 渲染器，正确识别 Z 轴高程
+4. 将图层加入 QGIS 工程，自动打开 3D 视图窗口
+
+### 外部点云加载
+点击「导出 ▼」→「加载外部点云」，支持以下格式：
+
+| 格式 | 加载方式 | 说明 |
+|---|---|---|
+| `.ply` | 直接读取 ASCII 数据 | 插件自身导出的 PLY 格式 |
+| `.las` / `.laz` | 通过 QGIS 点云索引读取 | 支持标准 LAS 1.x 格式，通过八叉树遍历提取 XYZ |
+
+点云加载后以球体点（半径 0.1）渲染，可与参数化模型在同一 3D 视图中叠加对比。
+
+---
+
 ## 点云数据生成脚本
 
 `tools/batch_obj_to_ply.py` 提供批量 OBJ 转点云功能，用于生成训练/测试数据集：
@@ -110,6 +132,7 @@ python batch_obj_to_ply.py --input E:\data\input --output E:\data\output
 - QGIS 3.x（开发环境：QGIS 3.44）
 - Qt 5.x
 - OpenGL（用于实时预览）
+- PDAL（用于 LAS/LAZ 点云加载，随 QGIS 编译）
 
 ### 点云生成脚本
 ```bash
@@ -122,7 +145,7 @@ pip install open3d numpy
 
 ```
 parammodeler/
-├── parammodeler_dock.h / .cpp   # 主 Dock 窗口
+├── parammodeler_dock.h / .cpp   # 主 Dock 窗口（含3D加载、点云导入）
 ├── buildmesh.h / .cpp           # 网格生成（所有基元）
 ├── meshdata.h                   # MeshData 数据结构
 ├── exportobj.h / .cpp           # OBJ 导出
@@ -143,7 +166,8 @@ parammodeler/
 - [x] OBJ / JSON / PLY 多格式导出
 - [x] 位姿六参数支持
 - [x] 批量点云数据生成脚本
-- [ ] 点云导入与三维场景叠加对照
+- [x] 参数化模型一键加载到 QGIS 3D 场景
+- [x] 外部点云（PLY / LAS / LAZ）加载与三维场景叠加对照
 - [ ] 基元类型自动分类
 - [ ] 参数反演
 
