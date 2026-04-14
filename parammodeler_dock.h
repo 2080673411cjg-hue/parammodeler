@@ -27,6 +27,7 @@
 #include <QTimer>
 
 class QgisInterface;
+class QgsVectorLayer; 
 class PreviewGLWidget;
 class QMenu;                    // ← 新增这一行（推荐显式包含）
 
@@ -120,7 +121,7 @@ private slots:
   void onExportJSONClicked();
   void onExportPLYClicked();
 		void onExportMeshClicked();
-		void onLoadToQGIS3D();          
+		void onLoadToQGIS3D(bool zoomToLayer = true); // 增加默认参数，true 表示缩放相机          
 		void onLoadExternalPointCloud();
 
   // 基元切换槽函数
@@ -148,8 +149,9 @@ private:
   PreviewGLWidget *m_previewWidget = nullptr;
   QTimer          *m_previewTimer  = nullptr;
 		
-		void removeLayerByName( const QString &name );  //加载前先检查工程里有没有同名图层的私有函数
-
+		void removeLayerByName( const QString &name, const QString &excludeId = QString() );  //加载前先检查工程里有没有同名图层的私有函数
+  QgsVectorLayer *m_modelLayer = nullptr;//新增一个成员变量，缓存图层指针
+		bool            m_isUpdating = false; 
 };
 
 #endif // PARAMMODELER_DOCK_H

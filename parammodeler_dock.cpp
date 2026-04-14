@@ -65,6 +65,8 @@
 #include "qgspointcloudblock.h"
 #include "qgspointcloudattribute.h"
 #include "qgspointclouddataprovider.h"
+#include <qgsphongmaterialsettings.h>
+#include <qgs3dtypes.h>
 //slider和spinBox的绑定函数
 static void bindSliderSpin(QSlider* slider, QDoubleSpinBox* spin, double multiplier, double maxVal = 100.0, double minVal = 0.0)
 {
@@ -95,66 +97,66 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   ui->setupUi( this );// 初始化UI界面
   setWindowTitle( tr( "Parametric Modeler" ) );// 设置窗口标题
   // slider和spinBox的每个基元的绑定
-  bindSliderSpin( ui->sliderCWidth, ui->spinBoxCWidth, 100.0 );  // 长方体
-  bindSliderSpin( ui->sliderCDepth, ui->spinBoxCDepth, 100.0 );
-  bindSliderSpin( ui->sliderCHeight, ui->spinBoxCHeight, 100.0 );
-  bindSliderSpin( ui->sliderCylRadius, ui->spinBoxCylRadius, 100.0 );  // 圆柱
-  bindSliderSpin( ui->sliderCylHeight, ui->spinBoxCylHeight, 100.0 );
-  bindSliderSpin( ui->sliderLMainWidth, ui->spinBoxLMainWidth, 100.0 );
-  bindSliderSpin( ui->sliderLMainDepth, ui->spinBoxLMainDepth, 100.0 );
-  bindSliderSpin( ui->sliderLWingWidth, ui->spinBoxLWingWidth, 100.0 );
-  bindSliderSpin( ui->sliderLWingDepth, ui->spinBoxLWingDepth, 100.0 );
-  bindSliderSpin( ui->sliderLHeight, ui->spinBoxLHeight, 100.0 );
-  bindSliderSpin( ui->sliderConeCylRadius, ui->spinBoxConeCylRadius, 100.0 );  // 圆锥体 (ConeCylinder)
-  bindSliderSpin( ui->sliderConeCylCylHeight, ui->spinBoxConeCylCylHeight, 100.0 );
-  bindSliderSpin( ui->sliderConeCylConeHeight, ui->spinBoxConeCylConeHeight, 100.0 );
-  bindSliderSpin( ui->sliderGRWidth,      ui->spinBoxGRWidth,      100.0 );  // 人字形屋顶 (GabledRoof) 绑定
-  bindSliderSpin( ui->sliderGRDepth,      ui->spinBoxGRDepth,      100.0 );
-  bindSliderSpin( ui->sliderGRHeightWall, ui->spinBoxGRHeightWall, 100.0 );
-  bindSliderSpin( ui->sliderGRHeightRoof, ui->spinBoxGRHeightRoof, 100.0 );
-		bindSliderSpin(ui->sliderPRWidth,      ui->spinBoxPRWidth,      100.0);		// --- PyramidRoof (金字塔房屋) 绑定 ---
-		bindSliderSpin(ui->sliderPRDepth,      ui->spinBoxPRDepth,      100.0);
-		bindSliderSpin(ui->sliderPRHeightWall, ui->spinBoxPRHeightWall, 100.0);
-		bindSliderSpin(ui->sliderPRHeightRoof, ui->spinBoxPRHeightRoof, 100.0);
-  bindSliderSpin( ui->sliderTPRBottomWidth, ui->spinBoxTPRBottomWidth, 100.0 );		// --- TPRoof (棱台房屋) 绑定 ---
-  bindSliderSpin( ui->sliderTPRBottomDepth, ui->spinBoxTPRBottomDepth, 100.0 );
-		bindSliderSpin(ui->sliderTPRTopWidth,   ui->spinBoxTPRTopWidth,   100.0);
-		bindSliderSpin(ui->sliderTPRTopDepth,   ui->spinBoxTPRTopDepth,   100.0);
-		bindSliderSpin(ui->sliderTPRHeightWall, ui->spinBoxTPRHeightWall, 100.0);
-		bindSliderSpin(ui->sliderTPRHeightRoof, ui->spinBoxTPRHeightRoof, 100.0);
-  bindSliderSpin( ui->sliderHCRWidth,      ui->spinBoxHCRWidth,      100.0 );  // --- HalfCylinderRoof (半圆柱屋顶) 绑定 ---
-  bindSliderSpin( ui->sliderHCRDepth,      ui->spinBoxHCRDepth,      100.0 );
-  bindSliderSpin( ui->sliderHCRHeightWall, ui->spinBoxHCRHeightWall, 100.0 );
-  bindSliderSpin( ui->sliderHCRRadius,     ui->spinBoxHCRRadius,     100.0 );
-  bindSliderSpin( ui->sliderICWidth,       ui->spinBoxICWidth,       100.0 );  // --- IndentedCuboid (凹陷长方体) 绑定 ---
-  bindSliderSpin( ui->sliderICDepth,       ui->spinBoxICDepth,       100.0 );
-  bindSliderSpin( ui->sliderICHeight,      ui->spinBoxICHeight,      100.0 );
-  bindSliderSpin( ui->sliderICInnerWidth,  ui->spinBoxICInnerWidth,  100.0 );
-  bindSliderSpin( ui->sliderICInnerDepth,  ui->spinBoxICInnerDepth,  100.0 );
-  bindSliderSpin( ui->sliderICInnerHeight, ui->spinBoxICInnerHeight, 100.0 );
-  bindSliderSpin( ui->sliderICOffsetX,     ui->spinBoxICOffsetX,     100.0 );
-  bindSliderSpin( ui->sliderICOffsetY,     ui->spinBoxICOffsetY,     100.0 );
-  bindSliderSpin( ui->sliderAGHWidth,       ui->spinBoxAGHWidth,       100.0 );  // --- AsymmetricGableHouse (非对称人字形屋顶房屋) 绑定 ---
-  bindSliderSpin( ui->sliderAGHDepth,       ui->spinBoxAGHDepth,       100.0 );
-  bindSliderSpin( ui->sliderAGHHeightWall,  ui->spinBoxAGHHeightWall,  100.0 );
-  bindSliderSpin( ui->sliderAGHRoofHeight,  ui->spinBoxAGHRoofHeight,  100.0 );
-  bindSliderSpin( ui->sliderAGHRidgeLength, ui->spinBoxAGHRidgeLength, 100.0 );
-  bindSliderSpin( ui->sliderAGHRidgeOffset, ui->spinBoxAGHRidgeOffset, 100.0, 50.0, -50.0 );
-  bindSliderSpin( ui->sliderCylHemiRadius,    ui->spinBoxCylHemiRadius,    100.0 );  // --- CylinderHemisphere (穹顶圆柱) 绑定 ---
-  bindSliderSpin( ui->sliderCylHemiHeight,    ui->spinBoxCylHemiHeight,    100.0 );
-  bindSliderSpin( ui->sliderCylHemiDomeHeight,ui->spinBoxCylHemiDomeHeight,100.0 );
-  bindSliderSpin( ui->sliderCylHemiBulge,     ui->spinBoxCylHemiBulge,     100.0, 1.0 );
-  bindSliderSpin( ui->sliderFTBaseRadius,    ui->spinBoxFTBaseRadius,    100.0 );  // --- FourStageRoundTower (四段式圆塔形) 绑定 ---
-  bindSliderSpin( ui->sliderFTBaseHeight,    ui->spinBoxFTBaseHeight,    100.0 );
-  bindSliderSpin( ui->sliderFTMiddleHeight,  ui->spinBoxFTMiddleHeight,  100.0 );
-  bindSliderSpin( ui->sliderFTMiddleTopRadius,ui->spinBoxFTMiddleTopRadius,100.0 );
-  bindSliderSpin( ui->sliderFTMiddleBulge,   ui->spinBoxFTMiddleBulge,   100.0, 0.6 );
-  bindSliderSpin( ui->sliderFTConeHeight,    ui->spinBoxFTConeHeight,    100.0 );
-  bindSliderSpin( ui->sliderTGWidth1,     ui->spinBoxTGWidth1,     100.0 );  // --- TwoGableHouses (双人字屋顶房屋) 绑定 ---
-  bindSliderSpin( ui->sliderTGWidth2,     ui->spinBoxTGWidth2,     100.0 );
-  bindSliderSpin( ui->sliderTGDepth,      ui->spinBoxTGDepth,      100.0 );
-  bindSliderSpin( ui->sliderTGHeightWall, ui->spinBoxTGHeightWall, 100.0 );
-  bindSliderSpin( ui->sliderTGRoofHeight, ui->spinBoxTGRoofHeight, 100.0 );
+  bindSliderSpin( ui->sliderCWidth, ui->spinBoxCWidth, 100.0, 50.0 );  // 长方体
+  bindSliderSpin( ui->sliderCDepth, ui->spinBoxCDepth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderCHeight, ui->spinBoxCHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderCylRadius, ui->spinBoxCylRadius, 100.0, 50.0 );  // 圆柱
+  bindSliderSpin( ui->sliderCylHeight, ui->spinBoxCylHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderLMainWidth, ui->spinBoxLMainWidth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderLMainDepth, ui->spinBoxLMainDepth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderLWingWidth, ui->spinBoxLWingWidth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderLWingDepth, ui->spinBoxLWingDepth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderLHeight, ui->spinBoxLHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderConeCylRadius, ui->spinBoxConeCylRadius, 100.0, 50.0 );  // 圆锥体 (ConeCylinder)
+  bindSliderSpin( ui->sliderConeCylCylHeight, ui->spinBoxConeCylCylHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderConeCylConeHeight, ui->spinBoxConeCylConeHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderGRWidth,      ui->spinBoxGRWidth,100,50 );  // 人字形屋顶 (GabledRoof) 绑定
+  bindSliderSpin( ui->sliderGRDepth, ui->spinBoxGRDepth, 100, 50 );
+  bindSliderSpin( ui->sliderGRHeightWall, ui->spinBoxGRHeightWall, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderGRHeightRoof, ui->spinBoxGRHeightRoof, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderPRWidth, ui->spinBoxPRWidth, 100, 50 ); // --- PyramidRoof (金字塔房屋) 绑定 ---
+  bindSliderSpin( ui->sliderPRDepth, ui->spinBoxPRDepth, 100, 50 );
+		bindSliderSpin(ui->sliderPRHeightWall, ui->spinBoxPRHeightWall, 100.0, 50.0 );
+		bindSliderSpin(ui->sliderPRHeightRoof, ui->spinBoxPRHeightRoof, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTPRBottomWidth, ui->spinBoxTPRBottomWidth, 100.0, 50.0 );		// --- TPRoof (棱台房屋) 绑定 ---
+  bindSliderSpin( ui->sliderTPRBottomDepth, ui->spinBoxTPRBottomDepth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTPRTopWidth, ui->spinBoxTPRTopWidth, 100, 50 );
+  bindSliderSpin( ui->sliderTPRTopDepth, ui->spinBoxTPRTopDepth, 100, 50 );
+  bindSliderSpin( ui->sliderTPRHeightWall, ui->spinBoxTPRHeightWall, 100, 50 );
+  bindSliderSpin( ui->sliderTPRHeightRoof, ui->spinBoxTPRHeightRoof, 100, 50 );
+  bindSliderSpin( ui->sliderHCRWidth, ui->spinBoxHCRWidth, 100, 50 ); // --- HalfCylinderRoof (半圆柱屋顶) 绑定 ---
+  bindSliderSpin( ui->sliderHCRDepth, ui->spinBoxHCRDepth, 100, 50 );
+  bindSliderSpin( ui->sliderHCRHeightWall, ui->spinBoxHCRHeightWall, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderHCRRadius, ui->spinBoxHCRRadius, 100, 50 );
+  bindSliderSpin( ui->sliderICWidth, ui->spinBoxICWidth, 100, 50 ); // --- IndentedCuboid (凹陷长方体) 绑定 ---
+  bindSliderSpin( ui->sliderICDepth, ui->spinBoxICDepth, 100, 50 );
+  bindSliderSpin( ui->sliderICHeight, ui->spinBoxICHeight, 100, 50 );
+  bindSliderSpin( ui->sliderICInnerWidth, ui->spinBoxICInnerWidth, 100, 50 );
+  bindSliderSpin( ui->sliderICInnerDepth, ui->spinBoxICInnerDepth, 100, 50 );
+  bindSliderSpin( ui->sliderICInnerHeight, ui->spinBoxICInnerHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderICOffsetX, ui->spinBoxICOffsetX, 100, 50 );
+  bindSliderSpin( ui->sliderICOffsetY, ui->spinBoxICOffsetY, 100, 50 );
+  bindSliderSpin( ui->sliderAGHWidth, ui->spinBoxAGHWidth, 100, 50 ); // --- AsymmetricGableHouse (非对称人字形屋顶房屋) 绑定 ---
+  bindSliderSpin( ui->sliderAGHDepth, ui->spinBoxAGHDepth, 100, 50 );
+  bindSliderSpin( ui->sliderAGHHeightWall, ui->spinBoxAGHHeightWall, 100, 50 );
+  bindSliderSpin( ui->sliderAGHRoofHeight, ui->spinBoxAGHRoofHeight, 100, 50 );
+  bindSliderSpin( ui->sliderAGHRidgeLength, ui->spinBoxAGHRidgeLength, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderAGHRidgeOffset, ui->spinBoxAGHRidgeOffset, 100, 50.0, -50.0 );
+  bindSliderSpin( ui->sliderCylHemiRadius, ui->spinBoxCylHemiRadius, 100, 50 ); // --- CylinderHemisphere (穹顶圆柱) 绑定 ---
+  bindSliderSpin( ui->sliderCylHemiHeight, ui->spinBoxCylHemiHeight, 100, 50 );
+  bindSliderSpin( ui->sliderCylHemiDomeHeight, ui->spinBoxCylHemiDomeHeight, 100, 50 );
+  bindSliderSpin( ui->sliderCylHemiBulge, ui->spinBoxCylHemiBulge, 100.0, 1.0 );
+  bindSliderSpin( ui->sliderFTBaseRadius, ui->spinBoxFTBaseRadius, 100.0, 50.0 ); // --- FourStageRoundTower (四段式圆塔形) 绑定 ---
+  bindSliderSpin( ui->sliderFTBaseHeight, ui->spinBoxFTBaseHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderFTMiddleHeight, ui->spinBoxFTMiddleHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderFTMiddleTopRadius, ui->spinBoxFTMiddleTopRadius, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderFTMiddleBulge, ui->spinBoxFTMiddleBulge, 100.0, 0.6 );
+  bindSliderSpin( ui->sliderFTConeHeight, ui->spinBoxFTConeHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTGWidth1, ui->spinBoxTGWidth1, 100.0, 50.0 ); // --- TwoGableHouses (双人字屋顶房屋) 绑定 ---
+  bindSliderSpin( ui->sliderTGWidth2, ui->spinBoxTGWidth2, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTGDepth, ui->spinBoxTGDepth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTGHeightWall, ui->spinBoxTGHeightWall, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTGRoofHeight, ui->spinBoxTGRoofHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGAngle,      ui->spinBoxTGAngle,      10.0, 179.0 );
   // ====================== 创建导出菜单 ======================
   m_exportMenu = new QMenu(this);
@@ -177,10 +179,11 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   ui->toolButtonExport->setPopupMode(QToolButton::InstantPopup);
   // 预览 Widget 初始化
   m_previewWidget = ui->previewWidget;
-  // 防抖 Timer：slider 停止拖动 200ms 后触发刷新
+		ui->checkBoxAutoSync->setChecked(false); //设置实时同步默认不开启
+  // 防抖 Timer：slider 停止拖动 1000ms 后触发刷新
   m_previewTimer = new QTimer( this );
   m_previewTimer->setSingleShot( true );
-  m_previewTimer->setInterval( 200 );
+  m_previewTimer->setInterval( 1000 );
   connect( m_previewTimer, &QTimer::timeout, this, &ParamModelerDock::onUpdatePreview );
   // ---- 连接所有 slider 的 valueChanged → 启动防抖 Timer ----
   auto schedulePreview = [this]( int ) { m_previewTimer->start(); };
@@ -250,8 +253,10 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   // 切换基元时立刻刷新预览
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, [this]( const QString & ) { onUpdatePreview(); } );
 }
+//析构函数
 ParamModelerDock::~ParamModelerDock()
 {
+	 m_modelLayer = nullptr; // 不 delete，图层归 QgsProject 所有
   delete ui;
 }
 
@@ -588,86 +593,129 @@ void ParamModelerDock::onExportMeshClicked()
     QMessageBox::information(this, tr("导出成功"), tr("Mesh 已导出为 STL。"));
 }
 // ========直接加载模型到 QGIS 3D 场景===========
-void ParamModelerDock::onLoadToQGIS3D()
+void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
 {
-  QString primitiveType = ui->comboPrimitive->currentText();
+    if ( m_isUpdating ) return;
+    m_isUpdating = true;
 
-  MeshData mesh = BuildMesh::build( primitiveType, this );
-  if ( mesh.isEmpty() )
-  {
-    QMessageBox::warning( this, tr( "错误" ), tr( "无法生成模型，请检查参数" ) );
-    return;
-  }
-  // 读取位姿参数
-  double tx = poseTranslateX();
-  double ty = poseTranslateY();
-  double tz = poseTranslateZ();
-  double rx = poseRotateX();
-  double ry = poseRotateY();
-  double rz = poseRotateZ();
-  // 创建变换矩阵（ZYX 顺序）
-  QMatrix4x4 mat;
-  mat.setToIdentity();
-  mat.translate( tx, ty, tz );
-  mat.rotate( rz, 0, 0, 1 ); // 先 Z
-  mat.rotate( ry, 0, 1, 0 ); // 再 Y
-  mat.rotate( rx, 1, 0, 0 ); // 最后 X
-  QString layerName = QString( "%1 (ParamModeler)" ).arg( primitiveType );
-  QgsVectorLayer *layer = new QgsVectorLayer( "PolygonZ?crs=EPSG:3857", layerName, "memory" );
+    // 1. 构建新网格
+    QString primitiveType = ui->comboPrimitive->currentText();
+    MeshData mesh = BuildMesh::build( primitiveType, this );
+    if ( mesh.isEmpty() )
+    {
+        if ( zoomToLayer )
+            QMessageBox::warning( this, tr("错误"), tr("无法生成模型，请检查参数") );
+        m_isUpdating = false;
+        return;
+    }
 
-  if ( !layer || !layer->isValid() )
-  {
-    QMessageBox::warning( this, tr( "错误" ), tr( "创建内存图层失败" ) );
-    delete layer;
-    return;
-  }
+    // 2. 应用位姿变换
+    QMatrix4x4 mat;
+    mat.setToIdentity();
+    mat.translate( poseTranslateX(), poseTranslateY(), poseTranslateZ() );
+    mat.rotate( poseRotateZ(), 0, 0, 1 );
+    mat.rotate( poseRotateY(), 0, 1, 0 );
+    mat.rotate( poseRotateX(), 1, 0, 0 );
 
-  QgsFeatureList features;
-  int triCount = mesh.indices.size() / 3;
+    // 3. 构造 Feature 列表
+    QgsFeatureList features;
+    int triCount = mesh.indices.size() / 3;
+    for ( int i = 0; i < triCount; i++ )
+    {
+        QVector3D v0 = mat.map( mesh.vertices[mesh.indices[i * 3    ]] );
+        QVector3D v1 = mat.map( mesh.vertices[mesh.indices[i * 3 + 1]] );
+        QVector3D v2 = mat.map( mesh.vertices[mesh.indices[i * 3 + 2]] );
 
-  for ( int i = 0; i < triCount; i++ )
-  {
-    QVector3D v0 = mesh.vertices[mesh.indices[i * 3]];
-    QVector3D v1 = mesh.vertices[mesh.indices[i * 3 + 1]];
-    QVector3D v2 = mesh.vertices[mesh.indices[i * 3 + 2]];
-    // 应用位姿
-    v0 = mat.map( v0 );
-    v1 = mat.map( v1 );
-    v2 = mat.map( v2 );
-    QgsPolygon *poly = new QgsPolygon();
-    QgsLineString *ring = new QgsLineString();
-    ring->setPoints( QgsPointSequence() << QgsPoint( v0.x(), v0.y(), v0.z() ) << QgsPoint( v1.x(), v1.y(), v1.z() ) << QgsPoint( v2.x(), v2.y(), v2.z() ) << QgsPoint( v0.x(), v0.y(), v0.z() ) );
+        QgsPolygon    *poly = new QgsPolygon();
+        QgsLineString *ring = new QgsLineString();
+        ring->setPoints( QgsPointSequence()
+            << QgsPoint( v0.x(), v0.y(), v0.z() )
+            << QgsPoint( v1.x(), v1.y(), v1.z() )
+            << QgsPoint( v2.x(), v2.y(), v2.z() )
+            << QgsPoint( v0.x(), v0.y(), v0.z() ) );
+        poly->setExteriorRing( ring );
+        QgsFeature feat;
+        feat.setGeometry( QgsGeometry( poly ) );
+        features.append( feat );
+    }
 
-    poly->setExteriorRing( ring );
+    // 4. 判断是否可以复用已有图层
+    //    检查：图层指针有效 & 仍在项目中 & 面数相同（基元未切换）
+    bool canReuse = ( m_modelLayer != nullptr )
+                 && ( QgsProject::instance()->mapLayer( m_modelLayer->id() ) != nullptr )
+                 && ( m_modelLayer->featureCount() == triCount );
 
-    QgsFeature feat;
-    feat.setGeometry( QgsGeometry( poly ) );
-    features.append( feat );
-  }
+    if ( canReuse )
+    {
+        // ★ 核心路径：原地修改，不删不建，最轻量
+        m_modelLayer->startEditing();
 
-  layer->dataProvider()->addFeatures( features );
-  // 3D 渲染设置
-  QgsPolygon3DSymbol *symbol3D = new QgsPolygon3DSymbol();
-  symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
-  symbol3D->setAltitudeBinding( Qgis::AltitudeBinding::Vertex );
-  QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
-  renderer3D->setSymbol( symbol3D );
-  layer->setRenderer3D( renderer3D );
-  removeLayerByName( layerName );
-  QgsProject::instance()->addMapLayer( layer );
-  // 自动新建 3D 视图
-  if ( mIface->mapCanvases3D().isEmpty() )
-  {
-    mIface->createNewMapCanvas3D( tr( "ParamModeler 3D" ) );
-  }
+        // 拿到所有旧 Feature 的 ID，逐个替换几何体
+        QgsFeatureIterator it = m_modelLayer->getFeatures();
+        QgsFeature oldFeat;
+        int idx = 0;
+        while ( it.nextFeature( oldFeat ) && idx < features.size() )
+        {
+            QgsGeometry geom = features[idx].geometry();//先存成局部变量再传入：
+            m_modelLayer->changeGeometry( oldFeat.id(), geom );
+            idx++;
+        }
 
-  QMessageBox::information( this, tr( "加载成功" ), tr( "模型已加载到图层面板！\n\n"
-                                                        "图层：%1\n"
-                                                        "三角面数：%2\n\n"
-                                                        "位姿（平移 + ZYX 旋转）已正确应用\n\n"
-                                                        "提示：请将 3D 视图设为「浮动」状态，避免插件界面被压缩。" )
-                                                      .arg( layerName )
-                                                      .arg( triCount ) );
+        m_modelLayer->commitChanges();
+        // 通知 3D 渲染器数据已更新
+        emit m_modelLayer->repaintRequested();
+    }
+    else
+    {
+        // ★ 降级路径：第一次加载，或切换了基元（面数不同），重建图层
+        QString layerName = "ParamModeler_Model";
+
+        QgsVectorLayer *layer = new QgsVectorLayer( "PolygonZ?crs=EPSG:3857", layerName, "memory" );
+        if ( !layer || !layer->isValid() )
+        {
+            if ( zoomToLayer )
+                QMessageBox::warning( this, tr("错误"), tr("创建内存图层失败") );
+            delete layer;
+            m_isUpdating = false;
+            return;
+        }
+
+        layer->dataProvider()->addFeatures( features );
+
+        QgsPolygon3DSymbol *symbol3D = new QgsPolygon3DSymbol();
+        symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
+        symbol3D->setAltitudeBinding( Qgis::AltitudeBinding::Vertex );
+        symbol3D->setCullingMode( Qgs3DTypes::NoCulling );
+        QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
+        renderer3D->setSymbol( symbol3D );
+        layer->setRenderer3D( renderer3D );
+
+        // 先加新图层，再清理旧图层（避免空窗口期）
+        QgsProject::instance()->addMapLayer( layer );
+        if ( m_modelLayer )
+            removeLayerByName( "ParamModeler_Model", layer->id() );
+
+        // 缓存新图层指针
+        m_modelLayer = layer;
+
+        // 监听图层被外部删除的情况（比如用户手动从图层树删除）
+        connect( m_modelLayer, &QgsMapLayer::willBeDeleted, this, [this]() {
+            m_modelLayer = nullptr;
+        } );
+
+        if ( mIface->mapCanvases3D().isEmpty() )
+            mIface->createNewMapCanvas3D( tr("ParamModeler 3D") );
+
+        if ( zoomToLayer )
+        {
+            mIface->mapCanvas()->setExtent( layer->extent() );
+            mIface->mapCanvas()->refresh();
+            QMessageBox::information( this, tr("加载成功"),
+                tr("模型已加载！\n三角面数：%1").arg( triCount ) );
+        }
+    }
+
+    m_isUpdating = false;
 }
 // ====================== 加载外部点云到 QGIS 3D 视图 ======================
 void ParamModelerDock::onLoadExternalPointCloud()
@@ -910,32 +958,40 @@ void ParamModelerDock::onLoadExternalPointCloud()
 
 QMessageBox::information( this, tr( "加载成功" ), tr( "点云已加载！\n图层：%1\n\n可在3D视图中与模型叠加对比。" ).arg( layerName ) );
 }
-// 加载前先检查工程里有没有同名图层的私有函数
-void ParamModelerDock::removeLayerByName( const QString &name )
+// ============================================================
+//加载前先判断是否有同名图层
+// ============================================================
+void ParamModelerDock::removeLayerByName( const QString &name, const QString &excludeId )
 {
-    const QMap<QString, QgsMapLayer *> layers =
-        QgsProject::instance()->mapLayers();
-    for ( auto it = layers.begin(); it != layers.end(); ++it )
+    QStringList toRemove;
+    const auto layers = QgsProject::instance()->mapLayers();
+    for ( auto it = layers.cbegin(); it != layers.cend(); ++it )
     {
-        if ( it.value()->name() == name )
-        {
-            QgsProject::instance()->removeMapLayer( it.value()->id() );
-            break;
-        }
+        if ( it.value()->name() == name && it.key() != excludeId )
+            toRemove << it.key();
     }
+    for ( const QString &id : toRemove )
+        QgsProject::instance()->removeMapLayer( id );
 }
 // ============================================================
-// 预览刷新：根据当前基元和参数重建网格，推送给 PreviewGLWidget
+// 预览刷新：根据当前参数重建网格，并根据开关决定是否同步到QGIS
 // ============================================================
 void ParamModelerDock::onUpdatePreview()
 {
     if ( !m_previewWidget ) return;
 
+    // 1. 刷新左侧 OpenGL 预览
     QString prim = ui->comboPrimitive->currentText();
     MeshData mesh = BuildMesh::build( prim, this );
     m_previewWidget->setMesh( mesh );
-}
 
+    // 2. 联动刷新 QGIS 3D (检查右下角开关)
+    if ( ui->checkBoxAutoSync && ui->checkBoxAutoSync->isChecked() )
+    {
+        // 调用加载函数，传 false 表示只更新模型，不跳动相机视角
+        this->onLoadToQGIS3D( false );
+    }
+}
 double ParamModelerDock::poseTranslateX() const { return ui->lineEditTX->text().toDouble(); }
 double ParamModelerDock::poseTranslateY() const { return ui->lineEditTY->text().toDouble(); }
 double ParamModelerDock::poseTranslateZ() const { return ui->lineEditTZ->text().toDouble(); }
