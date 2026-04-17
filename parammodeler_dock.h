@@ -117,23 +117,23 @@ public:
   double tgAngle() const;
 
 private slots:
+  void onPrimitiveChanged(const QString &prim); // 基元切换槽函数
   void onExportOBJClicked();
   void onExportJSONClicked();
   void onExportPLYClicked();
 		void onExportMeshClicked();
-		void onLoadToQGIS3D(bool zoomToLayer = true); // 增加默认参数，true 表示缩放相机          
+		void onLoadToQGIS3D(bool zoomToLayer = true); // 将模型加载/同步到QGIS 3D视图，增加默认参数，true 表示缩放相机          
 		void onLoadExternalPointCloud();
-
-  // 基元切换槽函数
-  void onPrimitiveChanged(const QString &prim);
+		
+		
   void onLoadInputData();
   void onClassifyPrimitive();
   void onInverseParams();
   void onExportRebuiltOBJ();
   void onExportRebuiltJSON();
+		
+  void onUpdatePreview();//主刷新入口
 
-  // 预览刷新
-  void onUpdatePreview();
 
 private:
   Ui::ParamModelerDock *ui;
@@ -149,7 +149,7 @@ private:
   PreviewGLWidget *m_previewWidget = nullptr;
   QTimer          *m_previewTimer  = nullptr;
 		
-		void removeLayerByName( const QString &name, const QString &excludeId = QString() );  //加载前先检查工程里有没有同名图层的私有函数
+		void removeLayerByName( const QString &name, const QString &excludeId = QString() );  //在加载新模型前，根据名称添加并删除旧图层
   QgsVectorLayer *m_modelLayer = nullptr;//新增一个成员变量，缓存图层指针
 		bool            m_isUpdating = false; 
 };

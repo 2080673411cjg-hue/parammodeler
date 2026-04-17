@@ -67,7 +67,8 @@
 #include "qgspointclouddataprovider.h"
 #include <qgsphongmaterialsettings.h>
 #include <qgs3dtypes.h>
-//slider和spinBox的绑定函数
+// ======================slider和spinBox的绑定函数：==================================
+//根据倍率（乘数）同步数值，确保滑动条和数字输入框显示的参数一致
 static void bindSliderSpin(QSlider* slider, QDoubleSpinBox* spin, double multiplier, double maxVal = 100.0, double minVal = 0.0)
 {
     if (!slider || !spin) return;
@@ -89,6 +90,8 @@ static void bindSliderSpin(QSlider* slider, QDoubleSpinBox* spin, double multipl
         }
     });
 }
+// ===========================构造函数=================================
+//绑定所有基元的UI控件、创建导出菜单、初始化OpenGL预览窗口，并设置1000ms的防抖定时器（m_previewTimer）以优化性能。
 ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   : QDockWidget( parent )// 调用父类构造函数
   , ui( new Ui::ParamModelerDock )// 创建UI对象
@@ -253,19 +256,15 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   // 切换基元时立刻刷新预览
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, [this]( const QString & ) { onUpdatePreview(); } );
 }
-//析构函数
+// ===========================析构函数=================================
 ParamModelerDock::~ParamModelerDock()
 {
 	 m_modelLayer = nullptr; // 不 delete，图层归 QgsProject 所有
   delete ui;
 }
-
-// ==============================
-// 切换基元类型，显示对应参数页
-// ==============================
+// ==========================切换参数页基元函数================================
 void ParamModelerDock::onPrimitiveChanged(const QString &prim)
 {
-    // 根据基元显示不同参数组
     if (prim == "Cuboid")
     {
         ui->stackedWidgetParams->setCurrentWidget(ui->pageCuboid);
@@ -319,167 +318,8 @@ void ParamModelerDock::onPrimitiveChanged(const QString &prim)
       ui->stackedWidgetParams->setCurrentWidget( ui->pageTwoGableHouses );
     }
 }
-// ========================================================================
-// Tab2：加载点云 / OBJ 数据
-// ========================================================================
-void ParamModelerDock::onLoadInputData()
-{
-    QString filePath = QFileDialog::getOpenFileName(
-        this,
-        tr("加载点云或模型数据"),
-        "",
-        tr("3D Data (*.obj *.ply *.pcd *.las *.laz)")
-    );
-    if (filePath.isEmpty())
-        return;
-    QFileInfo fileInfo(filePath);
-    // 记录路径
-    m_inputDataPath = filePath;
-    // UI 状态更新
-    ui->labelInputInfo->setText(
-        tr("已加载：%1").arg(fileInfo.fileName())
-    );
-    ui->labelPrimitiveType->setText(
-        tr("识别结果：未识别")
-    );
-    ui->tableInverseParams->setRowCount(0);
-    ui->btnClassifyPrimitive->setEnabled(true);
-    QMessageBox::information(
-        this,
-        tr("数据加载成功"),
-        tr("已成功加载文件：\n%1").arg(fileInfo.fileName())
-    );
-}
-// ========================================================================
-// 基元类型自动识别（第一版：规则 + 几何特征）
-// ========================================================================
-void ParamModelerDock::onClassifyPrimitive()
-{
-    // 0. 是否已加载数据
-    if ( m_inputDataPath.isEmpty() )
-    {
-        QMessageBox::warning(
-            this,
-            tr( "未加载数据" ),
-            tr( "请先加载点云或 OBJ 数据，再进行基元类型识别。" )
-        );
-        return;
-    }
-    QFileInfo fileInfo( m_inputDataPath );
-    QString suffix = fileInfo.suffix().toLower();
-    // 1. 占位的几何特征（后面会由真实计算替换）
-    double sizeX = 0.0;
-    double sizeY = 0.0;
-    double sizeZ = 0.0;
-    // 2. 简单区分数据类型（第一版不真正解析）
-    if ( suffix == "obj" )
-    {
-        // TODO: 解析 OBJ，计算 bounding box
-        // 临时占位
-        sizeX = 10.0;
-        sizeY = 10.0;
-        sizeZ = 8.0;
-    }
-    else
-    {
-        // TODO: 点云 bounding box
-        sizeX = 12.0;
-        sizeY = 6.0;
-        sizeZ = 5.0;
-    }
-    // 3. 规则分类（第一版：可解释）
-    QString detectedType;
-
-    if ( sizeZ < sizeX * 0.3 && sizeZ < sizeY * 0.3 )
-    {
-        detectedType = tr( "长方体" );
-    }
-    else if ( qAbs( sizeX - sizeY ) < 0.2 * qMax( sizeX, sizeY ) )
-    {
-        detectedType = tr( "圆柱" );
-    }
-    else if ( sizeX > sizeY * 1.5 )
-    {
-        detectedType = tr( "人字形屋顶房屋" );
-    }
-    else
-    {
-        detectedType = tr( "未识别" );
-    }
-    // 4. UI 更新
-    ui->labelPrimitiveType->setText(
-        tr( "识别结果：%1" ).arg( detectedType )
-    );
-
-    // 5. 提示（可选，但对调试很友好）
-    QMessageBox::information(
-        this,
-        tr( "基元识别完成" ),
-        tr( "识别结果：%1\n\n"
-            "尺寸估计：\n"
-            "X = %2, Y = %3, Z = %4" )
-          .arg( detectedType )
-          .arg( sizeX )
-          .arg( sizeY )
-          .arg( sizeZ )
-    );
-}
-// ========================================================================
-// Tab2：参数反演（Mock版）
-// ========================================================================
-void ParamModelerDock::onInverseParams()
-{
-  if ( m_inputDataPath.isEmpty() )
-  {
-    QMessageBox::warning(
-      this,
-      tr( "参数反演" ),
-      tr( "请先加载点云或模型数据！" )
-    );
-    return;
-  }
-  // ------------------------------
-  // 1. 假反演圆柱参数 (老师建议：先跑通流程)
-  // ------------------------------
-  double radius = 5.0;  // 假设反演出的半径
-  double height = 10.0; // 假设反演出的高度
-  // 更新 Tab2 的表格显示 (保持不变)
-  ui->tableInverseParams->setRowCount( 2 );
-  ui->tableInverseParams->setItem( 0, 0, new QTableWidgetItem( "半径" ) );
-  ui->tableInverseParams->setItem( 0, 1, new QTableWidgetItem( QString::number( radius ) ) );
-  ui->tableInverseParams->setItem( 1, 0, new QTableWidgetItem( "高度" ) );
-  ui->tableInverseParams->setItem( 1, 1, new QTableWidgetItem( QString::number( height ) ) );
-  // ------------------------------
-  // 2. 自动切换到 Tab1 圆柱生成器
-  // ------------------------------
-  ui->tabWidget->setCurrentIndex( 0 );              // 切到 Tab1
-  ui->comboPrimitive->setCurrentText( "Cylinder" ); // 自动触发界面切换
-  // ------------------------------
-  // 3. 把反演参数写入 Tab1 的新 UI 控件
-  // ------------------------------
-  // 修改点：使用 setValue() 替换原来的 setText()
-  // 由于之前已经在构造函数绑定了 Slider 和 SpinBox，
-  // 此处设置 Value 后，Slider 会自动同步滑动。
-  ui->spinBoxCylRadius->setValue( radius );
-  ui->spinBoxCylHeight->setValue( height );
-  QMessageBox::information(
-    this,
-    tr( "参数反演完成" ),
-    tr( "圆柱参数反演完成，并已同步到 Tab1 的交互控件。" )
-  );
-}
-//tab2的导出obj和json
-void ParamModelerDock::onExportRebuiltOBJ()
-{
-    onExportOBJClicked();
-}
-void ParamModelerDock::onExportRebuiltJSON()
-{
-    onExportJSONClicked();
-}
-// ========================================================================
-// 导出前检验：检查当前参数是否能生成有效网格
-// ========================================================================
+// =======================导出前检验===================
+// 在导出前检查当前参数是否能生成有效的几何网格
 static bool checkMeshValid( const QString &primitiveType, ParamModelerDock *dock )
 {
     MeshData mesh = BuildMesh::build( primitiveType, dock );
@@ -491,10 +331,7 @@ static bool checkMeshValid( const QString &primitiveType, ParamModelerDock *dock
     }
     return true;
 }
-
-// ========================================================================
-// 导出 OBJ
-// ========================================================================
+// ========================导出 OBJ====================
 void ParamModelerDock::onExportOBJClicked()
 {
     QString primitiveType = ui->comboPrimitive->currentText();
@@ -528,18 +365,14 @@ void ParamModelerDock::onExportOBJClicked()
         );
     }
 }
-// ========================================================================
-// 导出 JSON（支持 type + params + transform）
-// ========================================================================
+// ========================导出 JSON===================
 void ParamModelerDock::onExportJSONClicked()
 {
     QString primitiveType = ui->comboPrimitive->currentText();
     if ( !checkMeshValid( primitiveType, this ) ) return;
     ExportJSON::writeJSON(this);
 }
-// ========================================================================
-// 导出点云
-// ========================================================================
+// ========================导出点云====================
 void ParamModelerDock::onExportPLYClicked()
 {
     QString primitiveType = ui->comboPrimitive->currentText();
@@ -551,9 +384,7 @@ void ParamModelerDock::onExportPLYClicked()
 
     ExportPointCloud::exportPLY( fileName, primitiveType, this );
 }
-// ========================================================================
-// 导出Mesh
-// ========================================================================
+// ========================导出Mesh====================
 void ParamModelerDock::onExportMeshClicked()
 {
     // 1. 获取保存路径
@@ -592,7 +423,9 @@ void ParamModelerDock::onExportMeshClicked()
     file.close();
     QMessageBox::information(this, tr("导出成功"), tr("Mesh 已导出为 STL。"));
 }
-// ========直接加载模型到 QGIS 3D 场景===========
+
+// ================将模型加载同步到QGIS 3D视图=========
+//如果图层已存在且面数未变，直接通过changeGeometry修改要素几何，不涉及图层，实现平滑更新；
 void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
 {
     if ( m_isUpdating ) return;
@@ -717,7 +550,8 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
 
     m_isUpdating = false;
 }
-// ====================== 加载外部点云到 QGIS 3D 视图 ======================
+// =================将外部点云加载到QGIS 3D视图======================================
+//针对 LAS/LAZ 使用了 BFS 广度优先搜索遍历八叉树索引，将海量点云高效转化为 QGIS 的 3D 点符号图层，以便与参数化模型进行重叠对比。
 void ParamModelerDock::onLoadExternalPointCloud()
 {
   QString filePath = QFileDialog::getOpenFileName(
@@ -727,7 +561,7 @@ void ParamModelerDock::onLoadExternalPointCloud()
   if ( filePath.isEmpty() )
     return;
 
-  QFileInfo fi( filePath );
+  QFileInfo fi( filePath );//提取文件名
   QString layerName = QString( "外部点云 - %1" ).arg( fi.fileName() );
   QString suffix = fi.suffix().toLower();
 
@@ -775,8 +609,16 @@ void ParamModelerDock::onLoadExternalPointCloud()
 
     // 设置球体半径为0.1（很小，看起来像点云）
     QVariantMap props;
-    props["radius"] = 0.1;
+    props["radius"] = 0.03;
     symbol3D->setShapeProperties( props );
+    
+				QgsPhongMaterialSettings material;
+				QColor pointColor( 255, 200, 0, 160 );  // 
+				material.setAmbient( pointColor );
+				material.setDiffuse( pointColor );
+				material.setSpecular( Qt::black );  // 
+				material.setShininess( 0 );
+				symbol3D->setMaterialSettings( material.clone() );
 
     QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
     renderer3D->setSymbol( symbol3D );
@@ -848,8 +690,17 @@ void ParamModelerDock::onLoadExternalPointCloud()
     symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
     symbol3D->setShape( Qgis::Point3DShape::Sphere );
     QVariantMap props;
-    props["radius"] = 0.1;
+    props["radius"] = 0.03;
     symbol3D->setShapeProperties( props );
+				
+				QgsPhongMaterialSettings material;
+				QColor pointColor( 255, 200, 0, 160 );
+				material.setAmbient( pointColor );
+				material.setDiffuse( pointColor );
+				material.setSpecular( Qt::black );
+				material.setShininess( 0 );
+				symbol3D->setMaterialSettings( material.clone() );
+
     QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
     renderer3D->setSymbol( symbol3D );
     vl->setRenderer3D( renderer3D );
@@ -958,9 +809,8 @@ void ParamModelerDock::onLoadExternalPointCloud()
 
 QMessageBox::information( this, tr( "加载成功" ), tr( "点云已加载！\n图层：%1\n\n可在3D视图中与模型叠加对比。" ).arg( layerName ) );
 }
-// ============================================================
-//加载前先判断是否有同名图层
-// ============================================================
+// ================================清理图层============================
+// 在加载新模型前，根据名称添加并删除旧图层，通过excludeId确保不会误删当前正在使用的新图层。
 void ParamModelerDock::removeLayerByName( const QString &name, const QString &excludeId )
 {
     QStringList toRemove;
@@ -973,9 +823,8 @@ void ParamModelerDock::removeLayerByName( const QString &name, const QString &ex
     for ( const QString &id : toRemove )
         QgsProject::instance()->removeMapLayer( id );
 }
-// ============================================================
-// 预览刷新：根据当前参数重建网格，并根据开关决定是否同步到QGIS
-// ============================================================
+// ===============================主刷新函数=============================
+// 根据当前参数重建网格，并根据开关决定是否同步到QGIS
 void ParamModelerDock::onUpdatePreview()
 {
     if ( !m_previewWidget ) return;
@@ -992,14 +841,16 @@ void ParamModelerDock::onUpdatePreview()
         this->onLoadToQGIS3D( false );
     }
 }
+// ========================参数访问====================================
+//读取 UI 控件（如 spinBox 数字框或 lineEdit 文本框）里的值，并将其转换为 double交给模型构建函数使用
+//位姿变换参数
 double ParamModelerDock::poseTranslateX() const { return ui->lineEditTX->text().toDouble(); }
 double ParamModelerDock::poseTranslateY() const { return ui->lineEditTY->text().toDouble(); }
 double ParamModelerDock::poseTranslateZ() const { return ui->lineEditTZ->text().toDouble(); }
 double ParamModelerDock::poseRotateX()    const { return ui->lineEditRX->text().toDouble(); }
 double ParamModelerDock::poseRotateY()    const { return ui->lineEditRY->text().toDouble(); }
 double ParamModelerDock::poseRotateZ()    const { return ui->lineEditRZ->text().toDouble(); }
-// 参数访问（UI → 参数层）
-// =================================================
+//几何体形状参数
 double ParamModelerDock::cuboidWidth() const { return ui->spinBoxCWidth->value(); }
 double ParamModelerDock::cuboidDepth() const { return ui->spinBoxCDepth->value(); }
 double ParamModelerDock::cuboidHeight() const { return ui->spinBoxCHeight->value(); }
@@ -1061,3 +912,156 @@ double ParamModelerDock::tgDepth() const { return ui->spinBoxTGDepth->value(); }
 double ParamModelerDock::tgWallHeight() const { return ui->spinBoxTGHeightWall->value(); }
 double ParamModelerDock::tgRoofHeight() const { return ui->spinBoxTGRoofHeight->value(); }
 double ParamModelerDock::tgAngle() const { return ui->spinBoxTGAngle->value(); }
+
+// ========================================================================
+// Tab2：加载点云 / OBJ 数据
+// ========================================================================
+void ParamModelerDock::onLoadInputData()
+{
+  QString filePath = QFileDialog::getOpenFileName(
+    this,
+    tr( "加载点云或模型数据" ),
+    "",
+    tr( "3D Data (*.obj *.ply *.pcd *.las *.laz)" )
+  );
+  if ( filePath.isEmpty() )
+    return;
+  QFileInfo fileInfo( filePath );
+  // 记录路径
+  m_inputDataPath = filePath;
+  // UI 状态更新
+  ui->labelInputInfo->setText(
+    tr( "已加载：%1" ).arg( fileInfo.fileName() )
+  );
+  ui->labelPrimitiveType->setText(
+    tr( "识别结果：未识别" )
+  );
+  ui->tableInverseParams->setRowCount( 0 );
+  ui->btnClassifyPrimitive->setEnabled( true );
+  QMessageBox::information(
+    this,
+    tr( "数据加载成功" ),
+    tr( "已成功加载文件：\n%1" ).arg( fileInfo.fileName() )
+  );
+}
+// ========================================================================
+// 基元类型自动识别（第一版：规则 + 几何特征）
+// ========================================================================
+void ParamModelerDock::onClassifyPrimitive()
+{
+  // 0. 是否已加载数据
+  if ( m_inputDataPath.isEmpty() )
+  {
+    QMessageBox::warning(
+      this,
+      tr( "未加载数据" ),
+      tr( "请先加载点云或 OBJ 数据，再进行基元类型识别。" )
+    );
+    return;
+  }
+  QFileInfo fileInfo( m_inputDataPath );
+  QString suffix = fileInfo.suffix().toLower();
+  // 1. 占位的几何特征（后面会由真实计算替换）
+  double sizeX = 0.0;
+  double sizeY = 0.0;
+  double sizeZ = 0.0;
+  // 2. 简单区分数据类型（第一版不真正解析）
+  if ( suffix == "obj" )
+  {
+    // TODO: 解析 OBJ，计算 bounding box
+    // 临时占位
+    sizeX = 10.0;
+    sizeY = 10.0;
+    sizeZ = 8.0;
+  }
+  else
+  {
+    // TODO: 点云 bounding box
+    sizeX = 12.0;
+    sizeY = 6.0;
+    sizeZ = 5.0;
+  }
+  // 3. 规则分类（第一版：可解释）
+  QString detectedType;
+
+  if ( sizeZ < sizeX * 0.3 && sizeZ < sizeY * 0.3 )
+  {
+    detectedType = tr( "长方体" );
+  }
+  else if ( qAbs( sizeX - sizeY ) < 0.2 * qMax( sizeX, sizeY ) )
+  {
+    detectedType = tr( "圆柱" );
+  }
+  else if ( sizeX > sizeY * 1.5 )
+  {
+    detectedType = tr( "人字形屋顶房屋" );
+  }
+  else
+  {
+    detectedType = tr( "未识别" );
+  }
+  // 4. UI 更新
+  ui->labelPrimitiveType->setText(
+    tr( "识别结果：%1" ).arg( detectedType )
+  );
+
+  // 5. 提示（可选，但对调试很友好）
+  QMessageBox::information(
+    this,
+    tr( "基元识别完成" ),
+    tr( "识别结果：%1\n\n"
+        "尺寸估计：\n"
+        "X = %2, Y = %3, Z = %4" )
+      .arg( detectedType )
+      .arg( sizeX )
+      .arg( sizeY )
+      .arg( sizeZ )
+  );
+}
+// ========================================================================
+// Tab2：参数反演（Mock版）
+// ========================================================================
+void ParamModelerDock::onInverseParams()
+{
+  if ( m_inputDataPath.isEmpty() )
+  {
+    QMessageBox::warning(
+      this,
+      tr( "参数反演" ),
+      tr( "请先加载点云或模型数据！" )
+    );
+    return;
+  }
+  // 1. 假反演圆柱参数 (老师建议：先跑通流程)
+  double radius = 5.0;  // 假设反演出的半径
+  double height = 10.0; // 假设反演出的高度
+  // 更新 Tab2 的表格显示 (保持不变)
+  ui->tableInverseParams->setRowCount( 2 );
+  ui->tableInverseParams->setItem( 0, 0, new QTableWidgetItem( "半径" ) );
+  ui->tableInverseParams->setItem( 0, 1, new QTableWidgetItem( QString::number( radius ) ) );
+  ui->tableInverseParams->setItem( 1, 0, new QTableWidgetItem( "高度" ) );
+  ui->tableInverseParams->setItem( 1, 1, new QTableWidgetItem( QString::number( height ) ) );
+  // 2. 自动切换到 Tab1 圆柱生成器
+  ui->tabWidget->setCurrentIndex( 0 );              // 切到 Tab1
+  ui->comboPrimitive->setCurrentText( "Cylinder" ); // 自动触发界面切换
+
+  // 修改点：使用 setValue() 替换原来的 setText()
+  // 由于之前已经在构造函数绑定了 Slider 和 SpinBox，
+  // 此处设置 Value 后，Slider 会自动同步滑动。
+  ui->spinBoxCylRadius->setValue( radius );
+  ui->spinBoxCylHeight->setValue( height );
+  QMessageBox::information(
+    this,
+    tr( "参数反演完成" ),
+    tr( "圆柱参数反演完成，并已同步到 Tab1 的交互控件。" )
+  );
+}
+//tab2的导出obj和json
+void ParamModelerDock::onExportRebuiltOBJ()
+{
+  onExportOBJClicked();
+}
+void ParamModelerDock::onExportRebuiltJSON()
+{
+  onExportJSONClicked();
+}
