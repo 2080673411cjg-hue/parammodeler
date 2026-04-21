@@ -161,6 +161,10 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderTGHeightWall, ui->spinBoxTGHeightWall, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGRoofHeight, ui->spinBoxTGRoofHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGAngle,      ui->spinBoxTGAngle,      10.0, 179.0 );
+		//位姿旋转三参数的输入绑定
+		bindSliderSpin(ui->sliderROmega, ui->spinBoxROmega, 10.0, 180.0, -180.0);
+		bindSliderSpin(ui->sliderRPhi,   ui->spinBoxRPhi,   10.0, 180.0, -180.0);
+		bindSliderSpin(ui->sliderRKappa, ui->spinBoxRKappa, 10.0, 180.0, -180.0);
   // ====================== 创建导出菜单 ======================
   m_exportMenu = new QMenu(this);
   QAction *actOBJ = m_exportMenu->addAction(tr("导出 OBJ 文件 (*.obj)"));
@@ -190,6 +194,10 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   connect( m_previewTimer, &QTimer::timeout, this, &ParamModelerDock::onUpdatePreview );
   // ---- 连接所有 slider 的 valueChanged → 启动防抖 Timer ----
   auto schedulePreview = [this]( int ) { m_previewTimer->start(); };
+		//旋转三参数，左侧预览图就刷新，需要连接信号
+		connect(ui->spinBoxROmega, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &ParamModelerDock::onUpdatePreview);
+		connect(ui->spinBoxRPhi,   static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &ParamModelerDock::onUpdatePreview);
+		connect(ui->spinBoxRKappa, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &ParamModelerDock::onUpdatePreview);
   connect( ui->sliderCWidth,  &QSlider::valueChanged, this, schedulePreview );  // 长方体
   connect( ui->sliderCDepth,  &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCHeight, &QSlider::valueChanged, this, schedulePreview );
@@ -399,6 +407,13 @@ void ParamModelerDock::onExportMeshClicked()
         QMessageBox::warning(this, tr("导出失败"), tr("当前模型没有几何数据。"));
         return;
     }
+    // ★ 补上位姿变换，和 onLoadToQGIS3D 保持一致
+    QMatrix4x4 mat;
+    mat.setToIdentity();
+    mat.translate( poseTranslateX(), poseTranslateY(), poseTranslateZ() );
+    mat.rotate( poseRotateX(), 1, 0, 0 ); // ω
+    mat.rotate( poseRotateY(), 0, 1, 0 ); // φ
+    mat.rotate( poseRotateZ(), 0, 0, 1 ); // κ
     // 3. 写入 STL 格式 (标准的 Mesh 文件格式)
     QFile file(fileName);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) return;
@@ -446,9 +461,10 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
     QMatrix4x4 mat;
     mat.setToIdentity();
     mat.translate( poseTranslateX(), poseTranslateY(), poseTranslateZ() );
-    mat.rotate( poseRotateZ(), 0, 0, 1 );
-    mat.rotate( poseRotateY(), 0, 1, 0 );
-    mat.rotate( poseRotateX(), 1, 0, 0 );
+    // 改后（X→Y→Z，即ω→φ→κ，摄影测量标准）
+    mat.rotate( poseRotateX(), 1, 0, 0 ); // ω，绕X
+    mat.rotate( poseRotateY(), 0, 1, 0 ); // φ，绕Y
+    mat.rotate( poseRotateZ(), 0, 0, 1 ); // κ，绕Z
 
     // 3. 构造 Feature 列表
     QgsFeatureList features;
@@ -847,9 +863,11 @@ void ParamModelerDock::onUpdatePreview()
 double ParamModelerDock::poseTranslateX() const { return ui->lineEditTX->text().toDouble(); }
 double ParamModelerDock::poseTranslateY() const { return ui->lineEditTY->text().toDouble(); }
 double ParamModelerDock::poseTranslateZ() const { return ui->lineEditTZ->text().toDouble(); }
-double ParamModelerDock::poseRotateX()    const { return ui->lineEditRX->text().toDouble(); }
-double ParamModelerDock::poseRotateY()    const { return ui->lineEditRY->text().toDouble(); }
-double ParamModelerDock::poseRotateZ()    const { return ui->lineEditRZ->text().toDouble(); }
+// 找到这三个函数，用新的 spinBox 替换掉报错的 lineEdit
+double ParamModelerDock::poseRotateX() const { return ui->spinBoxROmega->value(); } // 指向新控件：Omega
+double ParamModelerDock::poseRotateY() const { return ui->spinBoxRPhi->value(); } // 指向新控件：Phi
+double ParamModelerDock::poseRotateZ() const { return ui->spinBoxRKappa->value(); } // 指向新控件：Kappa
+
 //几何体形状参数
 double ParamModelerDock::cuboidWidth() const { return ui->spinBoxCWidth->value(); }
 double ParamModelerDock::cuboidDepth() const { return ui->spinBoxCDepth->value(); }

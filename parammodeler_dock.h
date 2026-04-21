@@ -49,9 +49,9 @@ public:
   double poseTranslateX() const;
   double poseTranslateY() const;
   double poseTranslateZ() const;
-  double poseRotateX() const;
-  double poseRotateY() const;
-  double poseRotateZ() const;
+  double poseRotateX() const; // Omega
+		double poseRotateY() const; // Phi
+		double poseRotateZ() const; // Kappa
 
   // ===== 各基元参数访问接口 =====
   double cuboidWidth() const;

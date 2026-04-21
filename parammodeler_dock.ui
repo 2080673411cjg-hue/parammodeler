@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>669</width>
+    <width>682</width>
     <height>764</height>
    </rect>
   </property>
@@ -49,9 +49,9 @@
            <property name="geometry">
             <rect>
              <x>0</x>
-             <y>-289</y>
-             <width>618</width>
-             <height>975</height>
+             <y>0</y>
+             <width>631</width>
+             <height>917</height>
             </rect>
            </property>
            <layout class="QVBoxLayout" name="verticalLayoutScrollTab1">
@@ -145,67 +145,174 @@
               <property name="title">
                <string>位姿（Transform）</string>
               </property>
-              <layout class="QFormLayout" name="formLayoutTransform">
-               <item row="0" column="0">
-                <widget class="QLabel" name="labelTX">
-                 <property name="text">
-                  <string>平移 X：</string>
-                 </property>
-                </widget>
+              <layout class="QVBoxLayout" name="verticalLayout">
+               <item>
+                <layout class="QHBoxLayout" name="horizontalLayout_4">
+                 <item>
+                  <widget class="QLabel" name="labelTX">
+                   <property name="text">
+                    <string>平移 X：</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLineEdit" name="lineEditTX"/>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="labelTY">
+                   <property name="text">
+                    <string>平移 Y：</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLineEdit" name="lineEditTY"/>
+                 </item>
+                 <item>
+                  <widget class="QLabel" name="labelTZ">
+                   <property name="text">
+                    <string>平移 Z：</string>
+                   </property>
+                  </widget>
+                 </item>
+                 <item>
+                  <widget class="QLineEdit" name="lineEditTZ"/>
+                 </item>
+                </layout>
                </item>
-               <item row="0" column="1">
-                <widget class="QLineEdit" name="lineEditTX"/>
-               </item>
-               <item row="1" column="0">
-                <widget class="QLabel" name="labelTY">
-                 <property name="text">
-                  <string>平移 Y：</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="1" column="1">
-                <widget class="QLineEdit" name="lineEditTY"/>
-               </item>
-               <item row="2" column="0">
-                <widget class="QLabel" name="labelTZ">
-                 <property name="text">
-                  <string>平移 Z：</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="2" column="1">
-                <widget class="QLineEdit" name="lineEditTZ"/>
-               </item>
-               <item row="3" column="0">
-                <widget class="QLabel" name="labelRX">
-                 <property name="text">
-                  <string>旋转 X：</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="3" column="1">
-                <widget class="QLineEdit" name="lineEditRX"/>
-               </item>
-               <item row="4" column="0">
-                <widget class="QLabel" name="labelRY">
-                 <property name="text">
-                  <string>旋转 Y：</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="4" column="1">
-                <widget class="QLineEdit" name="lineEditRY"/>
-               </item>
-               <item row="5" column="0">
-                <widget class="QLabel" name="labelRZ">
-                 <property name="text">
-                  <string>旋转 Z：</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="5" column="1">
-                <widget class="QLineEdit" name="lineEditRZ"/>
-               </item>
+               <item>
+																<layout class="QVBoxLayout" name="layoutRotationGroup">
+																	<item>
+																		<layout class="QHBoxLayout" name="layoutROmega">
+																			<item>
+																				<widget class="QLabel" name="labelROmega">
+																					<property name="minimumSize">
+																						<size>
+																							<width>80</width>
+																							<height>0</height>
+																						</size>
+																					</property>
+																					<property name="text">
+																						<string>旋转角(ω):</string>
+																					</property>
+																				</widget>
+																			</item>
+																			<item>
+																				<widget class="QSlider" name="sliderROmega">
+																					<property name="orientation">
+																						<enum>Qt::Horizontal</enum>
+																					</property>
+																					<property name="minimum">
+																						<number>-1800</number>
+																					</property>
+																					<property name="maximum">
+																						<number>1800</number>
+																					</property>
+																				</widget>
+																			</item>
+																			<item>
+																				<widget class="QDoubleSpinBox" name="spinBoxROmega">
+																					<property name="minimum">
+																						<number>-180.0</number>
+																					</property>
+																					<property name="maximum">
+																						<number>180.0</number>
+																					</property>
+																					<property name="singleStep">
+																						<number>0.1</number>
+																					</property>
+																				</widget>
+																			</item>
+																		</layout>
+																	</item>
+																	<item>
+																		<layout class="QHBoxLayout" name="layoutRPhi">
+																			<item>
+																				<widget class="QLabel" name="labelRPhi">
+																					<property name="minimumSize">
+																						<size>
+																							<width>80</width>
+																							<height>0</height>
+																						</size>
+																					</property>
+																					<property name="text">
+																						<string>旋转角(φ):</string>
+																					</property>
+																				</widget>
+																			</item>
+																			<item>
+																				<widget class="QSlider" name="sliderRPhi">
+																					<property name="orientation">
+																						<enum>Qt::Horizontal</enum>
+																					</property>
+																					<property name="minimum">
+																						<number>-1800</number>
+																					</property>
+																					<property name="maximum">
+																						<number>1800</number>
+																					</property>
+																				</widget>
+																			</item>
+																			<item>
+																				<widget class="QDoubleSpinBox" name="spinBoxRPhi">
+																					<property name="minimum">
+																						<number>-180.0</number>
+																					</property>
+																					<property name="maximum">
+																						<number>180.0</number>
+																					</property>
+																					<property name="singleStep">
+																						<number>0.1</number>
+																					</property>
+																				</widget>
+																			</item>
+																		</layout>
+																	</item>
+																	<item>
+																		<layout class="QHBoxLayout" name="layoutRKappa">
+																			<item>
+																				<widget class="QLabel" name="labelRKappa">
+																					<property name="minimumSize">
+																						<size>
+																							<width>80</width>
+																							<height>0</height>
+																						</size>
+																					</property>
+																					<property name="text">
+																						<string>旋转角(κ):</string>
+																					</property>
+																				</widget>
+																			</item>
+																			<item>
+																				<widget class="QSlider" name="sliderRKappa">
+																					<property name="orientation">
+																						<enum>Qt::Horizontal</enum>
+																					</property>
+																					<property name="minimum">
+																						<number>-1800</number>
+																					</property>
+																					<property name="maximum">
+																						<number>1800</number>
+																					</property>
+																				</widget>
+																			</item>
+																			<item>
+																				<widget class="QDoubleSpinBox" name="spinBoxRKappa">
+																					<property name="minimum">
+																						<number>-180.0</number>
+																					</property>
+																					<property name="maximum">
+																						<number>180.0</number>
+																					</property>
+																					<property name="singleStep">
+																						<number>0.1</number>
+																					</property>
+																				</widget>
+																			</item>
+																		</layout>
+																	</item>
+																</layout>
+															</item>
               </layout>
              </widget>
             </item>
@@ -1854,7 +1961,7 @@
             <item>
              <widget class="QCheckBox" name="checkBoxAutoSync">
               <property name="toolTip">
-               <string/>
+               <string>开启后，调整参数会实时更新 QGIS 3D 场景</string>
               </property>
               <property name="text">
                <string>实时同步至 3D 视图</string>

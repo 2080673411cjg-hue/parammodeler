@@ -45,9 +45,9 @@ static QVector3D applyPose( const QVector3D &v,
     QMatrix4x4 mat;
     mat.setToIdentity();
     mat.translate( tx, ty, tz );
-    mat.rotate( rz, 0, 0, 1 );
-    mat.rotate( ry, 0, 1, 0 );
-    mat.rotate( rx, 1, 0, 0 );
+    mat.rotate( rx, 1, 0, 0 ); // ω
+    mat.rotate( ry, 0, 1, 0 ); // φ
+    mat.rotate( rz, 0, 0, 1 ); // κ
     return mat.map( v );
 }
 

@@ -71,12 +71,12 @@ QJsonObject ExportJSON::buildTransform(ParamModelerDock *dock)
         return ok ? v : 0.0;
     };
 
-    t["tx"] = toDouble(dock->ui->lineEditTX->text());
-    t["ty"] = toDouble(dock->ui->lineEditTY->text());
-    t["tz"] = toDouble(dock->ui->lineEditTZ->text());
-    t["rx"] = toDouble(dock->ui->lineEditRX->text());
-    t["ry"] = toDouble(dock->ui->lineEditRY->text());
-    t["rz"] = toDouble(dock->ui->lineEditRZ->text());
+    t["tx"] = dock->poseTranslateX();
+    t["ty"] = dock->poseTranslateY();
+    t["tz"] = dock->poseTranslateZ();
+    t["rx"] = dock->poseRotateX(); // 内部自动指向 Omega spinBox
+    t["ry"] = dock->poseRotateY(); // 内部自动指向 Phi spinBox
+    t["rz"] = dock->poseRotateZ(); // 内部自动指向 Kappa spinBox
 
     return t;
 }

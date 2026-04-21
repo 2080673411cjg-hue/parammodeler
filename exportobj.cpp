@@ -37,11 +37,7 @@ static void deduplicateMesh( const MeshData &mesh,
         }
     }
 }
-
-// ============================================================
-// 位姿变换：ZYX 欧拉角（角度制）+ 平移
-// 顺序：先旋转（Z→Y→X），再平移
-// ============================================================
+//位姿
 static QVector3D applyPose( const QVector3D &v,
                             double tx, double ty, double tz,
                             double rx, double ry, double rz )
@@ -49,9 +45,9 @@ static QVector3D applyPose( const QVector3D &v,
     QMatrix4x4 mat;
     mat.setToIdentity();
     mat.translate( tx, ty, tz );
-    mat.rotate( rz, 0, 0, 1 );  // 先绕 Z
-    mat.rotate( ry, 0, 1, 0 );  // 再绕 Y
-    mat.rotate( rx, 1, 0, 0 );  // 最后绕 X
+    mat.rotate( rx, 1, 0, 0 ); // ω
+    mat.rotate( ry, 0, 1, 0 ); // φ
+    mat.rotate( rz, 0, 0, 1 ); // κ
     return mat.map( v );
 }
 
