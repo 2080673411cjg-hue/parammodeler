@@ -35,9 +35,6 @@ static float triangleArea( const QVector3D &A,
     return QVector3D::crossProduct( B - A, C - A ).length() * 0.5f;
 }
 
-// ============================================================
-// 位姿变换（ZYX 欧拉角，角度制）
-// ============================================================
 static QVector3D applyPose( const QVector3D &v,
                              double tx, double ty, double tz,
                              double rx, double ry, double rz )

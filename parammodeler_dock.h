@@ -25,6 +25,8 @@
 
 #include <QDockWidget>
 #include <QTimer>
+#include <QMap>
+#include <QVector>
 
 class QgisInterface;
 class QgsVectorLayer; 
@@ -50,8 +52,8 @@ public:
   double poseTranslateY() const;
   double poseTranslateZ() const;
   double poseRotateX() const; // Omega
-		double poseRotateY() const; // Phi
-		double poseRotateZ() const; // Kappa
+	double poseRotateY() const; // Phi
+	double poseRotateZ() const; // Kappa
 
   // ===== 各基元参数访问接口 =====
   double cuboidWidth() const;
@@ -121,9 +123,9 @@ private slots:
   void onExportOBJClicked();
   void onExportJSONClicked();
   void onExportPLYClicked();
-		void onExportMeshClicked();
-		void onLoadToQGIS3D(bool zoomToLayer = true); // 将模型加载/同步到QGIS 3D视图，增加默认参数，true 表示缩放相机          
-		void onLoadExternalPointCloud();
+	void onExportMeshClicked();
+	void onLoadToQGIS3D(bool zoomToLayer = true); // 将模型加载/同步到QGIS 3D视图，增加默认参数，true 表示缩放相机          
+	void onLoadExternalPointCloud();
 		
 		
   void onLoadInputData();
@@ -138,6 +140,8 @@ private slots:
 private:
   Ui::ParamModelerDock *ui;
   QgisInterface *mIface;
+		QString m_currentPrimitive;                  // 记录当前基元名
+  QMap<QString, QVector<double>> m_poseMap;    // 各基元的位姿存档
 
   // ===== Tab2：输入数据 =====
   QString m_inputDataPath;

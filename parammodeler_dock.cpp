@@ -98,7 +98,9 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   , mIface( iface )// 保存QGIS接口指针
 {
   ui->setupUi( this );// 初始化UI界面
+  m_currentPrimitive = ui->comboPrimitive->currentText(); //初始化一下m_currentPrimitive
   setWindowTitle( tr( "Parametric Modeler" ) );// 设置窗口标题
+		
   // slider和spinBox的每个基元的绑定
   bindSliderSpin( ui->sliderCWidth, ui->spinBoxCWidth, 100.0, 50.0 );  // 长方体
   bindSliderSpin( ui->sliderCDepth, ui->spinBoxCDepth, 100.0, 50.0 );
@@ -119,8 +121,8 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderGRHeightRoof, ui->spinBoxGRHeightRoof, 100.0, 50.0 );
   bindSliderSpin( ui->sliderPRWidth, ui->spinBoxPRWidth, 100, 50 ); // --- PyramidRoof (金字塔房屋) 绑定 ---
   bindSliderSpin( ui->sliderPRDepth, ui->spinBoxPRDepth, 100, 50 );
-		bindSliderSpin(ui->sliderPRHeightWall, ui->spinBoxPRHeightWall, 100.0, 50.0 );
-		bindSliderSpin(ui->sliderPRHeightRoof, ui->spinBoxPRHeightRoof, 100.0, 50.0 );
+	bindSliderSpin(ui->sliderPRHeightWall, ui->spinBoxPRHeightWall, 100.0, 50.0 );
+	bindSliderSpin(ui->sliderPRHeightRoof, ui->spinBoxPRHeightRoof, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTPRBottomWidth, ui->spinBoxTPRBottomWidth, 100.0, 50.0 );		// --- TPRoof (棱台房屋) 绑定 ---
   bindSliderSpin( ui->sliderTPRBottomDepth, ui->spinBoxTPRBottomDepth, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTPRTopWidth, ui->spinBoxTPRTopWidth, 100, 50 );
@@ -161,22 +163,21 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderTGHeightWall, ui->spinBoxTGHeightWall, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGRoofHeight, ui->spinBoxTGRoofHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGAngle,      ui->spinBoxTGAngle,      10.0, 179.0 );
-		//位姿旋转三参数的输入绑定
-		bindSliderSpin(ui->sliderROmega, ui->spinBoxROmega, 10.0, 180.0, -180.0);
-		bindSliderSpin(ui->sliderRPhi,   ui->spinBoxRPhi,   10.0, 180.0, -180.0);
-		bindSliderSpin(ui->sliderRKappa, ui->spinBoxRKappa, 10.0, 180.0, -180.0);
+	//位姿旋转三参数的输入绑定
+	bindSliderSpin(ui->sliderROmega, ui->spinBoxROmega, 10.0, 180.0, -180.0);
+	bindSliderSpin(ui->sliderRPhi,   ui->spinBoxRPhi,   10.0, 180.0, -180.0);
+	bindSliderSpin(ui->sliderRKappa, ui->spinBoxRKappa, 10.0, 180.0, -180.0);
   // ====================== 创建导出菜单 ======================
   m_exportMenu = new QMenu(this);
   QAction *actOBJ = m_exportMenu->addAction(tr("导出 OBJ 文件 (*.obj)"));
   QAction *actJSON = m_exportMenu->addAction(tr("导出 JSON 参数 (*.json)"));
   QAction *actPLY = m_exportMenu->addAction(tr("导出点云 PLY (*.ply)"));
-	 QAction *actMesh = m_exportMenu->addAction(tr("导出 Mesh 文件 (*.stl)"));
-		m_exportMenu->addSeparator();
-	 QAction *actTo3D = m_exportMenu->addAction(tr("直接加载到 QGIS 3D 场景"));
-		QAction *actLoadPC = m_exportMenu->addAction(tr("加载外部点云到 3D 视图"));
+	QAction *actMesh = m_exportMenu->addAction(tr("导出 Mesh 文件 (*.stl)"));
+	m_exportMenu->addSeparator();
+	QAction *actTo3D = m_exportMenu->addAction(tr("直接加载到 QGIS 3D 场景"));
+	QAction *actLoadPC = m_exportMenu->addAction(tr("加载外部点云到 3D 视图"));
   connect( actTo3D, &QAction::triggered, this, &ParamModelerDock::onLoadToQGIS3D ); 
-		connect(actLoadPC, &QAction::triggered, this, &ParamModelerDock::onLoadExternalPointCloud);
-		
+	connect(actLoadPC, &QAction::triggered, this, &ParamModelerDock::onLoadExternalPointCloud);	
   connect(actOBJ,  &QAction::triggered, this, &ParamModelerDock::onExportOBJClicked);
   connect(actJSON, &QAction::triggered, this, &ParamModelerDock::onExportJSONClicked);
   connect(actPLY,  &QAction::triggered, this, &ParamModelerDock::onExportPLYClicked);
@@ -194,10 +195,11 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   connect( m_previewTimer, &QTimer::timeout, this, &ParamModelerDock::onUpdatePreview );
   // ---- 连接所有 slider 的 valueChanged → 启动防抖 Timer ----
   auto schedulePreview = [this]( int ) { m_previewTimer->start(); };
-		//旋转三参数，左侧预览图就刷新，需要连接信号
-		connect(ui->spinBoxROmega, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &ParamModelerDock::onUpdatePreview);
-		connect(ui->spinBoxRPhi,   static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &ParamModelerDock::onUpdatePreview);
-		connect(ui->spinBoxRKappa, static_cast<void(QDoubleSpinBox::*)(double)>(&QDoubleSpinBox::valueChanged), this, &ParamModelerDock::onUpdatePreview);
+	//旋转三参数，左侧预览图就刷新，需要连接信号
+  auto schedulePreviewD = [this]( double ) { m_previewTimer->start(); };
+  connect( ui->spinBoxROmega, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
+  connect( ui->spinBoxRPhi, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
+  connect( ui->spinBoxRKappa, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
   connect( ui->sliderCWidth,  &QSlider::valueChanged, this, schedulePreview );  // 长方体
   connect( ui->sliderCDepth,  &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCHeight, &QSlider::valueChanged, this, schedulePreview );
@@ -271,60 +273,64 @@ ParamModelerDock::~ParamModelerDock()
   delete ui;
 }
 // ==========================切换参数页基元函数================================
-void ParamModelerDock::onPrimitiveChanged(const QString &prim)
+void ParamModelerDock::onPrimitiveChanged( const QString &prim )
 {
-    if (prim == "Cuboid")
-    {
-        ui->stackedWidgetParams->setCurrentWidget(ui->pageCuboid);
-    }
-    else if (prim == "Cylinder")
-    {
-        ui->stackedWidgetParams->setCurrentWidget(ui->pageCylinder);
-    }
-	  else if (prim == "LHouse")
-    {
-        ui->stackedWidgetParams->setCurrentWidget(ui->pageLHouse);
-    }
-	  else if (prim == "ConeCylinder")
-	  {
-		    ui->stackedWidgetParams->setCurrentWidget(ui->pageConeCylinder);
-	  }
-    else if ( prim == "GabledRoof" )
-    {
-        ui->stackedWidgetParams->setCurrentWidget( ui->pageGabledRoof );
-    }
-    else if ( prim == "PyramidRoof" )
-    {
-      ui->stackedWidgetParams->setCurrentWidget( ui->pagePyramidRoof );
-    }
-    else if ( prim == "TruncatedPyramidRoof" )
-    {
-      ui->stackedWidgetParams->setCurrentWidget( ui->pageTPRoof );
-    }
-    else if ( prim == "HalfCylinderRoof" )
-    {
-      ui->stackedWidgetParams->setCurrentWidget( ui->pageHalfCylinderRoof );
-    }
-    else if ( prim == "穹顶圆柱" )
-    {
-      ui->stackedWidgetParams->setCurrentWidget( ui->pageCylinderHemisphere );
-    }
-	  else if ( prim == "凹陷长方体" )
-    {
-      ui->stackedWidgetParams->setCurrentWidget( ui->pageIndentedCuboid );
-    }
-    else if ( prim == "非对称人字形屋顶房屋" )
-    {
-      ui->stackedWidgetParams->setCurrentWidget( ui->pageAsymmetricGableHouse );
-    }
-    else if ( prim == "四段式圆塔形" )
-    {
-      ui->stackedWidgetParams->setCurrentWidget( ui->pageFourStageRoundTower );
-    }
-	  else if ( prim == "双人字屋顶房屋" )
-    {
-      ui->stackedWidgetParams->setCurrentWidget( ui->pageTwoGableHouses );
-    }
+  // 1. 离开前保存旧基元的位姿
+  if ( !m_currentPrimitive.isEmpty() )
+  {
+    m_poseMap[m_currentPrimitive] = {
+      ui->lineEditTX->text().toDouble(),
+      ui->lineEditTY->text().toDouble(),
+      ui->lineEditTZ->text().toDouble(),
+      ui->spinBoxROmega->value(),
+      ui->spinBoxRPhi->value(),
+      ui->spinBoxRKappa->value()
+    };
+  }
+
+  // 2. QHash 替代 if-else 链，新增基元只需在此加一行
+  static const QHash<QString, QWidget *( Ui::ParamModelerDock::* )> pageMap = {
+    { "Cuboid", &Ui::ParamModelerDock::pageCuboid },
+    { "Cylinder", &Ui::ParamModelerDock::pageCylinder },
+    { "LHouse", &Ui::ParamModelerDock::pageLHouse },
+    { "ConeCylinder", &Ui::ParamModelerDock::pageConeCylinder },
+    { "GabledRoof", &Ui::ParamModelerDock::pageGabledRoof },
+    { "PyramidRoof", &Ui::ParamModelerDock::pagePyramidRoof },
+    { "TruncatedPyramidRoof", &Ui::ParamModelerDock::pageTPRoof },
+    { "HalfCylinderRoof", &Ui::ParamModelerDock::pageHalfCylinderRoof },
+    { "CylinderHemisphere", &Ui::ParamModelerDock::pageCylinderHemisphere },
+    { "IndentedCuboid", &Ui::ParamModelerDock::pageIndentedCuboid },
+    { "AsymmetricGableHouse", &Ui::ParamModelerDock::pageAsymmetricGableHouse },
+    { "FourStageRoundTower", &Ui::ParamModelerDock::pageFourStageRoundTower },
+    { "TwoGableHouses", &Ui::ParamModelerDock::pageTwoGableHouses },
+  };
+
+  auto it = pageMap.find( prim );
+  if ( it != pageMap.end() )
+    ui->stackedWidgetParams->setCurrentWidget( ui->*( it.value() ) );
+
+  // 3. 恢复新基元的位姿，没有记录就清零
+  if ( m_poseMap.contains( prim ) )
+  {
+    const auto &p = m_poseMap[prim];
+    ui->lineEditTX->setText( QString::number( p[0] ) );
+    ui->lineEditTY->setText( QString::number( p[1] ) );
+    ui->lineEditTZ->setText( QString::number( p[2] ) );
+    ui->spinBoxROmega->setValue( p[3] );
+    ui->spinBoxRPhi->setValue( p[4] );
+    ui->spinBoxRKappa->setValue( p[5] );
+  }
+  else
+  {
+    ui->lineEditTX->setText( "0" );
+    ui->lineEditTY->setText( "0" );
+    ui->lineEditTZ->setText( "0" );
+    ui->spinBoxROmega->setValue( 0 );
+    ui->spinBoxRPhi->setValue( 0 );
+    ui->spinBoxRKappa->setValue( 0 );
+  }
+
+  m_currentPrimitive = prim;
 }
 // =======================导出前检验===================
 // 在导出前检查当前参数是否能生成有效的几何网格
@@ -420,10 +426,12 @@ void ParamModelerDock::onExportMeshClicked()
     QTextStream out(&file);
     out << "solid ParamModelerMesh\n";
     // 利用你 MeshData 中的索引进行面片遍历
-    for (int i = 0; i < mesh.indices.size(); i += 3) {
-        QVector3D v1 = mesh.vertices[mesh.indices[i]];
-        QVector3D v2 = mesh.vertices[mesh.indices[i+1]];
-        QVector3D v3 = mesh.vertices[mesh.indices[i+2]];
+    const int safeCount = ( mesh.indices.size() / 3 ) * 3; // 同时修复 Fix2 的越界
+    for ( int i = 0; i < safeCount; i += 3 )
+    {
+        QVector3D v1 = mat.map( mesh.vertices[mesh.indices[i]] );     
+        QVector3D v2 = mat.map( mesh.vertices[mesh.indices[i + 1]] );
+        QVector3D v3 = mat.map( mesh.vertices[mesh.indices[i + 2]] ); 
         // 计算法线以保证 3D 软件正常显示
         QVector3D normal = QVector3D::crossProduct(v2 - v1, v3 - v1).normalized();
         out << "  facet normal " << normal.x() << " " << normal.y() << " " << normal.z() << "\n";
