@@ -131,8 +131,6 @@ private slots:
   void onLoadInputData();
   void onClassifyPrimitive();
   void onInverseParams();
-  void onExportRebuiltOBJ();
-  void onExportRebuiltJSON();
 		
   void onUpdatePreview();//主刷新入口
 

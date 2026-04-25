@@ -317,7 +317,14 @@
              </widget>
             </item>
             <item>
-             <widget class="QGroupBox" name="groupBoxParameters">
+             <widget class="QSplitter" name="splitterParams">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="childrenCollapsible">
+               <bool>false</bool>
+              </property>
+              <widget class="QGroupBox" name="groupBoxParameters">
               <property name="title">
                <string>模型参数</string>
               </property>
@@ -1917,6 +1924,199 @@
                </item>
               </layout>
              </widget>
+             <widget class="QWidget" name="widgetInversionPanel">
+              <property name="minimumSize">
+               <size>
+                <width>210</width>
+                <height>0</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>240</width>
+                <height>16777215</height>
+               </size>
+              </property>
+              <layout class="QVBoxLayout" name="layoutInversionPanel">
+               <property name="spacing">
+                <number>4</number>
+               </property>
+               <property name="leftMargin">
+                <number>4</number>
+               </property>
+               <property name="topMargin">
+                <number>4</number>
+               </property>
+               <property name="rightMargin">
+                <number>4</number>
+               </property>
+               <property name="bottomMargin">
+                <number>4</number>
+               </property>
+               <item>
+                <widget class="QPushButton" name="btnToggleInversion">
+                 <property name="text">
+                  <string>▶ 点云反演</string>
+                 </property>
+                 <property name="checkable">
+                  <bool>true</bool>
+                 </property>
+                 <property name="checked">
+                  <bool>false</bool>
+                 </property>
+                 <property name="flat">
+                  <bool>true</bool>
+                 </property>
+                 <property name="styleSheet">
+                  <string>QPushButton { text-align: left; font-weight: bold; padding: 4px; border-bottom: 1px solid #aaa; }</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QFrame" name="frameInversion">
+                 <property name="visible">
+                  <bool>false</bool>
+                 </property>
+                 <property name="frameShape">
+                  <enum>QFrame::StyledPanel</enum>
+                 </property>
+                 <layout class="QVBoxLayout" name="layoutFrameInversion">
+                  <property name="spacing">
+                   <number>6</number>
+                  </property>
+                  <property name="leftMargin">
+                   <number>4</number>
+                  </property>
+                  <property name="topMargin">
+                   <number>6</number>
+                  </property>
+                  <property name="rightMargin">
+                   <number>4</number>
+                  </property>
+                  <property name="bottomMargin">
+                   <number>6</number>
+                  </property>
+                  <item>
+                   <widget class="QPushButton" name="btnLoadPointCloud">
+                    <property name="text">
+                     <string>📂 导入点云</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="labelInputInfo">
+                    <property name="text">
+                     <string>未加载</string>
+                    </property>
+                    <property name="wordWrap">
+                     <bool>true</bool>
+                    </property>
+                    <property name="styleSheet">
+                     <string>color: #666; font-size: 11px;</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QLabel" name="labelPrimitiveType">
+                    <property name="text">
+                     <string>识别结果：-</string>
+                    </property>
+                    <property name="wordWrap">
+                     <bool>true</bool>
+                    </property>
+                    <property name="styleSheet">
+                     <string>font-weight: bold;</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QProgressBar" name="progressInversion">
+                    <property name="visible">
+                     <bool>false</bool>
+                    </property>
+                    <property name="maximum">
+                     <number>100</number>
+                    </property>
+                    <property name="value">
+                     <number>0</number>
+                    </property>
+                    <property name="textVisible">
+                     <bool>false</bool>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <layout class="QHBoxLayout" name="layoutInversionBtns">
+                    <item>
+                     <widget class="QPushButton" name="btnClassifyPrimitive">
+                      <property name="text">
+                       <string>🔍 识别</string>
+                      </property>
+                      <property name="enabled">
+                       <bool>false</bool>
+                      </property>
+                     </widget>
+                    </item>
+                    <item>
+                     <widget class="QPushButton" name="btnInverseParams">
+                      <property name="text">
+                       <string>⚙ 反演</string>
+                      </property>
+                      <property name="enabled">
+                       <bool>false</bool>
+                      </property>
+                     </widget>
+                    </item>
+                   </layout>
+                  </item>
+                  <item>
+                   <widget class="QTableWidget" name="tableInverseParams">
+                    <property name="minimumSize">
+                     <size>
+                      <width>0</width>
+                      <height>100</height>
+                     </size>
+                    </property>
+                    <property name="selectionBehavior">
+                     <enum>QAbstractItemView::SelectRows</enum>
+                    </property>
+                    <property name="rowCount">
+                     <number>0</number>
+                    </property>
+                    <property name="columnCount">
+                     <number>2</number>
+                    </property>
+                    <column>
+                     <property name="text">
+                      <string>参数名</string>
+                     </property>
+                    </column>
+                    <column>
+                     <property name="text">
+                      <string>参数值</string>
+                     </property>
+                    </column>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="verticalSpacerInversion">
+                    <property name="orientation">
+                     <enum>Qt::Vertical</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>20</width>
+                      <height>40</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </widget>
+               </item>
+              </layout>
+             </widget>
+            </widget>
             </item>
             <item>
              <widget class="PreviewGLWidget" name="previewWidget">
@@ -1970,124 +2170,6 @@
             </item>
            </layout>
           </widget>
-         </widget>
-        </item>
-       </layout>
-      </widget>
-      <widget class="QWidget" name="tabInverseModeling">
-       <attribute name="title">
-        <string>分类与参数反演</string>
-       </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_tab2">
-        <item>
-         <widget class="QGroupBox" name="groupInputData">
-          <property name="title">
-           <string>输入数据</string>
-          </property>
-          <layout class="QVBoxLayout" name="layoutInputData">
-           <item>
-            <widget class="QPushButton" name="btnLoadPointCloud">
-             <property name="text">
-              <string>加载点云 / OBJ</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="labelInputInfo">
-             <property name="text">
-              <string>未加载数据</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="groupPrimitiveClassify">
-          <property name="title">
-           <string>基元类型识别</string>
-          </property>
-          <layout class="QVBoxLayout" name="layoutPrimitiveClassify">
-           <item>
-            <widget class="QPushButton" name="btnClassifyPrimitive">
-             <property name="text">
-              <string>自动识别基元类型</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="labelPrimitiveType">
-             <property name="text">
-              <string>识别结果：未识别</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="groupInverseParams">
-          <property name="title">
-           <string>参数反演</string>
-          </property>
-          <layout class="QVBoxLayout" name="layoutInverseParams">
-           <item>
-            <widget class="QPushButton" name="btnInverseParams">
-             <property name="text">
-              <string>开始参数反演</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QTableWidget" name="tableInverseParams">
-             <property name="selectionBehavior">
-              <enum>QAbstractItemView::SelectRows</enum>
-             </property>
-             <property name="rowCount">
-              <number>0</number>
-             </property>
-             <property name="columnCount">
-              <number>2</number>
-             </property>
-             <attribute name="horizontalHeaderVisible">
-              <bool>true</bool>
-             </attribute>
-             <column>
-              <property name="text">
-               <string>参数名</string>
-              </property>
-             </column>
-             <column>
-              <property name="text">
-               <string>参数值</string>
-              </property>
-             </column>
-            </widget>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="groupVerifyExport">
-          <property name="title">
-           <string>结果验证与导出</string>
-          </property>
-          <layout class="QHBoxLayout" name="layoutVerifyExport">
-           <item>
-            <widget class="QPushButton" name="btnRebuildFromParams">
-             <property name="text">
-              <string>用反演参数重建模型</string>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QPushButton" name="btnExportInverseJSON">
-             <property name="text">
-              <string>导出反演参数 JSON</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
          </widget>
         </item>
        </layout>

@@ -265,6 +265,21 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, &ParamModelerDock::onPrimitiveChanged );
   // 切换基元时立刻刷新预览
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, [this]( const QString & ) { onUpdatePreview(); } );
+		// ====================== 点云反演折叠面板 ======================
+		ui->frameInversion->setVisible( false );  // 默认收起
+
+		connect( ui->btnToggleInversion, &QPushButton::toggled, this, [this]( bool checked ) {
+						ui->frameInversion->setVisible( checked );
+						ui->btnToggleInversion->setText( checked ? "▼ 点云反演" : "▶ 点云反演" );
+		} );
+
+		connect( ui->btnLoadPointCloud, &QPushButton::clicked,  this, &ParamModelerDock::onLoadInputData );
+		connect( ui->btnClassifyPrimitive,       &QPushButton::clicked,  this, &ParamModelerDock::onClassifyPrimitive );
+		connect( ui->btnInverseParams,        &QPushButton::clicked,  this, &ParamModelerDock::onInverseParams );
+
+		// 反演按钮初始禁用，加载数据后才启用
+		ui->btnClassifyPrimitive->setEnabled( false );
+		ui->btnInverseParams->setEnabled(  false );
 }
 // ===========================析构函数=================================
 ParamModelerDock::~ParamModelerDock()
@@ -944,150 +959,75 @@ double ParamModelerDock::tgAngle() const { return ui->spinBoxTGAngle->value(); }
 // ========================================================================
 void ParamModelerDock::onLoadInputData()
 {
-  QString filePath = QFileDialog::getOpenFileName(
-    this,
-    tr( "加载点云或模型数据" ),
-    "",
-    tr( "3D Data (*.obj *.ply *.pcd *.las *.laz)" )
-  );
-  if ( filePath.isEmpty() )
-    return;
-  QFileInfo fileInfo( filePath );
-  // 记录路径
-  m_inputDataPath = filePath;
-  // UI 状态更新
-  ui->labelInputInfo->setText(
-    tr( "已加载：%1" ).arg( fileInfo.fileName() )
-  );
-  ui->labelPrimitiveType->setText(
-    tr( "识别结果：未识别" )
-  );
-  ui->tableInverseParams->setRowCount( 0 );
-  ui->btnClassifyPrimitive->setEnabled( true );
-  QMessageBox::information(
-    this,
-    tr( "数据加载成功" ),
-    tr( "已成功加载文件：\n%1" ).arg( fileInfo.fileName() )
-  );
+    QString filePath = QFileDialog::getOpenFileName(
+        this, tr("导入点云"), "",
+        tr("点云文件 (*.ply *.las *.laz *.xyz *.txt)") );
+    if ( filePath.isEmpty() ) return;
+
+    m_inputDataPath = filePath;
+    QFileInfo fi( filePath );
+
+    ui->labelInputInfo->setText( tr("已加载：%1").arg( fi.fileName() ) );
+    ui->labelPrimitiveType->setText( tr("识别结果：-") );
+    ui->tableInverseParams->setRowCount( 0 );
+
+    // 加载完才能识别，识别完才能反演
+    ui->btnClassifyPrimitive->setEnabled( true );
+    ui->btnInverseParams->setEnabled(  false );
 }
 // ========================================================================
 // 基元类型自动识别（第一版：规则 + 几何特征）
 // ========================================================================
 void ParamModelerDock::onClassifyPrimitive()
 {
-  // 0. 是否已加载数据
-  if ( m_inputDataPath.isEmpty() )
-  {
-    QMessageBox::warning(
-      this,
-      tr( "未加载数据" ),
-      tr( "请先加载点云或 OBJ 数据，再进行基元类型识别。" )
-    );
-    return;
-  }
-  QFileInfo fileInfo( m_inputDataPath );
-  QString suffix = fileInfo.suffix().toLower();
-  // 1. 占位的几何特征（后面会由真实计算替换）
-  double sizeX = 0.0;
-  double sizeY = 0.0;
-  double sizeZ = 0.0;
-  // 2. 简单区分数据类型（第一版不真正解析）
-  if ( suffix == "obj" )
-  {
-    // TODO: 解析 OBJ，计算 bounding box
-    // 临时占位
-    sizeX = 10.0;
-    sizeY = 10.0;
-    sizeZ = 8.0;
-  }
-  else
-  {
-    // TODO: 点云 bounding box
-    sizeX = 12.0;
-    sizeY = 6.0;
-    sizeZ = 5.0;
-  }
-  // 3. 规则分类（第一版：可解释）
-  QString detectedType;
+    if ( m_inputDataPath.isEmpty() ) return;
 
-  if ( sizeZ < sizeX * 0.3 && sizeZ < sizeY * 0.3 )
-  {
-    detectedType = tr( "长方体" );
-  }
-  else if ( qAbs( sizeX - sizeY ) < 0.2 * qMax( sizeX, sizeY ) )
-  {
-    detectedType = tr( "圆柱" );
-  }
-  else if ( sizeX > sizeY * 1.5 )
-  {
-    detectedType = tr( "人字形屋顶房屋" );
-  }
-  else
-  {
-    detectedType = tr( "未识别" );
-  }
-  // 4. UI 更新
-  ui->labelPrimitiveType->setText(
-    tr( "识别结果：%1" ).arg( detectedType )
-  );
+    // TODO: 真实特征提取替换这里的占位逻辑
+    // 现阶段保留占位，流程跑通后再替换
+    QString detectedType = "Cylinder";   // 占位
+    double  confidence   = 0.87;         // 占位
 
-  // 5. 提示（可选，但对调试很友好）
-  QMessageBox::information(
-    this,
-    tr( "基元识别完成" ),
-    tr( "识别结果：%1\n\n"
-        "尺寸估计：\n"
-        "X = %2, Y = %3, Z = %4" )
-      .arg( detectedType )
-      .arg( sizeX )
-      .arg( sizeY )
-      .arg( sizeZ )
-  );
+    ui->labelPrimitiveType->setText(
+        tr("识别结果：%1（%.0f%%）").arg( detectedType ).arg( confidence * 100 ) );
+
+    // 直接同步到 Tab1 的基元选择，用户可以看到参数页切换
+    ui->comboPrimitive->setCurrentText( detectedType );
+
+    ui->btnInverseParams->setEnabled( true );  // 识别完才开放反演
 }
 // ========================================================================
 // Tab2：参数反演（Mock版）
 // ========================================================================
 void ParamModelerDock::onInverseParams()
 {
-  if ( m_inputDataPath.isEmpty() )
-  {
-    QMessageBox::warning(
-      this,
-      tr( "参数反演" ),
-      tr( "请先加载点云或模型数据！" )
-    );
-    return;
-  }
-  // 1. 假反演圆柱参数 (老师建议：先跑通流程)
-  double radius = 5.0;  // 假设反演出的半径
-  double height = 10.0; // 假设反演出的高度
-  // 更新 Tab2 的表格显示 (保持不变)
-  ui->tableInverseParams->setRowCount( 2 );
-  ui->tableInverseParams->setItem( 0, 0, new QTableWidgetItem( "半径" ) );
-  ui->tableInverseParams->setItem( 0, 1, new QTableWidgetItem( QString::number( radius ) ) );
-  ui->tableInverseParams->setItem( 1, 0, new QTableWidgetItem( "高度" ) );
-  ui->tableInverseParams->setItem( 1, 1, new QTableWidgetItem( QString::number( height ) ) );
-  // 2. 自动切换到 Tab1 圆柱生成器
-  ui->tabWidget->setCurrentIndex( 0 );              // 切到 Tab1
-  ui->comboPrimitive->setCurrentText( "Cylinder" ); // 自动触发界面切换
+    if ( m_inputDataPath.isEmpty() ) return;
 
-  // 修改点：使用 setValue() 替换原来的 setText()
-  // 由于之前已经在构造函数绑定了 Slider 和 SpinBox，
-  // 此处设置 Value 后，Slider 会自动同步滑动。
-  ui->spinBoxCylRadius->setValue( radius );
-  ui->spinBoxCylHeight->setValue( height );
-  QMessageBox::information(
-    this,
-    tr( "参数反演完成" ),
-    tr( "圆柱参数反演完成，并已同步到 Tab1 的交互控件。" )
-  );
+    ui->progressInversion->setVisible( true );
+    ui->progressInversion->setValue( 0 );
+
+    // TODO: 真实反演替换占位值
+    QString prim = ui->comboPrimitive->currentText();
+
+    if ( prim == "Cylinder" )
+    {
+        double radius = 5.0;   // 占位
+        double height = 10.0;  // 占位
+
+        ui->spinBoxCylRadius->setValue( radius );
+        ui->spinBoxCylHeight->setValue( height );
+
+        ui->tableInverseParams->setRowCount( 2 );
+        ui->tableInverseParams->setItem( 0, 0, new QTableWidgetItem( tr("半径") ) );
+        ui->tableInverseParams->setItem( 0, 1, new QTableWidgetItem( QString::number( radius ) ) );
+        ui->tableInverseParams->setItem( 1, 0, new QTableWidgetItem( tr("高度") ) );
+        ui->tableInverseParams->setItem( 1, 1, new QTableWidgetItem( QString::number( height ) ) );
+    }
+    // else if 其他基元 ...
+
+    ui->progressInversion->setValue( 100 );
+    ui->progressInversion->setVisible( false );
+
+    // 反演完直接触发预览刷新
+    onUpdatePreview();
 }
-//tab2的导出obj和json
-void ParamModelerDock::onExportRebuiltOBJ()
-{
-  onExportOBJClicked();
-}
-void ParamModelerDock::onExportRebuiltJSON()
-{
-  onExportJSONClicked();
-}
+
