@@ -15,6 +15,65 @@
   </property>
   <widget class="QWidget" name="dockWidgetContents">
    <layout class="QVBoxLayout" name="mainVerticalLayout">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="leftMargin">
+				 <number>0</number>
+				</property>
+				<property name="topMargin">
+				 <number>0</number>
+				</property>
+				<property name="rightMargin">
+				 <number>0</number>
+				</property>
+				<property name="bottomMargin">
+				 <number>0</number>
+				</property>
+    <item>
+     <widget class="QMenuBar" name="menuBar">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="nativeMenuBar">
+       <bool>false</bool>
+      </property>
+      <widget class="QMenu" name="menuExport">
+       <property name="title">
+        <string>导出 / 加载</string>
+       </property>
+       <addaction name="actOBJ"/>
+       <addaction name="actJSON"/>
+       <addaction name="actPLY"/>
+       <addaction name="actMesh"/>
+       <addaction name="separator"/>
+       <addaction name="actTo3D"/>
+       <addaction name="actLoadPC"/>
+      </widget>
+      <addaction name="menuExport"/>
+      <action name="actOBJ">
+       <property name="text"><string>导出 OBJ 文件 (*.obj)</string></property>
+      </action>
+      <action name="actJSON">
+       <property name="text"><string>导出 JSON 参数 (*.json)</string></property>
+      </action>
+      <action name="actPLY">
+       <property name="text"><string>导出点云 PLY (*.ply)</string></property>
+      </action>
+      <action name="actMesh">
+       <property name="text"><string>导出 Mesh 文件 (*.stl)</string></property>
+      </action>
+      <action name="actTo3D">
+       <property name="text"><string>加载模型到 QGIS 3D 场景</string></property>
+      </action>
+      <action name="actLoadPC">
+       <property name="text"><string>加载外部点云到 3D 视图</string></property>
+      </action>
+     </widget>
+    </item>
     <item>
      <widget class="QTabWidget" name="tabWidget">
       <property name="currentIndex">
@@ -2127,36 +2186,6 @@
                </size>
               </property>
              </widget>
-            </item>
-            <item>
-             <layout class="QHBoxLayout" name="horizontalLayoutButtons">
-              <item>
-               <widget class="QToolButton" name="toolButtonExport">
-                <property name="text">
-                 <string>导出</string>
-                </property>
-                <property name="popupMode">
-                 <enum>QToolButton::InstantPopup</enum>
-                </property>
-                <property name="toolButtonStyle">
-                 <enum>Qt::ToolButtonTextBesideIcon</enum>
-                </property>
-               </widget>
-              </item>
-              <item>
-               <spacer name="horizontalSpacer">
-                <property name="orientation">
-                 <enum>Qt::Horizontal</enum>
-                </property>
-                <property name="sizeHint" stdset="0">
-                 <size>
-                  <width>40</width>
-                  <height>20</height>
-                 </size>
-                </property>
-               </spacer>
-              </item>
-             </layout>
             </item>
             <item>
              <widget class="QCheckBox" name="checkBoxAutoSync">

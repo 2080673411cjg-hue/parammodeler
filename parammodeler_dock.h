@@ -142,10 +142,7 @@ private:
   QMap<QString, QVector<double>> m_poseMap;    // 各基元的位姿存档
 
   // ===== Tab2：输入数据 =====
-  QString m_inputDataPath;
-
-  // ===== 导出菜单 =====
-  QMenu *m_exportMenu = nullptr;        
+  QString m_inputDataPath;       
 
   // ===== 预览 =====
   PreviewGLWidget *m_previewWidget = nullptr;
