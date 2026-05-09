@@ -55,7 +55,7 @@ MeshData BuildMesh::buildCuboid( ParamModelerDock *dock )
     QVector3D v0(0,0,0), v1(W,0,0), v2(W,D,0), v3(0,D,0);
     QVector3D v4(0,0,H), v5(W,0,H), v6(W,D,H), v7(0,D,H);
 
-    m.addQuad( v0, v3, v2, v1 ); // 底面
+    m.addQuad( v0, v1, v2, v3 ); // 底面（CCW从下方看）
     m.addQuad( v4, v5, v6, v7 ); // 顶面
     m.addQuad( v0, v1, v5, v4 ); // 前面
     m.addQuad( v1, v2, v6, v5 ); // 右面

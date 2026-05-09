@@ -22,6 +22,8 @@
 #include "exportjson.h"
 #include "exportobj.h"
 #include "exportpointcloud.h"
+#include "parammodeler_classify.h"
+#include "parammodeler_inverse.h"
 
 // 2. Qt 核心与界面框架 (文件、内存、基本 UI)
 #include <QFileInfo>
@@ -48,6 +50,7 @@
 #include <QgsPoint.h>
 #include <QgsLineString.h>
 #include <QgsPolygon.h>
+#include <qgsmultipolygon.h>
 
 // 4. QGIS 图层与渲染系统 (2D/3D)
 #include <QgsVectorLayer.h>
@@ -57,6 +60,7 @@
 #include <QgsPolygon3DSymbol.h>      // 用于 3D 材质属性
 #include <QgsVectorLayer3DRenderer.h>// 3D 渲染器
 #include <Qgs3DMapCanvas.h>          // 3D 画布交互
+#include <qgs3dmapsettings.h>
 #include <QgsPoint3DSymbol.h>
 #include "qgscoordinatereferencesystem.h"
 #include "qgspointcloud3dsymbol.h"
@@ -68,6 +72,8 @@
 #include "qgspointclouddataprovider.h"
 #include <qgsphongmaterialsettings.h>
 #include <qgs3dtypes.h>
+#include <qgsvectorfilewriter.h>
+#include <QDateTime>
 // ======================slider和spinBox的绑定函数：==================================
 //根据倍率（乘数）同步数值，确保滑动条和数字输入框显示的参数一致
 static void bindSliderSpin(QSlider* slider, QDoubleSpinBox* spin, double multiplier, double maxVal = 100.0, double minVal = 0.0)
@@ -455,7 +461,9 @@ void ParamModelerDock::onExportMeshClicked()
 }
 
 // ================将模型加载同步到QGIS 3D视图=========
-//如果图层已存在且面数未变，直接通过changeGeometry修改要素几何，不涉及图层，实现平滑更新；
+// 每次写入临时 GeoPackage 文件再加载新图层，强制 QGIS 完全重建 3D 渲染实体，
+// 避免 Qt3D 包围盒缓存导致的面丢失（面缺失）问题。
+// 使用独立文件名避免文件缓存，并显式刷新 3D 画布保证同步更新。
 void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
 {
   if ( m_isUpdating )
@@ -477,13 +485,13 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
   QMatrix4x4 mat;
   mat.setToIdentity();
   mat.translate( poseTranslateX(), poseTranslateY(), poseTranslateZ() );
-  // 改后（X→Y→Z，即ω→φ→κ，摄影测量标准）
   mat.rotate( poseRotateX(), 1, 0, 0 ); // ω，绕X
   mat.rotate( poseRotateY(), 0, 1, 0 ); // φ，绕Y
   mat.rotate( poseRotateZ(), 0, 0, 1 ); // κ，绕Z
 
-  // 3. 构造 Feature 列表
-  QgsFeatureList features;
+  // 3. 构造单个 MultiPolygonZ（把所有三角形合并到一个几何体，避免每个三角形
+  //    一个 feature 导致 Qt3D 创建数百个实体，部分实体丢失造成"面缺失"）
+  QgsMultiPolygon *multiPoly = new QgsMultiPolygon();
   int triCount = mesh.indices.size() / 3;
   for ( int i = 0; i < triCount; i++ )
   {
@@ -495,89 +503,119 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
     QgsLineString *ring = new QgsLineString();
     ring->setPoints( QgsPointSequence() << QgsPoint( v0.x(), v0.y(), v0.z() ) << QgsPoint( v1.x(), v1.y(), v1.z() ) << QgsPoint( v2.x(), v2.y(), v2.z() ) << QgsPoint( v0.x(), v0.y(), v0.z() ) );
     poly->setExteriorRing( ring );
-    QgsFeature feat;
-    feat.setGeometry( QgsGeometry( poly ) );
-    features.append( feat );
+    multiPoly->addGeometry( poly );
   }
 
-  // 4. 判断是否可以复用已有图层
-  //    检查：图层指针有效 & 仍在项目中 & 面数相同（基元未切换）
-  bool canReuse = ( m_modelLayer != nullptr )
-                  && ( QgsProject::instance()->mapLayer( m_modelLayer->id() ) != nullptr )
-                  && ( m_modelLayer->featureCount() == triCount );
+  QgsFeature feat;
+  feat.setGeometry( QgsGeometry( multiPoly ) );
+  QgsFeatureList features;
+  features.append( feat );
 
-  if ( canReuse )
+  // 4. 写到临时 GeoPackage 文件再加载，逼迫 QGIS 每次完整重建 3D 渲染管线
+  QString layerName = "ParamModeler_Model";
+
+  // 使用时间戳生成唯一文件名，避免 OGR 文件缓存导致旧数据残留
+  QString gpkgPath = QDir::tempPath() + "/parammodeler_"
+                     + QString::number( QDateTime::currentMSecsSinceEpoch() ) + ".gpkg";
+
+  // 4a. 用内存图层承载 feature，再导出为 GPKG
+  QgsVectorLayer *tmpLayer = new QgsVectorLayer( "MultiPolygonZ?crs=EPSG:3857", "tmp", "memory" );
+  tmpLayer->dataProvider()->addFeatures( features );
+
+  QgsVectorFileWriter::writeAsVectorFormat( tmpLayer, gpkgPath, "UTF-8",
+      QgsCoordinateReferenceSystem( "EPSG:3857" ), "GPKG" );
+  delete tmpLayer;
+
+  // 4b. 从 GPKG 文件加载为独立图层
+  QgsVectorLayer *layer = new QgsVectorLayer( gpkgPath, layerName, "ogr" );
+  if ( !layer || !layer->isValid() )
   {
-    // ★ 核心路径：原地修改，不删不建，最轻量
-    m_modelLayer->startEditing();
-
-    // 拿到所有旧 Feature 的 ID，逐个替换几何体
-    QgsFeatureIterator it = m_modelLayer->getFeatures();
-    QgsFeature oldFeat;
-    int idx = 0;
-    while ( it.nextFeature( oldFeat ) && idx < features.size() )
-    {
-      QgsGeometry geom = features[idx].geometry(); //先存成局部变量再传入：
-      m_modelLayer->changeGeometry( oldFeat.id(), geom );
-      idx++;
-    }
-
-    m_modelLayer->commitChanges();
-    // 通知 3D 渲染器数据已更新
-    emit m_modelLayer->repaintRequested();
-  }
-  else
-  {
-    // ★ 降级路径：第一次加载，或切换了基元（面数不同），重建图层
-    QString layerName = "ParamModeler_Model";
-
-    QgsVectorLayer *layer = new QgsVectorLayer( "PolygonZ?crs=EPSG:3857", layerName, "memory" );
-    if ( !layer || !layer->isValid() )
-    {
-      if ( zoomToLayer )
-        QMessageBox::warning( this, tr( "错误" ), tr( "创建内存图层失败" ) );
-      delete layer;
-      m_isUpdating = false;
-      return;
-    }
-
-    layer->dataProvider()->addFeatures( features );
-
-    QgsPolygon3DSymbol *symbol3D = new QgsPolygon3DSymbol();
-    symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
-    symbol3D->setAltitudeBinding( Qgis::AltitudeBinding::Vertex );
-    symbol3D->setCullingMode( Qgs3DTypes::NoCulling );
-    QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
-    renderer3D->setSymbol( symbol3D );
-    layer->setRenderer3D( renderer3D );
-
-    // 先加新图层，再清理旧图层（避免空窗口期）
-    QgsProject::instance()->addMapLayer( layer );
-    if ( m_modelLayer )
-      removeLayerByName( "ParamModeler_Model", layer->id() );
-
-    // 缓存新图层指针
-    m_modelLayer = layer;
-
-    // 监听图层被外部删除的情况（比如用户手动从图层树删除）
-    connect( m_modelLayer, &QgsMapLayer::willBeDeleted, this, [this]() {
-      m_modelLayer = nullptr;
-    } );
-
-    if ( mIface->mapCanvases3D().isEmpty() )
-      mIface->createNewMapCanvas3D( tr( "ParamModeler 3D" ) );
-
     if ( zoomToLayer )
+      QMessageBox::warning( this, tr( "错误" ), tr( "从 GeoPackage 加载图层失败" ) );
+    delete layer;
+    m_isUpdating = false;
+    return;
+  }
+
+  // 4c. 3D 符号 — 禁用面剔除 + 强环境光，消除黑面和面缺失
+  QgsPolygon3DSymbol *symbol3D = new QgsPolygon3DSymbol();
+  symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
+  symbol3D->setAltitudeBinding( Qgis::AltitudeBinding::Vertex );
+  symbol3D->setCullingMode( Qgs3DTypes::NoCulling );
+
+  QgsPhongMaterialSettings material;
+  material.setAmbient( QColor( 70, 70, 70 ) );
+  material.setDiffuse( QColor( 175, 175, 175 ) );
+  material.setSpecular( QColor( 30, 30, 30 ) );
+  material.setShininess( 4.0 );
+  symbol3D->setMaterialSettings( material.clone() );
+
+  QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
+  renderer3D->setSymbol( symbol3D );
+  layer->setRenderer3D( renderer3D );
+
+  // 4d. 先移除旧图层，再添加新图层（保证信号顺序清晰，3D 画布能正确跟踪）
+  if ( m_modelLayer )
+    QgsProject::instance()->removeMapLayer( m_modelLayer->id() );
+
+  QgsProject::instance()->addMapLayer( layer );
+
+  // 清理旧临时文件（保留最近几个，避免 temp 目录膨胀）
+  QString prevGpkg = m_lastGpkgPath;
+  m_lastGpkgPath = gpkgPath;
+  if ( !prevGpkg.isEmpty() )
+    QFile::remove( prevGpkg );
+
+  m_modelLayer = layer;
+
+  connect( m_modelLayer, &QgsMapLayer::willBeDeleted, this, [this]() {
+    m_modelLayer = nullptr;
+  } );
+
+  if ( mIface->mapCanvases3D().isEmpty() )
+    mIface->createNewMapCanvas3D( tr( "ParamModeler 3D" ) );
+
+  // 4e. 显式刷新 3D 画布，确保新图层被 3D 渲染管线拾取
+  QList<Qgs3DMapCanvas *> canvases3D = mIface->mapCanvases3D();
+  for ( Qgs3DMapCanvas *canvas3D : canvases3D )
+  {
+    if ( !canvas3D )
+      continue;
+    Qgs3DMapSettings *settings = canvas3D->mapSettings();
+    if ( !settings )
+      continue;
+
+    // 如果 3D 设置已显式指定了图层列表，将新图层加入其中
+    QList<QgsMapLayer *> curLayers = settings->layers();
+    if ( !curLayers.isEmpty() )
     {
-      mIface->mapCanvas()->setExtent( layer->extent() );
-      mIface->mapCanvas()->refresh();
-      QMessageBox::information( this, tr( "加载成功" ), tr( "模型已加载！\n三角面数：%1" ).arg( triCount ) );
+      // 剔除旧模型图层，加入新图层
+      curLayers.erase(
+        std::remove_if( curLayers.begin(), curLayers.end(),
+          [&]( QgsMapLayer *l ) {
+            return l->name() == layerName && l->id() != layer->id();
+          } ),
+        curLayers.end() );
+      if ( !curLayers.contains( layer ) )
+        curLayers.append( layer );
+      settings->setLayers( curLayers );
     }
+    // layers() 为空说明 3D 画布跟随项目图层树，addMapLayer 已足够
+  }
+
+  // 强制触发重绘，让 3D 视图立即更新
+  layer->triggerRepaint();
+
+  if ( zoomToLayer )
+  {
+    mIface->mapCanvas()->setExtent( layer->extent() );
+    mIface->mapCanvas()->refresh();
+    QMessageBox::information( this, tr( "加载成功" ), tr( "模型已加载！\n三角面数：%1" ).arg( triCount ) );
   }
 
   m_isUpdating = false;
 }
-// =================将外部点云加载到QGIS 3D视图======================================
+  // =================将外部点云加载到QGIS 3D视图======================================
 //针对 LAS/LAZ 使用了 BFS 广度优先搜索遍历八叉树索引，将海量点云高效转化为 QGIS 的 3D 点符号图层，以便与参数化模型进行重叠对比。
 void ParamModelerDock::onLoadExternalPointCloud()
 {
@@ -1113,27 +1151,23 @@ void ParamModelerDock::onLoadInputData()
     ui->btnInverseParams->setEnabled(  false );
 }
 // ========================================================================
-// 基元类型自动识别（第一版：规则 + 几何特征）
+// 基元类型自动识别（调用分类模块）
 // ========================================================================
 void ParamModelerDock::onClassifyPrimitive()
 {
     if ( m_inputDataPath.isEmpty() ) return;
 
-    // TODO: 真实特征提取替换这里的占位逻辑
-    // 现阶段保留占位，流程跑通后再替换
-    QString detectedType = "Cylinder";   // 占位
-    double  confidence   = 0.87;         // 占位
+    PrimitiveClassifier::Result result = PrimitiveClassifier::classify( m_inputDataPath );
 
     ui->labelPrimitiveType->setText(
-        tr("识别结果：%1（%.0f%%）").arg( detectedType ).arg( confidence * 100 ) );
+        tr("识别结果：%1（%.0f%%）").arg( result.primitiveType ).arg( result.confidence * 100 ) );
 
-    // 直接同步到 Tab1 的基元选择，用户可以看到参数页切换
-    ui->comboPrimitive->setCurrentText( detectedType );
+    ui->comboPrimitive->setCurrentText( result.primitiveType );
 
-    ui->btnInverseParams->setEnabled( true );  // 识别完才开放反演
+    ui->btnInverseParams->setEnabled( true );
 }
 // ========================================================================
-// Tab2：参数反演（Mock版）
+// 参数反演（调用反演模块）
 // ========================================================================
 void ParamModelerDock::onInverseParams()
 {
@@ -1142,29 +1176,26 @@ void ParamModelerDock::onInverseParams()
     ui->progressInversion->setVisible( true );
     ui->progressInversion->setValue( 0 );
 
-    // TODO: 真实反演替换占位值
     QString prim = ui->comboPrimitive->currentText();
 
-    if ( prim == "Cylinder" )
+    QMap<QString, double> params = ParamInverter::invert( prim, m_inputDataPath );
+
+    if ( !params.isEmpty() )
     {
-        double radius = 5.0;   // 占位
-        double height = 10.0;  // 占位
+        ParamInverter::applyToUI( this, params );
 
-        ui->spinBoxCylRadius->setValue( radius );
-        ui->spinBoxCylHeight->setValue( height );
-
-        ui->tableInverseParams->setRowCount( 2 );
-        ui->tableInverseParams->setItem( 0, 0, new QTableWidgetItem( tr("半径") ) );
-        ui->tableInverseParams->setItem( 0, 1, new QTableWidgetItem( QString::number( radius ) ) );
-        ui->tableInverseParams->setItem( 1, 0, new QTableWidgetItem( tr("高度") ) );
-        ui->tableInverseParams->setItem( 1, 1, new QTableWidgetItem( QString::number( height ) ) );
+        ui->tableInverseParams->setRowCount( params.size() );
+        int row = 0;
+        for ( auto it = params.cbegin(); it != params.cend(); ++it, ++row )
+        {
+            ui->tableInverseParams->setItem( row, 0, new QTableWidgetItem( it.key() ) );
+            ui->tableInverseParams->setItem( row, 1, new QTableWidgetItem( QString::number( it.value(), 'f', 2 ) ) );
+        }
     }
-    // else if 其他基元 ...
 
     ui->progressInversion->setValue( 100 );
     ui->progressInversion->setVisible( false );
 
-    // 反演完直接触发预览刷新
     onUpdatePreview();
 }
 

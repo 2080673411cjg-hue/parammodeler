@@ -7,11 +7,12 @@ set (parammodeler_SRCS
   parammodeler.cpp
   parammodeler_dock.cpp
   exportjson.cpp
-  exportobj.cpp  
+  exportobj.cpp
 		exportpointcloud.cpp
 		buildmesh.cpp
   previewglwidget.cpp
-		
+  parammodeler_classify.cpp
+  parammodeler_inverse.cpp
 )
 set (parammodeler_UIS
   parammodeler_dock.ui
