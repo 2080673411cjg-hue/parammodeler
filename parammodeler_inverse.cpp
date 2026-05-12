@@ -13,10 +13,15 @@
 
 #include <QFile>
 #include <QFileInfo>
+#include <QStringList>
+#include <QTextStream>
+#include <QDir>
 #include <QtMath>
 #include <algorithm>
 #include <cmath>
 #include <random>
+#include <windows.h>
+#define DEBUG_LOG(msg) OutputDebugStringW(msg)
 
 #include <qgspointcloudlayer.h>
 #include <qgspointcloudindex.h>
@@ -34,36 +39,67 @@ QMap<QString, double> ParamInverter::invert( const QString &primitiveType,
 {
     QVector<QVector3D> pts = loadPoints( filePath );
 
+    QMap<QString, double> result;
     if ( primitiveType == "Cuboid" )
-        return invertCuboid( pts );
-    if ( primitiveType == "Cylinder" )
-        return invertCylinder( pts );
-    if ( primitiveType == "LHouse" )
-        return invertLHouse( pts );
-    if ( primitiveType == "ConeCylinder" )
-        return invertConeCylinder( pts );
-    if ( primitiveType == "GabledRoof" )
-        return invertGabledRoof( pts );
-    if ( primitiveType == "PyramidRoof" )
-        return invertPyramidRoof( pts );
-    if ( primitiveType == "TruncatedPyramidRoof" )
-        return invertTruncatedPyramidRoof( pts );
-    if ( primitiveType == "HalfCylinderRoof" )
-        return invertHalfCylinderRoof( pts );
-    if ( primitiveType == "CylinderHemisphere" )
-        return invertCylinderHemisphere( pts );
-    if ( primitiveType == "穹顶圆柱" )
-        return invertCylinderHemisphere( pts );
-    if ( primitiveType == "IndentedCuboid" || primitiveType == "凹陷长方体" )
-        return invertIndentedCuboid( pts );
-    if ( primitiveType == "AsymmetricGableHouse" || primitiveType == "非对称人字形屋顶房屋" )
-        return invertAsymmetricGableHouse( pts );
-    if ( primitiveType == "FourStageRoundTower" || primitiveType == "四段式圆塔形" )
-        return invertFourStageRoundTower( pts );
-    if ( primitiveType == "TwoGableHouses" || primitiveType == "双人字屋顶房屋" )
-        return invertTwoGableHouses( pts );
+        result = invertCuboid( pts );
+    else if ( primitiveType == "Cylinder" )
+        result = invertCylinder( pts );
+    else if ( primitiveType == "LHouse" )
+        result = invertLHouse( pts );
+    else if ( primitiveType == "ConeCylinder" )
+        result = invertConeCylinder( pts );
+    else if ( primitiveType == "GabledRoof" )
+        result = invertGabledRoof( pts );
+    else if ( primitiveType == "PyramidRoof" )
+        result = invertPyramidRoof( pts );
+    else if ( primitiveType == "TruncatedPyramidRoof" )
+        result = invertTruncatedPyramidRoof( pts );
+    else if ( primitiveType == "HalfCylinderRoof" )
+        result = invertHalfCylinderRoof( pts );
+    else if ( primitiveType == "CylinderHemisphere" || primitiveType == "穹顶圆柱" )
+        result = invertCylinderHemisphere( pts );
+    else if ( primitiveType == "IndentedCuboid" || primitiveType == "凹陷长方体" )
+        result = invertIndentedCuboid( pts );
+    else if ( primitiveType == "AsymmetricGableHouse" || primitiveType == "非对称人字形屋顶房屋" )
+        result = invertAsymmetricGableHouse( pts );
+    else if ( primitiveType == "FourStageRoundTower" || primitiveType == "四段式圆塔形" )
+        result = invertFourStageRoundTower( pts );
+    else if ( primitiveType == "TwoGableHouses" || primitiveType == "双人字屋顶房屋" )
+        result = invertTwoGableHouses( pts );
 
-    return QMap<QString, double>();
+    // ===== 调试输出 =====
+    if ( !result.isEmpty() )
+    {
+        QString dbg = QString( "\n=== ParamInverter Result [%1] ===\n" ).arg( primitiveType );
+        dbg += QString( "点云点数: %1\n" ).arg( pts.size() );
+
+        // 按类别分组输出参数
+        QStringList shapeKeys, poseKeys;
+        for ( auto it = result.constBegin(); it != result.constEnd(); ++it )
+        {
+            if ( it.key() == "tx" || it.key() == "ty" || it.key() == "tz" )
+                poseKeys << QString( "  %1 = %2" ).arg( it.key() ).arg( it.value(), 0, 'f', 4 );
+            else
+                shapeKeys << QString( "  %1 = %2" ).arg( it.key() ).arg( it.value(), 0, 'f', 4 );
+        }
+        if ( !shapeKeys.isEmpty() )
+            dbg += "形状参数:\n" + shapeKeys.join( "\n" ) + "\n";
+        if ( !poseKeys.isEmpty() )
+            dbg += "位姿参数:\n" + poseKeys.join( "\n" ) + "\n";
+        dbg += "========================================\n";
+
+        DEBUG_LOG( dbg.toStdWString().c_str() );
+
+        QFile logFile( QDir::tempPath() + "/parammodeler_inverse.log" );
+        if ( logFile.open( QIODevice::Append | QIODevice::Text ) )
+        {
+            QTextStream ts( &logFile );
+            ts << dbg;
+            logFile.close();
+        }
+    }
+
+    return result;
 }
 
 // ====================================================================
@@ -86,51 +122,51 @@ void ParamInverter::applyToUI( ParamModelerDock *dock,
             edit->setText( QString::number( params[key], 'f', 2 ) );
     };
 
+    set( "length",     dock->ui->spinBoxCLength,     dock->ui->sliderCLength );
     set( "width",     dock->ui->spinBoxCWidth,     dock->ui->sliderCWidth );
-    set( "depth",     dock->ui->spinBoxCDepth,     dock->ui->sliderCDepth );
     set( "height",    dock->ui->spinBoxCHeight,    dock->ui->sliderCHeight );
     set( "radius",    dock->ui->spinBoxCylRadius,  dock->ui->sliderCylRadius );
     set( "cylHeight", dock->ui->spinBoxCylHeight,  dock->ui->sliderCylHeight );
+    set( "lMainL",    dock->ui->spinBoxLMainLength,  dock->ui->sliderLMainLength );
     set( "lMainW",    dock->ui->spinBoxLMainWidth,  dock->ui->sliderLMainWidth );
-    set( "lMainD",    dock->ui->spinBoxLMainDepth,  dock->ui->sliderLMainDepth );
+    set( "lWingL",    dock->ui->spinBoxLWingLength,  dock->ui->sliderLWingLength );
     set( "lWingW",    dock->ui->spinBoxLWingWidth,  dock->ui->sliderLWingWidth );
-    set( "lWingD",    dock->ui->spinBoxLWingDepth,  dock->ui->sliderLWingDepth );
     set( "lHeight",   dock->ui->spinBoxLHeight,     dock->ui->sliderLHeight );
     set( "ccRadius",      dock->ui->spinBoxConeCylRadius,    dock->ui->sliderConeCylRadius );
     set( "ccCylHeight",   dock->ui->spinBoxConeCylCylHeight, dock->ui->sliderConeCylCylHeight );
     set( "ccConeHeight",  dock->ui->spinBoxConeCylConeHeight,dock->ui->sliderConeCylConeHeight );
+    set( "grLength",       dock->ui->spinBoxGRLength,      dock->ui->sliderGRLength );
     set( "grWidth",       dock->ui->spinBoxGRWidth,      dock->ui->sliderGRWidth );
-    set( "grDepth",       dock->ui->spinBoxGRDepth,      dock->ui->sliderGRDepth );
     set( "grWallHeight",  dock->ui->spinBoxGRHeightWall, dock->ui->sliderGRHeightWall );
     set( "grRoofHeight",  dock->ui->spinBoxGRHeightRoof, dock->ui->sliderGRHeightRoof );
+    set( "prLength",       dock->ui->spinBoxPRLength,      dock->ui->sliderPRLength );
     set( "prWidth",       dock->ui->spinBoxPRWidth,      dock->ui->sliderPRWidth );
-    set( "prDepth",       dock->ui->spinBoxPRDepth,      dock->ui->sliderPRDepth );
     set( "prWallHeight",  dock->ui->spinBoxPRHeightWall, dock->ui->sliderPRHeightWall );
     set( "prRoofHeight",  dock->ui->spinBoxPRHeightRoof, dock->ui->sliderPRHeightRoof );
+    set( "tpBottomLength",  dock->ui->spinBoxTPRBottomLength,  dock->ui->sliderTPRBottomLength );
     set( "tpBottomWidth",  dock->ui->spinBoxTPRBottomWidth,  dock->ui->sliderTPRBottomWidth );
-    set( "tpBottomDepth",  dock->ui->spinBoxTPRBottomDepth,  dock->ui->sliderTPRBottomDepth );
+    set( "tpTopLength",     dock->ui->spinBoxTPRTopLength,     dock->ui->sliderTPRTopLength );
     set( "tpTopWidth",     dock->ui->spinBoxTPRTopWidth,     dock->ui->sliderTPRTopWidth );
-    set( "tpTopDepth",     dock->ui->spinBoxTPRTopDepth,     dock->ui->sliderTPRTopDepth );
     set( "tpWallHeight",   dock->ui->spinBoxTPRHeightWall,   dock->ui->sliderTPRHeightWall );
     set( "tpRoofHeight",   dock->ui->spinBoxTPRHeightRoof,   dock->ui->sliderTPRHeightRoof );
+    set( "hcrLength",        dock->ui->spinBoxHCRLength,      dock->ui->sliderHCRLength );
     set( "hcrWidth",        dock->ui->spinBoxHCRWidth,      dock->ui->sliderHCRWidth );
-    set( "hcrDepth",        dock->ui->spinBoxHCRDepth,      dock->ui->sliderHCRDepth );
     set( "hcrWallHeight",   dock->ui->spinBoxHCRHeightWall, dock->ui->sliderHCRHeightWall );
     set( "hcrRadius",       dock->ui->spinBoxHCRRadius,     dock->ui->sliderHCRRadius );
     set( "chRadius",     dock->ui->spinBoxCylHemiRadius,     dock->ui->sliderCylHemiRadius );
     set( "chCylHeight",  dock->ui->spinBoxCylHemiHeight,     dock->ui->sliderCylHemiHeight );
     set( "chDomeHeight", dock->ui->spinBoxCylHemiDomeHeight, dock->ui->sliderCylHemiDomeHeight );
     set( "chBulge",      dock->ui->spinBoxCylHemiBulge,      dock->ui->sliderCylHemiBulge );
+    set( "icOuterL",    dock->ui->spinBoxICLength,       dock->ui->sliderICLength );
     set( "icOuterW",    dock->ui->spinBoxICWidth,       dock->ui->sliderICWidth );
-    set( "icOuterD",    dock->ui->spinBoxICDepth,       dock->ui->sliderICDepth );
     set( "icOuterH",    dock->ui->spinBoxICHeight,      dock->ui->sliderICHeight );
+    set( "icInnerL",    dock->ui->spinBoxICInnerLength,  dock->ui->sliderICInnerLength );
     set( "icInnerW",    dock->ui->spinBoxICInnerWidth,  dock->ui->sliderICInnerWidth );
-    set( "icInnerD",    dock->ui->spinBoxICInnerDepth,  dock->ui->sliderICInnerDepth );
     set( "icInnerH",    dock->ui->spinBoxICInnerHeight, dock->ui->sliderICInnerHeight );
     set( "icOffsetX",   dock->ui->spinBoxICOffsetX,     dock->ui->sliderICOffsetX );
     set( "icOffsetY",   dock->ui->spinBoxICOffsetY,     dock->ui->sliderICOffsetY );
+    set( "aghLength",       dock->ui->spinBoxAGHLength,       dock->ui->sliderAGHLength );
     set( "aghWidth",       dock->ui->spinBoxAGHWidth,       dock->ui->sliderAGHWidth );
-    set( "aghDepth",       dock->ui->spinBoxAGHDepth,       dock->ui->sliderAGHDepth );
     set( "aghWallHeight",  dock->ui->spinBoxAGHHeightWall,  dock->ui->sliderAGHHeightWall );
     set( "aghRoofHeight",  dock->ui->spinBoxAGHRoofHeight,  dock->ui->sliderAGHRoofHeight );
     set( "aghRidgeLen",    dock->ui->spinBoxAGHRidgeLength, dock->ui->sliderAGHRidgeLength );
@@ -141,9 +177,9 @@ void ParamInverter::applyToUI( ParamModelerDock *dock,
     set( "ftMidTopR",     dock->ui->spinBoxFTMiddleTopRadius,dock->ui->sliderFTMiddleTopRadius );
     set( "ftMidBulge",    dock->ui->spinBoxFTMiddleBulge,    dock->ui->sliderFTMiddleBulge );
     set( "ftConeH",       dock->ui->spinBoxFTConeHeight,     dock->ui->sliderFTConeHeight );
-    set( "tgWidth1",      dock->ui->spinBoxTGWidth1,     dock->ui->sliderTGWidth1 );
-    set( "tgWidth2",      dock->ui->spinBoxTGWidth2,     dock->ui->sliderTGWidth2 );
-    set( "tgDepth",       dock->ui->spinBoxTGDepth,      dock->ui->sliderTGDepth );
+    set( "tgLength1",      dock->ui->spinBoxTGLength1,     dock->ui->sliderTGLength1 );
+    set( "tgLength2",      dock->ui->spinBoxTGLength2,     dock->ui->sliderTGLength2 );
+    set( "tgWidth",       dock->ui->spinBoxTGWidth,      dock->ui->sliderTGWidth );
     set( "tgWallHeight",  dock->ui->spinBoxTGHeightWall, dock->ui->sliderTGHeightWall );
     set( "tgRoofHeight",  dock->ui->spinBoxTGRoofHeight, dock->ui->sliderTGRoofHeight );
     set( "tgAngle",       dock->ui->spinBoxTGAngle,      dock->ui->sliderTGAngle );
@@ -463,6 +499,478 @@ void ParamInverter::computeFootprintBounds( const QVector<QVector3D> &pts,
 }
 
 // ====================================================================
+// SA 目标函数：计算点云到参数化模型表面的 RMSE
+// ====================================================================
+double ParamInverter::computeFitError( const QVector<QVector3D> &pts,
+                                        const QString &type,
+                                        const QMap<QString, double> &params )
+{
+    double sumSq = 0;
+    int cnt = 0;
+
+    if ( type == "Cuboid" )
+    {
+        double x0 = params.value( "tx", 0 ), y0 = params.value( "ty", 0 ), z0 = params.value( "tz", 0 );
+        double L = params.value( "length", 1 ), W = params.value( "width", 1 ), H = params.value( "height", 1 );
+        for ( const QVector3D &v : pts )
+        {
+            double dx = qMax( 0.0, qMax( x0 - v.x(), v.x() - ( x0 + L ) ) );
+            double dy = qMax( 0.0, qMax( y0 - v.y(), v.y() - ( y0 + W ) ) );
+            double dz = qMax( 0.0, qMax( z0 - v.z(), v.z() - ( z0 + H ) ) );
+            sumSq += dx*dx + dy*dy + dz*dz;
+            cnt++;
+        }
+    }
+    else if ( type == "Cylinder" )
+    {
+        double cx = params.value( "tx", 0 ) + params.value( "radius", 1 );
+        double cy = params.value( "ty", 0 ) + params.value( "radius", 1 );
+        double z0 = params.value( "tz", 0 );
+        double H = params.value( "cylHeight", 1 ), R = params.value( "radius", 1 );
+        for ( const QVector3D &v : pts )
+        {
+            double r = std::sqrt( ( v.x() - cx ) * ( v.x() - cx ) + ( v.y() - cy ) * ( v.y() - cy ) );
+            bool inHeight = ( v.z() >= z0 && v.z() <= z0 + H );
+            bool inRadius = ( r <= R );
+
+            double dist;
+            if ( inHeight && inRadius )
+            {
+                // 点在圆柱内部：到最近表面的距离
+                double dSide = R - r;
+                double dTop  = z0 + H - v.z();
+                double dBot  = v.z() - z0;
+                dist = qMin( dSide, qMin( dTop, dBot ) );
+            }
+            else if ( inHeight && !inRadius )
+            {
+                dist = r - R;
+            }
+            else if ( !inHeight && inRadius )
+            {
+                double dTop = qMax( 0.0, v.z() - ( z0 + H ) );
+                double dBot = qMax( 0.0, z0 - v.z() );
+                dist = dTop + dBot;
+            }
+            else
+            {
+                double dSide = r - R;
+                double dTop  = qMax( 0.0, v.z() - ( z0 + H ) );
+                double dBot  = qMax( 0.0, z0 - v.z() );
+                dist = std::sqrt( dSide * dSide + ( dTop + dBot ) * ( dTop + dBot ) );
+            }
+            sumSq += dist * dist;
+            cnt++;
+        }
+    }
+    else if ( type == "LHouse" )
+    {
+        double x0 = params.value( "tx", 0 ), y0 = params.value( "ty", 0 ), z0 = params.value( "tz", 0 );
+        double mL = params.value( "lMainL", 1 ), mW = params.value( "lMainW", 1 );
+        double wL = params.value( "lWingL", 1 ), wW = params.value( "lWingW", 1 );
+        double H = params.value( "lHeight", 1 );
+        // L 形 = 主体矩形 (x0, y0)-(x0+mL, y0+mW) 并上 翼部矩形 (x0+mL, y0)-(x0+mL+wL, y0+wW)
+        for ( const QVector3D &v : pts )
+        {
+            // 点到 L 形包围的距离
+            double dz = qMax( 0.0, qMax( z0 - v.z(), v.z() - ( z0 + H ) ) );
+            // 主体区域距离
+            double dx1 = qMax( 0.0, qMax( x0 - v.x(), v.x() - ( x0 + mL ) ) );
+            double dy1 = qMax( 0.0, qMax( y0 - v.y(), v.y() - ( y0 + mW ) ) );
+            double d1 = std::sqrt( dx1*dx1 + dy1*dy1 + dz*dz );
+            // 翼部区域距离
+            double dx2 = qMax( 0.0, qMax( x0 + mL - v.x(), v.x() - ( x0 + mL + wL ) ) );
+            double dy2 = qMax( 0.0, qMax( y0 - v.y(), v.y() - ( y0 + wW ) ) );
+            double d2 = std::sqrt( dx2*dx2 + dy2*dy2 + dz*dz );
+            double dist = qMin( d1, d2 );
+            sumSq += dist * dist;
+            cnt++;
+        }
+    }
+    else if ( type == "ConeCylinder" )
+    {
+        double cx = params.value( "tx", 0 ) + params.value( "ccRadius", 1 );
+        double cy = params.value( "ty", 0 ) + params.value( "ccRadius", 1 );
+        double z0 = params.value( "tz", 0 );
+        double R = params.value( "ccRadius", 1 );
+        double cylH = params.value( "ccCylHeight", 1 );
+        double coneH = params.value( "ccConeHeight", 1 );
+        double splitZ = z0 + cylH;
+        double topZ = splitZ + coneH;
+        for ( const QVector3D &v : pts )
+        {
+            double r = std::sqrt( ( v.x() - cx ) * ( v.x() - cx ) + ( v.y() - cy ) * ( v.y() - cy ) );
+            double dist;
+            if ( v.z() <= splitZ )
+            {
+                // 圆柱部分
+                double dLat = qAbs( r - R );
+                double dBot = qMax( 0.0, z0 - v.z() );
+                dist = std::sqrt( dLat * dLat + dBot * dBot );
+            }
+            else
+            {
+                // 圆锥部分：理想半径线性收缩到 0
+                double t = ( v.z() - splitZ ) / coneH;
+                double idealR = R * ( 1.0 - t );
+                dist = qAbs( r - idealR );
+            }
+            sumSq += dist * dist;
+            cnt++;
+        }
+    }
+    else if ( type == "GabledRoof" || type == "PyramidRoof" || type == "AsymmetricGableHouse" )
+    {
+        // 通用棱柱+屋顶模型：底部为矩形棱柱，上部为斜面
+        QString pfx;
+        if ( type == "GabledRoof" ) pfx = "gr";
+        else if ( type == "PyramidRoof" ) pfx = "pr";
+        else pfx = "agh";
+
+        double x0 = params.value( "tx", 0 ), y0 = params.value( "ty", 0 ), z0 = params.value( "tz", 0 );
+        double L = params.value( pfx + "Length", params.value( pfx + "L", 1 ) );
+        double W = params.value( pfx + "Width", params.value( pfx + "W", 1 ) );
+        double wallH = params.value( pfx + "WallHeight", 1 );
+        double roofH = params.value( pfx + "RoofHeight", 1 );
+        double wallZ = z0 + wallH;
+        double topZ = wallZ + roofH;
+
+        for ( const QVector3D &v : pts )
+        {
+            double dist;
+            if ( v.z() <= wallZ )
+            {
+                // 墙体部分：到矩形棱柱表面距离
+                double dx = qMax( 0.0, qMax( x0 - v.x(), v.x() - ( x0 + L ) ) );
+                double dy = qMax( 0.0, qMax( y0 - v.y(), v.y() - ( y0 + W ) ) );
+                double dz = qMax( 0.0, z0 - v.z() );
+                dist = std::sqrt( dx*dx + dy*dy + dz*dz );
+            }
+            else
+            {
+                // 屋顶部分：点到屋顶面的近似距离
+                double cx = x0 + L * 0.5;
+                double relX = ( v.x() - cx ) / ( L * 0.5 + 0.001 );
+                double idealZ = wallZ + roofH * ( 1.0 - qAbs( relX ) );
+                dist = qMax( 0.0, v.z() - idealZ );
+            }
+            sumSq += dist * dist;
+            cnt++;
+        }
+    }
+    else if ( type == "TruncatedPyramidRoof" )
+    {
+        double x0 = params.value( "tx", 0 ), y0 = params.value( "ty", 0 ), z0 = params.value( "tz", 0 );
+        double bL = params.value( "tpBottomLength", 1 ), bW = params.value( "tpBottomWidth", 1 );
+        double tL = params.value( "tpTopLength", 0.5 ), tW = params.value( "tpTopWidth", 0.5 );
+        double wallH = params.value( "tpWallHeight", 1 );
+        double roofH = params.value( "tpRoofHeight", 1 );
+        double wallZ = z0 + wallH;
+
+        for ( const QVector3D &v : pts )
+        {
+            double dist;
+            if ( v.z() <= wallZ )
+            {
+                double dx = qMax( 0.0, qMax( x0 - v.x(), v.x() - ( x0 + bL ) ) );
+                double dy = qMax( 0.0, qMax( y0 - v.y(), v.y() - ( y0 + bW ) ) );
+                double dz = qMax( 0.0, z0 - v.z() );
+                dist = std::sqrt( dx*dx + dy*dy + dz*dz );
+            }
+            else
+            {
+                double t = ( v.z() - wallZ ) / roofH;
+                double iL = bL + ( tL - bL ) * t;
+                double iW = bW + ( tW - bW ) * t;
+                double cx = x0 + bL * 0.5, cy = y0 + bW * 0.5;
+                double dx = qMax( 0.0, qAbs( v.x() - cx ) - iL * 0.5 );
+                double dy = qMax( 0.0, qAbs( v.y() - cy ) - iW * 0.5 );
+                dist = std::sqrt( dx*dx + dy*dy );
+            }
+            sumSq += dist * dist;
+            cnt++;
+        }
+    }
+    else if ( type == "HalfCylinderRoof" )
+    {
+        double x0 = params.value( "tx", 0 ), y0 = params.value( "ty", 0 ), z0 = params.value( "tz", 0 );
+        double L = params.value( "hcrLength", 1 ), W = params.value( "hcrWidth", 1 );
+        double wallH = params.value( "hcrWallHeight", 1 );
+        double R = params.value( "hcrRadius", 1 );
+        double wallZ = z0 + wallH;
+
+        for ( const QVector3D &v : pts )
+        {
+            double dist;
+            if ( v.z() <= wallZ )
+            {
+                double dx = qMax( 0.0, qMax( x0 - v.x(), v.x() - ( x0 + L ) ) );
+                double dy = qMax( 0.0, qMax( y0 - v.y(), v.y() - ( y0 + W ) ) );
+                double dz = qMax( 0.0, z0 - v.z() );
+                dist = std::sqrt( dx*dx + dy*dy + dz*dz );
+            }
+            else
+            {
+                double cy = y0 + W * 0.5;
+                double dy = v.y() - cy;
+                double idealZ = wallZ + std::sqrt( qMax( 0.0, R*R - dy*dy ) );
+                dist = qAbs( v.z() - idealZ );
+            }
+            sumSq += dist * dist;
+            cnt++;
+        }
+    }
+    else if ( type == "CylinderHemisphere" )
+    {
+        double cx = params.value( "tx", 0 ) + params.value( "chRadius", 1 );
+        double cy = params.value( "ty", 0 ) + params.value( "chRadius", 1 );
+        double z0 = params.value( "tz", 0 );
+        double R = params.value( "chRadius", 1 );
+        double cylH = params.value( "chCylHeight", 1 );
+        double domeH = params.value( "chDomeHeight", 1 );
+        double splitZ = z0 + cylH;
+
+        for ( const QVector3D &v : pts )
+        {
+            double r = std::sqrt( ( v.x() - cx ) * ( v.x() - cx ) + ( v.y() - cy ) * ( v.y() - cy ) );
+            double dist;
+            if ( v.z() <= splitZ )
+            {
+                double dLat = qAbs( r - R );
+                double dBot = qMax( 0.0, z0 - v.z() );
+                dist = std::sqrt( dLat*dLat + dBot*dBot );
+            }
+            else
+            {
+                // 穹顶近似为半球
+                double t = ( v.z() - splitZ ) / domeH;
+                double idealR = R * std::sqrt( qMax( 0.0, 1.0 - t * t ) );
+                dist = qAbs( r - idealR );
+            }
+            sumSq += dist * dist;
+            cnt++;
+        }
+    }
+    else if ( type == "IndentedCuboid" )
+    {
+        double x0 = params.value( "tx", 0 ), y0 = params.value( "ty", 0 ), z0 = params.value( "tz", 0 );
+        double oL = params.value( "icOuterL", 1 ), oW = params.value( "icOuterW", 1 ), oH = params.value( "icOuterH", 1 );
+        double iL = params.value( "icInnerL", 0.5 ), iW = params.value( "icInnerW", 0.5 ), iH = params.value( "icInnerH", 0.5 );
+        double ox = params.value( "icOffsetX", 0.3 ), oy = params.value( "icOffsetY", 0.3 );
+
+        for ( const QVector3D &v : pts )
+        {
+            double dz = qMax( 0.0, qMax( z0 - v.z(), v.z() - ( z0 + oH ) ) );
+            // 外框距离
+            double dx1 = qMax( 0.0, qMax( x0 - v.x(), v.x() - ( x0 + oL ) ) );
+            double dy1 = qMax( 0.0, qMax( y0 - v.y(), v.y() - ( y0 + oW ) ) );
+            double d1 = std::sqrt( dx1*dx1 + dy1*dy1 + dz*dz );
+            // 内凹距离（负距离表示在凹陷内部）
+            double ix0 = x0 + ox, iy0 = y0 + oy;
+            bool inIndent = ( v.x() >= ix0 && v.x() <= ix0 + iL && v.y() >= iy0 && v.y() <= iy0 + iW && v.z() >= z0 && v.z() <= z0 + iH );
+            double dist;
+            if ( inIndent )
+            {
+                // 在凹陷内：距离为到凹陷边界的最小距离
+                double dix = qMin( v.x() - ix0, ix0 + iL - v.x() );
+                double diy = qMin( v.y() - iy0, iy0 + iW - v.y() );
+                dist = -qMin( dix, diy ); // 负值表示在内部
+            }
+            else
+            {
+                dist = d1;
+            }
+            sumSq += dist * dist;
+            cnt++;
+        }
+    }
+    else if ( type == "FourStageRoundTower" )
+    {
+        double cx = params.value( "tx", 0 ) + params.value( "ftBaseR", 1 );
+        double cy = params.value( "ty", 0 ) + params.value( "ftBaseR", 1 );
+        double z0 = params.value( "tz", 0 );
+        double baseR = params.value( "ftBaseR", 1 );
+        double baseH = params.value( "ftBaseH", 1 );
+        double midH = params.value( "ftMidH", 1 );
+        double midTopR = params.value( "ftMidTopR", 0.7 );
+        double coneH = params.value( "ftConeH", 1 );
+        double z1 = z0 + baseH;
+        double z2 = z1 + midH;
+        double z3 = z2 + coneH;
+
+        for ( const QVector3D &v : pts )
+        {
+            double r = std::sqrt( ( v.x() - cx ) * ( v.x() - cx ) + ( v.y() - cy ) * ( v.y() - cy ) );
+            double idealR;
+            if ( v.z() <= z1 ) idealR = baseR;
+            else if ( v.z() <= z2 ) { double t = ( v.z() - z1 ) / midH; idealR = baseR + ( midTopR - baseR ) * t; }
+            else if ( v.z() <= z3 ) { double t = ( v.z() - z2 ) / coneH; idealR = midTopR * ( 1.0 - t ); }
+            else idealR = 0;
+            double dist = qAbs( r - idealR );
+            sumSq += dist * dist;
+            cnt++;
+        }
+    }
+    else if ( type == "TwoGableHouses" )
+    {
+        double x0 = params.value( "tx", 0 ), y0 = params.value( "ty", 0 ), z0 = params.value( "tz", 0 );
+        double L1 = params.value( "tgLength1", 1 ), L2 = params.value( "tgLength2", 1 );
+        double W = params.value( "tgWidth", 1 );
+        double wallH = params.value( "tgWallHeight", 1 );
+        double roofH = params.value( "tgRoofHeight", 1 );
+        double wallZ = z0 + wallH;
+
+        for ( const QVector3D &v : pts )
+        {
+            double dist;
+            if ( v.z() <= wallZ )
+            {
+                double dx = qMax( 0.0, qMax( x0 - v.x(), v.x() - ( x0 + L1 + L2 ) ) );
+                double dy = qMax( 0.0, qMax( y0 - v.y(), v.y() - ( y0 + W ) ) );
+                double dz = qMax( 0.0, z0 - v.z() );
+                dist = std::sqrt( dx*dx + dy*dy + dz*dz );
+            }
+            else
+            {
+                double cx = x0 + ( L1 + L2 ) * 0.5;
+                double relX = ( v.x() - cx ) / ( ( L1 + L2 ) * 0.5 + 0.001 );
+                double idealZ = wallZ + roofH * ( 1.0 - qAbs( relX ) );
+                dist = qMax( 0.0, v.z() - idealZ );
+            }
+            sumSq += dist * dist;
+            cnt++;
+        }
+    }
+
+    return ( cnt > 0 ) ? std::sqrt( sumSq / cnt ) : 1e9;
+}
+
+// ====================================================================
+// SA 扰动策略：随机扰动一个形状参数，幅度随温度缩放
+// ====================================================================
+void ParamInverter::perturbParams( QMap<QString, double> &params,
+                                    const QString &type,
+                                    double T, std::mt19937 &rng )
+{
+    // 收集当前类型可扰动的形状参数键（排除位姿参数）
+    QStringList keys;
+    if ( type == "Cuboid" )
+        keys << "length" << "width" << "height";
+    else if ( type == "Cylinder" )
+        keys << "radius" << "cylHeight";
+    else if ( type == "LHouse" )
+        keys << "lMainL" << "lMainW" << "lWingL" << "lWingW" << "lHeight";
+    else if ( type == "ConeCylinder" )
+        keys << "ccRadius" << "ccCylHeight" << "ccConeHeight";
+    else if ( type == "GabledRoof" )
+        keys << "grLength" << "grWidth" << "grWallHeight" << "grRoofHeight";
+    else if ( type == "PyramidRoof" )
+        keys << "prLength" << "prWidth" << "prWallHeight" << "prRoofHeight";
+    else if ( type == "TruncatedPyramidRoof" )
+        keys << "tpBottomLength" << "tpBottomWidth" << "tpTopLength" << "tpTopWidth" << "tpWallHeight" << "tpRoofHeight";
+    else if ( type == "HalfCylinderRoof" )
+        keys << "hcrLength" << "hcrWidth" << "hcrWallHeight" << "hcrRadius";
+    else if ( type == "CylinderHemisphere" )
+        keys << "chRadius" << "chCylHeight" << "chDomeHeight" << "chBulge";
+    else if ( type == "IndentedCuboid" )
+        keys << "icOuterL" << "icOuterW" << "icOuterH" << "icInnerL" << "icInnerW" << "icInnerH" << "icOffsetX" << "icOffsetY";
+    else if ( type == "AsymmetricGableHouse" )
+        keys << "aghLength" << "aghWidth" << "aghWallHeight" << "aghRoofHeight" << "aghRidgeLen" << "aghRidgeOffset";
+    else if ( type == "FourStageRoundTower" )
+        keys << "ftBaseR" << "ftBaseH" << "ftMidH" << "ftMidTopR" << "ftMidBulge" << "ftConeH";
+    else if ( type == "TwoGableHouses" )
+        keys << "tgLength1" << "tgLength2" << "tgWidth" << "tgWallHeight" << "tgRoofHeight" << "tgAngle";
+
+    if ( keys.isEmpty() ) return;
+
+    // 随机选一个参数扰动
+    std::uniform_int_distribution<int> pick( 0, keys.size() - 1 );
+    QString key = keys[pick( rng )];
+
+    double val = params.value( key, 1.0 );
+    // 扰动幅度与温度和参数量级成正比
+    double sigma = qAbs( val ) * 0.1 * T + 0.01;
+    std::normal_distribution<double> noise( 0.0, sigma );
+
+    double newVal = val + noise( rng );
+
+    // 强制正值约束
+    if ( newVal < 0.01 ) newVal = 0.01;
+    params[key] = newVal;
+}
+
+// ====================================================================
+// SA 精化主循环：在初解基础上搜索更优参数组合
+// ====================================================================
+QMap<QString, double> ParamInverter::refineWithSA( const QVector<QVector3D> &pts,
+                                                    const QString &primitiveType,
+                                                    const QMap<QString, double> &initParams,
+                                                    int maxIter,
+                                                    double initTemp,
+                                                    double cooling )
+{
+    if ( pts.size() < 10 || initParams.isEmpty() ) return initParams;
+
+    QMap<QString, double> current = initParams;
+    double currentCost = computeFitError( pts, primitiveType, current );
+
+    QMap<QString, double> best = current;
+    double bestCost = currentCost;
+    double initCost = currentCost;
+
+    std::mt19937 rng( 42 );
+    std::uniform_real_distribution<double> uni( 0.0, 1.0 );
+
+    double T = initTemp;
+    for ( int iter = 0; iter < maxIter; iter++ )
+    {
+        QMap<QString, double> candidate = current;
+        perturbParams( candidate, primitiveType, T, rng );
+
+        double candidateCost = computeFitError( pts, primitiveType, candidate );
+        double delta = candidateCost - currentCost;
+
+        // Metropolis 准则
+        if ( delta < 0 || uni( rng ) < std::exp( -delta / T ) )
+        {
+            current = candidate;
+            currentCost = candidateCost;
+            if ( currentCost < bestCost )
+            {
+                best = current;
+                bestCost = currentCost;
+            }
+        }
+        T *= cooling;
+    }
+
+    // ===== 调试输出：SA 精化效果 =====
+    double finalCost = computeFitError( pts, primitiveType, best );
+    QString dbg = QString( "\n=== SA [%1] 初始RMSE=%2 → 最终RMSE=%3 ===\n" )
+                    .arg( primitiveType )
+                    .arg( initCost, 0, 'f', 4 )
+                    .arg( finalCost, 0, 'f', 4 );
+    // 输出精化前后关键参数的变化
+    for ( auto it = initParams.constBegin(); it != initParams.constEnd(); ++it )
+    {
+        if ( it.key() == "tx" || it.key() == "ty" || it.key() == "tz" ) continue;
+        double before = it.value();
+        double after  = best.value( it.key(), before );
+        dbg += QString( "  %1: %2 → %3\n" ).arg( it.key() ).arg( before, 0, 'f', 4 ).arg( after, 0, 'f', 4 );
+    }
+    DEBUG_LOG( dbg.toStdWString().c_str() );
+
+    // SA 未明显改善时返回初解
+    if ( finalCost >= initCost * 0.99 )
+    {
+        DEBUG_LOG( L"SA 未收敛，返回初解\n" );
+        return initParams;
+    }
+
+    return best;
+}
+
+// ====================================================================
 // Cuboid: 包围盒直接获取
 // ====================================================================
 QMap<QString, double> ParamInverter::invertCuboid( const QVector<QVector3D> &pts )
@@ -478,13 +986,13 @@ QMap<QString, double> ParamInverter::invertCuboid( const QVector<QVector3D> &pts
     for ( const QVector3D &v : pts ) zs.append( v.z() );
     std::sort( zs.begin(), zs.end() );
 
-    p["width"]  = maxX - minX;
-    p["depth"]  = maxY - minY;
+    p["length"]  = maxX - minX;
+    p["width"]  = maxY - minY;
     p["height"] = zs.last() - zs.first();
     p["tx"] = minX;
     p["ty"] = minY;
     p["tz"] = zs.first();
-    return p;
+    return refineWithSA( pts, "Cuboid", p );
 }
 
 // ====================================================================
@@ -495,28 +1003,34 @@ QMap<QString, double> ParamInverter::invertCylinder( const QVector<QVector3D> &p
     QMap<QString, double> p;
     if ( pts.size() < 10 ) return p;
 
-    // 用底部的点拟合圆（避免顶部噪声）
     QVector<double> zs;
     zs.reserve( pts.size() );
     for ( const QVector3D &v : pts ) zs.append( v.z() );
     std::sort( zs.begin(), zs.end() );
-    double zMin = zs.first(), zMax = zs.last();
-    double zCut = zMin + ( zMax - zMin ) * 0.3;
 
-    QVector<QVector3D> basePts;
+    // 用 1%~99% 分位数替代 zMin/zMax，排除顶底面噪声点
+    double zMin = zs[ zs.size() * 1 / 100 ];
+    double zMax = zs[ zs.size() * 99 / 100 ];
+    double H = zMax - zMin;
+
+    // 用中间 40%~80% 高度的点拟合圆（纯侧面，排除顶底面干扰）
+    double zLo = zMin + H * 0.40;
+    double zHi = zMin + H * 0.80;
+    QVector<QVector3D> sidePts;
     for ( const QVector3D &v : pts )
-        if ( v.z() <= zCut )
-            basePts.append( v );
+        if ( v.z() >= zLo && v.z() <= zHi )
+            sidePts.append( v );
+    if ( sidePts.size() < 10 ) sidePts = pts;
 
     double cx, cy, radius;
-    fitCircleRANSAC( basePts, cx, cy, radius );
+    fitCircleRANSAC( sidePts, cx, cy, radius );
 
-    p["radius"] = radius;
-    p["cylHeight"] = zMax - zMin;
+    p["radius"]    = radius;
+    p["cylHeight"] = H;
     p["tx"] = cx - radius;
     p["ty"] = cy - radius;
     p["tz"] = zMin;
-    return p;
+    return refineWithSA( pts, "Cylinder", p );
 }
 
 // ====================================================================
@@ -581,15 +1095,15 @@ QMap<QString, double> ParamInverter::invertLHouse( const QVector<QVector3D> &pts
     double sX = minX + W * splitX / G;
     double sY = minY + D * splitY / G;
 
-    p["lMainW"]   = sX - minX;
-    p["lMainD"]   = maxY - minY;
-    p["lWingW"]   = maxX - sX;
-    p["lWingD"]   = sY - minY;
+    p["lMainL"]   = sX - minX;
+    p["lMainW"]   = maxY - minY;
+    p["lWingL"]   = maxX - sX;
+    p["lWingW"]   = sY - minY;
     p["lHeight"]  = zMax - zMin;
     p["tx"] = minX;
     p["ty"] = minY;
     p["tz"] = zMin;
-    return p;
+    return refineWithSA( pts, "LHouse", p );
 }
 
 // ====================================================================
@@ -659,7 +1173,7 @@ QMap<QString, double> ParamInverter::invertConeCylinder( const QVector<QVector3D
     p["tx"] = crx - cr;
     p["ty"] = cry - cr;
     p["tz"] = zMin;
-    return p;
+    return refineWithSA( pts, "ConeCylinder", p );
 }
 
 // ====================================================================
@@ -691,14 +1205,14 @@ QMap<QString, double> ParamInverter::invertGabledRoof( const QVector<QVector3D> 
     QVector3D ridgeOrg, ridgeDir;
     fitLineRANSAC( topPts, ridgeOrg, ridgeDir );
 
-    p["grWidth"]      = maxX - minX;
-    p["grDepth"]      = maxY - minY;
+    p["grLength"]      = maxX - minX;
+    p["grWidth"]      = maxY - minY;
     p["grWallHeight"] = wallZ - zMin;
     p["grRoofHeight"] = zMax - wallZ;
     p["tx"] = minX;
     p["ty"] = minY;
     p["tz"] = zMin;
-    return p;
+    return refineWithSA( pts, "GabledRoof", p );
 }
 
 // ====================================================================
@@ -721,14 +1235,14 @@ QMap<QString, double> ParamInverter::invertPyramidRoof( const QVector<QVector3D>
     int splitIdx = findHeightSplit( zs, 0.4 );
     double wallZ = zs[qBound( 0, splitIdx, zs.size() - 1 )];
 
-    p["prWidth"]      = maxX - minX;
-    p["prDepth"]      = maxY - minY;
+    p["prLength"]      = maxX - minX;
+    p["prWidth"]      = maxY - minY;
     p["prWallHeight"] = wallZ - zMin;
     p["prRoofHeight"] = zMax - wallZ;
     p["tx"] = minX;
     p["ty"] = minY;
     p["tz"] = zMin;
-    return p;
+    return refineWithSA( pts, "PyramidRoof", p );
 }
 
 // ====================================================================
@@ -767,16 +1281,16 @@ QMap<QString, double> ParamInverter::invertTruncatedPyramidRoof( const QVector<Q
     double topW = qMax( 0.5, tMaxX - tMinX );
     double topD = qMax( 0.5, tMaxY - tMinY );
 
-    p["tpBottomWidth"]  = maxX - minX;
-    p["tpBottomDepth"]  = maxY - minY;
-    p["tpTopWidth"]     = topW;
-    p["tpTopDepth"]     = topD;
+    p["tpBottomLength"]  = maxX - minX;
+    p["tpBottomWidth"]  = maxY - minY;
+    p["tpTopLength"]     = topW;
+    p["tpTopWidth"]     = topD;
     p["tpWallHeight"]   = wallZ - zMin;
     p["tpRoofHeight"]   = zMax - wallZ;
     p["tx"] = minX;
     p["ty"] = minY;
     p["tz"] = zMin;
-    return p;
+    return refineWithSA( pts, "TruncatedPyramidRoof", p );
 }
 
 // ====================================================================
@@ -808,14 +1322,14 @@ QMap<QString, double> ParamInverter::invertHalfCylinderRoof( const QVector<QVect
     double crx, cry, cr;
     fitCircleRANSAC( topPts, crx, cry, cr );
 
-    p["hcrWidth"]      = maxX - minX;
-    p["hcrDepth"]      = maxY - minY;
+    p["hcrLength"]      = maxX - minX;
+    p["hcrWidth"]      = maxY - minY;
     p["hcrWallHeight"] = wallZ - zMin;
     p["hcrRadius"]     = cr;
     p["tx"] = minX;
     p["ty"] = minY;
     p["tz"] = zMin;
-    return p;
+    return refineWithSA( pts, "HalfCylinderRoof", p );
 }
 
 // ====================================================================
@@ -869,7 +1383,7 @@ QMap<QString, double> ParamInverter::invertCylinderHemisphere( const QVector<QVe
     p["tx"] = cx - radius;
     p["ty"] = cy - radius;
     p["tz"] = zMin;
-    return p;
+    return refineWithSA( pts, "CylinderHemisphere", p );
 }
 
 // ====================================================================
@@ -923,18 +1437,18 @@ QMap<QString, double> ParamInverter::invertIndentedCuboid( const QVector<QVector
     double ox = ( xStart < G ) ? ( xStart * W / G ) : W * 0.3;
     double oy = ( yStart < G ) ? ( yStart * D / G ) : D * 0.3;
 
-    p["icOuterW"]   = W;
-    p["icOuterD"]   = D;
+    p["icOuterL"]   = W;
+    p["icOuterW"]   = D;
     p["icOuterH"]   = H;
-    p["icInnerW"]   = iW;
-    p["icInnerD"]   = iD;
+    p["icInnerL"]   = iW;
+    p["icInnerW"]   = iD;
     p["icInnerH"]   = H * 0.6;
     p["icOffsetX"]  = ox;
     p["icOffsetY"]  = oy;
     p["tx"] = minX;
     p["ty"] = minY;
     p["tz"] = zMin;
-    return p;
+    return refineWithSA( pts, "IndentedCuboid", p );
 }
 
 // ====================================================================
@@ -976,8 +1490,8 @@ QMap<QString, double> ParamInverter::invertAsymmetricGableHouse( const QVector<Q
     // 脊线长度
     double ridgeLen = ( maxY - minY ) * 0.8;
 
-    p["aghWidth"]       = maxX - minX;
-    p["aghDepth"]       = maxY - minY;
+    p["aghLength"]       = maxX - minX;
+    p["aghWidth"]       = maxY - minY;
     p["aghWallHeight"]  = wallZ - zMin;
     p["aghRoofHeight"]  = zMax - wallZ;
     p["aghRidgeLen"]    = ridgeLen;
@@ -985,7 +1499,7 @@ QMap<QString, double> ParamInverter::invertAsymmetricGableHouse( const QVector<Q
     p["tx"] = minX;
     p["ty"] = minY;
     p["tz"] = zMin;
-    return p;
+    return refineWithSA( pts, "AsymmetricGableHouse", p );
 }
 
 // ====================================================================
@@ -1053,7 +1567,7 @@ QMap<QString, double> ParamInverter::invertFourStageRoundTower( const QVector<QV
     p["tx"] = cx - baseR;
     p["ty"] = cy - baseR;
     p["tz"] = zMin;
-    return p;
+    return refineWithSA( pts, "FourStageRoundTower", p );
 }
 
 // ====================================================================
@@ -1107,14 +1621,14 @@ QMap<QString, double> ParamInverter::invertTwoGableHouses( const QVector<QVector
     double w1 = W * 0.55;
     double w2 = W * 0.45;
 
-    p["tgWidth1"]     = w1;
-    p["tgWidth2"]     = w2;
-    p["tgDepth"]      = D;
+    p["tgLength1"]     = w1;
+    p["tgLength2"]     = w2;
+    p["tgWidth"]      = D;
     p["tgWallHeight"] = wallZ - zMin;
     p["tgRoofHeight"] = zMax - wallZ;
     p["tgAngle"]      = angle;
     p["tx"] = minX;
     p["ty"] = minY;
     p["tz"] = zMin;
-    return p;
+    return refineWithSA( pts, "TwoGableHouses", p );
 }

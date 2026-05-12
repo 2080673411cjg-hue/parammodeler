@@ -16,6 +16,9 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include <windows.h>
+#define DEBUG_LOG(msg) OutputDebugStringW(msg)
+#include <QDir>        // 写日志文件用
 
 #include <qgspointcloudlayer.h>
 #include <qgspointcloudindex.h>
@@ -24,26 +27,91 @@
 #include <qgspointcloudrequest.h>
 #include <qgspointcloudattribute.h>
 #include <qgsvector3d.h>
+#include <numeric>    // std::iota
+#include <random>     // std::mt19937
 
 // ====================================================================
 // 公共入口
 // ====================================================================
 PrimitiveClassifier::Result PrimitiveClassifier::classify( const QString &filePath )
 {
-    Result result;
-    result.primitiveType = "Cuboid";
-    result.confidence = 0.0;
+  Result result;
+  result.primitiveType = "Unknown";
+  result.confidence = 0.0;
 
-    if ( filePath.isEmpty() ) return result;
-
-    PointCloud pc = loadPointCloud( filePath );
-    if ( pc.points.isEmpty() ) return result;
-
-    PointCloud sp = downsample( pc, 2000 );
-    FeatureVector fv = extractFeatures( sp );
-    result = classifyByScore( fv );
-
+  if ( filePath.isEmpty() )
     return result;
+
+  PointCloud pc = loadPointCloud( filePath );
+  if ( pc.points.isEmpty() )
+    return result;
+
+  PointCloud sp = downsample( pc, 5000 );
+  sp = curvatureFilter( sp, 0.05, 0.20, 2000 );
+  FeatureVector fv = extractFeatures( sp );
+
+  // ===== 调试输出 START =====
+  QString dbg = QString(
+                  "\n=== PrimitiveClassifier Features ===\n"
+                  "原始点数:        %1\n"
+                  "采样后点数:      %2\n"
+                  "Circularity:     %3\n"
+                  "AspectRatio:     %4\n"
+                  "Convexity:       %5  ← L形应在0.5~0.65，矩形应在0.9+\n"
+                  "PcaRatio12:      %6\n"
+                  "PcaRatio23:      %7\n"
+                  "HeightRatio50:   %8\n"
+                  "HeightRatio80:   %9\n"
+                  "TopSlope:        %10\n"
+                  "SymmetryX:       %11  ← L形应在0.5，矩形应在0.9\n"
+                  "SymmetryY:       %12  ← 同上\n"
+                  "CrossSection:    %13\n"
+                  "NumStages:       %14\n"
+                  "RoofAngle:       %15\n"
+                  "TopLinearity:    %16\n"
+                  "VertSegments:    %17\n"
+                  "====================================\n"
+  )
+                  .arg( pc.originalCount )
+                  .arg( sp.points.size() )
+                  .arg( fv.footprintCircularity, 0, 'f', 4 )
+                  .arg( fv.footprintAspectRatio, 0, 'f', 4 )
+                  .arg( fv.footprintConvexity, 0, 'f', 4 )
+                  .arg( fv.pcaRatio12, 0, 'f', 4 )
+                  .arg( fv.pcaRatio23, 0, 'f', 4 )
+                  .arg( fv.heightRatio50, 0, 'f', 4 )
+                  .arg( fv.heightRatio80, 0, 'f', 4 )
+                  .arg( fv.topSlope, 0, 'f', 4 )
+                  .arg( fv.symmetryX, 0, 'f', 4 )
+                  .arg( fv.symmetryY, 0, 'f', 4 )
+                  .arg( fv.crossSectionConsistency, 0, 'f', 4 )
+                  .arg( fv.numStages )
+                  .arg( fv.roofAngle, 0, 'f', 4 )
+                  .arg( fv.topLinearity, 0, 'f', 4 )
+                  .arg( fv.numVerticalSegments );
+
+  // 方式1：VS输出窗口（推荐，RelWithDebInfo下最可靠）
+  DEBUG_LOG( dbg.toStdWString().c_str() );
+
+  // 方式2：同时写文件，万一输出窗口没显示
+  QFile logFile( QDir::tempPath() + "/parammodeler_classify.log" );
+  if ( logFile.open( QIODevice::Append | QIODevice::Text ) )
+  {
+    QTextStream ts( &logFile );
+    ts << dbg;
+    logFile.close();
+  }
+  // ===== 调试输出 END =====
+
+  result = classifyByScore( fv );
+
+  // 顺便也输出最终结果
+  QString res = QString( ">>> 识别结果: %1  置信度: %2%\n" )
+                  .arg( result.primitiveType )
+                  .arg( result.confidence * 100, 0, 'f', 1 );
+  DEBUG_LOG( res.toStdWString().c_str() );
+
+  return result;
 }
 
 // ====================================================================
@@ -297,7 +365,43 @@ PrimitiveClassifier::PointCloud PrimitiveClassifier::loadPointCloud( const QStri
 // ====================================================================
 // 体素降采样
 // ====================================================================
-PrimitiveClassifier::PointCloud PrimitiveClassifier::downsample( const PointCloud &pc, int targetPoints )
+PrimitiveClassifier::PointCloud PrimitiveClassifier::downsample(
+  const PointCloud &pc, int targetPoints
+)
+{
+  PointCloud result;
+  result.bboxMin = pc.bboxMin;
+  result.bboxMax = pc.bboxMax;
+  result.originalCount = pc.originalCount;
+
+  int n = pc.points.size();
+  if ( n <= targetPoints )
+  {
+    result.points = pc.points;
+    return result;
+  }
+
+  // ✅ 用随机打乱代替步进，保留空间均匀性
+  QVector<int> indices( n );
+  std::iota( indices.begin(), indices.end(), 0 );
+
+  // 用固定种子保证可重复性
+  std::mt19937 rng( 42 );
+  std::shuffle( indices.begin(), indices.end(), rng );
+
+  result.points.reserve( targetPoints );
+  for ( int i = 0; i < targetPoints; i++ )
+    result.points.append( pc.points[indices[i]] );
+
+  return result;
+}
+
+// ====================================================================
+// 曲率关键点滤波：基于双半径法向量夹角保留几何语义最丰富的点
+// ====================================================================
+PrimitiveClassifier::PointCloud PrimitiveClassifier::curvatureFilter(
+  const PointCloud &pc, double R1, double R2, int targetPoints
+)
 {
     PointCloud result;
     result.bboxMin = pc.bboxMin;
@@ -311,14 +415,154 @@ PrimitiveClassifier::PointCloud PrimitiveClassifier::downsample( const PointClou
         return result;
     }
 
-    float step = static_cast<float>( n ) / targetPoints;
-    result.points.reserve( targetPoints );
-    for ( int i = 0; i < targetPoints; i++ )
+    // 构建空间哈希网格加速邻域搜索
+    double gridSize = R2;
+    if ( gridSize < 0.001 ) gridSize = 0.1;
+
+    auto hashKey = [&]( int ix, int iy, int iz ) -> qint64 {
+        return ( static_cast<qint64>( ix + 50000 ) << 40 ) |
+               ( static_cast<qint64>( iy + 50000 ) << 20 ) |
+               static_cast<qint64>( iz + 50000 );
+    };
+
+    QMap<qint64, QVector<int>> grid;
+    for ( int i = 0; i < n; i++ )
     {
-        int idx = static_cast<int>( i * step );
-        if ( idx >= n ) idx = n - 1;
-        result.points.append( pc.points[idx] );
+        int ix = static_cast<int>( std::floor( pc.points[i].x() / gridSize ) );
+        int iy = static_cast<int>( std::floor( pc.points[i].y() / gridSize ) );
+        int iz = static_cast<int>( std::floor( pc.points[i].z() / gridSize ) );
+        grid[hashKey( ix, iy, iz )].append( i );
     }
+
+    auto findNeighbors = [&]( int idx, double radius ) -> QVector<int> {
+        QVector<int> result;
+        double px = pc.points[idx].x(), py = pc.points[idx].y(), pz = pc.points[idx].z();
+        int cx = static_cast<int>( std::floor( px / gridSize ) );
+        int cy = static_cast<int>( std::floor( py / gridSize ) );
+        int cz = static_cast<int>( std::floor( pz / gridSize ) );
+        int cellRadius = static_cast<int>( std::ceil( radius / gridSize ) );
+        double r2 = radius * radius;
+
+        for ( int dx = -cellRadius; dx <= cellRadius; dx++ )
+            for ( int dy = -cellRadius; dy <= cellRadius; dy++ )
+                for ( int dz = -cellRadius; dz <= cellRadius; dz++ )
+                {
+                    auto it = grid.find( hashKey( cx + dx, cy + dy, cz + dz ) );
+                    if ( it == grid.end() ) continue;
+                    for ( int j : it.value() )
+                    {
+                        double ddx = pc.points[j].x() - px;
+                        double ddy = pc.points[j].y() - py;
+                        double ddz = pc.points[j].z() - pz;
+                        if ( ddx * ddx + ddy * ddy + ddz * ddz <= r2 )
+                            result.append( j );
+                    }
+                }
+        return result;
+    };
+
+    // 对每个点计算双半径曲率得分
+    struct ScoredPoint { int idx; double score; };
+    QVector<ScoredPoint> scores;
+    scores.reserve( n );
+
+    for ( int i = 0; i < n; i++ )
+    {
+        // --- 半径 R1 的法向量估计（通过协方差矩阵最小特征值方向） ---
+        QVector<int> nb1 = findNeighbors( i, R1 );
+        double curvature1 = 0;
+        double nx1 = 0, ny1 = 0, nz1 = 1;
+
+        if ( nb1.size() >= 4 )
+        {
+            double mx = 0, my = 0, mz = 0;
+            for ( int j : nb1 ) { mx += pc.points[j].x(); my += pc.points[j].y(); mz += pc.points[j].z(); }
+            int cnt = nb1.size();
+            mx /= cnt; my /= cnt; mz /= cnt;
+
+            double cxx = 0, cxy = 0, cxz = 0, cyy = 0, cyz = 0, czz = 0;
+            for ( int j : nb1 )
+            {
+                double dx = pc.points[j].x() - mx, dy = pc.points[j].y() - my, dz = pc.points[j].z() - mz;
+                cxx += dx*dx; cxy += dx*dy; cxz += dx*dz;
+                cyy += dy*dy; cyz += dy*dz; czz += dz*dz;
+            }
+
+            // 简化：取协方差矩阵对角元素中最小的方向作为法向量近似
+            // 使用伴随矩阵的第一列近似最小特征向量
+            double a = cxx, b = cxy, c = cxz;
+            double e = cyy, f = cyz;
+            double h = czz;
+
+            // adjugate cofactors for (row 0) = cross products of rows 1,2
+            double v1x = e * h - f * f;
+            double v1y = c * f - b * h;
+            double v1z = b * f - c * e;
+            double len = std::sqrt( v1x*v1x + v1y*v1y + v1z*v1z );
+            if ( len > 1e-10 )
+            {
+                nx1 = v1x / len; ny1 = v1y / len; nz1 = v1z / len;
+            }
+
+            // 曲率 = 最小特征值 / 迹（通过行列式和迹近似）
+            double trace = a + e + h;
+            curvature1 = ( trace > 1e-10 ) ? ( len / ( trace * trace ) ) : 0;
+        }
+
+        // --- 半径 R2 的法向量 ---
+        QVector<int> nb2 = findNeighbors( i, R2 );
+        double curvature2 = 0;
+        double nx2 = 0, ny2 = 0, nz2 = 1;
+
+        if ( nb2.size() >= 4 )
+        {
+            double mx = 0, my = 0, mz = 0;
+            for ( int j : nb2 ) { mx += pc.points[j].x(); my += pc.points[j].y(); mz += pc.points[j].z(); }
+            int cnt = nb2.size();
+            mx /= cnt; my /= cnt; mz /= cnt;
+
+            double cxx = 0, cxy = 0, cxz = 0, cyy = 0, cyz = 0, czz = 0;
+            for ( int j : nb2 )
+            {
+                double dx = pc.points[j].x() - mx, dy = pc.points[j].y() - my, dz = pc.points[j].z() - mz;
+                cxx += dx*dx; cxy += dx*dy; cxz += dx*dz;
+                cyy += dy*dy; cyz += dy*dz; czz += dz*dz;
+            }
+
+            double a = cxx, b = cxy, c = cxz;
+            double e = cyy, f = cyz;
+            double h = czz;
+
+            double v1x = e * h - f * f;
+            double v1y = c * f - b * h;
+            double v1z = b * f - c * e;
+            double len = std::sqrt( v1x*v1x + v1y*v1y + v1z*v1z );
+            if ( len > 1e-10 )
+            {
+                nx2 = v1x / len; ny2 = v1y / len; nz2 = v1z / len;
+            }
+
+            double trace = a + e + h;
+            curvature2 = ( trace > 1e-10 ) ? ( len / ( trace * trace ) ) : 0;
+        }
+
+        // 双半径法向量夹角
+        double dot = qBound( -1.0, nx1*nx2 + ny1*ny2 + nz1*nz2, 1.0 );
+        double angle = std::acos( qAbs( dot ) );
+
+        // 综合得分：曲率差异 + 法向量夹角
+        double score = qAbs( curvature1 - curvature2 ) * 10.0 + angle;
+        scores.append( { i, score } );
+    }
+
+    // 按得分降序排列，取前 targetPoints 个
+    std::sort( scores.begin(), scores.end(),
+               []( const ScoredPoint &a, const ScoredPoint &b ) { return a.score > b.score; } );
+
+    result.points.reserve( targetPoints );
+    for ( int i = 0; i < targetPoints && i < scores.size(); i++ )
+        result.points.append( pc.points[scores[i].idx] );
+
     return result;
 }
 
@@ -439,8 +683,9 @@ double PrimitiveClassifier::computeCircularity( const QVector<QVector3D> &xyProj
     int n = radii.size();
     if ( n < 10 ) return 0.0;
 
-    // 只用中间 80% 的点来计算，过滤离群点
-    int lo = n / 10, hi = n * 9 / 10;
+    // 只用最外圈 20% 的点（径向距离最大的），忽略内部填充点
+    // 这样实心圆盘（导出圆柱的侧面采样）和圆环（真实扫描）都能正确识别为圆形
+    int lo = n * 4 / 5, hi = n * 19 / 20;
     double sum = 0, sumSq = 0;
     int cnt = 0;
     for ( int i = lo; i < hi; i++ )
@@ -517,21 +762,21 @@ static double polygonArea2D( const QVector<QVector3D> &poly )
     return qAbs( area ) * 0.5;
 }
 
-double PrimitiveClassifier::computeConvexity( const QVector<QVector3D> &xyProj,
-                                                const QVector3D &bboxMin,
-                                                const QVector3D &bboxMax )
+double PrimitiveClassifier::computeConvexity( const QVector<QVector3D> &xyProj, const QVector3D &bboxMin, const QVector3D &bboxMax )
 {
-    double bboxArea = ( bboxMax.x() - bboxMin.x() ) * ( bboxMax.y() - bboxMin.y() );
-    if ( bboxArea < 0.0001 ) return 1.0;
+  double bboxArea = ( bboxMax.x() - bboxMin.x() ) * ( bboxMax.y() - bboxMin.y() );
+  if ( bboxArea < 0.0001 )
+    return 1.0;
 
-    QVector<QVector3D> hull = convexHull2D( xyProj );
-    double hullArea = polygonArea2D( hull );
-    if ( hullArea < 0.0001 ) return 1.0;
+  QVector<QVector3D> hull = convexHull2D( xyProj );
+  double hullArea = polygonArea2D( hull );
+  if ( hullArea < 0.0001 )
+    return 1.0;
 
-    double convexity = bboxArea / hullArea;
-    return qBound( 0.0, convexity, 1.0 );
+  // ✅ 修正：凸包面积 / 包围盒面积，L形 ≈ 0.55，矩形 ≈ 0.95
+  double convexity = hullArea / bboxArea;
+  return qBound( 0.0, convexity, 1.0 );
 }
-
 // ====================================================================
 // PCA：协方差矩阵特征值分解
 // ====================================================================
@@ -745,15 +990,9 @@ double PrimitiveClassifier::computeCrossSectionConsistency( const PointCloud &pc
 
         if ( slicePts.size() < 5 ) continue;
 
-        QVector3D bmin = slicePts[0], bmax = slicePts[0];
-        for ( const QVector3D &p : slicePts )
-        {
-            if ( p.x() < bmin.x() ) bmin.setX( p.x() );
-            if ( p.y() < bmin.y() ) bmin.setY( p.y() );
-            if ( p.x() > bmax.x() ) bmax.setX( p.x() );
-            if ( p.y() > bmax.y() ) bmax.setY( p.y() );
-        }
-        double area = ( bmax.x() - bmin.x() ) * ( bmax.y() - bmin.y() );
+        // 用凸包面积替代包围盒面积，能区分 L 形和矩形等非凸截面
+        QVector<QVector3D> hull = convexHull2D( slicePts );
+        double area = polygonArea2D( hull );
         if ( area > 0 ) areas.append( area );
     }
 
@@ -863,14 +1102,14 @@ QVector<PrimitiveClassifier::TypeProfile> PrimitiveClassifier::buildProfiles()
         p.name = "Cuboid";
         p.expCircularity = 0.05;       p.weightCircularity = 2.0;
         p.expAspectRatio = 0.6;        p.weightAspectRatio = 0.5;
-        p.expConvexity = 0.95;         p.weightConvexity = 1.5;
+        p.expConvexity = 0.92;         p.weightConvexity = 1.5;
         p.expPcaRatio12 = 0.7;         p.weightPcaRatio12 = 1.0;
         p.expPcaRatio23 = 0.3;         p.weightPcaRatio23 = 1.0;
         p.expHeight50 = 0.5;           p.weightHeight50 = 0.5;
         p.expHeight80 = 0.8;           p.weightHeight80 = 0.5;
         p.expTopSlope = 0.01;          p.weightTopSlope = 2.0;
-        p.expSymmetryX = 0.9;          p.weightSymmetryX = 2.0;
-        p.expSymmetryY = 0.9;          p.weightSymmetryY = 2.0;
+        p.expSymmetryX = 0.88;          p.weightSymmetryX = 2.0;
+        p.expSymmetryY = 0.88;          p.weightSymmetryY = 2.0;
         p.expCrossSection = 0.95;      p.weightCrossSection = 2.0;
         p.expStages = 1;               p.weightStages = 1.0;
         p.expRoofAngle = 0.65;         p.weightRoofAngle = 0.5;
@@ -1168,14 +1407,14 @@ double PrimitiveClassifier::scoreProfile( const FeatureVector &fv, const TypePro
 
     addScore( tp.weightCircularity,     gaussScore( fv.footprintCircularity, tp.expCircularity, 0.25 ) );
     addScore( tp.weightAspectRatio,     gaussScore( fv.footprintAspectRatio, tp.expAspectRatio, 0.30 ) );
-    addScore( tp.weightConvexity,       gaussScore( fv.footprintConvexity,   tp.expConvexity,   0.20 ) );
+    addScore( tp.weightConvexity,       gaussScore( fv.footprintConvexity,   tp.expConvexity,   0.10 ) );
     addScore( tp.weightPcaRatio12,      gaussScore( fv.pcaRatio12,           tp.expPcaRatio12,   0.25 ) );
     addScore( tp.weightPcaRatio23,      gaussScore( fv.pcaRatio23,           tp.expPcaRatio23,   0.25 ) );
     addScore( tp.weightHeight50,        gaussScore( fv.heightRatio50,        tp.expHeight50,     0.15 ) );
     addScore( tp.weightHeight80,        gaussScore( fv.heightRatio80,        tp.expHeight80,     0.15 ) );
     addScore( tp.weightTopSlope,        gaussScore( fv.topSlope,             tp.expTopSlope,     0.08 ) );
-    addScore( tp.weightSymmetryX,       gaussScore( fv.symmetryX,            tp.expSymmetryX,    0.20 ) );
-    addScore( tp.weightSymmetryY,       gaussScore( fv.symmetryY,            tp.expSymmetryY,    0.20 ) );
+    addScore( tp.weightSymmetryX,       gaussScore( fv.symmetryX,            tp.expSymmetryX,    0.12 ) );
+    addScore( tp.weightSymmetryY,       gaussScore( fv.symmetryY,            tp.expSymmetryY,    0.12 ) );
     addScore( tp.weightCrossSection,    gaussScore( fv.crossSectionConsistency, tp.expCrossSection, 0.20 ) );
     addScore( tp.weightStages,          gaussScore( static_cast<double>( fv.numStages ), static_cast<double>( tp.expStages ), 1.0 ) );
     addScore( tp.weightRoofAngle,       gaussScore( fv.roofAngle,            tp.expRoofAngle,    0.20 ) );
@@ -1220,6 +1459,24 @@ PrimitiveClassifier::classifyByScore( const FeatureVector &fv )
     double margin = bestScore - secondBestScore;
     best.confidence = bestScore * ( 0.7 + 0.3 * qBound( 0.0, margin * 2.0, 1.0 ) );
     best.confidence = qBound( 0.0, best.confidence, 1.0 );
+
+    // ===== 拒识机制 =====
+    // 最佳分数过低：点云与所有类型都不匹配 → 输出 Unknown
+    const double REJECT_THRESHOLD = 0.45;
+    if ( bestScore < REJECT_THRESHOLD )
+    {
+        best.primitiveType = "Unknown";
+        best.confidence = 0.0;
+        return best;
+    }
+
+    // 最佳与第二名差距太小：类型模糊，降低置信度
+    const double AMBIGUITY_THRESHOLD = 0.05;
+    if ( margin < AMBIGUITY_THRESHOLD )
+    {
+        best.confidence *= 0.5;
+        best.confidence = qBound( 0.0, best.confidence, 1.0 );
+    }
 
     return best;
 }

@@ -74,6 +74,9 @@
 #include <qgs3dtypes.h>
 #include <qgsvectorfilewriter.h>
 #include <QDateTime>
+#include <windows.h>
+#define DEBUG_LOG(msg) OutputDebugStringW(msg)
+
 // ======================slider和spinBox的绑定函数：==================================
 //根据倍率（乘数）同步数值，确保滑动条和数字输入框显示的参数一致
 static void bindSliderSpin(QSlider* slider, QDoubleSpinBox* spin, double multiplier, double maxVal = 100.0, double minVal = 0.0)
@@ -109,47 +112,47 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   setWindowTitle( tr( "Parametric Modeler" ) );// 设置窗口标题
 		
   // slider和spinBox的每个基元的绑定
-  bindSliderSpin( ui->sliderCWidth, ui->spinBoxCWidth, 100.0, 50.0 );  // 长方体
-  bindSliderSpin( ui->sliderCDepth, ui->spinBoxCDepth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderCLength, ui->spinBoxCLength, 100.0, 50.0 );  // 长方体
+  bindSliderSpin( ui->sliderCWidth, ui->spinBoxCWidth, 100.0, 50.0 );
   bindSliderSpin( ui->sliderCHeight, ui->spinBoxCHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderCylRadius, ui->spinBoxCylRadius, 100.0, 50.0 );  // 圆柱
   bindSliderSpin( ui->sliderCylHeight, ui->spinBoxCylHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderLMainLength, ui->spinBoxLMainLength, 100.0, 50.0 );
   bindSliderSpin( ui->sliderLMainWidth, ui->spinBoxLMainWidth, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderLMainDepth, ui->spinBoxLMainDepth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderLWingLength, ui->spinBoxLWingLength, 100.0, 50.0 );
   bindSliderSpin( ui->sliderLWingWidth, ui->spinBoxLWingWidth, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderLWingDepth, ui->spinBoxLWingDepth, 100.0, 50.0 );
   bindSliderSpin( ui->sliderLHeight, ui->spinBoxLHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderConeCylRadius, ui->spinBoxConeCylRadius, 100.0, 50.0 );  // 圆锥体 (ConeCylinder)
   bindSliderSpin( ui->sliderConeCylCylHeight, ui->spinBoxConeCylCylHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderConeCylConeHeight, ui->spinBoxConeCylConeHeight, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderGRWidth,      ui->spinBoxGRWidth,100,50 );  // 人字形屋顶 (GabledRoof) 绑定
-  bindSliderSpin( ui->sliderGRDepth, ui->spinBoxGRDepth, 100, 50 );
+  bindSliderSpin( ui->sliderGRLength,      ui->spinBoxGRLength,100,50 );  // 人字形屋顶 (GabledRoof) 绑定
+  bindSliderSpin( ui->sliderGRWidth, ui->spinBoxGRWidth, 100, 50 );
   bindSliderSpin( ui->sliderGRHeightWall, ui->spinBoxGRHeightWall, 100.0, 50.0 );
   bindSliderSpin( ui->sliderGRHeightRoof, ui->spinBoxGRHeightRoof, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderPRWidth, ui->spinBoxPRWidth, 100, 50 ); // --- PyramidRoof (金字塔房屋) 绑定 ---
-  bindSliderSpin( ui->sliderPRDepth, ui->spinBoxPRDepth, 100, 50 );
+  bindSliderSpin( ui->sliderPRLength, ui->spinBoxPRLength, 100, 50 ); // --- PyramidRoof (金字塔房屋) 绑定 ---
+  bindSliderSpin( ui->sliderPRWidth, ui->spinBoxPRWidth, 100, 50 );
 	bindSliderSpin(ui->sliderPRHeightWall, ui->spinBoxPRHeightWall, 100.0, 50.0 );
 	bindSliderSpin(ui->sliderPRHeightRoof, ui->spinBoxPRHeightRoof, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderTPRBottomWidth, ui->spinBoxTPRBottomWidth, 100.0, 50.0 );		// --- TPRoof (棱台房屋) 绑定 ---
-  bindSliderSpin( ui->sliderTPRBottomDepth, ui->spinBoxTPRBottomDepth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTPRBottomLength, ui->spinBoxTPRBottomLength, 100.0, 50.0 );		// --- TPRoof (棱台房屋) 绑定 ---
+  bindSliderSpin( ui->sliderTPRBottomWidth, ui->spinBoxTPRBottomWidth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTPRTopLength, ui->spinBoxTPRTopLength, 100, 50 );
   bindSliderSpin( ui->sliderTPRTopWidth, ui->spinBoxTPRTopWidth, 100, 50 );
-  bindSliderSpin( ui->sliderTPRTopDepth, ui->spinBoxTPRTopDepth, 100, 50 );
   bindSliderSpin( ui->sliderTPRHeightWall, ui->spinBoxTPRHeightWall, 100, 50 );
   bindSliderSpin( ui->sliderTPRHeightRoof, ui->spinBoxTPRHeightRoof, 100, 50 );
-  bindSliderSpin( ui->sliderHCRWidth, ui->spinBoxHCRWidth, 100, 50 ); // --- HalfCylinderRoof (半圆柱屋顶) 绑定 ---
-  bindSliderSpin( ui->sliderHCRDepth, ui->spinBoxHCRDepth, 100, 50 );
+  bindSliderSpin( ui->sliderHCRLength, ui->spinBoxHCRLength, 100, 50 ); // --- HalfCylinderRoof (半圆柱屋顶) 绑定 ---
+  bindSliderSpin( ui->sliderHCRWidth, ui->spinBoxHCRWidth, 100, 50 );
   bindSliderSpin( ui->sliderHCRHeightWall, ui->spinBoxHCRHeightWall, 100.0, 50.0 );
   bindSliderSpin( ui->sliderHCRRadius, ui->spinBoxHCRRadius, 100, 50 );
-  bindSliderSpin( ui->sliderICWidth, ui->spinBoxICWidth, 100, 50 ); // --- IndentedCuboid (凹陷长方体) 绑定 ---
-  bindSliderSpin( ui->sliderICDepth, ui->spinBoxICDepth, 100, 50 );
+  bindSliderSpin( ui->sliderICLength, ui->spinBoxICLength, 100, 50 ); // --- IndentedCuboid (凹陷长方体) 绑定 ---
+  bindSliderSpin( ui->sliderICWidth, ui->spinBoxICWidth, 100, 50 );
   bindSliderSpin( ui->sliderICHeight, ui->spinBoxICHeight, 100, 50 );
+  bindSliderSpin( ui->sliderICInnerLength, ui->spinBoxICInnerLength, 100, 50 );
   bindSliderSpin( ui->sliderICInnerWidth, ui->spinBoxICInnerWidth, 100, 50 );
-  bindSliderSpin( ui->sliderICInnerDepth, ui->spinBoxICInnerDepth, 100, 50 );
   bindSliderSpin( ui->sliderICInnerHeight, ui->spinBoxICInnerHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderICOffsetX, ui->spinBoxICOffsetX, 100, 50 );
   bindSliderSpin( ui->sliderICOffsetY, ui->spinBoxICOffsetY, 100, 50 );
-  bindSliderSpin( ui->sliderAGHWidth, ui->spinBoxAGHWidth, 100, 50 ); // --- AsymmetricGableHouse (非对称人字形屋顶房屋) 绑定 ---
-  bindSliderSpin( ui->sliderAGHDepth, ui->spinBoxAGHDepth, 100, 50 );
+  bindSliderSpin( ui->sliderAGHLength, ui->spinBoxAGHLength, 100, 50 ); // --- AsymmetricGableHouse (非对称人字形屋顶房屋) 绑定 ---
+  bindSliderSpin( ui->sliderAGHWidth, ui->spinBoxAGHWidth, 100, 50 );
   bindSliderSpin( ui->sliderAGHHeightWall, ui->spinBoxAGHHeightWall, 100, 50 );
   bindSliderSpin( ui->sliderAGHRoofHeight, ui->spinBoxAGHRoofHeight, 100, 50 );
   bindSliderSpin( ui->sliderAGHRidgeLength, ui->spinBoxAGHRidgeLength, 100.0, 50.0 );
@@ -164,9 +167,9 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderFTMiddleTopRadius, ui->spinBoxFTMiddleTopRadius, 100.0, 50.0 );
   bindSliderSpin( ui->sliderFTMiddleBulge, ui->spinBoxFTMiddleBulge, 100.0, 0.6 );
   bindSliderSpin( ui->sliderFTConeHeight, ui->spinBoxFTConeHeight, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderTGWidth1, ui->spinBoxTGWidth1, 100.0, 50.0 ); // --- TwoGableHouses (双人字屋顶房屋) 绑定 ---
-  bindSliderSpin( ui->sliderTGWidth2, ui->spinBoxTGWidth2, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderTGDepth, ui->spinBoxTGDepth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTGLength1, ui->spinBoxTGLength1, 100.0, 50.0 ); // --- TwoGableHouses (双人字屋顶房屋) 绑定 ---
+  bindSliderSpin( ui->sliderTGLength2, ui->spinBoxTGLength2, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTGWidth, ui->spinBoxTGWidth, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGHeightWall, ui->spinBoxTGHeightWall, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGRoofHeight, ui->spinBoxTGRoofHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGAngle,      ui->spinBoxTGAngle,      10.0, 179.0 );
@@ -198,51 +201,51 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   connect( ui->spinBoxROmega, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
   connect( ui->spinBoxRPhi, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
   connect( ui->spinBoxRKappa, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
-  connect( ui->sliderCWidth,  &QSlider::valueChanged, this, schedulePreview );  // 长方体
-  connect( ui->sliderCDepth,  &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderCLength,  &QSlider::valueChanged, this, schedulePreview );  // 长方体
+  connect( ui->sliderCWidth,  &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCylRadius, &QSlider::valueChanged, this, schedulePreview );  // 圆柱
   connect( ui->sliderCylHeight, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderLMainWidth,  &QSlider::valueChanged, this, schedulePreview );  // L型房子
-  connect( ui->sliderLMainDepth,  &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderLMainLength,  &QSlider::valueChanged, this, schedulePreview );  // L型房子
+  connect( ui->sliderLMainWidth,  &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderLWingLength,  &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderLWingWidth,  &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderLWingDepth,  &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderLHeight,     &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderConeCylRadius,    &QSlider::valueChanged, this, schedulePreview ); // 圆锥圆柱
   connect( ui->sliderConeCylCylHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderConeCylConeHeight,&QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderGRWidth,      &QSlider::valueChanged, this, schedulePreview ); // 人字形屋顶
-  connect( ui->sliderGRDepth,      &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderGRLength,      &QSlider::valueChanged, this, schedulePreview ); // 人字形屋顶
+  connect( ui->sliderGRWidth,      &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderGRHeightWall, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderGRHeightRoof, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderPRWidth,      &QSlider::valueChanged, this, schedulePreview );  // 金字塔屋顶
-  connect( ui->sliderPRDepth,      &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderPRLength,      &QSlider::valueChanged, this, schedulePreview );  // 金字塔屋顶
+  connect( ui->sliderPRWidth,      &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderPRHeightWall, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderPRHeightRoof, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderTPRBottomWidth, &QSlider::valueChanged, this, schedulePreview );  // 棱台屋顶
-  connect( ui->sliderTPRBottomDepth, &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderTPRBottomLength, &QSlider::valueChanged, this, schedulePreview );  // 棱台屋顶
+  connect( ui->sliderTPRBottomWidth, &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderTPRTopLength,    &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTPRTopWidth,    &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderTPRTopDepth,    &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTPRHeightWall,  &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTPRHeightRoof,  &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderHCRWidth,      &QSlider::valueChanged, this, schedulePreview );  // 半圆柱屋顶
-  connect( ui->sliderHCRDepth,      &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderHCRLength,      &QSlider::valueChanged, this, schedulePreview );  // 半圆柱屋顶
+  connect( ui->sliderHCRWidth,      &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderHCRHeightWall, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderHCRRadius,     &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCylHemiRadius,    &QSlider::valueChanged, this, schedulePreview );  // 穹顶圆柱
   connect( ui->sliderCylHemiHeight,    &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCylHemiDomeHeight,&QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCylHemiBulge,     &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderICWidth,       &QSlider::valueChanged, this, schedulePreview );  // 凹陷长方体
-  connect( ui->sliderICDepth,       &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderICLength,       &QSlider::valueChanged, this, schedulePreview );  // 凹陷长方体
+  connect( ui->sliderICWidth,       &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderICHeight,      &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderICInnerLength,  &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderICInnerWidth,  &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderICInnerDepth,  &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderICInnerHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderICOffsetX,     &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderICOffsetY,     &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderAGHWidth,       &QSlider::valueChanged, this, schedulePreview );  // 非对称人字形屋顶
-  connect( ui->sliderAGHDepth,       &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderAGHLength,       &QSlider::valueChanged, this, schedulePreview );  // 非对称人字形屋顶
+  connect( ui->sliderAGHWidth,       &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderAGHHeightWall,  &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderAGHRoofHeight,  &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderAGHRidgeLength, &QSlider::valueChanged, this, schedulePreview );
@@ -253,9 +256,9 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   connect( ui->sliderFTMiddleTopRadius,&QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderFTMiddleBulge,    &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderFTConeHeight,     &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderTGWidth1,     &QSlider::valueChanged, this, schedulePreview );  // 双人字屋顶房屋
-  connect( ui->sliderTGWidth2,     &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderTGDepth,      &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderTGLength1,     &QSlider::valueChanged, this, schedulePreview );  // 双人字屋顶房屋
+  connect( ui->sliderTGLength2,     &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderTGWidth,      &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTGHeightWall, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTGRoofHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTGAngle,      &QSlider::valueChanged, this, schedulePreview );
@@ -278,6 +281,10 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
 		// 反演按钮初始禁用，加载数据后才启用
 		ui->btnClassifyPrimitive->setEnabled( false );
 		ui->btnInverseParams->setEnabled(  false );
+
+	DEBUG_LOG( L"\n[ParamModelerDock] 初始化完成，当前基元: " );
+	DEBUG_LOG( m_currentPrimitive.toStdWString().c_str() );
+	DEBUG_LOG( L"\n" );
 }
 // ===========================析构函数=================================
 ParamModelerDock::~ParamModelerDock()
@@ -288,6 +295,10 @@ ParamModelerDock::~ParamModelerDock()
 // ==========================切换参数页基元函数================================
 void ParamModelerDock::onPrimitiveChanged( const QString &prim )
 {
+  // 调试：记录基元切换
+  QString dbg = QString( "[ParamModeler] 切换基元: %1 → %2\n" ).arg( m_currentPrimitive ).arg( prim );
+  DEBUG_LOG( dbg.toStdWString().c_str() );
+
   // 1. 离开前保存旧基元的位姿
   if ( !m_currentPrimitive.isEmpty() )
   {
@@ -344,6 +355,16 @@ void ParamModelerDock::onPrimitiveChanged( const QString &prim )
   }
 
   m_currentPrimitive = prim;
+
+  // 调试：输出当前位姿
+  QString poseDbg = QString( "[ParamModeler] 位姿: tx=%1 ty=%2 tz=%3 omega=%4 phi=%5 kappa=%6\n" )
+    .arg( poseTranslateX(), 0, 'f', 2 )
+    .arg( poseTranslateY(), 0, 'f', 2 )
+    .arg( poseTranslateZ(), 0, 'f', 2 )
+    .arg( poseRotateX(), 0, 'f', 2 )
+    .arg( poseRotateY(), 0, 'f', 2 )
+    .arg( poseRotateZ(), 0, 'f', 2 );
+  DEBUG_LOG( poseDbg.toStdWString().c_str() );
 }
 // =======================导出前检验===================
 // 在导出前检查当前参数是否能生成有效的几何网格
@@ -362,6 +383,7 @@ static bool checkMeshValid( const QString &primitiveType, ParamModelerDock *dock
 void ParamModelerDock::onExportOBJClicked()
 {
     QString primitiveType = ui->comboPrimitive->currentText();
+    DEBUG_LOG( QString( "[Export] OBJ 导出开始, 基元: %1\n" ).arg( primitiveType ).toStdWString().c_str() );
     if ( !checkMeshValid( primitiveType, this ) ) return;
     // 1. 选择保存路径
     QString fileName = QFileDialog::getSaveFileName(
@@ -374,6 +396,7 @@ void ParamModelerDock::onExportOBJClicked()
         return;
     // 2. 调用模块化 OBJ 导出
     bool ok = ExportOBJ::exportOBJ(fileName, primitiveType, this);
+    DEBUG_LOG( QString( "[Export] OBJ 导出%1: %2\n" ).arg( ok ? "成功" : "失败" ).arg( fileName ).toStdWString().c_str() );
     // 3. 提示信息
     if (ok)
     {
@@ -396,13 +419,16 @@ void ParamModelerDock::onExportOBJClicked()
 void ParamModelerDock::onExportJSONClicked()
 {
     QString primitiveType = ui->comboPrimitive->currentText();
+    DEBUG_LOG( QString( "[Export] JSON 导出开始, 基元: %1\n" ).arg( primitiveType ).toStdWString().c_str() );
     if ( !checkMeshValid( primitiveType, this ) ) return;
     ExportJSON::writeJSON(this);
+    DEBUG_LOG( L"[Export] JSON 导出完成\n" );
 }
 // ========================导出点云====================
 void ParamModelerDock::onExportPLYClicked()
 {
     QString primitiveType = ui->comboPrimitive->currentText();
+    DEBUG_LOG( QString( "[Export] PLY 导出开始, 基元: %1\n" ).arg( primitiveType ).toStdWString().c_str() );
     if ( !checkMeshValid( primitiveType, this ) ) return;
 
     QString fileName = QFileDialog::getSaveFileName(
@@ -414,6 +440,7 @@ void ParamModelerDock::onExportPLYClicked()
 // ========================导出Mesh====================
 void ParamModelerDock::onExportMeshClicked()
 {
+    DEBUG_LOG( L"[Export] STL Mesh 导出开始\n" );
     // 1. 获取保存路径
     QString fileName = QFileDialog::getSaveFileName(
         this, tr("保存 Mesh 文件"), "", tr("STL Files (*.stl)") );
@@ -472,9 +499,11 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
 
   // 1. 构建新网格
   QString primitiveType = ui->comboPrimitive->currentText();
+  DEBUG_LOG( QString( "[3D] 加载模型到 QGIS 3D, 基元: %1\n" ).arg( primitiveType ).toStdWString().c_str() );
   MeshData mesh = BuildMesh::build( primitiveType, this );
   if ( mesh.isEmpty() )
   {
+    DEBUG_LOG( L"[3D] 网格生成失败\n" );
     if ( zoomToLayer )
       QMessageBox::warning( this, tr( "错误" ), tr( "无法生成模型，请检查参数" ) );
     m_isUpdating = false;
@@ -510,6 +539,8 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
   feat.setGeometry( QgsGeometry( multiPoly ) );
   QgsFeatureList features;
   features.append( feat );
+
+  DEBUG_LOG( QString( "[3D] 三角面数: %1, 顶点数: %2\n" ).arg( triCount ).arg( mesh.vertices.size() ).toStdWString().c_str() );
 
   // 4. 写到临时 GeoPackage 文件再加载，逼迫 QGIS 每次完整重建 3D 渲染管线
   QString layerName = "ParamModeler_Model";
@@ -629,6 +660,8 @@ void ParamModelerDock::onLoadExternalPointCloud()
   QFileInfo fi( filePath );//提取文件名
   QString layerName = QString( "外部点云 - %1" ).arg( fi.fileName() );
   QString suffix = fi.suffix().toLower();
+
+  DEBUG_LOG( QString( "[PointCloud] 加载外部点云: %1 (格式: %2)\n" ).arg( filePath ).arg( suffix ).toStdWString().c_str() );
 
   QgsMapLayer *pcLayer = nullptr;
 
@@ -1022,6 +1055,7 @@ void ParamModelerDock::onLoadExternalPointCloud()
   }
 
 QMessageBox::information( this, tr( "加载成功" ), tr( "点云已加载！\n图层：%1\n\n可在3D视图中与模型叠加对比。" ).arg( layerName ) );
+  DEBUG_LOG( QString( "[PointCloud] 加载成功, 图层: %1\n" ).arg( layerName ).toStdWString().c_str() );
 }
 // ================================清理图层============================
 // 在加载新模型前，根据名称添加并删除旧图层，通过excludeId确保不会误删当前正在使用的新图层。
@@ -1048,6 +1082,12 @@ void ParamModelerDock::onUpdatePreview()
     MeshData mesh = BuildMesh::build( prim, this );
     m_previewWidget->setMesh( mesh );
 
+    DEBUG_LOG( QString( "[Preview] 刷新预览: %1, 顶点=%2, 三角面=%3\n" )
+      .arg( prim )
+      .arg( mesh.vertices.size() )
+      .arg( mesh.indices.size() / 3 )
+      .toStdWString().c_str() );
+
     // 2. 联动刷新 QGIS 3D (检查右下角开关)
     if ( ui->checkBoxAutoSync && ui->checkBoxAutoSync->isChecked() )
     {
@@ -1067,47 +1107,47 @@ double ParamModelerDock::poseRotateY() const { return ui->spinBoxRPhi->value(); 
 double ParamModelerDock::poseRotateZ() const { return ui->spinBoxRKappa->value(); } // 指向新控件：Kappa
 
 //几何体形状参数
+double ParamModelerDock::cuboidLength() const { return ui->spinBoxCLength->value(); }
 double ParamModelerDock::cuboidWidth() const { return ui->spinBoxCWidth->value(); }
-double ParamModelerDock::cuboidDepth() const { return ui->spinBoxCDepth->value(); }
 double ParamModelerDock::cuboidHeight() const { return ui->spinBoxCHeight->value(); }
 double ParamModelerDock::cylinderRadius() const { return ui->spinBoxCylRadius->value(); }
 double ParamModelerDock::cylinderHeight() const { return ui->spinBoxCylHeight->value(); }
+double ParamModelerDock::LMainLength() const { return ui->spinBoxLMainLength->value(); }
 double ParamModelerDock::LMainWidth() const { return ui->spinBoxLMainWidth->value(); }
-double ParamModelerDock::LMainDepth() const { return ui->spinBoxLMainDepth->value(); }
+double ParamModelerDock::LWingLength() const { return ui->spinBoxLWingLength->value(); }
 double ParamModelerDock::LWingWidth() const { return ui->spinBoxLWingWidth->value(); }
-double ParamModelerDock::LWingDepth() const { return ui->spinBoxLWingDepth->value(); }
 double ParamModelerDock::LHeight() const { return ui->spinBoxLHeight->value(); }
 double ParamModelerDock::coneCylRadius() const { return ui->spinBoxConeCylRadius->value(); }
 double ParamModelerDock::coneCylCylHeight() const { return ui->spinBoxConeCylCylHeight->value(); }
 double ParamModelerDock::coneCylConeHeight() const { return ui->spinBoxConeCylConeHeight->value(); }
+double ParamModelerDock::gabledRoofLength() const { return ui->spinBoxGRLength->value(); }
 double ParamModelerDock::gabledRoofWidth() const { return ui->spinBoxGRWidth->value(); }
-double ParamModelerDock::gabledRoofDepth() const { return ui->spinBoxGRDepth->value(); }
 double ParamModelerDock::gabledRoofWallHeight() const { return ui->spinBoxGRHeightWall->value(); }
 double ParamModelerDock::gabledRoofRoofHeight() const { return ui->spinBoxGRHeightRoof->value(); }
+double ParamModelerDock::pyramidLength() const { return ui->spinBoxPRLength->value(); }
 double ParamModelerDock::pyramidWidth() const { return ui->spinBoxPRWidth->value(); }
-double ParamModelerDock::pyramidDepth() const { return ui->spinBoxPRDepth->value(); }
 double ParamModelerDock::pyramidWallHeight() const { return ui->spinBoxPRHeightWall->value(); }
 double ParamModelerDock::pyramidRoofHeight() const { return ui->spinBoxPRHeightRoof->value(); }
+double ParamModelerDock::tpBottomLength() const { return ui->spinBoxTPRBottomLength->value(); }
 double ParamModelerDock::tpBottomWidth() const { return ui->spinBoxTPRBottomWidth->value(); }
-double ParamModelerDock::tpBottomDepth() const { return ui->spinBoxTPRBottomDepth->value(); }
+double ParamModelerDock::tpTopLength() const { return ui->spinBoxTPRTopLength->value(); }
 double ParamModelerDock::tpTopWidth() const { return ui->spinBoxTPRTopWidth->value(); }
-double ParamModelerDock::tpTopDepth() const { return ui->spinBoxTPRTopDepth->value(); }
 double ParamModelerDock::tpWallHeight() const { return ui->spinBoxTPRHeightWall->value(); }
 double ParamModelerDock::tpRoofHeight() const { return ui->spinBoxTPRHeightRoof->value(); }
+double ParamModelerDock::hcrLength() const { return ui->spinBoxHCRLength->value(); }
 double ParamModelerDock::hcrWidth() const { return ui->spinBoxHCRWidth->value(); }
-double ParamModelerDock::hcrDepth() const { return ui->spinBoxHCRDepth->value(); }
 double ParamModelerDock::hcrWallHeight() const { return ui->spinBoxHCRHeightWall->value(); }
 double ParamModelerDock::hcrRadius() const { return ui->spinBoxHCRRadius->value(); }
+double ParamModelerDock::icOuterLength() const { return ui->spinBoxICLength->value(); }
 double ParamModelerDock::icOuterWidth() const { return ui->spinBoxICWidth->value(); }
-double ParamModelerDock::icOuterDepth() const { return ui->spinBoxICDepth->value(); }
 double ParamModelerDock::icOuterHeight() const { return ui->spinBoxICHeight->value(); }
+double ParamModelerDock::icInnerLength() const { return ui->spinBoxICInnerLength->value(); }
 double ParamModelerDock::icInnerWidth() const { return ui->spinBoxICInnerWidth->value(); }
-double ParamModelerDock::icInnerDepth() const { return ui->spinBoxICInnerDepth->value(); }
 double ParamModelerDock::icInnerHeight() const { return ui->spinBoxICInnerHeight->value(); }
 double ParamModelerDock::icOffsetX() const { return ui->spinBoxICOffsetX->value(); }
 double ParamModelerDock::icOffsetY() const { return ui->spinBoxICOffsetY->value(); }
+double ParamModelerDock::aghLength() const { return ui->spinBoxAGHLength->value(); }
 double ParamModelerDock::aghWidth() const { return ui->spinBoxAGHWidth->value(); }
-double ParamModelerDock::aghDepth() const { return ui->spinBoxAGHDepth->value(); }
 double ParamModelerDock::aghWallHeight() const { return ui->spinBoxAGHHeightWall->value(); }
 double ParamModelerDock::aghRoofHeight() const { return ui->spinBoxAGHRoofHeight->value(); }
 double ParamModelerDock::aghRidgeLength() const { return ui->spinBoxAGHRidgeLength->value(); }
@@ -1122,9 +1162,9 @@ double ParamModelerDock::ftMiddleHeight() const { return ui->spinBoxFTMiddleHeig
 double ParamModelerDock::ftMiddleTopRadius() const { return ui->spinBoxFTMiddleTopRadius->value(); }
 double ParamModelerDock::ftMiddleBulge() const { return ui->spinBoxFTMiddleBulge->value(); }
 double ParamModelerDock::ftConeHeight() const { return ui->spinBoxFTConeHeight->value(); }
-double ParamModelerDock::tgWidth1() const { return ui->spinBoxTGWidth1->value(); }
-double ParamModelerDock::tgWidth2() const { return ui->spinBoxTGWidth2->value(); }
-double ParamModelerDock::tgDepth() const { return ui->spinBoxTGDepth->value(); }
+double ParamModelerDock::tgLength1() const { return ui->spinBoxTGLength1->value(); }
+double ParamModelerDock::tgLength2() const { return ui->spinBoxTGLength2->value(); }
+double ParamModelerDock::tgWidth() const { return ui->spinBoxTGWidth->value(); }
 double ParamModelerDock::tgWallHeight() const { return ui->spinBoxTGHeightWall->value(); }
 double ParamModelerDock::tgRoofHeight() const { return ui->spinBoxTGRoofHeight->value(); }
 double ParamModelerDock::tgAngle() const { return ui->spinBoxTGAngle->value(); }
@@ -1142,6 +1182,8 @@ void ParamModelerDock::onLoadInputData()
     m_inputDataPath = filePath;
     QFileInfo fi( filePath );
 
+    DEBUG_LOG( QString( "[Tab2] 加载输入数据: %1\n" ).arg( filePath ).toStdWString().c_str() );
+
     ui->labelInputInfo->setText( tr("已加载：%1").arg( fi.fileName() ) );
     ui->labelPrimitiveType->setText( tr("识别结果：-") );
     ui->tableInverseParams->setRowCount( 0 );
@@ -1157,10 +1199,19 @@ void ParamModelerDock::onClassifyPrimitive()
 {
     if ( m_inputDataPath.isEmpty() ) return;
 
+    DEBUG_LOG( QString( "[Tab2] 开始基元分类, 文件: %1\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
     PrimitiveClassifier::Result result = PrimitiveClassifier::classify( m_inputDataPath );
 
+    DEBUG_LOG( QString( "[Tab2] 分类完成: %1, 置信度: %2%\n" )
+      .arg( result.primitiveType )
+      .arg( result.confidence * 100, 0, 'f', 1 )
+      .toStdWString().c_str() );
+
     ui->labelPrimitiveType->setText(
-        tr("识别结果：%1（%.0f%%）").arg( result.primitiveType ).arg( result.confidence * 100 ) );
+      tr( "识别结果：%1（%2%）" )
+        .arg( result.primitiveType )
+        .arg( result.confidence * 100, 0, 'f', 0 )
+    ); // 0位小数
 
     ui->comboPrimitive->setCurrentText( result.primitiveType );
 
@@ -1178,10 +1229,12 @@ void ParamModelerDock::onInverseParams()
 
     QString prim = ui->comboPrimitive->currentText();
 
+    DEBUG_LOG( QString( "[Tab2] 开始参数反演, 基元: %1, 文件: %2\n" ).arg( prim ).arg( m_inputDataPath ).toStdWString().c_str() );
     QMap<QString, double> params = ParamInverter::invert( prim, m_inputDataPath );
 
     if ( !params.isEmpty() )
     {
+        DEBUG_LOG( QString( "[Tab2] 反演完成, 返回 %1 个参数\n" ).arg( params.size() ).toStdWString().c_str() );
         ParamInverter::applyToUI( this, params );
 
         ui->tableInverseParams->setRowCount( params.size() );

@@ -14,6 +14,7 @@
 #include <QMap>
 #include <QVector>
 #include <QVector3D>
+#include <random>
 
 class ParamModelerDock;
 
@@ -56,6 +57,20 @@ private:
     static void computeFootprintBounds( const QVector<QVector3D> &pts,
                                          double &minX, double &maxX,
                                          double &minY, double &maxY );
+
+    // SA refinement
+    static double computeFitError( const QVector<QVector3D> &pts,
+                                    const QString &type,
+                                    const QMap<QString, double> &params );
+    static void perturbParams( QMap<QString, double> &params,
+                                const QString &type,
+                                double T, std::mt19937 &rng );
+    static QMap<QString, double> refineWithSA( const QVector<QVector3D> &pts,
+                                                const QString &primitiveType,
+                                                const QMap<QString, double> &initParams,
+                                                int maxIter = 1000,
+                                                double initTemp = 1.0,
+                                                double cooling = 0.995 );
 };
 
 #endif // PARAMMODELER_INVERSE_H

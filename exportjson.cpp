@@ -88,8 +88,8 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
 
     if (type == "Cuboid")
     {
+        p["length"]  = dock->cuboidLength();
         p["width"]  = dock->cuboidWidth();
-        p["depth"]  = dock->cuboidDepth();
         p["height"] = dock->cuboidHeight();
     }
     else if (type == "Cylinder")
@@ -99,10 +99,10 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
     }
     else if (type == "LHouse")
     {
+      p["A_length"] = dock->LMainLength();
       p["A_width"] = dock->LMainWidth();
-      p["A_depth"] = dock->LMainDepth();
+      p["B_length"] = dock->LWingLength();
       p["B_width"] = dock->LWingWidth();
-      p["B_depth"] = dock->LWingDepth();
       p["height"] = dock->LHeight();
     }
     else if (type == "ConeCylinder")
@@ -113,31 +113,31 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
 	}
     else if (type == "GabledRoof")
     {
+        p["length"] = dock->gabledRoofLength();
         p["width"] = dock->gabledRoofWidth();
-        p["depth"] = dock->gabledRoofDepth();
         p["wallHeight"] = dock->gabledRoofWallHeight();
         p["roofHeight"] = dock->gabledRoofRoofHeight();
     }
     else if (type == "PyramidRoof")
     {
+        p["length"] = dock->pyramidLength();
         p["width"] = dock->pyramidWidth();
-        p["depth"] = dock->pyramidDepth();
         p["wallHeight"] = dock->pyramidWallHeight();
         p["roofHeight"] = dock->pyramidRoofHeight();
     }
     else if (type == "TruncatedPyramidRoof")
     {
+      p["length"] = dock->tpBottomLength();
       p["width"] = dock->tpBottomWidth();
-      p["depth"] = dock->tpBottomDepth();
       p["wallHeight"] = dock->tpWallHeight();
       p["roofHeight"] = dock->tpRoofHeight();
+      p["topLength"] = dock->tpTopLength();
       p["topWidth"] = dock->tpTopWidth();
-      p["topDepth"] = dock->tpTopDepth();
     }
     else if (type == "HalfCylinderRoof")
     {
+        p["length"]      = dock->hcrLength();
         p["width"]      = dock->hcrWidth();
-        p["depth"]      = dock->hcrDepth();
         p["wallHeight"] = dock->hcrWallHeight();
         p["radius"]     = dock->hcrRadius();
     }
@@ -150,19 +150,19 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
     }
     else if ( type == "凹陷长方体" )
     {
+      p["outerLength"]  = dock->icOuterLength();
       p["outerWidth"]  = dock->icOuterWidth();
-      p["outerDepth"]  = dock->icOuterDepth();
       p["outerHeight"] = dock->icOuterHeight();
+      p["innerLength"]  = dock->icInnerLength();
       p["innerWidth"]  = dock->icInnerWidth();
-      p["innerDepth"]  = dock->icInnerDepth();
       p["innerHeight"] = dock->icInnerHeight();
       p["offsetX"]     = dock->icOffsetX();
       p["offsetY"]     = dock->icOffsetY();
     }
     else if ( type == "非对称人字形屋顶房屋" )
     {
+      p["length"]       = dock->aghLength();
       p["width"]       = dock->aghWidth();
-      p["depth"]       = dock->aghDepth();
       p["wallHeight"]  = dock->aghWallHeight();
       p["roofHeight"]  = dock->aghRoofHeight();
       p["ridgeLength"] = dock->aghRidgeLength();
@@ -181,9 +181,9 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
 
     else if ( type == "双人字屋顶房屋" )
     {
-      p["width1"]     = dock->tgWidth1();
-      p["width2"]     = dock->tgWidth2();
-      p["depth"]      = dock->tgDepth();
+      p["length1"]     = dock->tgLength1();
+      p["length2"]     = dock->tgLength2();
+      p["width"]      = dock->tgWidth();
       p["wallHeight"] = dock->tgWallHeight();
       p["roofHeight"] = dock->tgRoofHeight();
       p["angle"]      = dock->tgAngle();

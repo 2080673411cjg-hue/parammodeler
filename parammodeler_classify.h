@@ -58,6 +58,7 @@ private:
 
     static PointCloud loadPointCloud( const QString &filePath );
     static PointCloud downsample( const PointCloud &pc, int targetPoints );
+    static PointCloud curvatureFilter( const PointCloud &pc, double R1, double R2, int targetPoints );
 
     static FeatureVector extractFeatures( const PointCloud &pc );
 

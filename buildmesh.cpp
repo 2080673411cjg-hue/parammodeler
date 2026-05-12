@@ -19,26 +19,35 @@
 #include "parammodeler_dock.h"
 #include <QtMath>
 #include <cmath>
+#include <windows.h>
+#define DEBUG_LOG(msg) OutputDebugStringW(msg)
 
 // ============================================================
 // 统一入口
 // ============================================================
 MeshData BuildMesh::build( const QString &primitiveType, ParamModelerDock *dock )
 {
-    if ( primitiveType == "Cuboid" )              return buildCuboid( dock );
-    if ( primitiveType == "Cylinder" )            return buildCylinder( dock );
-    if ( primitiveType == "LHouse" )              return buildLHouse( dock );
-    if ( primitiveType == "ConeCylinder" )        return buildConeCylinder( dock );
-    if ( primitiveType == "GabledRoof" )          return buildGabledRoof( dock );
-    if ( primitiveType == "PyramidRoof" )         return buildPyramidRoof( dock );
-    if ( primitiveType == "TruncatedPyramidRoof") return buildTruncatedPyramidRoof( dock );
-    if ( primitiveType == "HalfCylinderRoof" )    return buildHalfCylinderRoof( dock );
-    if ( primitiveType == "穹顶圆柱" )             return buildCylinderHemisphere( dock );
-    if ( primitiveType == "凹陷长方体" )            return buildIndentedCuboid( dock );
-    if ( primitiveType == "非对称人字形屋顶房屋" )   return buildAsymmetricGableHouse( dock );
-    if ( primitiveType == "四段式圆塔形" )           return buildFourStageRoundTower( dock );
-    if ( primitiveType == "双人字屋顶房屋" )         return buildTwoGableHouses( dock );
-    return MeshData{};
+    MeshData m;
+    if      ( primitiveType == "Cuboid" )              m = buildCuboid( dock );
+    else if ( primitiveType == "Cylinder" )            m = buildCylinder( dock );
+    else if ( primitiveType == "LHouse" )              m = buildLHouse( dock );
+    else if ( primitiveType == "ConeCylinder" )        m = buildConeCylinder( dock );
+    else if ( primitiveType == "GabledRoof" )          m = buildGabledRoof( dock );
+    else if ( primitiveType == "PyramidRoof" )         m = buildPyramidRoof( dock );
+    else if ( primitiveType == "TruncatedPyramidRoof") m = buildTruncatedPyramidRoof( dock );
+    else if ( primitiveType == "HalfCylinderRoof" )    m = buildHalfCylinderRoof( dock );
+    else if ( primitiveType == "穹顶圆柱" )             m = buildCylinderHemisphere( dock );
+    else if ( primitiveType == "凹陷长方体" )            m = buildIndentedCuboid( dock );
+    else if ( primitiveType == "非对称人字形屋顶房屋" )   m = buildAsymmetricGableHouse( dock );
+    else if ( primitiveType == "四段式圆塔形" )           m = buildFourStageRoundTower( dock );
+    else if ( primitiveType == "双人字屋顶房屋" )         m = buildTwoGableHouses( dock );
+
+    DEBUG_LOG( QString( "[BuildMesh] %1 → 顶点=%2, 三角面=%3\n" )
+      .arg( primitiveType )
+      .arg( m.vertices.size() )
+      .arg( m.indices.size() / 3 )
+      .toStdWString().c_str() );
+    return m;
 }
 
 // ============================================================
@@ -47,8 +56,8 @@ MeshData BuildMesh::build( const QString &primitiveType, ParamModelerDock *dock 
 MeshData BuildMesh::buildCuboid( ParamModelerDock *dock )
 {
     MeshData m;
-    double W = dock->cuboidWidth();
-    double D = dock->cuboidDepth();
+    double W = dock->cuboidLength();
+    double D = dock->cuboidWidth();
     double H = dock->cuboidHeight();
     if ( W <= 0 || D <= 0 || H <= 0 ) return m;
 
@@ -100,11 +109,14 @@ MeshData BuildMesh::buildCylinder( ParamModelerDock *dock )
 MeshData BuildMesh::buildLHouse( ParamModelerDock *dock )
 {
     MeshData m;
-    double Aw = dock->LMainWidth();
-    double Ad = dock->LMainDepth();
-    double Bw = dock->LWingWidth();
-    double Bd = dock->LWingDepth();
+    double Aw = dock->LMainLength();
+    double Ad = dock->LMainWidth();
+    double Bw = dock->LWingLength();
+    double Bd = dock->LWingWidth();
     double H  = dock->LHeight();
+				// 加这一行
+    DEBUG_LOG( QString("[LHouse] Aw=%1 Ad=%2 Bw=%3 Bd=%4 H=%5\n")
+        .arg(Aw).arg(Ad).arg(Bw).arg(Bd).arg(H).toStdWString().c_str() );
     if ( Aw<=0||Ad<=0||Bw<=0||Bd<=0||H<=0 ) return m;
 
     // 7个底部顶点，7个顶部顶点
@@ -170,8 +182,8 @@ MeshData BuildMesh::buildConeCylinder( ParamModelerDock *dock )
 MeshData BuildMesh::buildGabledRoof( ParamModelerDock *dock )
 {
     MeshData m;
-    double W  = dock->gabledRoofWidth();
-    double D  = dock->gabledRoofDepth();
+    double W  = dock->gabledRoofLength();
+    double D  = dock->gabledRoofWidth();
     double HW = dock->gabledRoofWallHeight();
     double HR = dock->gabledRoofRoofHeight();
     if ( W<=0||D<=0||HW<=0||HR<=0 ) return m;
@@ -199,8 +211,8 @@ MeshData BuildMesh::buildGabledRoof( ParamModelerDock *dock )
 MeshData BuildMesh::buildPyramidRoof( ParamModelerDock *dock )
 {
     MeshData m;
-    double W  = dock->pyramidWidth();
-    double D  = dock->pyramidDepth();
+    double W  = dock->pyramidLength();
+    double D  = dock->pyramidWidth();
     double HW = dock->pyramidWallHeight();
     double HR = dock->pyramidRoofHeight();
     if ( W<=0||D<=0||HW<=0||HR<=0 ) return m;
@@ -227,12 +239,12 @@ MeshData BuildMesh::buildPyramidRoof( ParamModelerDock *dock )
 MeshData BuildMesh::buildTruncatedPyramidRoof( ParamModelerDock *dock )
 {
     MeshData m;
-    double W  = dock->tpBottomWidth();
-    double D  = dock->tpBottomDepth();
+    double W  = dock->tpBottomLength();
+    double D  = dock->tpBottomWidth();
     double HW = dock->tpWallHeight();
     double HR = dock->tpRoofHeight();
-    double WT = dock->tpTopWidth();
-    double DT = dock->tpTopDepth();
+    double WT = dock->tpTopLength();
+    double DT = dock->tpTopWidth();
     if ( W<=0||D<=0||HW<=0||HR<=0 ) return m;
 
     QVector3D v0(0,0,0), v1(W,0,0), v2(W,D,0), v3(0,D,0);
@@ -260,8 +272,8 @@ MeshData BuildMesh::buildTruncatedPyramidRoof( ParamModelerDock *dock )
 MeshData BuildMesh::buildHalfCylinderRoof( ParamModelerDock *dock )
 {
     MeshData m;
-    double W  = dock->hcrWidth();
-    double D  = dock->hcrDepth();
+    double W  = dock->hcrLength();
+    double D  = dock->hcrWidth();
     double HW = dock->hcrWallHeight();
     double R  = dock->hcrRadius();
     if ( W<=0||D<=0||HW<=0||R<=0 ) return m;
@@ -380,8 +392,8 @@ MeshData BuildMesh::buildCylinderHemisphere( ParamModelerDock *dock )
 MeshData BuildMesh::buildIndentedCuboid( ParamModelerDock *dock )
 {
     MeshData m;
-    double W  = dock->icOuterWidth(),  D  = dock->icOuterDepth(),  H  = dock->icOuterHeight();
-    double w  = dock->icInnerWidth(),  d  = dock->icInnerDepth(),  h  = dock->icInnerHeight();
+    double W  = dock->icOuterLength(),  D  = dock->icOuterWidth(),  H  = dock->icOuterHeight();
+    double w  = dock->icInnerLength(),  d  = dock->icInnerWidth(),  h  = dock->icInnerHeight();
     double ox = dock->icOffsetX(),     oy = dock->icOffsetY();
     if ( W<=0||D<=0||H<=0 ) return m;
 
@@ -420,7 +432,7 @@ MeshData BuildMesh::buildIndentedCuboid( ParamModelerDock *dock )
 MeshData BuildMesh::buildAsymmetricGableHouse( ParamModelerDock *dock )
 {
   MeshData m;
-  double W = dock->aghWidth(), D = dock->aghDepth();
+  double W = dock->aghLength(), D = dock->aghWidth();
   double H = dock->aghWallHeight(), roofH = dock->aghRoofHeight();
   double ridgeL = dock->aghRidgeLength(), ridgeOff = dock->aghRidgeOffset();
   if ( W <= 0 || D <= 0 || H <= 0 || roofH <= 0 )
@@ -546,9 +558,9 @@ MeshData BuildMesh::buildFourStageRoundTower( ParamModelerDock *dock )
 MeshData BuildMesh::buildTwoGableHouses( ParamModelerDock *dock )
 {
     MeshData m;
-    double W1    = dock->tgWidth1();
-    double W2    = dock->tgWidth2();
-    double D     = dock->tgDepth();
+    double W1    = dock->tgLength1();
+    double W2    = dock->tgLength2();
+    double D     = dock->tgWidth();
     double H     = dock->tgWallHeight();
     double roofH = dock->tgRoofHeight();
     double angle = dock->tgAngle();
