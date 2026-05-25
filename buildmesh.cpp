@@ -36,11 +36,11 @@ MeshData BuildMesh::build( const QString &primitiveType, ParamModelerDock *dock 
     else if ( primitiveType == "PyramidRoof" )         m = buildPyramidRoof( dock );
     else if ( primitiveType == "TruncatedPyramidRoof") m = buildTruncatedPyramidRoof( dock );
     else if ( primitiveType == "HalfCylinderRoof" )    m = buildHalfCylinderRoof( dock );
-    else if ( primitiveType == "穹顶圆柱" )             m = buildCylinderHemisphere( dock );
-    else if ( primitiveType == "凹陷长方体" )            m = buildIndentedCuboid( dock );
-    else if ( primitiveType == "非对称人字形屋顶房屋" )   m = buildAsymmetricGableHouse( dock );
-    else if ( primitiveType == "四段式圆塔形" )           m = buildFourStageRoundTower( dock );
-    else if ( primitiveType == "双人字屋顶房屋" )         m = buildTwoGableHouses( dock );
+    else if ( primitiveType == "CylinderHemisphere" )     m = buildCylinderHemisphere( dock );
+    else if ( primitiveType == "IndentedCuboid" )        m = buildIndentedCuboid( dock );
+    else if ( primitiveType == "AsymmetricGableHouse" )  m = buildAsymmetricGableHouse( dock );
+    else if ( primitiveType == "FourStageRoundTower" )   m = buildFourStageRoundTower( dock );
+    else if ( primitiveType == "TwoGableHouses" )        m = buildTwoGableHouses( dock );
 
     DEBUG_LOG( QString( "[BuildMesh] %1 → 顶点=%2, 三角面=%3\n" )
       .arg( primitiveType )
@@ -114,33 +114,61 @@ MeshData BuildMesh::buildLHouse( ParamModelerDock *dock )
     double Bw = dock->LWingLength();
     double Bd = dock->LWingWidth();
     double H  = dock->LHeight();
-				// 加这一行
+
     DEBUG_LOG( QString("[LHouse] Aw=%1 Ad=%2 Bw=%3 Bd=%4 H=%5\n")
         .arg(Aw).arg(Ad).arg(Bw).arg(Bd).arg(H).toStdWString().c_str() );
     if ( Aw<=0||Ad<=0||Bw<=0||Bd<=0||H<=0 ) return m;
 
-    // 7个底部顶点，7个顶部顶点
-    QVector<QVector3D> bot = {
-        {0,0,0}, {(float)Aw,0,0}, {(float)(Aw+Bw),0,0},
-        {(float)(Aw+Bw),(float)Bd,0}, {(float)Aw,(float)Bd,0},
-        {(float)Aw,(float)Ad,0}, {0,(float)Ad,0}
-    };
-    QVector<QVector3D> top;
-    for ( auto &v : bot ) top << QVector3D(v.x(), v.y(), H);
+    // L形拆成两个凸多边形，各自三角化，凹角不填充
+    // 主体: (0,0)-(Aw,0)-(Aw,Bd)-(Aw,Ad)-(0,Ad)
+    // 翼部: (Aw,0)-(Aw+Bw,0)-(Aw+Bw,Bd)-(Aw,Bd)
 
-    // 底面（三角扇形）
-    for ( int i = 1; i < 6; i++ )
-        m.addTriangle( bot[0], bot[i], bot[i+1] );
-    // 顶面
-    for ( int i = 1; i < 6; i++ )
-        m.addTriangle( top[0], top[i+1], top[i] );
-    // 侧面
-    int n = bot.size();
-    for ( int i = 0; i < n; i++ )
-    {
-        int j = (i+1)%n;
-        m.addQuad( bot[i], bot[j], top[j], top[i] );
-    }
+    auto V = []( double x, double y, double z ) { return QVector3D( (float)x, (float)y, (float)z ); };
+
+    // ===== 底面 (法线 -Z, winding: 从下往上看顺时针) =====
+    // 主体 6 边凹多边形，以凹角 (Aw,Bd) 为枢纽拆 3 个三角形
+    m.addTriangle( V(0,0,0), V(Aw,Bd,0), V(Aw,0,0) );
+    m.addTriangle( V(0,0,0), V(0,Ad,0),  V(Aw,Bd,0) );
+    m.addTriangle( V(0,Ad,0), V(Aw,Ad,0), V(Aw,Bd,0) );
+    // 翼部矩形 2 个三角形
+    m.addTriangle( V(Aw,0,0), V(Aw+Bw,Bd,0), V(Aw+Bw,0,0) );
+    m.addTriangle( V(Aw,0,0), V(Aw,Bd,0),     V(Aw+Bw,Bd,0) );
+
+    // ===== 顶面 (法线 +Z, winding: 从上往下看逆时针) =====
+    m.addTriangle( V(0,0,H), V(Aw,0,H),   V(Aw,Bd,H) );
+    m.addTriangle( V(0,0,H), V(Aw,Bd,H),  V(0,Ad,H) );
+    m.addTriangle( V(0,Ad,H), V(Aw,Bd,H), V(Aw,Ad,H) );
+    m.addTriangle( V(Aw,0,H), V(Aw+Bw,0,H), V(Aw+Bw,Bd,H) );
+    m.addTriangle( V(Aw,0,H), V(Aw+Bw,Bd,H), V(Aw,Bd,H) );
+
+    // ===== 墙面 (每面2个三角形, 法线朝外) =====
+
+    // 前墙 y=0, 覆盖全宽 [0, Aw+Bw], 法线 -Y
+    m.addTriangle( V(0,0,0),     V(Aw,0,0),     V(Aw,0,H) );
+    m.addTriangle( V(0,0,0),     V(Aw,0,H),     V(0,0,H) );
+    m.addTriangle( V(Aw,0,0),     V(Aw+Bw,0,0), V(Aw+Bw,0,H) );
+    m.addTriangle( V(Aw,0,0),     V(Aw+Bw,0,H), V(Aw,0,H) );
+
+    // 后墙 y=Ad, 法线 +Y
+    m.addTriangle( V(0,Ad,0),   V(Aw,Ad,0),   V(Aw,Ad,H) );
+    m.addTriangle( V(0,Ad,0),   V(Aw,Ad,H),   V(0,Ad,H) );
+
+    // 左墙 x=0, 法线 -X
+    m.addTriangle( V(0,Ad,0),   V(0,0,0),     V(0,0,H) );
+    m.addTriangle( V(0,Ad,0),   V(0,0,H),     V(0,Ad,H) );
+
+    // 右墙上段 x=Aw, y∈[Bd,Ad], 法线 +X
+    m.addTriangle( V(Aw,Bd,0), V(Aw,Ad,0), V(Aw,Ad,H) );
+    m.addTriangle( V(Aw,Bd,0), V(Aw,Ad,H), V(Aw,Bd,H) );
+
+    // 翼部后墙 y=Bd, 法线 +Y
+    m.addTriangle( V(Aw,Bd,0),     V(Aw+Bw,Bd,0), V(Aw+Bw,Bd,H) );
+    m.addTriangle( V(Aw,Bd,0),     V(Aw+Bw,Bd,H), V(Aw,Bd,H) );
+
+    // 翼部右墙 x=Aw+Bw, 法线 +X
+    m.addTriangle( V(Aw+Bw,0,0), V(Aw+Bw,Bd,0), V(Aw+Bw,Bd,H) );
+    m.addTriangle( V(Aw+Bw,0,0), V(Aw+Bw,Bd,H), V(Aw+Bw,0,H) );
+
     return m;
 }
 

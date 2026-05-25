@@ -11,6 +11,8 @@ set (parammodeler_SRCS
 		exportpointcloud.cpp
 		buildmesh.cpp
   previewglwidget.cpp
+  parammodeler_pcdloader.cpp
+  parammodeler_pcdfeatures.cpp
   parammodeler_classify.cpp
   parammodeler_inverse.cpp
 )

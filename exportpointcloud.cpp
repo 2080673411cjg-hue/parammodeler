@@ -132,8 +132,8 @@ bool ExportPointCloud::exportPLY( const QString &fileName, const QString &primit
     return false;
   }
 
-  // 2. 按法线方向把三角形分成水平面（顶/底）和侧面两组
-  //    法线 Z 分量 > 0.7 → 水平面；否则 → 侧面
+  // 2. 按法线方向把三角形分成顶面和侧面两组，底面直接排除
+  //    法线 Z > 0.7 → 顶面；Z < -0.7 → 底面（跳过）；其余 → 侧面
   QVector<int> horzTris, sideTris;
   for ( int i = 0; i < triCount; i++ )
   {
@@ -141,8 +141,10 @@ bool ExportPointCloud::exportPLY( const QString &fileName, const QString &primit
     QVector3D B = mesh.vertices[mesh.indices[i * 3 + 1]];
     QVector3D C = mesh.vertices[mesh.indices[i * 3 + 2]];
     QVector3D n = QVector3D::crossProduct( B - A, C - A ).normalized();
-    if ( qAbs( n.z() ) > 0.7f )
+    if ( n.z() > 0.7f )
       horzTris << i;
+    else if ( n.z() < -0.7f )
+      continue;  // 底面跳过，不采样
     else
       sideTris << i;
   }

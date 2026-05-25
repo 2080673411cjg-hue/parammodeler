@@ -1082,12 +1082,6 @@ void ParamModelerDock::onUpdatePreview()
     MeshData mesh = BuildMesh::build( prim, this );
     m_previewWidget->setMesh( mesh );
 
-    DEBUG_LOG( QString( "[Preview] 刷新预览: %1, 顶点=%2, 三角面=%3\n" )
-      .arg( prim )
-      .arg( mesh.vertices.size() )
-      .arg( mesh.indices.size() / 3 )
-      .toStdWString().c_str() );
-
     // 2. 联动刷新 QGIS 3D (检查右下角开关)
     if ( ui->checkBoxAutoSync && ui->checkBoxAutoSync->isChecked() )
     {
@@ -1200,7 +1194,7 @@ void ParamModelerDock::onClassifyPrimitive()
     if ( m_inputDataPath.isEmpty() ) return;
 
     DEBUG_LOG( QString( "[Tab2] 开始基元分类, 文件: %1\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
-    PrimitiveClassifier::Result result = PrimitiveClassifier::classify( m_inputDataPath );
+    PcdResult result = PrimitiveClassifier::classify( m_inputDataPath );
 
     DEBUG_LOG( QString( "[Tab2] 分类完成: %1, 置信度: %2%\n" )
       .arg( result.primitiveType )

@@ -141,14 +141,14 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
         p["wallHeight"] = dock->hcrWallHeight();
         p["radius"]     = dock->hcrRadius();
     }
-    else if ( type == "穹顶圆柱" )
+    else if ( type == "CylinderHemisphere" )
     {
       p["radius"]     = dock->cylHemiRadius();
       p["cyl_height"] = dock->cylHemiHeight();
       p["domeHeight"] = dock->cylHemiDomeHeight();
       p["bulgeFactor"]= dock->cylHemiBulge();
     }
-    else if ( type == "凹陷长方体" )
+    else if ( type == "IndentedCuboid" )
     {
       p["outerLength"]  = dock->icOuterLength();
       p["outerWidth"]  = dock->icOuterWidth();
@@ -159,7 +159,7 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
       p["offsetX"]     = dock->icOffsetX();
       p["offsetY"]     = dock->icOffsetY();
     }
-    else if ( type == "非对称人字形屋顶房屋" )
+    else if ( type == "AsymmetricGableHouse" )
     {
       p["length"]       = dock->aghLength();
       p["width"]       = dock->aghWidth();
@@ -168,7 +168,7 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
       p["ridgeLength"] = dock->aghRidgeLength();
       p["ridgeOffset"] = dock->aghRidgeOffset();
     }
-    else if ( type == "四段式圆塔形" )
+    else if ( type == "FourStageRoundTower" )
     {
       p["baseRadius"]     = dock->ftBaseRadius();
       p["baseHeight"]     = dock->ftBaseHeight();
@@ -179,7 +179,7 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
     }
 
 
-    else if ( type == "双人字屋顶房屋" )
+    else if ( type == "TwoGableHouses" )
     {
       p["length1"]     = dock->tgLength1();
       p["length2"]     = dock->tgLength2();
