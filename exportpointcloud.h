@@ -14,6 +14,12 @@ public:
                            const QString    &primitiveType,
                            ParamModelerDock *dock,
                            int               sampleCount = 50000 );
+
+    // Export normalized fixed-size xyz points for external deep learning models.
+    static bool exportDLInputTXT( const QString    &fileName,
+                                  const QString    &primitiveType,
+                                  ParamModelerDock *dock,
+                                  int               pointCount = 2048 );
 };
 
 #endif // EXPORTPOINTCLOUD_H

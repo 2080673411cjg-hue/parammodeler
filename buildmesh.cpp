@@ -508,18 +508,25 @@ MeshData BuildMesh::buildAsymmetricGableHouse( ParamModelerDock *dock )
   return m;
 }
 // ============================================================
-// 四段式圆塔形
+// 四段式圆塔形：短圆柱底座 + 低坡弧面屋顶 + 顶部小尖锥
 // ============================================================
 MeshData BuildMesh::buildFourStageRoundTower( ParamModelerDock *dock )
 {
     MeshData m;
     double baseR   = dock->ftBaseRadius();
     double baseH   = dock->ftBaseHeight();
-    double midH    = dock->ftMiddleHeight();
-    double midTopR = dock->ftMiddleTopRadius();
+    double roofH   = dock->ftMiddleHeight();
+    double capR    = dock->ftMiddleTopRadius();
     double bulge   = dock->ftMiddleBulge();
     double coneH   = dock->ftConeHeight();
-    if ( baseR<=0||baseH<=0||coneH<=0 ) return m;
+    if ( baseR<=0||baseH<=0||roofH<=0||capR<=0||coneH<=0 ) return m;
+
+    double roofR = baseR * 1.12;
+    double eaveH = qBound( 0.25, baseH * 0.20, 0.9 );
+    double bodyTopZ = baseH - eaveH;
+    capR = qBound( roofR * 0.02, capR, roofR * 0.35 );
+    bulge = qBound( 0.0, bulge, 0.6 );
+    if ( bodyTopZ <= 0.0 ) return m;
 
     const int seg=64, layers=16;
 
@@ -533,10 +540,10 @@ MeshData BuildMesh::buildFourStageRoundTower( ParamModelerDock *dock )
     };
 
     auto evalBezier = [&]( double t, double &r, double &z ) {
-        double P0x=baseR, P0y=baseH;
-        double P1x=baseR*(1.0+bulge), P1y=baseH+midH*0.33;
-        double P2x=midTopR*(1.0+bulge*0.5), P2y=baseH+midH*0.66;
-        double P3x=midTopR, P3y=baseH+midH;
+        double P0x=roofR, P0y=baseH;
+        double P1x=roofR*(1.0-0.08*bulge), P1y=baseH+roofH*0.12;
+        double P2x=capR+(roofR-capR)*(0.35+0.25*bulge), P2y=baseH+roofH*0.85;
+        double P3x=capR, P3y=baseH+roofH;
         double u=1.0-t;
         r=u*u*u*P0x+3*u*u*t*P1x+3*u*t*t*P2x+t*t*t*P3x;
         z=u*u*u*P0y+3*u*u*t*P1y+3*u*t*t*P2y+t*t*t*P3y;
@@ -559,11 +566,19 @@ MeshData BuildMesh::buildFourStageRoundTower( ParamModelerDock *dock )
     }
 
     // 圆柱段
-    QVector<QVector3D> topRing = makeRing(baseR, baseH);
-    connectRings(botRing, topRing);
+    QVector<QVector3D> bodyTopRing = makeRing(baseR, bodyTopZ);
+    connectRings(botRing, bodyTopRing);
 
-    // 贝塞尔中部
-    QVector<QVector3D> prev = topRing;
+    // 有厚度的外挑檐口
+    QVector<QVector3D> eaveInnerTopRing = makeRing(baseR, baseH);
+    QVector<QVector3D> eaveOuterBottomRing = makeRing(roofR, bodyTopZ);
+    QVector<QVector3D> eaveRing = makeRing(roofR, baseH);
+    connectRings(bodyTopRing, eaveOuterBottomRing);     // 檐口底面
+    connectRings(eaveOuterBottomRing, eaveRing);        // 檐口外侧竖面
+    connectRings(eaveInnerTopRing, eaveRing);           // 檐口顶面
+
+    // 低坡弧面屋顶
+    QVector<QVector3D> prev = eaveRing;
     for ( int l=1; l<=layers; l++ ) {
         double t=l/double(layers), r, z;
         evalBezier(t, r, z);
@@ -572,8 +587,8 @@ MeshData BuildMesh::buildFourStageRoundTower( ParamModelerDock *dock )
         prev = cur;
     }
 
-    // 圆锥段
-    QVector3D apex(0, 0, baseH+midH+coneH);
+    // 顶部小尖锥
+    QVector3D apex(0, 0, baseH+roofH+coneH);
     for ( int i=0; i<seg; i++ ) {
         int n=(i+1)%seg;
         m.addTriangle(prev[i], prev[n], apex);

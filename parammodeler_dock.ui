@@ -48,6 +48,7 @@
        <addaction name="actOBJ"/>
        <addaction name="actJSON"/>
        <addaction name="actPLY"/>
+       <addaction name="actDLPointCloud"/>
        <addaction name="actMesh"/>
        <addaction name="separator"/>
        <addaction name="actTo3D"/>
@@ -66,6 +67,11 @@
       <action name="actPLY">
        <property name="text">
         <string>导出点云 PLY (*.ply)</string>
+       </property>
+      </action>
+      <action name="actDLPointCloud">
+       <property name="text">
+        <string>导出深度学习点云 TXT (*.txt)</string>
        </property>
       </action>
       <action name="actMesh">
@@ -1695,7 +1701,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelFTMiddleHeight">
                   <property name="text">
-                   <string>中部过渡高度：</string>
+                   <string>弧面屋顶高度：</string>
                   </property>
                  </widget>
                 </item>
@@ -1720,7 +1726,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelFTMiddleTopRadius">
                   <property name="text">
-                   <string>中部顶部半径：</string>
+                   <string>小尖锥底半径：</string>
                   </property>
                  </widget>
                 </item>
@@ -1745,7 +1751,7 @@
                 <item row="4" column="0">
                  <widget class="QLabel" name="labelFTMiddleBulge">
                   <property name="text">
-                   <string>中部鼓包系数：</string>
+                   <string>屋顶弧度系数：</string>
                   </property>
                  </widget>
                 </item>
@@ -1776,7 +1782,7 @@
                 <item row="5" column="0">
                  <widget class="QLabel" name="labelFTConeHeight">
                   <property name="text">
-                   <string>顶部圆锥高度：</string>
+                   <string>小尖锥高度：</string>
                   </property>
                  </widget>
                 </item>

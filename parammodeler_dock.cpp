@@ -192,6 +192,7 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
 		connect( ui->actOBJ,    &QAction::triggered, this, &ParamModelerDock::onExportOBJClicked );
 		connect( ui->actJSON,   &QAction::triggered, this, &ParamModelerDock::onExportJSONClicked );
 		connect( ui->actPLY,    &QAction::triggered, this, &ParamModelerDock::onExportPLYClicked );
+		connect( ui->actDLPointCloud, &QAction::triggered, this, &ParamModelerDock::onExportDLPointCloudClicked );
 		connect( ui->actMesh,   &QAction::triggered, this, &ParamModelerDock::onExportMeshClicked );
 		connect( ui->actTo3D,   &QAction::triggered, this, &ParamModelerDock::onLoadToQGIS3D );
 		connect( ui->actLoadPC, &QAction::triggered, this, &ParamModelerDock::onLoadExternalPointCloud );
@@ -448,6 +449,27 @@ void ParamModelerDock::onExportPLYClicked()
     ExportPointCloud::exportPLY( fileName, primitiveType, this );
 }
 // ========================导出Mesh====================
+void ParamModelerDock::onExportDLPointCloudClicked()
+{
+    QString primitiveType = ui->comboPrimitive->currentText();
+    DEBUG_LOG( QString( "[Export] DL TXT export start, primitive: %1\n" ).arg( primitiveType ).toStdWString().c_str() );
+    if ( !checkMeshValid( primitiveType, this ) ) return;
+
+    QString fileName = QFileDialog::getSaveFileName(
+        this, tr("保存深度学习输入点云"), "", tr("TXT Files (*.txt)") );
+    if ( fileName.isEmpty() ) return;
+
+    bool ok = ExportPointCloud::exportDLInputTXT( fileName, primitiveType, this, 2048 );
+    if ( ok )
+    {
+        QMessageBox::information(
+            this,
+            tr("导出成功"),
+            tr("深度学习输入点云已保存到:\n%1").arg( fileName )
+        );
+    }
+}
+// ========================瀵煎嚭Mesh====================
 void ParamModelerDock::onExportMeshClicked()
 {
     DEBUG_LOG( L"[Export] STL Mesh 导出开始\n" );
