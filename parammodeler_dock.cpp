@@ -24,6 +24,7 @@
 #include "exportpointcloud.h"
 #include "parammodeler_classify.h"
 #include "parammodeler_inverse.h"
+#include "parammodeler_scene3d.h"
 
 // 2. Qt 核心与界面框架 (文件、内存、基本 UI)
 #include <QFileInfo>
@@ -448,7 +449,7 @@ void ParamModelerDock::onExportPLYClicked()
 
     ExportPointCloud::exportPLY( fileName, primitiveType, this );
 }
-// ========================导出Mesh====================
+// ========================导出深度学习点云====================
 void ParamModelerDock::onExportDLPointCloudClicked()
 {
     QString primitiveType = ui->comboPrimitive->currentText();
@@ -469,7 +470,7 @@ void ParamModelerDock::onExportDLPointCloudClicked()
         );
     }
 }
-// ========================瀵煎嚭Mesh====================
+// ========================导出 Mesh====================
 void ParamModelerDock::onExportMeshClicked()
 {
     DEBUG_LOG( L"[Export] STL Mesh 导出开始\n" );
@@ -543,147 +544,42 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
   }
 
   // 2. 应用位姿变换
-  QMatrix4x4 mat;
-  mat.setToIdentity();
-  mat.translate( poseTranslateX(), poseTranslateY(), poseTranslateZ() );
-  mat.rotate( poseRotateX(), 1, 0, 0 ); // ω，绕X
-  mat.rotate( poseRotateY(), 0, 1, 0 ); // φ，绕Y
-  mat.rotate( poseRotateZ(), 0, 0, 1 ); // κ，绕Z
+  ParamModelerPose pose;
+  pose.tx = poseTranslateX();
+  pose.ty = poseTranslateY();
+  pose.tz = poseTranslateZ();
+  pose.rx = poseRotateX();
+  pose.ry = poseRotateY();
+  pose.rz = poseRotateZ();
 
-  // 3. 构造单个 MultiPolygonZ（把所有三角形合并到一个几何体，避免每个三角形
-  //    一个 feature 导致 Qt3D 创建数百个实体，部分实体丢失造成"面缺失"）
-  QgsMultiPolygon *multiPoly = new QgsMultiPolygon();
-  int triCount = mesh.indices.size() / 3;
-  for ( int i = 0; i < triCount; i++ )
-  {
-    QVector3D v0 = mat.map( mesh.vertices[mesh.indices[i * 3]] );
-    QVector3D v1 = mat.map( mesh.vertices[mesh.indices[i * 3 + 1]] );
-    QVector3D v2 = mat.map( mesh.vertices[mesh.indices[i * 3 + 2]] );
+  ParamModelerModelLoadResult loadResult = ParamModelerScene3D::loadModelMesh(
+    mIface, mesh, pose, m_modelLayer, m_lastGpkgPath, zoomToLayer, this );
 
-    QgsPolygon *poly = new QgsPolygon();
-    QgsLineString *ring = new QgsLineString();
-    ring->setPoints( QgsPointSequence() << QgsPoint( v0.x(), v0.y(), v0.z() ) << QgsPoint( v1.x(), v1.y(), v1.z() ) << QgsPoint( v2.x(), v2.y(), v2.z() ) << QgsPoint( v0.x(), v0.y(), v0.z() ) );
-    poly->setExteriorRing( ring );
-    multiPoly->addGeometry( poly );
-  }
-
-  QgsFeature feat;
-  feat.setGeometry( QgsGeometry( multiPoly ) );
-  QgsFeatureList features;
-  features.append( feat );
-
-  DEBUG_LOG( QString( "[3D] 三角面数: %1, 顶点数: %2\n" ).arg( triCount ).arg( mesh.vertices.size() ).toStdWString().c_str() );
-
-  // 4. 写到临时 GeoPackage 文件再加载，逼迫 QGIS 每次完整重建 3D 渲染管线
-  QString layerName = "ParamModeler_Model";
-
-  // 使用时间戳生成唯一文件名，避免 OGR 文件缓存导致旧数据残留
-  QString gpkgPath = QDir::tempPath() + "/parammodeler_"
-                     + QString::number( QDateTime::currentMSecsSinceEpoch() ) + ".gpkg";
-
-  // 4a. 用内存图层承载 feature，再导出为 GPKG
-  QgsVectorLayer *tmpLayer = new QgsVectorLayer( "MultiPolygonZ?crs=EPSG:3857", "tmp", "memory" );
-  tmpLayer->dataProvider()->addFeatures( features );
-
-  QgsVectorFileWriter::writeAsVectorFormat( tmpLayer, gpkgPath, "UTF-8",
-      QgsCoordinateReferenceSystem( "EPSG:3857" ), "GPKG" );
-  delete tmpLayer;
-
-  // 4b. 从 GPKG 文件加载为独立图层
-  QgsVectorLayer *layer = new QgsVectorLayer( gpkgPath, layerName, "ogr" );
-  if ( !layer || !layer->isValid() )
+  if ( !loadResult.layer )
   {
     if ( zoomToLayer )
-      QMessageBox::warning( this, tr( "错误" ), tr( "从 GeoPackage 加载图层失败" ) );
-    delete layer;
+      QMessageBox::warning( this, tr( "错误" ), loadResult.errorMessage );
     m_isUpdating = false;
     return;
   }
 
-  // 4c. 3D 符号 — 禁用面剔除 + 强环境光，消除黑面和面缺失
-  QgsPolygon3DSymbol *symbol3D = new QgsPolygon3DSymbol();
-  symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
-  symbol3D->setAltitudeBinding( Qgis::AltitudeBinding::Vertex );
-  symbol3D->setCullingMode( Qgs3DTypes::NoCulling );
-
-  QgsPhongMaterialSettings material;
-  material.setAmbient( QColor( 70, 70, 70 ) );
-  material.setDiffuse( QColor( 175, 175, 175 ) );
-  material.setSpecular( QColor( 30, 30, 30 ) );
-  material.setShininess( 4.0 );
-  symbol3D->setMaterialSettings( material.clone() );
-
-  QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
-  renderer3D->setSymbol( symbol3D );
-  layer->setRenderer3D( renderer3D );
-
-  // 4d. 先移除旧图层，再添加新图层（保证信号顺序清晰，3D 画布能正确跟踪）
-  if ( m_modelLayer )
-    QgsProject::instance()->removeMapLayer( m_modelLayer->id() );
-
-  QgsProject::instance()->addMapLayer( layer );
-
-  // 清理旧临时文件（保留最近几个，避免 temp 目录膨胀）
-  QString prevGpkg = m_lastGpkgPath;
-  m_lastGpkgPath = gpkgPath;
-  if ( !prevGpkg.isEmpty() )
-    QFile::remove( prevGpkg );
-
-  m_modelLayer = layer;
-
+  m_modelLayer = loadResult.layer;
+  m_lastGpkgPath = loadResult.gpkgPath;
   connect( m_modelLayer, &QgsMapLayer::willBeDeleted, this, [this]() {
     m_modelLayer = nullptr;
   } );
 
-  if ( mIface->mapCanvases3D().isEmpty() )
-    mIface->createNewMapCanvas3D( tr( "ParamModeler 3D" ) );
-
-  // 4e. 显式刷新 3D 画布，确保新图层被 3D 渲染管线拾取
-  QList<Qgs3DMapCanvas *> canvases3D = mIface->mapCanvases3D();
-  for ( Qgs3DMapCanvas *canvas3D : canvases3D )
-  {
-    if ( !canvas3D )
-      continue;
-    Qgs3DMapSettings *settings = canvas3D->mapSettings();
-    if ( !settings )
-      continue;
-
-    // 如果 3D 设置已显式指定了图层列表，将新图层加入其中
-    QList<QgsMapLayer *> curLayers = settings->layers();
-    if ( !curLayers.isEmpty() )
-    {
-      // 剔除旧模型图层，加入新图层
-      curLayers.erase(
-        std::remove_if( curLayers.begin(), curLayers.end(),
-          [&]( QgsMapLayer *l ) {
-            return l->name() == layerName && l->id() != layer->id();
-          } ),
-        curLayers.end() );
-      if ( !curLayers.contains( layer ) )
-        curLayers.append( layer );
-      settings->setLayers( curLayers );
-    }
-    // layers() 为空说明 3D 画布跟随项目图层树，addMapLayer 已足够
-  }
-
-  // 强制触发重绘，让 3D 视图立即更新
-  layer->triggerRepaint();
-
   if ( zoomToLayer )
-  {
-    mIface->mapCanvas()->setExtent( layer->extent() );
-    mIface->mapCanvas()->refresh();
-    QMessageBox::information( this, tr( "加载成功" ), tr( "模型已加载！\n三角面数：%1" ).arg( triCount ) );
-  }
+    QMessageBox::information( this, tr( "加载成功" ), tr( "模型已加载！\n三角面数：%1" ).arg( loadResult.triangleCount ) );
 
   m_isUpdating = false;
 }
-  // =================将外部点云加载到QGIS 3D视图======================================
+// =================将外部点云加载到QGIS 3D视图======================================
 //针对 LAS/LAZ 使用了 BFS 广度优先搜索遍历八叉树索引，将海量点云高效转化为 QGIS 的 3D 点符号图层，以便与参数化模型进行重叠对比。
 void ParamModelerDock::onLoadExternalPointCloud()
 {
   QString filePath = QFileDialog::getOpenFileName(
-    this, tr( "选择点云文件" ), "", tr( "点云文件 (*.ply *.las *.laz *.xyz *.txt)" )
+    this, tr( "选择点云文件" ), "", tr( "点云文件 (*.ply *.las *.laz)" )
   );
 
   if ( filePath.isEmpty() )
@@ -695,413 +591,17 @@ void ParamModelerDock::onLoadExternalPointCloud()
 
   DEBUG_LOG( QString( "[PointCloud] 加载外部点云: %1 (格式: %2)\n" ).arg( filePath ).arg( suffix ).toStdWString().c_str() );
 
-  QgsMapLayer *pcLayer = nullptr;
-
-  if ( suffix == "ply" )
-{
-  // ===== PLY：支持 ASCII 和 Binary（little/big endian）=====
-  QFile plyFile( filePath );
-  if ( !plyFile.open( QIODevice::ReadOnly ) )  // ← 不加 Text，统一用 ReadOnly
+  QString errorMessage;
+  QgsMapLayer *loadedLayer = ParamModelerScene3D::loadExternalPointCloud(
+    mIface, filePath, layerName, this, &errorMessage );
+  if ( !loadedLayer )
   {
-    QMessageBox::warning( this, tr("错误"), tr("无法打开PLY文件") );
+    QMessageBox::warning( this, tr( "加载失败" ), errorMessage );
     return;
   }
 
-  // ---------- 1. 解析 Header ----------
-  enum class PlyFormat { Unknown, Ascii, BinaryLE, BinaryBE };
-  PlyFormat plyFormat = PlyFormat::Unknown;
-  int vertexCount = 0;
-
-  // property: name -> (byteOffset, byteSize)
-  // 我们只关心 x/y/z 三个 property 的偏移和类型
-  struct PropInfo { int offset; int size; bool isDouble; };
-  QMap<QString, PropInfo> propMap;
-  int currentOffset = 0;  // 在一个 record 里累计字节偏移
-
-  // 逐行读 header（header 一定是纯 ASCII）
-  while ( true )
-  {
-    // 手动按行读，兼容 \r\n 和 \n
-    QByteArray lineBA;
-    char c;
-    while ( plyFile.getChar(&c) )
-    {
-      if ( c == '\n' ) break;
-      if ( c != '\r' ) lineBA.append(c);
-    }
-    QString line = QString::fromLatin1( lineBA ).trimmed();
-
-    if ( line.startsWith("format") )
-    {
-      if      ( line.contains("ascii") )                  plyFormat = PlyFormat::Ascii;
-      else if ( line.contains("binary_little_endian") )   plyFormat = PlyFormat::BinaryLE;
-      else if ( line.contains("binary_big_endian") )      plyFormat = PlyFormat::BinaryBE;
-    }
-    else if ( line.startsWith("element vertex") )
-    {
-      vertexCount = line.split(' ', Qt::SkipEmptyParts).last().toInt();
-    }
-    else if ( line.startsWith("property") )
-    {
-      // 格式：property <type> <name>
-      // 只处理 vertex 的 property（element vertex 之后，element face 之前）
-      QStringList tok = line.split(' ', Qt::SkipEmptyParts);
-      if ( tok.size() >= 3 )
-      {
-        QString typeName = tok[1];
-        QString propName = tok[2];
-
-        int sz = 4;
-        bool isDbl = false;
-        if      ( typeName == "double" || typeName == "float64" ) { sz = 8; isDbl = true; }
-        else if ( typeName == "float"  || typeName == "float32" ) { sz = 4; isDbl = false; }
-        else if ( typeName == "int"    || typeName == "int32"   ||
-                  typeName == "uint"   || typeName == "uint32"  ) { sz = 4; isDbl = false; }
-        else if ( typeName == "short"  || typeName == "int16"   ||
-                  typeName == "ushort" || typeName == "uint16"  ) { sz = 2; isDbl = false; }
-        else if ( typeName == "char"   || typeName == "uchar"   ||
-                  typeName == "int8"   || typeName == "uint8"   ) { sz = 1; isDbl = false; }
-
-        propMap[propName] = { currentOffset, sz, isDbl };
-        currentOffset += sz;
-      }
-    }
-    else if ( line == "end_header" )
-    {
-      break;
-    }
-
-    if ( plyFile.atEnd() ) break;
-  }
-  // currentOffset 此时就是一个顶点 record 的总字节数
-  int recordSize = currentOffset;
-
-  // ---------- 2. 校验 ----------
-  if ( plyFormat == PlyFormat::Unknown || vertexCount == 0 ||
-       !propMap.contains("x") || !propMap.contains("y") || !propMap.contains("z") )
-  {
-    QMessageBox::warning( this, tr("错误"),
-      tr("PLY文件格式不支持或缺少 x/y/z 属性\nformat=%1  vertices=%2")
-        .arg( (int)plyFormat ).arg( vertexCount ) );
-    plyFile.close();
-    return;
-  }
-
-  // ---------- 3. 创建图层 + 3D 渲染器（和原来完全一样）----------
-  QgsVectorLayer *vl = new QgsVectorLayer(
-    "PointZ?crs=EPSG:3857", layerName, "memory" );
-
-  QgsPoint3DSymbol *symbol3D = new QgsPoint3DSymbol();
-  symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
-  symbol3D->setShape( Qgis::Point3DShape::Sphere );
-  QVariantMap props;
-  props["radius"] = 0.03;
-  symbol3D->setShapeProperties( props );
-
-  QgsPhongMaterialSettings material;
-  QColor pointColor( 30, 100, 255, 255 );
-  material.setAmbient( pointColor );
-  material.setDiffuse( pointColor );
-  material.setSpecular( Qt::black );
-  material.setShininess( 0 );
-  symbol3D->setMaterialSettings( material.clone() );
-
-  QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
-  renderer3D->setSymbol( symbol3D );
-  vl->setRenderer3D( renderer3D );
-
-  // ---------- 4. 读取顶点数据 ----------
-  const PropInfo &px = propMap["x"];
-  const PropInfo &py = propMap["y"];
-  const PropInfo &pz = propMap["z"];
-
-  // 把 QByteArray 里某偏移的数据转成 double 的 lambda
-  // 支持 float/double，支持字节序翻转
-  auto readVal = [&]( const QByteArray &rec, const PropInfo &pi, bool bigEndian ) -> double
-  {
-    if ( pi.isDouble )
-    {
-      double v;
-      memcpy( &v, rec.constData() + pi.offset, 8 );
-      if ( bigEndian )
-      {
-        char *b = reinterpret_cast<char*>(&v);
-        std::reverse( b, b + 8 );
-      }
-      return v;
-    }
-    else
-    {
-      float v;
-      memcpy( &v, rec.constData() + pi.offset, 4 );
-      if ( bigEndian )
-      {
-        char *b = reinterpret_cast<char*>(&v);
-        std::reverse( b, b + 4 );
-      }
-      return static_cast<double>(v);
-    }
-  };
-
-  bool isBigEndian = ( plyFormat == PlyFormat::BinaryBE );
-
-  QgsFeatureList features;
-  features.reserve( 1000 );
-  int count = 0;
-
-  if ( plyFormat == PlyFormat::Ascii )
-  {
-    // ASCII 路径：和原来一样，但现在按 property 顺序确定列索引
-    // 找 x/y/z 在 property 列表里的列号
-    int xCol = -1, yCol = -1, zCol = -1;
-    int col = 0;
-    for ( auto it = propMap.begin(); it != propMap.end(); ++it, ++col )
-    {
-      if ( it.key() == "x" ) xCol = col;
-      if ( it.key() == "y" ) yCol = col;
-      if ( it.key() == "z" ) zCol = col;
-    }
-    // QMap 是按 key 字母序排的，不能直接用来确定列号
-    // 需要在 header 解析时记录 property 插入顺序，这里用更简单的方式：
-    // Open3D 的 ASCII PLY 总是 x y z 在前三列，直接用 parts[0/1/2] 最安全
-    // 但为了通用性，改用偏移最小的三个 property 的顺序
-    // ---- 简化处理：ASCII 时重新用 parts[xCol/yCol/zCol] ----
-    // 因为 QMap 字母序和 header 顺序不同，重建一个顺序表
-    QStringList propOrder;
-    {
-      // 重新过一遍 header 拿顺序（复用已解析的 propMap，按 offset 排序）
-      QList<QPair<int,QString>> offsetList;
-      for ( auto it = propMap.begin(); it != propMap.end(); ++it )
-        offsetList.append( { it.value().offset, it.key() } );
-      std::sort( offsetList.begin(), offsetList.end() );
-      for ( auto &p : offsetList ) propOrder << p.second;
-    }
-    xCol = propOrder.indexOf("x");
-    yCol = propOrder.indexOf("y");
-    zCol = propOrder.indexOf("z");
-
-    while ( !plyFile.atEnd() && count < vertexCount )
-    {
-      QByteArray lineBA = plyFile.readLine().trimmed();
-      if ( lineBA.isEmpty() ) continue;
-      QList<QByteArray> parts = lineBA.split(' ');
-      // 过滤空串（多余空格）
-      parts.removeAll( QByteArray() );
-      int need = std::max( { xCol, yCol, zCol } ) + 1;
-      if ( parts.size() < need ) continue;
-
-      double x = parts[xCol].toDouble();
-      double y = parts[yCol].toDouble();
-      double z = parts[zCol].toDouble();
-
-      QgsFeature feat;
-      feat.setGeometry( QgsGeometry( new QgsPoint( x, y, z ) ) );
-      features.append( feat );
-      count++;
-
-      if ( features.size() >= 1000 )
-      {
-        vl->dataProvider()->addFeatures( features );
-        features.clear();
-      }
-    }
-  }
-  else
-  {
-    // Binary 路径：按 recordSize 逐块读取
-    for ( int i = 0; i < vertexCount; i++ )
-    {
-      QByteArray rec = plyFile.read( recordSize );
-      if ( rec.size() < recordSize )
-        break;  // 文件提前结束
-
-      double x = readVal( rec, px, isBigEndian );
-      double y = readVal( rec, py, isBigEndian );
-      double z = readVal( rec, pz, isBigEndian );
-
-      QgsFeature feat;
-      feat.setGeometry( QgsGeometry( new QgsPoint( x, y, z ) ) );
-      features.append( feat );
-      count++;
-
-      if ( features.size() >= 1000 )
-      {
-        vl->dataProvider()->addFeatures( features );
-        features.clear();
-      }
-    }
-  }
-
-  if ( !features.isEmpty() )
-    vl->dataProvider()->addFeatures( features );
-
-  plyFile.close();
-  pcLayer = vl;
-}
-  else if ( suffix == "las" || suffix == "laz" )
-  {
-    // ===== LAS/LAZ：通过QGIS点云索引读取XYZ，转成内存PointZ图层 =====
-
-    // 先用QgsPointCloudLayer加载，拿到index
-    QgsPointCloudLayer *tmpLayer = new QgsPointCloudLayer( filePath, "tmp", "pdal" );
-    if ( !tmpLayer || !tmpLayer->isValid() )
-    {
-      QMessageBox::warning( this, tr( "错误" ), tr( "无法加载LAS文件：%1" ).arg( filePath ) );
-      delete tmpLayer;
-      return;
-    }
-
-    QgsPointCloudIndex index = tmpLayer->dataProvider()->index();
-    if ( !index.isValid() )
-    {
-      QMessageBox::warning( this, tr( "错误" ), tr( "点云索引无效" ) );
-      delete tmpLayer;
-      return;
-    }
-
-    // 创建内存PointZ图层
-    QgsVectorLayer *vl = new QgsVectorLayer(
-      "PointZ?crs=EPSG:3857", layerName, "memory"
-    );
-
-    // 设置3D渲染器（和PLY一样）
-    QgsPoint3DSymbol *symbol3D = new QgsPoint3DSymbol();
-    symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
-    symbol3D->setShape( Qgis::Point3DShape::Sphere );
-    QVariantMap props;
-    props["radius"] = 0.03;
-    symbol3D->setShapeProperties( props );
-				
-    QgsPhongMaterialSettings material;
-    QColor pointColor( 30, 100, 255, 255 );
-    material.setAmbient( pointColor );
-    material.setDiffuse( pointColor );
-    material.setSpecular( Qt::black );
-    material.setShininess( 0 );
-    symbol3D->setMaterialSettings( material.clone() );
-
-    QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
-    renderer3D->setSymbol( symbol3D );
-    vl->setRenderer3D( renderer3D );
-
-    // 准备请求：只读XYZ
-    QgsPointCloudAttributeCollection attrs;
-    attrs.push_back( QgsPointCloudAttribute( "X", QgsPointCloudAttribute::Int32 ) );
-    attrs.push_back( QgsPointCloudAttribute( "Y", QgsPointCloudAttribute::Int32 ) );
-    attrs.push_back( QgsPointCloudAttribute( "Z", QgsPointCloudAttribute::Int32 ) );
-    QgsPointCloudRequest request;
-    request.setAttributes( attrs );
-
-    // scale和offset用于把整数坐标转成真实坐标
-    QgsVector3D scale = index.scale();
-    QgsVector3D offset = index.offset();
-
-    // BFS遍历八叉树所有节点
-    QgsFeatureList features;
-    features.reserve( 1000 );
-    QList<QgsPointCloudNodeId> queue;
-    queue.append( index.root() );
-
-    while ( !queue.isEmpty() )
-    {
-      QgsPointCloudNodeId nodeId = queue.takeFirst();
-
-      // 加入子节点
-      QgsPointCloudNode node = index.getNode( nodeId );
-      for ( const QgsPointCloudNodeId &child : node.children() )
-        queue.append( child );
-
-      // 读取节点数据
-      std::unique_ptr<QgsPointCloudBlock> block = index.nodeData( nodeId, request );
-      if ( !block )
-        continue;
-
-      const char *data = block->data();
-      int pointCount = block->pointCount();
-      int recordSize = block->pointRecordSize();
-
-      // 解析每个点的XYZ（Int32）
-      for ( int i = 0; i < pointCount; i++ )
-      {
-        const char *ptr = data + i * recordSize;
-
-        qint32 ix = *reinterpret_cast<const qint32 *>( ptr );
-        qint32 iy = *reinterpret_cast<const qint32 *>( ptr + 4 );
-        qint32 iz = *reinterpret_cast<const qint32 *>( ptr + 8 );
-
-        double x = ix * scale.x() + offset.x();
-        double y = iy * scale.y() + offset.y();
-        double z = iz * scale.z() + offset.z();
-
-        QgsFeature feat;
-        feat.setGeometry( QgsGeometry( new QgsPoint( x, y, z ) ) );
-        features.append( feat );
-
-        if ( features.size() >= 1000 )
-        {
-          vl->dataProvider()->addFeatures( features );
-          features.clear();
-        }
-      }
-    }
-
-    if ( !features.isEmpty() )
-      vl->dataProvider()->addFeatures( features );
-
-    delete tmpLayer;
-    pcLayer = vl;
-  }
-  else
-  {
-    QMessageBox::warning( this, tr( "不支持" ), tr( "暂不支持该格式：%1" ).arg( suffix ) );
-    return;
-  }
-
-  if ( !pcLayer || !pcLayer->isValid() )
-  {
-    QMessageBox::warning( this, tr( "加载失败" ), tr( "图层无效，路径：%1" ).arg( filePath ) );
-    if ( pcLayer )
-      delete pcLayer;
-    return;
-  }
-  removeLayerByName( layerName );
-  QgsProject::instance()->addMapLayer( pcLayer );
-
-  // 让2D地图缩放到点云范围，3D相机跟过去
-  mIface->mapCanvas()->setExtent( pcLayer->extent() );
-  mIface->mapCanvas()->refresh();
-
-  // 自动打开3D视图
-  if ( mIface->mapCanvases3D().isEmpty() )
-  {
-    Qgs3DMapCanvas *canvas3D = mIface->createNewMapCanvas3D( "ParamModeler 3D" );
-    if ( canvas3D )
-    {
-      QDockWidget *dock = qobject_cast<QDockWidget *>( canvas3D->parent() );
-      if ( dock )
-      {
-        dock->setFloating( true );
-        dock->resize( 800, 600 );
-      }
-    }
-  }
-
-QMessageBox::information( this, tr( "加载成功" ), tr( "点云已加载！\n图层：%1\n\n可在3D视图中与模型叠加对比。" ).arg( layerName ) );
-  DEBUG_LOG( QString( "[PointCloud] 加载成功, 图层: %1\n" ).arg( layerName ).toStdWString().c_str() );
-}
-// ================================清理图层============================
-// 在加载新模型前，根据名称添加并删除旧图层，通过excludeId确保不会误删当前正在使用的新图层。
-void ParamModelerDock::removeLayerByName( const QString &name, const QString &excludeId )
-{
-    QStringList toRemove;
-    const auto layers = QgsProject::instance()->mapLayers();
-    for ( auto it = layers.cbegin(); it != layers.cend(); ++it )
-    {
-        if ( it.value()->name() == name && it.key() != excludeId )
-            toRemove << it.key();
-    }
-    for ( const QString &id : toRemove )
-        QgsProject::instance()->removeMapLayer( id );
+  QMessageBox::information( this, tr( "加载成功" ), tr( "点云已加载！\n图层：%1\n\n可在3D视图中与模型叠加对比。" ).arg( layerName ) );
+  DEBUG_LOG( QString( "[PointCloud] load success, layer: %1\n" ).arg( layerName ).toStdWString().c_str() );
 }
 // ===============================主刷新函数=============================
 // 根据当前参数重建网格，并根据开关决定是否同步到QGIS

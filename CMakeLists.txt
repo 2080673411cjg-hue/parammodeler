@@ -15,6 +15,7 @@ set (parammodeler_SRCS
   parammodeler_pcdfeatures.cpp
   parammodeler_classify.cpp
   parammodeler_inverse.cpp
+  parammodeler_scene3d.cpp
 )
 set (parammodeler_UIS
   parammodeler_dock.ui

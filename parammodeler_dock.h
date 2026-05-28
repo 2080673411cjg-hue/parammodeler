@@ -150,7 +150,6 @@ private:
   PreviewGLWidget *m_previewWidget = nullptr;
   QTimer          *m_previewTimer  = nullptr;
 		
-		void removeLayerByName( const QString &name, const QString &excludeId = QString() );  //在加载新模型前，根据名称添加并删除旧图层
   QgsVectorLayer *m_modelLayer = nullptr;//新增一个成员变量，缓存图层指针
 		bool            m_isUpdating = false; 
 			QString         m_lastGpkgPath;             // 上一次临时 GPKG 文件路径，用于清理
