@@ -141,7 +141,7 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
         p["wallHeight"] = dock->hcrWallHeight();
         p["radius"]     = dock->hcrRadius();
     }
-    else if ( type == "CylinderHemisphere" )
+    else if ( type == "CylinderDome" || type == "CylinderHemisphere" )
     {
       p["radius"]     = dock->cylHemiRadius();
       p["cyl_height"] = dock->cylHemiHeight();

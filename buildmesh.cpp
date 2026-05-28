@@ -36,7 +36,8 @@ MeshData BuildMesh::build( const QString &primitiveType, ParamModelerDock *dock 
     else if ( primitiveType == "PyramidRoof" )         m = buildPyramidRoof( dock );
     else if ( primitiveType == "TruncatedPyramidRoof") m = buildTruncatedPyramidRoof( dock );
     else if ( primitiveType == "HalfCylinderRoof" )    m = buildHalfCylinderRoof( dock );
-    else if ( primitiveType == "CylinderHemisphere" )     m = buildCylinderHemisphere( dock );
+    else if ( primitiveType == "CylinderDome" ||
+              primitiveType == "CylinderHemisphere" )     m = buildCylinderHemisphere( dock );
     else if ( primitiveType == "IndentedCuboid" )        m = buildIndentedCuboid( dock );
     else if ( primitiveType == "AsymmetricGableHouse" )  m = buildAsymmetricGableHouse( dock );
     else if ( primitiveType == "FourStageRoundTower" )   m = buildFourStageRoundTower( dock );
@@ -303,7 +304,7 @@ MeshData BuildMesh::buildHalfCylinderRoof( ParamModelerDock *dock )
     double W  = dock->hcrLength();
     double D  = dock->hcrWidth();
     double HW = dock->hcrWallHeight();
-    double R  = dock->hcrRadius();
+    double R  = D / 2.0;
     if ( W<=0||D<=0||HW<=0||R<=0 ) return m;
 
     const int N = 32;
@@ -344,7 +345,7 @@ MeshData BuildMesh::buildHalfCylinderRoof( ParamModelerDock *dock )
 }
 
 // ============================================================
-// 穹顶圆柱
+// 圆柱穹顶
 // ============================================================
 MeshData BuildMesh::buildCylinderHemisphere( ParamModelerDock *dock )
 {
@@ -581,64 +582,85 @@ MeshData BuildMesh::buildFourStageRoundTower( ParamModelerDock *dock )
 }
 
 // ============================================================
-// 双人字屋顶房屋
+// 双人字屋顶房屋：House 2 绕 House 1 的 C 点竖直轴旋转
 // ============================================================
 MeshData BuildMesh::buildTwoGableHouses( ParamModelerDock *dock )
 {
     MeshData m;
-    double W1    = dock->tgLength1();
-    double W2    = dock->tgLength2();
-    double D     = dock->tgWidth();
+    double L1    = dock->tgLength1();
+    double L2    = dock->tgLength2();
+    double W     = dock->tgWidth();
     double H     = dock->tgWallHeight();
     double roofH = dock->tgRoofHeight();
     double angle = dock->tgAngle();
-    if ( W1<=0||W2<=0||D<=0||H<=0||roofH<=0 ) return m;
+    if ( L1<=0||L2<=0||W<=0||H<=0||roofH<=0 ) return m;
+    if ( angle < 90.0 ) angle = 90.0;
+    if ( angle > 180.0 ) angle = 180.0;
 
     double turnAngle = 180.0 - angle;
-    double bevelAngle = turnAngle / 2.0;
-    double bevelRad = bevelAngle * M_PI / 180.0;
-    double totalRad = turnAngle * M_PI / 180.0;
+    double totalRad  = turnAngle * M_PI / 180.0;
+    double ct = cos(totalRad), st = sin(totalRad);
 
-    // ---- 第一栋 ----
-    QVector3D h1b0(0,0,0), h1b1(D,0,0), h1b2(D,W1,0), h1b3(0,W1,0);
-    QVector3D h1w0(0,0,H), h1w1(D,0,H), h1w2(D,W1,H), h1w3(0,W1,H);
-    QVector3D h1r0(D/2,0,H+roofH), h1r1(D/2,W1,H+roofH);
+    // ---- House 1: A-B-C-D, AB 为长度，BC 为宽度，C 为旋转轴底点 ----
+    QVector3D A(0,0,0), B(L1,0,0), C(L1,W,0), Dp(0,W,0);
+    QVector3D Aw(0,0,H), Bw(L1,0,H), Cw(L1,W,H), Dw(0,W,H);
+    QVector3D R0(0,W/2,H+roofH), R1(L1,W/2,H+roofH);
 
-    m.addQuad(h1b3,h1b2,h1b1,h1b0); // 底
-    m.addQuad(h1b0,h1b1,h1w1,h1w0); // 前墙
-    m.addQuad(h1b1,h1b2,h1w2,h1w1); // 后墙
-    m.addQuad(h1b2,h1b3,h1w3,h1w2); // 右墙
-    m.addQuad(h1b3,h1b0,h1w0,h1w3); // 左墙
-    m.addTriangle(h1w0,h1w1,h1r0);  // 前山墙
-    m.addTriangle(h1w2,h1w3,h1r1);  // 后山墙
-    m.addQuad(h1w0,h1w3,h1r1,h1r0); // 左坡
-    m.addQuad(h1w1,h1w2,h1r1,h1r0); // 右坡（注意法线）
-    m.addTriangle(h1w1,h1r0,h1r1);
-    m.addTriangle(h1w1,h1r1,h1w2);
-
-    // ---- 第二栋（旋转后） ----
-    auto tr = [&]( double lx, double ly, double lz ) -> QVector3D {
-        double rx = cos(totalRad)*lx - sin(totalRad)*ly;
-        double ry = sin(totalRad)*lx + cos(totalRad)*ly;
-        return QVector3D(0+rx, W1+ry, lz);
+    // ---- House 2: E-F-G-H, H 与 C 重合，整栋房屋绕 C 逆时针旋转 ----
+    auto rotAroundC = [&]( const QVector3D &p ) -> QVector3D {
+        double dx = p.x() - C.x();
+        double dy = p.y() - C.y();
+        return QVector3D(
+            C.x() + dx * ct - dy * st,
+            C.y() + dx * st + dy * ct,
+            p.z()
+        );
     };
 
-    QVector3D h2b0=tr(0,0,0),    h2b1=tr(D,0,0);
-    QVector3D h2b2=tr(D,W2,0),   h2b3=tr(0,W2,0);
-    QVector3D h2w0=tr(0,0,H),    h2w1=tr(D,0,H);
-    QVector3D h2w2=tr(D,W2,H),   h2w3=tr(0,W2,H);
-    QVector3D h2r0=tr(D/2,0,H+roofH), h2r1=tr(D/2,W2,H+roofH);
+    QVector3D E = rotAroundC( QVector3D(L1,0,0) );
+    QVector3D F = rotAroundC( QVector3D(L1+L2,0,0) );
+    QVector3D G = rotAroundC( QVector3D(L1+L2,W,0) );
+    QVector3D H2 = C;
+    QVector3D Ew = rotAroundC( QVector3D(L1,0,H) );
+    QVector3D Fw = rotAroundC( QVector3D(L1+L2,0,H) );
+    QVector3D Gw = rotAroundC( QVector3D(L1+L2,W,H) );
+    QVector3D Hw = Cw;
+    QVector3D R2 = rotAroundC( QVector3D(L1,W/2,H+roofH) );
+    QVector3D R3 = rotAroundC( QVector3D(L1+L2,W/2,H+roofH) );
 
-    m.addQuad(h2b3,h2b2,h2b1,h2b0);
-    m.addQuad(h2b0,h2b1,h2w1,h2w0);
-    m.addQuad(h2b1,h2b2,h2w2,h2w1);
-    m.addQuad(h2b2,h2b3,h2w3,h2w2);
-    m.addQuad(h2b3,h2b0,h2w0,h2w3);
-    m.addTriangle(h2w0,h2w1,h2r0);
-    m.addTriangle(h2w2,h2w3,h2r1);
-    m.addQuad(h2w0,h2w3,h2r1,h2r0);
-    m.addTriangle(h2w1,h2r0,h2r1);
-    m.addTriangle(h2w1,h2r1,h2w2);
+    auto addHouse1Exterior = [&]() {
+        m.addQuad(A,Dp,C,B);        // 底面
+        m.addQuad(A,B,Bw,Aw);       // AB 外墙
+        m.addQuad(C,Dp,Dw,Cw);      // CD 外墙
+        m.addQuad(Dp,A,Aw,Dw);      // DA 端墙
+        m.addTriangle(Aw,R0,Dw);    // D-A 山墙
+        m.addQuad(Aw,Bw,R1,R0);     // AB 侧屋坡
+        m.addQuad(Dw,R0,R1,Cw);     // CD 侧屋坡
+    };
+
+    auto addHouse2Exterior = [&]() {
+        m.addQuad(E,H2,G,F);        // 底面
+        m.addQuad(E,F,Fw,Ew);       // EF 外墙
+        m.addQuad(F,G,Gw,Fw);       // FG 端墙
+        m.addQuad(G,H2,Hw,Gw);      // GH 外墙
+        m.addTriangle(Fw,Gw,R3);    // F-G 山墙
+        m.addQuad(Ew,Fw,R3,R2);     // 一侧屋坡
+        m.addQuad(Hw,R2,R3,Gw);     // 另一侧屋坡
+    };
+
+    auto addGapConnector = [&]() {
+        if ( angle >= 179.999 )
+            return;
+
+        m.addTriangle(B, C, E);       // 缺口底面
+        m.addQuad(B, E, Ew, Bw);      // 缺口侧面
+        m.addQuad(Bw, Ew, R2, R1);    // 屋脊前侧屋顶梯形面
+        m.addTriangle(Cw, R1, R2);    // 屋脊背侧屋顶三角面
+    };
+
+    addHouse1Exterior();
+    addHouse2Exterior();
+    addGapConnector();
 
     return m;
 }

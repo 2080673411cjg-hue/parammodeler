@@ -292,10 +292,10 @@ QVector<TypeProfile> PrimitiveClassifier::buildProfiles()
         profiles.append( p );
     }
 
-    // --- CylinderHemisphere ---
+    // --- CylinderDome ---
     {
         TypeProfile p;
-        p.name = "CylinderHemisphere";
+        p.name = "CylinderDome";
         p.expCircularity = 0.77;       p.weightCircularity = 3.0;
         p.expAspectRatio = 0.79;       p.weightAspectRatio = 0.5;
         p.expConvexity = 0.66;         p.weightConvexity = 1.5;

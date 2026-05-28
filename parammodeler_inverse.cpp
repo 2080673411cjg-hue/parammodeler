@@ -56,7 +56,10 @@ QMap<QString, double> ParamInverter::invert( const QString &primitiveType,
         result = invertTruncatedPyramidRoof( pts );
     else if ( primitiveType == "HalfCylinderRoof" )
         result = invertHalfCylinderRoof( pts );
-    else if ( primitiveType == "CylinderHemisphere" || primitiveType == "穹顶圆柱" )
+    else if ( primitiveType == "CylinderDome" ||
+              primitiveType == "CylinderHemisphere" ||
+              primitiveType == "穹顶圆柱" ||
+              primitiveType == "圆柱穹顶" )
         result = invertCylinderHemisphere( pts );
     else if ( primitiveType == "IndentedCuboid" || primitiveType == "凹陷长方体" )
         result = invertIndentedCuboid( pts );
@@ -720,7 +723,7 @@ double ParamInverter::computeFitError( const QVector<QVector3D> &pts,
             cnt++;
         }
     }
-    else if ( type == "CylinderHemisphere" )
+    else if ( type == "CylinderDome" || type == "CylinderHemisphere" )
     {
         double cx = params.value( "tx", 0 ) + params.value( "chRadius", 1 );
         double cy = params.value( "ty", 0 ) + params.value( "chRadius", 1 );
@@ -870,7 +873,7 @@ void ParamInverter::perturbParams( QMap<QString, double> &params,
         keys << "tpBottomLength" << "tpBottomWidth" << "tpTopLength" << "tpTopWidth" << "tpWallHeight" << "tpRoofHeight";
     else if ( type == "HalfCylinderRoof" )
         keys << "hcrLength" << "hcrWidth" << "hcrWallHeight" << "hcrRadius";
-    else if ( type == "CylinderHemisphere" )
+    else if ( type == "CylinderDome" || type == "CylinderHemisphere" )
         keys << "chRadius" << "chCylHeight" << "chDomeHeight" << "chBulge";
     else if ( type == "IndentedCuboid" )
         keys << "icOuterL" << "icOuterW" << "icOuterH" << "icInnerL" << "icInnerW" << "icInnerH" << "icOffsetX" << "icOffsetY";
@@ -1333,7 +1336,7 @@ QMap<QString, double> ParamInverter::invertHalfCylinderRoof( const QVector<QVect
 }
 
 // ====================================================================
-// CylinderHemisphere: 圆柱+穹顶
+// CylinderDome: 圆柱+贝塞尔穹顶
 // ====================================================================
 QMap<QString, double> ParamInverter::invertCylinderHemisphere( const QVector<QVector3D> &pts )
 {
@@ -1383,7 +1386,7 @@ QMap<QString, double> ParamInverter::invertCylinderHemisphere( const QVector<QVe
     p["tx"] = cx - radius;
     p["ty"] = cy - radius;
     p["tz"] = zMin;
-    return refineWithSA( pts, "CylinderHemisphere", p );
+    return refineWithSA( pts, "CylinderDome", p );
 }
 
 // ====================================================================

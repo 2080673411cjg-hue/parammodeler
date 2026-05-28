@@ -39,7 +39,7 @@ A QGIS plugin for parametric 3D building primitive modeling, real-time preview, 
 | 金字塔屋顶 | `PyramidRoof` | 4 | 四坡锥形屋顶房屋（长/宽/墙高/顶高） |
 | 棱台屋顶 | `TruncatedPyramidRoof` | 6 | 截顶四棱锥屋顶（底长/底宽/顶长/顶宽/墙高/顶高） |
 | 半圆柱屋顶 | `HalfCylinderRoof` | 4 | 拱形屋顶房屋（长/宽/墙高/半径） |
-| 穹顶圆柱 | `CylinderHemisphere` | 4 | 圆柱+贝塞尔穹顶（半径/柱高/穹高/鼓胀度） |
+| 圆柱穹顶 | `CylinderDome` | 4 | 圆柱+贝塞尔穹顶（半径/柱高/穹高/鼓胀度） |
 | 凹陷长方体 | `IndentedCuboid` | 8 | 带顶部凹槽的长方体（外长/外宽/外高/内长/内宽/内高/偏移X/偏移Y） |
 | 非对称人字形屋顶 | `AsymmetricGableHouse` | 6 | 屋脊可偏移的不对称双坡屋顶（长/宽/墙高/顶高/脊长/脊偏移） |
 | 四段式圆塔形 | `FourStageRoundTower` | 6 | 圆柱+贝塞尔过渡+圆锥塔形（底半径/底高/中高/中顶半径/鼓胀/锥高） |

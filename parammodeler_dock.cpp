@@ -39,6 +39,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QVBoxLayout>
+#include <QAbstractSpinBox>
 #include <algorithm>
 
 // 3. QGIS 基础与地理要素处理
@@ -142,7 +143,16 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderHCRLength, ui->spinBoxHCRLength, 100, 50 ); // --- HalfCylinderRoof (半圆柱屋顶) 绑定 ---
   bindSliderSpin( ui->sliderHCRWidth, ui->spinBoxHCRWidth, 100, 50 );
   bindSliderSpin( ui->sliderHCRHeightWall, ui->spinBoxHCRHeightWall, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderHCRRadius, ui->spinBoxHCRRadius, 100, 50 );
+  ui->sliderHCRRadius->hide();
+  ui->spinBoxHCRRadius->setReadOnly( true );
+  ui->spinBoxHCRRadius->setButtonSymbols( QAbstractSpinBox::NoButtons );
+  ui->spinBoxHCRRadius->setRange( 0.0, 25.0 );
+  auto syncHCRRadius = [this]() {
+    ui->spinBoxHCRRadius->setValue( ui->spinBoxHCRWidth->value() / 2.0 );
+  };
+  syncHCRRadius();
+  connect( ui->spinBoxHCRWidth, QOverload<double>::of( &QDoubleSpinBox::valueChanged ),
+           this, [syncHCRRadius]( double ) { syncHCRRadius(); } );
   bindSliderSpin( ui->sliderICLength, ui->spinBoxICLength, 100, 50 ); // --- IndentedCuboid (凹陷长方体) 绑定 ---
   bindSliderSpin( ui->sliderICWidth, ui->spinBoxICWidth, 100, 50 );
   bindSliderSpin( ui->sliderICHeight, ui->spinBoxICHeight, 100, 50 );
@@ -157,7 +167,7 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderAGHRoofHeight, ui->spinBoxAGHRoofHeight, 100, 50 );
   bindSliderSpin( ui->sliderAGHRidgeLength, ui->spinBoxAGHRidgeLength, 100.0, 50.0 );
   bindSliderSpin( ui->sliderAGHRidgeOffset, ui->spinBoxAGHRidgeOffset, 100, 50.0, -50.0 );
-  bindSliderSpin( ui->sliderCylHemiRadius, ui->spinBoxCylHemiRadius, 100, 50 ); // --- CylinderHemisphere (穹顶圆柱) 绑定 ---
+  bindSliderSpin( ui->sliderCylHemiRadius, ui->spinBoxCylHemiRadius, 100, 50 ); // --- CylinderDome (圆柱穹顶) 绑定 ---
   bindSliderSpin( ui->sliderCylHemiHeight, ui->spinBoxCylHemiHeight, 100, 50 );
   bindSliderSpin( ui->sliderCylHemiDomeHeight, ui->spinBoxCylHemiDomeHeight, 100, 50 );
   bindSliderSpin( ui->sliderCylHemiBulge, ui->spinBoxCylHemiBulge, 100.0, 1.0 );
@@ -172,7 +182,7 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderTGWidth, ui->spinBoxTGWidth, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGHeightWall, ui->spinBoxTGHeightWall, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGRoofHeight, ui->spinBoxTGRoofHeight, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderTGAngle,      ui->spinBoxTGAngle,      10.0, 179.0 );
+  bindSliderSpin( ui->sliderTGAngle,      ui->spinBoxTGAngle,      10.0, 180.0, 90.0 );
 	//位姿旋转三参数的输入绑定
 	bindSliderSpin(ui->sliderROmega, ui->spinBoxROmega, 10.0, 180.0, -180.0);
 	bindSliderSpin(ui->sliderRPhi,   ui->spinBoxRPhi,   10.0, 180.0, -180.0);
@@ -231,8 +241,7 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   connect( ui->sliderHCRLength,      &QSlider::valueChanged, this, schedulePreview );  // 半圆柱屋顶
   connect( ui->sliderHCRWidth,      &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderHCRHeightWall, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderHCRRadius,     &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderCylHemiRadius,    &QSlider::valueChanged, this, schedulePreview );  // 穹顶圆柱
+  connect( ui->sliderCylHemiRadius,    &QSlider::valueChanged, this, schedulePreview );  // 圆柱穹顶
   connect( ui->sliderCylHemiHeight,    &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCylHemiDomeHeight,&QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCylHemiBulge,     &QSlider::valueChanged, this, schedulePreview );
@@ -322,6 +331,7 @@ void ParamModelerDock::onPrimitiveChanged( const QString &prim )
     { "PyramidRoof", &Ui::ParamModelerDock::pagePyramidRoof },
     { "TruncatedPyramidRoof", &Ui::ParamModelerDock::pageTPRoof },
     { "HalfCylinderRoof", &Ui::ParamModelerDock::pageHalfCylinderRoof },
+    { "CylinderDome", &Ui::ParamModelerDock::pageCylinderHemisphere },
     { "CylinderHemisphere", &Ui::ParamModelerDock::pageCylinderHemisphere },
     { "IndentedCuboid", &Ui::ParamModelerDock::pageIndentedCuboid },
     { "AsymmetricGableHouse", &Ui::ParamModelerDock::pageAsymmetricGableHouse },

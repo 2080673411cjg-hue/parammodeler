@@ -158,7 +158,7 @@
              </item>
              <item>
               <property name="text">
-               <string>CylinderHemisphere</string>
+               <string>CylinderDome</string>
               </property>
              </item>
              <item>
@@ -1949,16 +1949,16 @@
                   <item>
                    <widget class="QDoubleSpinBox" name="spinBoxTGAngle">
                     <property name="minimum">
-                     <double>1.000000000000000</double>
+                     <double>90.000000000000000</double>
                     </property>
                     <property name="maximum">
-                     <double>179.000000000000000</double>
+                     <double>180.000000000000000</double>
                     </property>
                     <property name="singleStep">
                      <double>1.000000000000000</double>
                     </property>
                     <property name="value">
-                     <double>1.000000000000000</double>
+                     <double>180.000000000000000</double>
                     </property>
                    </widget>
                   </item>
