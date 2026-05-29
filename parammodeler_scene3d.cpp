@@ -114,11 +114,15 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
   symbol3D->setAltitudeBinding( Qgis::AltitudeBinding::Vertex );
   symbol3D->setCullingMode( Qgs3DTypes::NoCulling );
 
+  QColor modelColor( 105, 130, 145, 220 );
+  QColor ambientColor( 55, 65, 70, 220 );
+  QColor specularColor( 10, 10, 10, 60 );
+
   QgsPhongMaterialSettings material;
-  material.setAmbient( QColor( 70, 70, 70 ) );
-  material.setDiffuse( QColor( 175, 175, 175 ) );
-  material.setSpecular( QColor( 30, 30, 30 ) );
-  material.setShininess( 4.0 );
+  material.setAmbient( ambientColor );
+  material.setDiffuse( modelColor );
+  material.setSpecular( specularColor );
+  material.setShininess( 1.0 );
   symbol3D->setMaterialSettings( material.clone() );
 
   QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();

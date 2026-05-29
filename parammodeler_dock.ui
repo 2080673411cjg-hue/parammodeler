@@ -43,14 +43,18 @@
       </property>
       <widget class="QMenu" name="menuExport">
        <property name="title">
-        <string>导出 / 加载</string>
+        <string>导出</string>
        </property>
        <addaction name="actOBJ"/>
+       <addaction name="actMesh"/>
        <addaction name="actJSON"/>
        <addaction name="actPLY"/>
        <addaction name="actDLPointCloud"/>
-       <addaction name="actMesh"/>
-       <addaction name="separator"/>
+      </widget>
+      <widget class="QMenu" name="menuLoad3D">
+       <property name="title">
+        <string>加载到 3D</string>
+       </property>
        <addaction name="actTo3D"/>
        <addaction name="actLoadPC"/>
       </widget>
@@ -76,20 +80,21 @@
       </action>
       <action name="actMesh">
        <property name="text">
-        <string>导出 Mesh 文件 (*.stl)</string>
+        <string>导出 STL Mesh 文件 (*.stl)</string>
        </property>
       </action>
       <action name="actTo3D">
        <property name="text">
-        <string>加载模型到 QGIS 3D 场景</string>
+        <string>加载当前模型到 QGIS 3D 场景</string>
        </property>
       </action>
       <action name="actLoadPC">
        <property name="text">
-        <string>加载外部点云到 3D 视图</string>
+        <string>加载外部点云到 QGIS 3D 场景</string>
        </property>
       </action>
       <addaction name="menuExport"/>
+      <addaction name="menuLoad3D"/>
      </widget>
     </item>
     <item>
