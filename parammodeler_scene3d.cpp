@@ -37,6 +37,7 @@
 #include <qgsphongmaterialsettings.h>
 #include <qgsvectorfilewriter.h>
 #include <qgsmapcanvas.h>
+#include <qgsrectangle.h>
 
 namespace
 {
@@ -111,6 +112,17 @@ void applyPolygon3DMaterial( QgsVectorLayer *layer,
   QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
   renderer3D->setSymbol( symbol3D );
   layer->setRenderer3D( renderer3D );
+}
+
+QgsRectangle padded3DViewExtent( const QgsRectangle &extent )
+{
+  QgsRectangle padded = extent;
+  if ( padded.isNull() )
+    return padded;
+
+  const double pad = std::max( std::max( padded.width(), padded.height() ) * 0.25, 20.0 );
+  padded.grow( pad );
+  return padded;
 }
 }
 
@@ -219,6 +231,11 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
   if ( roofLayer )
     QgsProject::instance()->addMapLayer( roofLayer );
 
+  QgsRectangle viewExtent = layer->extent();
+  if ( roofLayer )
+    viewExtent.combineExtentWith( roofLayer->extent() );
+  viewExtent = padded3DViewExtent( viewExtent );
+
   if ( !previousGpkgPath.isEmpty() )
     removeTempGpkgPaths( previousGpkgPath );
 
@@ -234,12 +251,15 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
     if ( !settings )
       continue;
 
+    if ( !viewExtent.isNull() )
+      settings->setExtent( viewExtent );
+
     QList<QgsMapLayer *> curLayers = settings->layers();
     curLayers.erase(
       std::remove_if( curLayers.begin(), curLayers.end(),
                       [&]( QgsMapLayer *l ) {
-                        return ( l->name() == layerName && l->id() != layer->id() ) ||
-                               ( l->name() == roofLayerName && ( !roofLayer || l->id() != roofLayer->id() ) );
+                        return l && ( ( l->name() == layerName && l->id() != layer->id() ) ||
+                                      ( l->name() == roofLayerName && ( !roofLayer || l->id() != roofLayer->id() ) ) );
                       } ),
       curLayers.end() );
     if ( !curLayers.contains( layer ) )
@@ -247,6 +267,8 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
     if ( roofLayer && !curLayers.contains( roofLayer ) )
       curLayers.append( roofLayer );
     settings->setLayers( curLayers );
+    if ( !viewExtent.isNull() )
+      canvas3D->setViewFrom2DExtent( viewExtent );
   }
 
   layer->triggerRepaint();
@@ -255,7 +277,7 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
 
   if ( zoomToLayer && iface->mapCanvas() )
   {
-    iface->mapCanvas()->setExtent( layer->extent() );
+    iface->mapCanvas()->setExtent( viewExtent );
     iface->mapCanvas()->refresh();
   }
 
@@ -347,9 +369,11 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
   removeLayerByName( layerName );
   QgsProject::instance()->addMapLayer( vl );
 
+  QgsRectangle viewExtent = padded3DViewExtent( vl->extent() );
+
   if ( iface->mapCanvas() )
   {
-    iface->mapCanvas()->setExtent( vl->extent() );
+    iface->mapCanvas()->setExtent( viewExtent );
     iface->mapCanvas()->refresh();
   }
 
@@ -366,6 +390,34 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
       }
     }
   }
+
+  QList<Qgs3DMapCanvas *> canvases3D = iface->mapCanvases3D();
+  for ( Qgs3DMapCanvas *canvas3D : canvases3D )
+  {
+    if ( !canvas3D )
+      continue;
+    Qgs3DMapSettings *settings = canvas3D->mapSettings();
+    if ( !settings )
+      continue;
+
+    if ( !viewExtent.isNull() )
+      settings->setExtent( viewExtent );
+
+    QList<QgsMapLayer *> curLayers = settings->layers();
+    curLayers.erase(
+      std::remove_if( curLayers.begin(), curLayers.end(),
+                      [&]( QgsMapLayer *l ) {
+                        return l && l->name() == layerName && l->id() != vl->id();
+                      } ),
+      curLayers.end() );
+    if ( !curLayers.contains( vl ) )
+      curLayers.append( vl );
+    settings->setLayers( curLayers );
+    if ( !viewExtent.isNull() )
+      canvas3D->setViewFrom2DExtent( viewExtent );
+  }
+
+  vl->triggerRepaint();
 
   Q_UNUSED( parent );
   return vl;
