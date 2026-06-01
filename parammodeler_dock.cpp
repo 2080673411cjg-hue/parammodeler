@@ -41,7 +41,9 @@
 #include <QAction>
 #include <QVBoxLayout>
 #include <QAbstractSpinBox>
+#include <QRandomGenerator>
 #include <algorithm>
+#include <cmath>
 
 // 3. QGIS 基础与地理要素处理
 #include <qgis.h>
@@ -167,7 +169,7 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderAGHHeightWall, ui->spinBoxAGHHeightWall, 100, 50 );
   bindSliderSpin( ui->sliderAGHRoofHeight, ui->spinBoxAGHRoofHeight, 100, 50 );
   bindSliderSpin( ui->sliderAGHRidgeLength, ui->spinBoxAGHRidgeLength, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderAGHRidgeOffset, ui->spinBoxAGHRidgeOffset, 100, 50.0, -50.0 );
+  bindSliderSpin( ui->sliderAGHRidgeOffset, ui->spinBoxAGHRidgeOffset, 100.0, 0.8, 0.2 );
   bindSliderSpin( ui->sliderCylHemiRadius, ui->spinBoxCylHemiRadius, 100, 50 ); // --- CylinderDome (圆柱穹顶) 绑定 ---
   bindSliderSpin( ui->sliderCylHemiHeight, ui->spinBoxCylHemiHeight, 100, 50 );
   bindSliderSpin( ui->sliderCylHemiDomeHeight, ui->spinBoxCylHemiDomeHeight, 100, 50 );
@@ -183,7 +185,8 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderTGWidth, ui->spinBoxTGWidth, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGHeightWall, ui->spinBoxTGHeightWall, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGRoofHeight, ui->spinBoxTGRoofHeight, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderTGAngle,      ui->spinBoxTGAngle,      10.0, 180.0, 90.0 );
+  bindSliderSpin( ui->sliderTGAngle,      ui->spinBoxTGAngle,      10.0, 180.0, 135.0 );
+  bindSliderSpin( ui->sliderTGRidgeRatio, ui->spinBoxTGRidgeRatio, 100.0, 0.8, 0.2 );
 	//位姿旋转三参数的输入绑定
 	bindSliderSpin(ui->sliderROmega, ui->spinBoxROmega, 10.0, 180.0, -180.0);
 	bindSliderSpin(ui->sliderRPhi,   ui->spinBoxRPhi,   10.0, 180.0, -180.0);
@@ -273,10 +276,12 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   connect( ui->sliderTGHeightWall, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTGRoofHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTGAngle,      &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderTGRidgeRatio, &QSlider::valueChanged, this, schedulePreview );
   // 切换基元时切换参数页面
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, &ParamModelerDock::onPrimitiveChanged );
   // 切换基元时立刻刷新预览
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, [this]( const QString & ) { onUpdatePreview(); } );
+  connect( ui->btnRandomParams, &QPushButton::clicked, this, &ParamModelerDock::onRandomizeCurrentPrimitive );
 		// ====================== 点云反演折叠面板 ======================
 		ui->frameInversion->setVisible( false );  // 默认收起
 
@@ -380,6 +385,136 @@ void ParamModelerDock::onPrimitiveChanged( const QString &prim )
 }
 // =======================导出前检验===================
 // 在导出前检查当前参数是否能生成有效的几何网格
+// ======================= Random Parameters ===================
+void ParamModelerDock::onRandomizeCurrentPrimitive()
+{
+  auto rnd = []( double minVal, double maxVal, double step = 0.1 ) {
+    const double raw = minVal + QRandomGenerator::global()->generateDouble() * ( maxVal - minVal );
+    return std::round( raw / step ) * step;
+  };
+  auto set = []( QDoubleSpinBox *spin, double value ) {
+    if ( spin )
+      spin->setValue( value );
+  };
+
+  const QString prim = ui->comboPrimitive->currentText();
+
+  if ( prim == "Cuboid" )
+  {
+    set( ui->spinBoxCLength, rnd( 6.0, 18.0 ) );
+    set( ui->spinBoxCWidth, rnd( 4.0, 12.0 ) );
+    set( ui->spinBoxCHeight, rnd( 2.5, 8.0 ) );
+  }
+  else if ( prim == "Cylinder" )
+  {
+    set( ui->spinBoxCylRadius, rnd( 2.0, 8.0 ) );
+    set( ui->spinBoxCylHeight, rnd( 3.0, 14.0 ) );
+  }
+  else if ( prim == "LHouse" )
+  {
+    const double mainLength = rnd( 10.0, 22.0 );
+    const double mainWidth = rnd( 6.0, 14.0 );
+    set( ui->spinBoxLMainLength, mainLength );
+    set( ui->spinBoxLMainWidth, mainWidth );
+    set( ui->spinBoxLWingLength, rnd( mainLength * 0.35, mainLength * 0.75 ) );
+    set( ui->spinBoxLWingWidth, rnd( mainWidth * 0.35, mainWidth * 0.75 ) );
+    set( ui->spinBoxLHeight, rnd( 2.5, 7.0 ) );
+  }
+  else if ( prim == "ConeCylinder" )
+  {
+    set( ui->spinBoxConeCylRadius, rnd( 2.0, 8.0 ) );
+    set( ui->spinBoxConeCylCylHeight, rnd( 2.5, 9.0 ) );
+    set( ui->spinBoxConeCylConeHeight, rnd( 1.5, 6.0 ) );
+  }
+  else if ( prim == "GabledRoof" )
+  {
+    set( ui->spinBoxGRLength, rnd( 8.0, 24.0 ) );
+    set( ui->spinBoxGRWidth, rnd( 5.0, 14.0 ) );
+    set( ui->spinBoxGRHeightWall, rnd( 2.5, 7.0 ) );
+    set( ui->spinBoxGRHeightRoof, rnd( 1.2, 5.0 ) );
+  }
+  else if ( prim == "PyramidRoof" )
+  {
+    set( ui->spinBoxPRLength, rnd( 7.0, 20.0 ) );
+    set( ui->spinBoxPRWidth, rnd( 5.0, 16.0 ) );
+    set( ui->spinBoxPRHeightWall, rnd( 2.5, 7.0 ) );
+    set( ui->spinBoxPRHeightRoof, rnd( 1.5, 6.0 ) );
+  }
+  else if ( prim == "TruncatedPyramidRoof" )
+  {
+    const double bottomLength = rnd( 10.0, 24.0 );
+    const double bottomWidth = rnd( 8.0, 18.0 );
+    set( ui->spinBoxTPRBottomLength, bottomLength );
+    set( ui->spinBoxTPRBottomWidth, bottomWidth );
+    set( ui->spinBoxTPRTopLength, rnd( bottomLength * 0.35, bottomLength * 0.80 ) );
+    set( ui->spinBoxTPRTopWidth, rnd( bottomWidth * 0.35, bottomWidth * 0.80 ) );
+    set( ui->spinBoxTPRHeightWall, rnd( 2.5, 7.0 ) );
+    set( ui->spinBoxTPRHeightRoof, rnd( 1.2, 5.0 ) );
+  }
+  else if ( prim == "HalfCylinderRoof" )
+  {
+    set( ui->spinBoxHCRLength, rnd( 8.0, 24.0 ) );
+    set( ui->spinBoxHCRWidth, rnd( 4.0, 14.0 ) );
+    set( ui->spinBoxHCRHeightWall, rnd( 2.5, 7.0 ) );
+  }
+  else if ( prim == "CylinderDome" || prim == "CylinderHemisphere" )
+  {
+    set( ui->spinBoxCylHemiRadius, rnd( 3.0, 9.0 ) );
+    set( ui->spinBoxCylHemiHeight, rnd( 2.5, 9.0 ) );
+    set( ui->spinBoxCylHemiDomeHeight, rnd( 1.0, 5.0 ) );
+    set( ui->spinBoxCylHemiBulge, rnd( 0.15, 0.65, 0.01 ) );
+  }
+  else if ( prim == "IndentedCuboid" )
+  {
+    const double outerLength = rnd( 10.0, 24.0 );
+    const double outerWidth = rnd( 8.0, 18.0 );
+    const double outerHeight = rnd( 4.0, 12.0 );
+    const double innerLength = rnd( outerLength * 0.25, outerLength * 0.60 );
+    const double innerWidth = rnd( outerWidth * 0.25, outerWidth * 0.60 );
+    set( ui->spinBoxICLength, outerLength );
+    set( ui->spinBoxICWidth, outerWidth );
+    set( ui->spinBoxICHeight, outerHeight );
+    set( ui->spinBoxICInnerLength, innerLength );
+    set( ui->spinBoxICInnerWidth, innerWidth );
+    set( ui->spinBoxICInnerHeight, rnd( outerHeight * 0.25, outerHeight * 0.75 ) );
+    set( ui->spinBoxICOffsetX, rnd( 0.0, outerLength - innerLength ) );
+    set( ui->spinBoxICOffsetY, rnd( 0.0, outerWidth - innerWidth ) );
+  }
+  else if ( prim == "AsymmetricGableHouse" )
+  {
+    const double length = rnd( 10.0, 24.0 );
+    const double width = rnd( 5.0, 14.0 );
+    set( ui->spinBoxAGHLength, length );
+    set( ui->spinBoxAGHWidth, width );
+    set( ui->spinBoxAGHHeightWall, rnd( 2.5, 7.0 ) );
+    set( ui->spinBoxAGHRoofHeight, rnd( 1.2, 5.0 ) );
+    set( ui->spinBoxAGHRidgeLength, rnd( length * 0.40, length * 0.90 ) );
+    set( ui->spinBoxAGHRidgeOffset, rnd( 0.3, 0.7, 0.01 ) );
+  }
+  else if ( prim == "FourStageRoundTower" )
+  {
+    set( ui->spinBoxFTBaseRadius, rnd( 5.0, 12.0 ) );
+    set( ui->spinBoxFTBaseHeight, rnd( 1.2, 3.5 ) );
+    set( ui->spinBoxFTMiddleHeight, rnd( 1.0, 3.0 ) );
+    set( ui->spinBoxFTMiddleTopRadius, rnd( 0.5, 1.6 ) );
+    set( ui->spinBoxFTMiddleBulge, rnd( 0.15, 0.45, 0.01 ) );
+    set( ui->spinBoxFTConeHeight, rnd( 0.8, 2.0 ) );
+  }
+  else if ( prim == "TwoGableHouses" )
+  {
+    set( ui->spinBoxTGLength1, rnd( 10.0, 24.0 ) );
+    set( ui->spinBoxTGLength2, rnd( 7.0, 18.0 ) );
+    set( ui->spinBoxTGWidth, rnd( 5.0, 12.0 ) );
+    set( ui->spinBoxTGHeightWall, rnd( 2.5, 7.0 ) );
+    set( ui->spinBoxTGRoofHeight, rnd( 1.2, 4.5 ) );
+    set( ui->spinBoxTGAngle, rnd( 135.0, 180.0, 1.0 ) );
+    set( ui->spinBoxTGRidgeRatio, rnd( 0.3, 0.7, 0.01 ) );
+  }
+
+  onUpdatePreview();
+}
+
+// ======================= Export Validation ===================
 static bool checkMeshValid( const QString &primitiveType, ParamModelerDock *dock )
 {
     MeshData mesh = BuildMesh::build( primitiveType, dock );
@@ -677,7 +812,8 @@ double ParamModelerDock::aghWidth() const { return ui->spinBoxAGHWidth->value();
 double ParamModelerDock::aghWallHeight() const { return ui->spinBoxAGHHeightWall->value(); }
 double ParamModelerDock::aghRoofHeight() const { return ui->spinBoxAGHRoofHeight->value(); }
 double ParamModelerDock::aghRidgeLength() const { return ui->spinBoxAGHRidgeLength->value(); }
-double ParamModelerDock::aghRidgeOffset() const { return ui->spinBoxAGHRidgeOffset->value(); }
+double ParamModelerDock::aghRidgeOffset() const { return ( aghRidgeRatio() - 0.5 ) * aghWidth(); }
+double ParamModelerDock::aghRidgeRatio() const { return ui->spinBoxAGHRidgeOffset->value(); }
 double ParamModelerDock::cylHemiRadius() const { return ui->spinBoxCylHemiRadius->value(); }
 double ParamModelerDock::cylHemiHeight() const { return ui->spinBoxCylHemiHeight->value(); }
 double ParamModelerDock::cylHemiDomeHeight() const { return ui->spinBoxCylHemiDomeHeight->value(); }
@@ -694,6 +830,7 @@ double ParamModelerDock::tgWidth() const { return ui->spinBoxTGWidth->value(); }
 double ParamModelerDock::tgWallHeight() const { return ui->spinBoxTGHeightWall->value(); }
 double ParamModelerDock::tgRoofHeight() const { return ui->spinBoxTGRoofHeight->value(); }
 double ParamModelerDock::tgAngle() const { return ui->spinBoxTGAngle->value(); }
+double ParamModelerDock::tgRidgeRatio() const { return ui->spinBoxTGRidgeRatio->value(); }
 
 // ========================================================================
 // Tab2：加载点云 / OBJ 数据

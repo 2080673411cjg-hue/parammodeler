@@ -232,3 +232,14 @@ pip install numpy open3d torch
 ## 作者
 
 Chai, 2025-2026
+
+---
+
+## Version History
+
+### v2.0.2
+
+- Refined `TwoGableHouses`: fixed shared `BC` connection line, limited ridge angle to `135-180`, and added adjustable ridge position ratio.
+- Updated `AsymmetricGableHouse`: changed ridge control from absolute offset to ridge position ratio while keeping offset export compatibility.
+- Added a random-parameter button for quick primitive preview/testing.
+- Improved QGIS 3D model loading: model is split into body and roof layers, with beige walls and dark-red roofs.

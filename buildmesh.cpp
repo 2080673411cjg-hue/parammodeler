@@ -463,9 +463,11 @@ MeshData BuildMesh::buildAsymmetricGableHouse( ParamModelerDock *dock )
   MeshData m;
   double W = dock->aghLength(), D = dock->aghWidth();
   double H = dock->aghWallHeight(), roofH = dock->aghRoofHeight();
-  double ridgeL = dock->aghRidgeLength(), ridgeOff = dock->aghRidgeOffset();
+  double ridgeL = dock->aghRidgeLength(), ridgeRatio = dock->aghRidgeRatio();
   if ( W <= 0 || D <= 0 || H <= 0 || roofH <= 0 )
     return m;
+  if ( ridgeRatio < 0.2 ) ridgeRatio = 0.2;
+  if ( ridgeRatio > 0.8 ) ridgeRatio = 0.8;
 
   QVector3D v0( 0, 0, 0 ), v1( W, 0, 0 ), v2( W, D, 0 ), v3( 0, D, 0 );
   QVector3D v4( 0, 0, H ), v5( W, 0, H ), v6( W, D, H ), v7( 0, D, H );
@@ -476,7 +478,7 @@ MeshData BuildMesh::buildAsymmetricGableHouse( ParamModelerDock *dock )
   double rc = W / 2.0;            // 宽度中心
   double rs = rc - ridgeL / 2.0;  // 屋脊起点 X
   double re = rc + ridgeL / 2.0;  // 屋脊终点 X
-  double ry = D / 2.0 + ridgeOff; // 屋脊 Y 位置
+  double ry = D * ridgeRatio;     // 屋脊 Y 位置
 
   QVector3D r0( rs, ry, H + roofH ); // 屋脊左端
   QVector3D r1( re, ry, H + roofH ); // 屋脊右端
@@ -608,9 +610,70 @@ MeshData BuildMesh::buildTwoGableHouses( ParamModelerDock *dock )
     double H     = dock->tgWallHeight();
     double roofH = dock->tgRoofHeight();
     double angle = dock->tgAngle();
+    double ridgeRatio = dock->tgRidgeRatio();
     if ( L1<=0||L2<=0||W<=0||H<=0||roofH<=0 ) return m;
-    if ( angle < 90.0 ) angle = 90.0;
+    if ( angle < 135.0 ) angle = 135.0;
     if ( angle > 180.0 ) angle = 180.0;
+    if ( ridgeRatio < 0.2 ) ridgeRatio = 0.2;
+    if ( ridgeRatio > 0.8 ) ridgeRatio = 0.8;
+
+    {
+        const double turnRad = ( 180.0 - angle ) * M_PI / 180.0;
+        const double ct = cos( turnRad );
+        const double st = sin( turnRad );
+        const double roofZ = H + roofH;
+        const double ridgeY = W * ridgeRatio;
+
+        auto withZ = []( const QVector3D &p, double z ) {
+            return QVector3D( p.x(), p.y(), z );
+        };
+        auto addWalls = [&]( const QVector<QVector3D> &poly )
+        {
+            for ( int i = 0; i < poly.size(); ++i )
+            {
+                const QVector3D p0 = poly[i];
+                const QVector3D p1 = poly[( i + 1 ) % poly.size()];
+                m.addQuad( p0, p1, withZ( p1, H ), withZ( p0, H ) );
+            }
+        };
+
+        // Plan view: House 1 is rectangle A-B-C-D; House 2 is parallelogram B-E-G-C.
+        const QVector3D A( 0, 0, 0 );
+        const QVector3D B( L1, 0, 0 );
+        const QVector3D C( L1, W, 0 );
+        const QVector3D Dp( 0, W, 0 );
+        const QVector3D dir( ct, st, 0 );
+        const QVector3D E = B + dir * L2;
+        const QVector3D G = C + dir * L2;
+
+        QVector<QVector3D> footprint;
+        footprint << A << B << E << G << C << Dp;
+
+        m.addTriangle( C, B, A );
+        m.addTriangle( Dp, C, A );
+        m.addTriangle( G, E, B );
+        m.addTriangle( C, G, B );
+        addWalls( footprint );
+
+        const QVector3D Aw = withZ( A, H );
+        const QVector3D Bw = withZ( B, H );
+        const QVector3D Cw = withZ( C, H );
+        const QVector3D Dw = withZ( Dp, H );
+        const QVector3D Ew = withZ( E, H );
+        const QVector3D Gw = withZ( G, H );
+        const QVector3D R0( 0, ridgeY, roofZ );
+        const QVector3D R1( L1, ridgeY, roofZ );
+        const QVector3D R2 = R1 + dir * L2;
+
+        m.addTriangle( Aw, R0, Dw );
+        m.addTriangle( Ew, Gw, R2 );
+        m.addQuad( Aw, Bw, R1, R0 );
+        m.addQuad( Dw, R0, R1, Cw );
+        m.addQuad( Bw, Ew, R2, R1 );
+        m.addQuad( Cw, R1, R2, Gw );
+
+        return m;
+    }
 
     double turnAngle = 180.0 - angle;
     double totalRad  = turnAngle * M_PI / 180.0;

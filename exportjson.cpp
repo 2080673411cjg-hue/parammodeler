@@ -167,6 +167,7 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
       p["roofHeight"]  = dock->aghRoofHeight();
       p["ridgeLength"] = dock->aghRidgeLength();
       p["ridgeOffset"] = dock->aghRidgeOffset();
+      p["ridgeRatio"]  = dock->aghRidgeRatio();
     }
     else if ( type == "FourStageRoundTower" )
     {
@@ -187,6 +188,7 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
       p["wallHeight"] = dock->tgWallHeight();
       p["roofHeight"] = dock->tgRoofHeight();
       p["angle"]      = dock->tgAngle();
+      p["ridgeRatio"] = dock->tgRidgeRatio();
     }
 
     return p;

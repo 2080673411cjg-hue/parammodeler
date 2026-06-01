@@ -102,6 +102,7 @@ public:
   double aghRoofHeight() const;
   double aghRidgeLength() const;
   double aghRidgeOffset() const;
+  double aghRidgeRatio() const;
   double cylHemiRadius() const;
   double cylHemiHeight() const;
   double cylHemiDomeHeight() const;
@@ -118,6 +119,7 @@ public:
   double tgWallHeight() const;
   double tgRoofHeight() const;
   double tgAngle() const;
+  double tgRidgeRatio() const;
 
 private slots:
   void onPrimitiveChanged(const QString &prim); // 基元切换槽函数
@@ -133,6 +135,7 @@ private slots:
   void onLoadInputData();
   void onClassifyPrimitive();
   void onInverseParams();
+  void onRandomizeCurrentPrimitive();
 		
   void onUpdatePreview();//主刷新入口
 

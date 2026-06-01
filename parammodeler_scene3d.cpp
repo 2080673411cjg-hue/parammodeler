@@ -38,6 +38,82 @@
 #include <qgsvectorfilewriter.h>
 #include <qgsmapcanvas.h>
 
+namespace
+{
+void removeTempGpkgPaths( const QString &paths )
+{
+  for ( const QString &path : paths.split( '\n' ) )
+  {
+    const QString trimmed = path.trimmed();
+    if ( !trimmed.isEmpty() )
+      QFile::remove( trimmed );
+  }
+}
+
+QgsPolygon *makeTrianglePolygon( const QVector3D &v0, const QVector3D &v1, const QVector3D &v2 )
+{
+  QgsPolygon *poly = new QgsPolygon();
+  QgsLineString *ring = new QgsLineString();
+  ring->setPoints( QgsPointSequence()
+                   << QgsPoint( v0.x(), v0.y(), v0.z() )
+                   << QgsPoint( v1.x(), v1.y(), v1.z() )
+                   << QgsPoint( v2.x(), v2.y(), v2.z() )
+                   << QgsPoint( v0.x(), v0.y(), v0.z() ) );
+  poly->setExteriorRing( ring );
+  return poly;
+}
+
+QgsVectorLayer *writeMeshLayer( QgsMultiPolygon *multiPoly,
+                                const QString &layerName,
+                                const QString &gpkgPath,
+                                QString *errorMessage )
+{
+  QgsFeature feat;
+  feat.setGeometry( QgsGeometry( multiPoly ) );
+  QgsFeatureList features;
+  features.append( feat );
+
+  QgsVectorLayer *tmpLayer = new QgsVectorLayer( "MultiPolygonZ?crs=EPSG:3857", "tmp", "memory" );
+  tmpLayer->dataProvider()->addFeatures( features );
+  QgsVectorFileWriter::writeAsVectorFormat( tmpLayer, gpkgPath, "UTF-8",
+                                            QgsCoordinateReferenceSystem( "EPSG:3857" ), "GPKG" );
+  delete tmpLayer;
+
+  QgsVectorLayer *layer = new QgsVectorLayer( gpkgPath, layerName, "ogr" );
+  if ( !layer || !layer->isValid() )
+  {
+    if ( errorMessage )
+      *errorMessage = QObject::tr( "Failed to load model layer from GeoPackage: %1" ).arg( layerName );
+    delete layer;
+    QFile::remove( gpkgPath );
+    return nullptr;
+  }
+  return layer;
+}
+
+void applyPolygon3DMaterial( QgsVectorLayer *layer,
+                             const QColor &diffuse,
+                             const QColor &ambient,
+                             const QColor &specular )
+{
+  QgsPolygon3DSymbol *symbol3D = new QgsPolygon3DSymbol();
+  symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
+  symbol3D->setAltitudeBinding( Qgis::AltitudeBinding::Vertex );
+  symbol3D->setCullingMode( Qgs3DTypes::NoCulling );
+
+  QgsPhongMaterialSettings material;
+  material.setAmbient( ambient );
+  material.setDiffuse( diffuse );
+  material.setSpecular( specular );
+  material.setShininess( 1.0 );
+  symbol3D->setMaterialSettings( material.clone() );
+
+  QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
+  renderer3D->setSymbol( symbol3D );
+  layer->setRenderer3D( renderer3D );
+}
+}
+
 ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *iface,
                                                                  const MeshData &mesh,
                                                                  const ParamModelerPose &pose,
@@ -48,6 +124,7 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
 {
   ParamModelerModelLoadResult result;
   const QString layerName = "ParamModeler_Model";
+  const QString roofLayerName = "ParamModeler_Model_Roof";
 
   if ( !iface )
   {
@@ -67,75 +144,83 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
   mat.rotate( pose.ry, 0, 1, 0 );
   mat.rotate( pose.rz, 0, 0, 1 );
 
-  QgsMultiPolygon *multiPoly = new QgsMultiPolygon();
+  QgsMultiPolygon *bodyMultiPoly = new QgsMultiPolygon();
+  QgsMultiPolygon *roofMultiPoly = new QgsMultiPolygon();
   const int triCount = mesh.indices.size() / 3;
+  int bodyTriCount = 0;
+  int roofTriCount = 0;
   for ( int i = 0; i < triCount; i++ )
   {
-    QVector3D v0 = mat.map( mesh.vertices[mesh.indices[i * 3]] );
-    QVector3D v1 = mat.map( mesh.vertices[mesh.indices[i * 3 + 1]] );
-    QVector3D v2 = mat.map( mesh.vertices[mesh.indices[i * 3 + 2]] );
+    const QVector3D local0 = mesh.vertices[mesh.indices[i * 3]];
+    const QVector3D local1 = mesh.vertices[mesh.indices[i * 3 + 1]];
+    const QVector3D local2 = mesh.vertices[mesh.indices[i * 3 + 2]];
+    QVector3D v0 = mat.map( local0 );
+    QVector3D v1 = mat.map( local1 );
+    QVector3D v2 = mat.map( local2 );
 
-    QgsPolygon *poly = new QgsPolygon();
-    QgsLineString *ring = new QgsLineString();
-    ring->setPoints( QgsPointSequence()
-                     << QgsPoint( v0.x(), v0.y(), v0.z() )
-                     << QgsPoint( v1.x(), v1.y(), v1.z() )
-                     << QgsPoint( v2.x(), v2.y(), v2.z() )
-                     << QgsPoint( v0.x(), v0.y(), v0.z() ) );
-    poly->setExteriorRing( ring );
-    multiPoly->addGeometry( poly );
+    const QVector3D normal = QVector3D::crossProduct( local1 - local0, local2 - local0 ).normalized();
+    if ( normal.z() > 0.15 )
+    {
+      roofMultiPoly->addGeometry( makeTrianglePolygon( v0, v1, v2 ) );
+      roofTriCount++;
+    }
+    else
+    {
+      bodyMultiPoly->addGeometry( makeTrianglePolygon( v0, v1, v2 ) );
+      bodyTriCount++;
+    }
   }
 
-  QgsFeature feat;
-  feat.setGeometry( QgsGeometry( multiPoly ) );
-  QgsFeatureList features;
-  features.append( feat );
-
-  QString gpkgPath = QDir::tempPath() + "/parammodeler_"
+  QString bodyGpkgPath = QDir::tempPath() + "/parammodeler_body_"
+                     + QString::number( QDateTime::currentMSecsSinceEpoch() ) + ".gpkg";
+  QString roofGpkgPath = QDir::tempPath() + "/parammodeler_roof_"
                      + QString::number( QDateTime::currentMSecsSinceEpoch() ) + ".gpkg";
 
-  QgsVectorLayer *tmpLayer = new QgsVectorLayer( "MultiPolygonZ?crs=EPSG:3857", "tmp", "memory" );
-  tmpLayer->dataProvider()->addFeatures( features );
-  QgsVectorFileWriter::writeAsVectorFormat( tmpLayer, gpkgPath, "UTF-8",
-                                            QgsCoordinateReferenceSystem( "EPSG:3857" ), "GPKG" );
-  delete tmpLayer;
-
-  QgsVectorLayer *layer = new QgsVectorLayer( gpkgPath, layerName, "ogr" );
-  if ( !layer || !layer->isValid() )
+  QString errorMessage;
+  QgsVectorLayer *layer = bodyTriCount > 0 ? writeMeshLayer( bodyMultiPoly, layerName, bodyGpkgPath, &errorMessage ) : nullptr;
+  QgsVectorLayer *roofLayer = roofTriCount > 0 ? writeMeshLayer( roofMultiPoly, roofLayerName, roofGpkgPath, &errorMessage ) : nullptr;
+  if ( !layer )
   {
-    result.errorMessage = "Failed to load model layer from GeoPackage.";
-    delete layer;
-    QFile::remove( gpkgPath );
+    result.errorMessage = errorMessage.isEmpty() ? "Failed to load model layer from GeoPackage." : errorMessage;
+    if ( roofLayer )
+      delete roofLayer;
+    QFile::remove( bodyGpkgPath );
+    QFile::remove( roofGpkgPath );
     return result;
   }
+  if ( roofTriCount <= 0 )
+  {
+    delete roofMultiPoly;
+    roofGpkgPath.clear();
+  }
+  else if ( !roofLayer )
+  {
+    QFile::remove( roofGpkgPath );
+    roofGpkgPath.clear();
+  }
 
-  QgsPolygon3DSymbol *symbol3D = new QgsPolygon3DSymbol();
-  symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
-  symbol3D->setAltitudeBinding( Qgis::AltitudeBinding::Vertex );
-  symbol3D->setCullingMode( Qgs3DTypes::NoCulling );
-
-  QColor modelColor( 105, 130, 145, 220 );
-  QColor ambientColor( 55, 65, 70, 220 );
-  QColor specularColor( 10, 10, 10, 60 );
-
-  QgsPhongMaterialSettings material;
-  material.setAmbient( ambientColor );
-  material.setDiffuse( modelColor );
-  material.setSpecular( specularColor );
-  material.setShininess( 1.0 );
-  symbol3D->setMaterialSettings( material.clone() );
-
-  QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
-  renderer3D->setSymbol( symbol3D );
-  layer->setRenderer3D( renderer3D );
+  applyPolygon3DMaterial( layer,
+                          QColor( 168, 158, 138, 225 ),
+                          QColor( 92, 84, 70, 225 ),
+                          QColor( 18, 15, 12, 45 ) );
+  if ( roofLayer )
+  {
+    applyPolygon3DMaterial( roofLayer,
+                            QColor( 132, 50, 42, 235 ),
+                            QColor( 72, 28, 24, 235 ),
+                            QColor( 18, 8, 6, 45 ) );
+  }
 
   if ( previousModelLayer )
     QgsProject::instance()->removeMapLayer( previousModelLayer->id() );
+  removeLayerByName( roofLayerName );
 
   QgsProject::instance()->addMapLayer( layer );
+  if ( roofLayer )
+    QgsProject::instance()->addMapLayer( roofLayer );
 
   if ( !previousGpkgPath.isEmpty() )
-    QFile::remove( previousGpkgPath );
+    removeTempGpkgPaths( previousGpkgPath );
 
   if ( iface->mapCanvases3D().isEmpty() )
     iface->createNewMapCanvas3D( QObject::tr( "ParamModeler 3D" ) );
@@ -150,21 +235,23 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
       continue;
 
     QList<QgsMapLayer *> curLayers = settings->layers();
-    if ( !curLayers.isEmpty() )
-    {
-      curLayers.erase(
-        std::remove_if( curLayers.begin(), curLayers.end(),
-                        [&]( QgsMapLayer *l ) {
-                          return l->name() == layerName && l->id() != layer->id();
-                        } ),
-        curLayers.end() );
-      if ( !curLayers.contains( layer ) )
-        curLayers.append( layer );
-      settings->setLayers( curLayers );
-    }
+    curLayers.erase(
+      std::remove_if( curLayers.begin(), curLayers.end(),
+                      [&]( QgsMapLayer *l ) {
+                        return ( l->name() == layerName && l->id() != layer->id() ) ||
+                               ( l->name() == roofLayerName && ( !roofLayer || l->id() != roofLayer->id() ) );
+                      } ),
+      curLayers.end() );
+    if ( !curLayers.contains( layer ) )
+      curLayers.append( layer );
+    if ( roofLayer && !curLayers.contains( roofLayer ) )
+      curLayers.append( roofLayer );
+    settings->setLayers( curLayers );
   }
 
   layer->triggerRepaint();
+  if ( roofLayer )
+    roofLayer->triggerRepaint();
 
   if ( zoomToLayer && iface->mapCanvas() )
   {
@@ -174,7 +261,9 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
 
   Q_UNUSED( parent );
   result.layer = layer;
-  result.gpkgPath = gpkgPath;
+  result.gpkgPath = bodyGpkgPath;
+  if ( !roofGpkgPath.isEmpty() )
+    result.gpkgPath += "\n" + roofGpkgPath;
   result.triangleCount = triCount;
   return result;
 }

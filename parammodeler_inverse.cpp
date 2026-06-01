@@ -173,7 +173,7 @@ void ParamInverter::applyToUI( ParamModelerDock *dock,
     set( "aghWallHeight",  dock->ui->spinBoxAGHHeightWall,  dock->ui->sliderAGHHeightWall );
     set( "aghRoofHeight",  dock->ui->spinBoxAGHRoofHeight,  dock->ui->sliderAGHRoofHeight );
     set( "aghRidgeLen",    dock->ui->spinBoxAGHRidgeLength, dock->ui->sliderAGHRidgeLength );
-    set( "aghRidgeOffset", dock->ui->spinBoxAGHRidgeOffset, dock->ui->sliderAGHRidgeOffset );
+    set( "aghRidgeRatio",  dock->ui->spinBoxAGHRidgeOffset, dock->ui->sliderAGHRidgeOffset );
     set( "ftBaseR",       dock->ui->spinBoxFTBaseRadius,     dock->ui->sliderFTBaseRadius );
     set( "ftBaseH",       dock->ui->spinBoxFTBaseHeight,     dock->ui->sliderFTBaseHeight );
     set( "ftMidH",        dock->ui->spinBoxFTMiddleHeight,   dock->ui->sliderFTMiddleHeight );
@@ -878,7 +878,7 @@ void ParamInverter::perturbParams( QMap<QString, double> &params,
     else if ( type == "IndentedCuboid" )
         keys << "icOuterL" << "icOuterW" << "icOuterH" << "icInnerL" << "icInnerW" << "icInnerH" << "icOffsetX" << "icOffsetY";
     else if ( type == "AsymmetricGableHouse" )
-        keys << "aghLength" << "aghWidth" << "aghWallHeight" << "aghRoofHeight" << "aghRidgeLen" << "aghRidgeOffset";
+        keys << "aghLength" << "aghWidth" << "aghWallHeight" << "aghRoofHeight" << "aghRidgeLen" << "aghRidgeRatio";
     else if ( type == "FourStageRoundTower" )
         keys << "ftBaseR" << "ftBaseH" << "ftMidH" << "ftMidTopR" << "ftMidBulge" << "ftConeH";
     else if ( type == "TwoGableHouses" )
@@ -1484,11 +1484,11 @@ QMap<QString, double> ParamInverter::invertAsymmetricGableHouse( const QVector<Q
     fitLineRANSAC( topPts, ridgeOrg, ridgeDir );
 
     // 脊线偏离中心的偏移量
-    double centerX = ( minX + maxX ) * 0.5;
-    double ridgeCX = 0;
-    for ( const QVector3D &v : topPts ) ridgeCX += v.x();
-    if ( !topPts.isEmpty() ) ridgeCX /= topPts.size();
-    double ridgeOffset = ridgeCX - centerX;
+    double ridgeY = 0;
+    for ( const QVector3D &v : topPts ) ridgeY += v.y();
+    if ( !topPts.isEmpty() ) ridgeY /= topPts.size();
+    double ridgeRatio = ( ridgeY - minY ) / qMax( 1e-6, maxY - minY );
+    ridgeRatio = qBound( 0.2, ridgeRatio, 0.8 );
 
     // 脊线长度
     double ridgeLen = ( maxY - minY ) * 0.8;
@@ -1498,7 +1498,7 @@ QMap<QString, double> ParamInverter::invertAsymmetricGableHouse( const QVector<Q
     p["aghWallHeight"]  = wallZ - zMin;
     p["aghRoofHeight"]  = zMax - wallZ;
     p["aghRidgeLen"]    = ridgeLen;
-    p["aghRidgeOffset"] = ridgeOffset;
+    p["aghRidgeRatio"]  = ridgeRatio;
     p["tx"] = minX;
     p["ty"] = minY;
     p["tz"] = zMin;

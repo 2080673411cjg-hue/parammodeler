@@ -194,6 +194,13 @@
              </item>
             </widget>
            </item>
+           <item row="1" column="1">
+            <widget class="QPushButton" name="btnRandomParams">
+             <property name="text">
+              <string>随机参数</string>
+             </property>
+            </widget>
+           </item>
           </layout>
          </widget>
         </item>
@@ -1615,7 +1622,7 @@
                 <item row="5" column="0">
                  <widget class="QLabel" name="labelAGHRidgeOffset">
                   <property name="text">
-                   <string>屋脊偏移：</string>
+                   <string>屋脊位置比例：</string>
                   </property>
                  </widget>
                 </item>
@@ -1624,10 +1631,10 @@
                   <item>
                    <widget class="QSlider" name="sliderAGHRidgeOffset">
                     <property name="minimum">
-                     <number>0</number>
+                     <number>20</number>
                     </property>
                     <property name="maximum">
-                     <number>99</number>
+                     <number>80</number>
                     </property>
                     <property name="orientation">
                      <enum>Qt::Horizontal</enum>
@@ -1637,13 +1644,16 @@
                   <item>
                    <widget class="QDoubleSpinBox" name="spinBoxAGHRidgeOffset">
                     <property name="minimum">
-                     <double>-50.000000000000000</double>
+                     <double>0.200000000000000</double>
                     </property>
                     <property name="maximum">
-                     <double>50.000000000000000</double>
+                     <double>0.800000000000000</double>
                     </property>
                     <property name="singleStep">
-                     <double>0.100000000000000</double>
+                     <double>0.010000000000000</double>
+                    </property>
+                    <property name="value">
+                     <double>0.500000000000000</double>
                     </property>
                    </widget>
                   </item>
@@ -1949,8 +1959,11 @@
                  <layout class="QHBoxLayout" name="layoutTGAngle">
                   <item>
                    <widget class="QSlider" name="sliderTGAngle">
+                    <property name="minimum">
+                     <number>1350</number>
+                    </property>
                     <property name="maximum">
-                     <number>180</number>
+                     <number>1800</number>
                     </property>
                     <property name="orientation">
                      <enum>Qt::Horizontal</enum>
@@ -1960,7 +1973,7 @@
                   <item>
                    <widget class="QDoubleSpinBox" name="spinBoxTGAngle">
                     <property name="minimum">
-                     <double>90.000000000000000</double>
+                     <double>135.000000000000000</double>
                     </property>
                     <property name="maximum">
                      <double>180.000000000000000</double>
@@ -1970,6 +1983,46 @@
                     </property>
                     <property name="value">
                      <double>180.000000000000000</double>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item row="6" column="0">
+                 <widget class="QLabel" name="labelTGRidgeRatio">
+                  <property name="text">
+                   <string>屋脊位置比例：</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="6" column="1">
+                 <layout class="QHBoxLayout" name="layoutTGRidgeRatio">
+                  <item>
+                   <widget class="QSlider" name="sliderTGRidgeRatio">
+                    <property name="minimum">
+                     <number>20</number>
+                    </property>
+                    <property name="maximum">
+                     <number>80</number>
+                    </property>
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QDoubleSpinBox" name="spinBoxTGRidgeRatio">
+                    <property name="minimum">
+                     <double>0.200000000000000</double>
+                    </property>
+                    <property name="maximum">
+                     <double>0.800000000000000</double>
+                    </property>
+                    <property name="singleStep">
+                     <double>0.010000000000000</double>
+                    </property>
+                    <property name="value">
+                     <double>0.500000000000000</double>
                     </property>
                    </widget>
                   </item>
