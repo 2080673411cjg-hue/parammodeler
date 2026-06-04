@@ -12,8 +12,7 @@ set (parammodeler_SRCS
 		buildmesh.cpp
   previewglwidget.cpp
   parammodeler_pcdloader.cpp
-  parammodeler_pcdfeatures.cpp
-  parammodeler_classify.cpp
+  parammodeler_pointnet.cpp
   parammodeler_inverse.cpp
   parammodeler_scene3d.cpp
 )

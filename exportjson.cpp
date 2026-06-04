@@ -108,29 +108,41 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
     else if (type == "ConeCylinder")
 	{
 		p["radius"] = dock->coneCylRadius();
-		p["cyl_height"] = dock->coneCylCylHeight();
-		p["cone_height"] = dock->coneCylConeHeight();
+		const double cylH = dock->coneCylCylHeight();
+		const double coneH = dock->coneCylConeHeight();
+		const double totalH = cylH + coneH;
+		p["totalHeight"] = totalH;
+		p["cylinderRatio"] = totalH > 1e-6 ? cylH / totalH : 0.7;
 	}
     else if (type == "GabledRoof")
     {
         p["length"] = dock->gabledRoofLength();
         p["width"] = dock->gabledRoofWidth();
-        p["wallHeight"] = dock->gabledRoofWallHeight();
-        p["roofHeight"] = dock->gabledRoofRoofHeight();
+        const double wallH = dock->gabledRoofWallHeight();
+        const double roofH = dock->gabledRoofRoofHeight();
+        const double totalH = wallH + roofH;
+        p["totalHeight"] = totalH;
+        p["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
     }
     else if (type == "PyramidRoof")
     {
         p["length"] = dock->pyramidLength();
         p["width"] = dock->pyramidWidth();
-        p["wallHeight"] = dock->pyramidWallHeight();
-        p["roofHeight"] = dock->pyramidRoofHeight();
+        const double wallH = dock->pyramidWallHeight();
+        const double roofH = dock->pyramidRoofHeight();
+        const double totalH = wallH + roofH;
+        p["totalHeight"] = totalH;
+        p["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
     }
     else if (type == "TruncatedPyramidRoof")
     {
       p["length"] = dock->tpBottomLength();
       p["width"] = dock->tpBottomWidth();
-      p["wallHeight"] = dock->tpWallHeight();
-      p["roofHeight"] = dock->tpRoofHeight();
+      const double wallH = dock->tpWallHeight();
+      const double roofH = dock->tpRoofHeight();
+      const double totalH = wallH + roofH;
+      p["totalHeight"] = totalH;
+      p["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
       p["topLength"] = dock->tpTopLength();
       p["topWidth"] = dock->tpTopWidth();
     }
@@ -144,8 +156,11 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
     else if ( type == "CylinderDome" || type == "CylinderHemisphere" )
     {
       p["radius"]     = dock->cylHemiRadius();
-      p["cyl_height"] = dock->cylHemiHeight();
-      p["domeHeight"] = dock->cylHemiDomeHeight();
+      const double cylH = dock->cylHemiHeight();
+      const double domeH = dock->cylHemiDomeHeight();
+      const double totalH = cylH + domeH;
+      p["totalHeight"] = totalH;
+      p["cylinderRatio"] = totalH > 1e-6 ? cylH / totalH : 0.7;
       p["bulgeFactor"]= dock->cylHemiBulge();
     }
     else if ( type == "IndentedCuboid" )
@@ -163,8 +178,11 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
     {
       p["length"]       = dock->aghLength();
       p["width"]       = dock->aghWidth();
-      p["wallHeight"]  = dock->aghWallHeight();
-      p["roofHeight"]  = dock->aghRoofHeight();
+      const double wallH = dock->aghWallHeight();
+      const double roofH = dock->aghRoofHeight();
+      const double totalH = wallH + roofH;
+      p["totalHeight"]  = totalH;
+      p["wallRatio"]  = totalH > 1e-6 ? wallH / totalH : 0.7;
       p["ridgeLength"] = dock->aghRidgeLength();
       p["ridgeOffset"] = dock->aghRidgeOffset();
       p["ridgeRatio"]  = dock->aghRidgeRatio();
@@ -185,8 +203,11 @@ QJsonObject ExportJSON::buildParams(ParamModelerDock *dock, const QString &type)
       p["length1"]     = dock->tgLength1();
       p["length2"]     = dock->tgLength2();
       p["width"]      = dock->tgWidth();
-      p["wallHeight"] = dock->tgWallHeight();
-      p["roofHeight"] = dock->tgRoofHeight();
+      const double wallH = dock->tgWallHeight();
+      const double roofH = dock->tgRoofHeight();
+      const double totalH = wallH + roofH;
+      p["totalHeight"] = totalH;
+      p["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
       p["angle"]      = dock->tgAngle();
       p["ridgeRatio"] = dock->tgRidgeRatio();
     }

@@ -22,8 +22,9 @@
 #include "exportjson.h"
 #include "exportobj.h"
 #include "exportpointcloud.h"
-#include "parammodeler_classify.h"
 #include "parammodeler_inverse.h"
+#include "parammodeler_pcdloader.h"
+#include "parammodeler_pointnet.h"
 #include "parammodeler_scene3d.h"
 
 // 2. Qt 核心与界面框架 (文件、内存、基本 UI)
@@ -37,13 +38,29 @@
 #include <QMatrix4x4>
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QInputDialog>
+#include <QDialog>
 #include <QMenu>
 #include <QAction>
+#include <QApplication>
+#include <QProgressDialog>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QFormLayout>
+#include <QLabel>
+#include <QPushButton>
+#include <QProgressBar>
+#include <QTableWidget>
+#include <QTableWidgetItem>
+#include <QHeaderView>
+#include <QAbstractItemView>
 #include <QAbstractSpinBox>
 #include <QRandomGenerator>
+#include <QRegularExpression>
+#include <QStringList>
 #include <algorithm>
 #include <cmath>
+#include <QJsonArray>
 
 // 3. QGIS 基础与地理要素处理
 #include <qgis.h>
@@ -128,21 +145,21 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderLHeight, ui->spinBoxLHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderConeCylRadius, ui->spinBoxConeCylRadius, 100.0, 50.0 );  // 圆锥体 (ConeCylinder)
   bindSliderSpin( ui->sliderConeCylCylHeight, ui->spinBoxConeCylCylHeight, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderConeCylConeHeight, ui->spinBoxConeCylConeHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderConeCylConeHeight, ui->spinBoxConeCylConeHeight, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderGRLength,      ui->spinBoxGRLength,100,50 );  // 人字形屋顶 (GabledRoof) 绑定
   bindSliderSpin( ui->sliderGRWidth, ui->spinBoxGRWidth, 100, 50 );
   bindSliderSpin( ui->sliderGRHeightWall, ui->spinBoxGRHeightWall, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderGRHeightRoof, ui->spinBoxGRHeightRoof, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderGRHeightRoof, ui->spinBoxGRHeightRoof, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderPRLength, ui->spinBoxPRLength, 100, 50 ); // --- PyramidRoof (金字塔房屋) 绑定 ---
   bindSliderSpin( ui->sliderPRWidth, ui->spinBoxPRWidth, 100, 50 );
 	bindSliderSpin(ui->sliderPRHeightWall, ui->spinBoxPRHeightWall, 100.0, 50.0 );
-	bindSliderSpin(ui->sliderPRHeightRoof, ui->spinBoxPRHeightRoof, 100.0, 50.0 );
+	bindSliderSpin(ui->sliderPRHeightRoof, ui->spinBoxPRHeightRoof, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderTPRBottomLength, ui->spinBoxTPRBottomLength, 100.0, 50.0 );		// --- TPRoof (棱台房屋) 绑定 ---
   bindSliderSpin( ui->sliderTPRBottomWidth, ui->spinBoxTPRBottomWidth, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTPRTopLength, ui->spinBoxTPRTopLength, 100, 50 );
   bindSliderSpin( ui->sliderTPRTopWidth, ui->spinBoxTPRTopWidth, 100, 50 );
   bindSliderSpin( ui->sliderTPRHeightWall, ui->spinBoxTPRHeightWall, 100, 50 );
-  bindSliderSpin( ui->sliderTPRHeightRoof, ui->spinBoxTPRHeightRoof, 100, 50 );
+  bindSliderSpin( ui->sliderTPRHeightRoof, ui->spinBoxTPRHeightRoof, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderHCRLength, ui->spinBoxHCRLength, 100, 50 ); // --- HalfCylinderRoof (半圆柱屋顶) 绑定 ---
   bindSliderSpin( ui->sliderHCRWidth, ui->spinBoxHCRWidth, 100, 50 );
   bindSliderSpin( ui->sliderHCRHeightWall, ui->spinBoxHCRHeightWall, 100.0, 50.0 );
@@ -162,17 +179,17 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderICInnerLength, ui->spinBoxICInnerLength, 100, 50 );
   bindSliderSpin( ui->sliderICInnerWidth, ui->spinBoxICInnerWidth, 100, 50 );
   bindSliderSpin( ui->sliderICInnerHeight, ui->spinBoxICInnerHeight, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderICOffsetX, ui->spinBoxICOffsetX, 100, 50 );
-  bindSliderSpin( ui->sliderICOffsetY, ui->spinBoxICOffsetY, 100, 50 );
+  bindSliderSpin( ui->sliderICOffsetX, ui->spinBoxICOffsetX, 100.0, 1.0, 0.0 );
+  bindSliderSpin( ui->sliderICOffsetY, ui->spinBoxICOffsetY, 100.0, 1.0, 0.0 );
   bindSliderSpin( ui->sliderAGHLength, ui->spinBoxAGHLength, 100, 50 ); // --- AsymmetricGableHouse (非对称人字形屋顶房屋) 绑定 ---
   bindSliderSpin( ui->sliderAGHWidth, ui->spinBoxAGHWidth, 100, 50 );
   bindSliderSpin( ui->sliderAGHHeightWall, ui->spinBoxAGHHeightWall, 100, 50 );
-  bindSliderSpin( ui->sliderAGHRoofHeight, ui->spinBoxAGHRoofHeight, 100, 50 );
+  bindSliderSpin( ui->sliderAGHRoofHeight, ui->spinBoxAGHRoofHeight, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderAGHRidgeLength, ui->spinBoxAGHRidgeLength, 100.0, 50.0 );
   bindSliderSpin( ui->sliderAGHRidgeOffset, ui->spinBoxAGHRidgeOffset, 100.0, 0.8, 0.2 );
   bindSliderSpin( ui->sliderCylHemiRadius, ui->spinBoxCylHemiRadius, 100, 50 ); // --- CylinderDome (圆柱穹顶) 绑定 ---
   bindSliderSpin( ui->sliderCylHemiHeight, ui->spinBoxCylHemiHeight, 100, 50 );
-  bindSliderSpin( ui->sliderCylHemiDomeHeight, ui->spinBoxCylHemiDomeHeight, 100, 50 );
+  bindSliderSpin( ui->sliderCylHemiDomeHeight, ui->spinBoxCylHemiDomeHeight, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderCylHemiBulge, ui->spinBoxCylHemiBulge, 100.0, 1.0 );
   bindSliderSpin( ui->sliderFTBaseRadius, ui->spinBoxFTBaseRadius, 100.0, 50.0 ); // --- FourStageRoundTower (四段式圆塔形) 绑定 ---
   bindSliderSpin( ui->sliderFTBaseHeight, ui->spinBoxFTBaseHeight, 100.0, 50.0 );
@@ -184,7 +201,7 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderTGLength2, ui->spinBoxTGLength2, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGWidth, ui->spinBoxTGWidth, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGHeightWall, ui->spinBoxTGHeightWall, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderTGRoofHeight, ui->spinBoxTGRoofHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTGRoofHeight, ui->spinBoxTGRoofHeight, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderTGAngle,      ui->spinBoxTGAngle,      10.0, 180.0, 135.0 );
   bindSliderSpin( ui->sliderTGRidgeRatio, ui->spinBoxTGRidgeRatio, 100.0, 0.8, 0.2 );
 	//位姿旋转三参数的输入绑定
@@ -197,6 +214,8 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
 		connect( ui->actJSON,   &QAction::triggered, this, &ParamModelerDock::onExportJSONClicked );
 		connect( ui->actPLY,    &QAction::triggered, this, &ParamModelerDock::onExportPLYClicked );
 		connect( ui->actDLPointCloud, &QAction::triggered, this, &ParamModelerDock::onExportDLPointCloudClicked );
+		connect( ui->actLoadedDLPointCloud, &QAction::triggered, this, &ParamModelerDock::onExportLoadedDLPointCloudClicked );
+		connect( ui->actDLDataset, &QAction::triggered, this, &ParamModelerDock::onExportDLDatasetClicked );
 		connect( ui->actMesh,   &QAction::triggered, this, &ParamModelerDock::onExportMeshClicked );
 		connect( ui->actTo3D,   &QAction::triggered, this, &ParamModelerDock::onLoadToQGIS3D );
 		connect( ui->actLoadPC, &QAction::triggered, this, &ParamModelerDock::onLoadExternalPointCloud );
@@ -282,20 +301,21 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   // 切换基元时立刻刷新预览
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, [this]( const QString & ) { onUpdatePreview(); } );
   connect( ui->btnRandomParams, &QPushButton::clicked, this, &ParamModelerDock::onRandomizeCurrentPrimitive );
-		// ====================== 点云反演折叠面板 ======================
-		ui->frameInversion->setVisible( false );  // 默认收起
-
-		connect( ui->btnToggleInversion, &QPushButton::toggled, this, [this]( bool checked ) {
-						ui->frameInversion->setVisible( checked );
-						ui->btnToggleInversion->setText( checked ? "▼ 点云反演" : "▶ 点云反演" );
-		} );
+		// ====================== 点云分类与参数估计弹窗 ======================
+		ui->frameInversion->setVisible( false );
+		ui->btnToggleInversion->setCheckable( false );
+		ui->btnToggleInversion->setFlat( false );
+		ui->btnToggleInversion->setStyleSheet( QString() );
+		ui->btnToggleInversion->setText( tr( "点云分类与参数估计" ) );
+		ui->formLayoutPrimitive->addRow( tr( "点云：" ), ui->btnToggleInversion );
+		connect( ui->btnToggleInversion, &QPushButton::clicked, this, &ParamModelerDock::onOpenPointCloudEstimateDialog );
 
 		connect( ui->btnLoadPointCloud, &QPushButton::clicked,  this, &ParamModelerDock::onLoadInputData );
-		connect( ui->btnClassifyPrimitive,       &QPushButton::clicked,  this, &ParamModelerDock::onClassifyPrimitive );
+		connect( ui->btnPointNetClassify,        &QPushButton::clicked,  this, &ParamModelerDock::onPointNetClassify );
 		connect( ui->btnInverseParams,        &QPushButton::clicked,  this, &ParamModelerDock::onInverseParams );
 
 		// 反演按钮初始禁用，加载数据后才启用
-		ui->btnClassifyPrimitive->setEnabled( false );
+		ui->btnPointNetClassify->setEnabled( false );
 		ui->btnInverseParams->setEnabled(  false );
 
 	DEBUG_LOG( L"\n[ParamModelerDock] 初始化完成，当前基元: " );
@@ -388,9 +408,19 @@ void ParamModelerDock::onPrimitiveChanged( const QString &prim )
 // ======================= Random Parameters ===================
 void ParamModelerDock::onRandomizeCurrentPrimitive()
 {
+  randomizeCurrentPrimitiveParams( true );
+}
+
+void ParamModelerDock::randomizeCurrentPrimitiveParams( bool refreshPreview )
+{
   auto rnd = []( double minVal, double maxVal, double step = 0.1 ) {
     const double raw = minVal + QRandomGenerator::global()->generateDouble() * ( maxVal - minVal );
     return std::round( raw / step ) * step;
+  };
+  auto rndAwayFromCenter = [&rnd]( double lowMin, double lowMax, double highMin, double highMax, double step = 0.01 ) {
+    if ( QRandomGenerator::global()->bounded( 2 ) == 0 )
+      return rnd( lowMin, lowMax, step );
+    return rnd( highMin, highMax, step );
   };
   auto set = []( QDoubleSpinBox *spin, double value ) {
     if ( spin )
@@ -423,22 +453,22 @@ void ParamModelerDock::onRandomizeCurrentPrimitive()
   else if ( prim == "ConeCylinder" )
   {
     set( ui->spinBoxConeCylRadius, rnd( 2.0, 8.0 ) );
-    set( ui->spinBoxConeCylCylHeight, rnd( 2.5, 9.0 ) );
-    set( ui->spinBoxConeCylConeHeight, rnd( 1.5, 6.0 ) );
+    set( ui->spinBoxConeCylCylHeight, rnd( 4.5, 14.0 ) );
+    set( ui->spinBoxConeCylConeHeight, rnd( 0.45, 0.80, 0.01 ) );
   }
   else if ( prim == "GabledRoof" )
   {
     set( ui->spinBoxGRLength, rnd( 8.0, 24.0 ) );
     set( ui->spinBoxGRWidth, rnd( 5.0, 14.0 ) );
-    set( ui->spinBoxGRHeightWall, rnd( 2.5, 7.0 ) );
-    set( ui->spinBoxGRHeightRoof, rnd( 1.2, 5.0 ) );
+    set( ui->spinBoxGRHeightWall, rnd( 4.5, 12.0 ) );
+    set( ui->spinBoxGRHeightRoof, rnd( 0.55, 0.82, 0.01 ) );
   }
   else if ( prim == "PyramidRoof" )
   {
     set( ui->spinBoxPRLength, rnd( 7.0, 20.0 ) );
     set( ui->spinBoxPRWidth, rnd( 5.0, 16.0 ) );
-    set( ui->spinBoxPRHeightWall, rnd( 2.5, 7.0 ) );
-    set( ui->spinBoxPRHeightRoof, rnd( 1.5, 6.0 ) );
+    set( ui->spinBoxPRHeightWall, rnd( 4.5, 12.0 ) );
+    set( ui->spinBoxPRHeightRoof, rnd( 0.55, 0.82, 0.01 ) );
   }
   else if ( prim == "TruncatedPyramidRoof" )
   {
@@ -448,8 +478,8 @@ void ParamModelerDock::onRandomizeCurrentPrimitive()
     set( ui->spinBoxTPRBottomWidth, bottomWidth );
     set( ui->spinBoxTPRTopLength, rnd( bottomLength * 0.35, bottomLength * 0.80 ) );
     set( ui->spinBoxTPRTopWidth, rnd( bottomWidth * 0.35, bottomWidth * 0.80 ) );
-    set( ui->spinBoxTPRHeightWall, rnd( 2.5, 7.0 ) );
-    set( ui->spinBoxTPRHeightRoof, rnd( 1.2, 5.0 ) );
+    set( ui->spinBoxTPRHeightWall, rnd( 4.5, 12.0 ) );
+    set( ui->spinBoxTPRHeightRoof, rnd( 0.55, 0.82, 0.01 ) );
   }
   else if ( prim == "HalfCylinderRoof" )
   {
@@ -460,8 +490,8 @@ void ParamModelerDock::onRandomizeCurrentPrimitive()
   else if ( prim == "CylinderDome" || prim == "CylinderHemisphere" )
   {
     set( ui->spinBoxCylHemiRadius, rnd( 3.0, 9.0 ) );
-    set( ui->spinBoxCylHemiHeight, rnd( 2.5, 9.0 ) );
-    set( ui->spinBoxCylHemiDomeHeight, rnd( 1.0, 5.0 ) );
+    set( ui->spinBoxCylHemiHeight, rnd( 4.5, 13.0 ) );
+    set( ui->spinBoxCylHemiDomeHeight, rnd( 0.50, 0.85, 0.01 ) );
     set( ui->spinBoxCylHemiBulge, rnd( 0.15, 0.65, 0.01 ) );
   }
   else if ( prim == "IndentedCuboid" )
@@ -477,8 +507,8 @@ void ParamModelerDock::onRandomizeCurrentPrimitive()
     set( ui->spinBoxICInnerLength, innerLength );
     set( ui->spinBoxICInnerWidth, innerWidth );
     set( ui->spinBoxICInnerHeight, rnd( outerHeight * 0.25, outerHeight * 0.75 ) );
-    set( ui->spinBoxICOffsetX, rnd( 0.0, outerLength - innerLength ) );
-    set( ui->spinBoxICOffsetY, rnd( 0.0, outerWidth - innerWidth ) );
+    set( ui->spinBoxICOffsetX, rnd( 0.0, 1.0, 0.01 ) );
+    set( ui->spinBoxICOffsetY, rnd( 0.0, 1.0, 0.01 ) );
   }
   else if ( prim == "AsymmetricGableHouse" )
   {
@@ -486,10 +516,10 @@ void ParamModelerDock::onRandomizeCurrentPrimitive()
     const double width = rnd( 5.0, 14.0 );
     set( ui->spinBoxAGHLength, length );
     set( ui->spinBoxAGHWidth, width );
-    set( ui->spinBoxAGHHeightWall, rnd( 2.5, 7.0 ) );
-    set( ui->spinBoxAGHRoofHeight, rnd( 1.2, 5.0 ) );
-    set( ui->spinBoxAGHRidgeLength, rnd( length * 0.40, length * 0.90 ) );
-    set( ui->spinBoxAGHRidgeOffset, rnd( 0.3, 0.7, 0.01 ) );
+    set( ui->spinBoxAGHHeightWall, rnd( 4.5, 12.0 ) );
+    set( ui->spinBoxAGHRoofHeight, rnd( 0.55, 0.82, 0.01 ) );
+    set( ui->spinBoxAGHRidgeLength, rnd( length * 0.45, length * 0.75 ) );
+    set( ui->spinBoxAGHRidgeOffset, rndAwayFromCenter( 0.2, 0.38, 0.62, 0.8, 0.01 ) );
   }
   else if ( prim == "FourStageRoundTower" )
   {
@@ -505,13 +535,190 @@ void ParamModelerDock::onRandomizeCurrentPrimitive()
     set( ui->spinBoxTGLength1, rnd( 10.0, 24.0 ) );
     set( ui->spinBoxTGLength2, rnd( 7.0, 18.0 ) );
     set( ui->spinBoxTGWidth, rnd( 5.0, 12.0 ) );
-    set( ui->spinBoxTGHeightWall, rnd( 2.5, 7.0 ) );
-    set( ui->spinBoxTGRoofHeight, rnd( 1.2, 4.5 ) );
-    set( ui->spinBoxTGAngle, rnd( 135.0, 180.0, 1.0 ) );
+    set( ui->spinBoxTGHeightWall, rnd( 4.5, 12.0 ) );
+    set( ui->spinBoxTGRoofHeight, rnd( 0.55, 0.82, 0.01 ) );
+    set( ui->spinBoxTGAngle, rnd( 135.0, 170.0, 1.0 ) );
     set( ui->spinBoxTGRidgeRatio, rnd( 0.3, 0.7, 0.01 ) );
   }
 
-  onUpdatePreview();
+  if ( refreshPreview )
+    onUpdatePreview();
+}
+
+void ParamModelerDock::onOpenPointCloudEstimateDialog()
+{
+    QDialog dialog( this );
+    dialog.setWindowTitle( tr( "点云分类与参数估计" ) );
+    dialog.resize( 560, 520 );
+
+    auto *mainLayout = new QVBoxLayout( &dialog );
+    auto *inputTitle = new QLabel( tr( "1. 输入点云" ), &dialog );
+    inputTitle->setStyleSheet( QStringLiteral( "font-weight: bold;" ) );
+    auto *inputInfo = new QLabel( &dialog );
+    inputInfo->setWordWrap( true );
+    inputInfo->setStyleSheet( QStringLiteral( "color: #555;" ) );
+    auto *btnLoad = new QPushButton( tr( "导入点云" ), &dialog );
+
+    auto *processTitle = new QLabel( tr( "2. 分类与参数估计" ), &dialog );
+    processTitle->setStyleSheet( QStringLiteral( "font-weight: bold; margin-top: 8px;" ) );
+    auto *resultLabel = new QLabel( tr( "识别结果：-" ), &dialog );
+    resultLabel->setWordWrap( true );
+    resultLabel->setStyleSheet( QStringLiteral( "font-weight: bold;" ) );
+
+    auto *progress = new QProgressBar( &dialog );
+    progress->setVisible( false );
+    progress->setTextVisible( false );
+
+    auto *buttonLayout = new QHBoxLayout();
+    auto *btnClassify = new QPushButton( tr( "PointNet 分类" ), &dialog );
+    auto *btnInverse = new QPushButton( tr( "参数估计" ), &dialog );
+    auto *btnFinish = new QPushButton( tr( "返回微调" ), &dialog );
+    buttonLayout->addWidget( btnClassify );
+    buttonLayout->addWidget( btnInverse );
+    buttonLayout->addWidget( btnFinish );
+
+    auto *table = new QTableWidget( &dialog );
+    table->setColumnCount( 2 );
+    table->setHorizontalHeaderLabels( QStringList() << tr( "参数名" ) << tr( "参数值" ) );
+    table->horizontalHeader()->setStretchLastSection( true );
+    table->setSelectionBehavior( QAbstractItemView::SelectRows );
+    table->setMinimumHeight( 160 );
+
+    mainLayout->addWidget( inputTitle );
+    mainLayout->addWidget( btnLoad );
+    mainLayout->addWidget( inputInfo );
+    mainLayout->addWidget( processTitle );
+    mainLayout->addWidget( resultLabel );
+    mainLayout->addWidget( progress );
+    mainLayout->addLayout( buttonLayout );
+    mainLayout->addWidget( table );
+
+    auto updateInputInfo = [&]() {
+        if ( m_inputDataPath.isEmpty() )
+        {
+            inputInfo->setText( tr( "未加载点云" ) );
+            btnClassify->setEnabled( false );
+            btnInverse->setEnabled( false );
+            return;
+        }
+
+        const QFileInfo fi( m_inputDataPath );
+        PointCloud pc = PointCloudLoader::load( m_inputDataPath );
+        if ( pc.points.isEmpty() )
+        {
+            inputInfo->setText( tr( "已选择：%1\n无法读取点云或点数为 0。" ).arg( fi.fileName() ) );
+            btnClassify->setEnabled( false );
+            btnInverse->setEnabled( false );
+            return;
+        }
+
+        inputInfo->setText(
+            tr( "已加载：%1\n点数：%2\nX: [%3, %4]\nY: [%5, %6]\nZ: [%7, %8]" )
+              .arg( fi.fileName() )
+              .arg( pc.points.size() )
+              .arg( pc.bboxMin.x(), 0, 'f', 3 )
+              .arg( pc.bboxMax.x(), 0, 'f', 3 )
+              .arg( pc.bboxMin.y(), 0, 'f', 3 )
+              .arg( pc.bboxMax.y(), 0, 'f', 3 )
+              .arg( pc.bboxMin.z(), 0, 'f', 3 )
+              .arg( pc.bboxMax.z(), 0, 'f', 3 )
+        );
+        btnClassify->setEnabled( true );
+        btnInverse->setEnabled( false );
+        resultLabel->setText( tr( "识别结果：-" ) );
+        table->setRowCount( 0 );
+    };
+
+    connect( btnLoad, &QPushButton::clicked, &dialog, [&]() {
+        const QString filePath = QFileDialog::getOpenFileName(
+            &dialog, tr( "导入点云" ), "",
+            tr( "点云文件 (*.ply *.las *.laz *.xyz *.txt)" ) );
+        if ( filePath.isEmpty() )
+            return;
+
+        m_inputDataPath = filePath;
+        updateInputInfo();
+    } );
+
+    connect( btnClassify, &QPushButton::clicked, &dialog, [&]() {
+        if ( m_inputDataPath.isEmpty() )
+            return;
+
+        progress->setRange( 0, 0 );
+        progress->setVisible( true );
+        resultLabel->setText( tr( "PointNet 分类中..." ) );
+        btnClassify->setEnabled( false );
+        btnInverse->setEnabled( false );
+        QApplication::processEvents();
+
+        PointNetPredictResult result = PointNetRunner::predict( m_inputDataPath, 1024, 3 );
+        progress->setRange( 0, 100 );
+        progress->setValue( 100 );
+        progress->setVisible( false );
+        btnClassify->setEnabled( true );
+
+        if ( !result.errorMessage.isEmpty() )
+        {
+            QMessageBox::warning( &dialog, tr( "PointNet failed" ), result.errorMessage );
+            resultLabel->setText( tr( "识别结果：-" ) );
+            return;
+        }
+        if ( result.predictions.isEmpty() )
+        {
+            QMessageBox::warning( &dialog, tr( "PointNet failed" ), tr( "No prediction returned." ) );
+            resultLabel->setText( tr( "识别结果：-" ) );
+            return;
+        }
+
+        const PointNetPrediction top1 = result.predictions.first();
+        resultLabel->setText(
+            tr( "识别结果：%1（%2%）\n已切换到对应基元，可参数估计后返回微调。" )
+              .arg( top1.className )
+              .arg( top1.probability * 100.0, 0, 'f', 1 )
+        );
+        ui->comboPrimitive->setCurrentText( top1.className );
+        btnInverse->setEnabled( true );
+    } );
+
+    connect( btnInverse, &QPushButton::clicked, &dialog, [&]() {
+        if ( m_inputDataPath.isEmpty() )
+            return;
+
+        progress->setRange( 0, 0 );
+        progress->setVisible( true );
+        btnInverse->setEnabled( false );
+        QApplication::processEvents();
+
+        const QString prim = ui->comboPrimitive->currentText();
+        QMap<QString, double> params = ParamInverter::invert( prim, m_inputDataPath );
+
+        progress->setRange( 0, 100 );
+        progress->setValue( 100 );
+        progress->setVisible( false );
+        btnInverse->setEnabled( true );
+
+        if ( params.isEmpty() )
+        {
+            QMessageBox::warning( &dialog, tr( "参数估计失败" ), tr( "未能从当前点云估计参数。" ) );
+            return;
+        }
+
+        ParamInverter::applyToUI( this, params );
+        table->setRowCount( params.size() );
+        int row = 0;
+        for ( auto it = params.cbegin(); it != params.cend(); ++it, ++row )
+        {
+            table->setItem( row, 0, new QTableWidgetItem( it.key() ) );
+            table->setItem( row, 1, new QTableWidgetItem( QString::number( it.value(), 'f', 2 ) ) );
+        }
+        onUpdatePreview();
+        resultLabel->setText( resultLabel->text() + tr( "\n参数已应用到主界面。" ) );
+    } );
+
+    connect( btnFinish, &QPushButton::clicked, &dialog, &QDialog::accept );
+
+    updateInputInfo();
+    dialog.exec();
 }
 
 // ======================= Export Validation ===================
@@ -605,7 +812,342 @@ void ParamModelerDock::onExportDLPointCloudClicked()
         );
     }
 }
-// ========================导出 Mesh====================
+
+static void normalizeDLPoints( QVector<QVector3D> &points )
+{
+  if ( points.isEmpty() )
+    return;
+
+  QVector3D center( 0, 0, 0 );
+  for ( const QVector3D &p : points )
+    center += p;
+  center /= float( points.size() );
+
+  float maxRadius = 0.0f;
+  for ( const QVector3D &p : points )
+    maxRadius = std::max( maxRadius, ( p - center ).length() );
+  if ( maxRadius <= 1e-8f )
+    maxRadius = 1.0f;
+
+  for ( QVector3D &p : points )
+    p = ( p - center ) / maxRadius;
+}
+
+static QVector<QVector3D> sampleFixedPointCount( const QVector<QVector3D> &source, int pointCount )
+{
+  QVector<QVector3D> sampled;
+  if ( source.isEmpty() || pointCount <= 0 )
+    return sampled;
+
+  sampled.reserve( pointCount );
+  for ( int i = 0; i < pointCount; ++i )
+  {
+    const int index = QRandomGenerator::global()->bounded( source.size() );
+    sampled.append( source[index] );
+  }
+  return sampled;
+}
+
+static bool writeDLPointTXT( const QString &fileName, QVector<QVector3D> points )
+{
+  normalizeDLPoints( points );
+
+  QFile file( fileName );
+  if ( !file.open( QIODevice::WriteOnly | QIODevice::Text ) )
+    return false;
+
+  QTextStream out( &file );
+  out.setRealNumberNotation( QTextStream::FixedNotation );
+  out.setRealNumberPrecision( 8 );
+  for ( const QVector3D &p : points )
+    out << p.x() << " " << p.y() << " " << p.z() << "\n";
+  return true;
+}
+
+void ParamModelerDock::onExportLoadedDLPointCloudClicked()
+{
+  if ( m_inputDataPath.isEmpty() )
+  {
+    QMessageBox::warning( this, tr( "Export failed" ), tr( "Please load an input point cloud first." ) );
+    return;
+  }
+
+  const QString fileName = QFileDialog::getSaveFileName(
+    this, tr( "Save PointNet Input TXT" ), "", tr( "TXT Files (*.txt)" ) );
+  if ( fileName.isEmpty() )
+    return;
+
+  PointCloud pc = PointCloudLoader::load( m_inputDataPath );
+  if ( pc.points.isEmpty() )
+  {
+    QMessageBox::warning( this, tr( "Export failed" ), tr( "Cannot read points from the loaded input file." ) );
+    return;
+  }
+
+  const int pointCount = 2048;
+  QVector<QVector3D> sampled = sampleFixedPointCount( pc.points, pointCount );
+  if ( !writeDLPointTXT( fileName, sampled ) )
+  {
+    QMessageBox::critical( this, tr( "Export failed" ), tr( "Cannot write PointNet input TXT file." ) );
+    return;
+  }
+
+  QMessageBox::information(
+    this,
+    tr( "Export complete" ),
+    tr( "PointNet input TXT saved.\nSource points: %1\nExported points: %2\nFile: %3" )
+      .arg( pc.points.size() )
+      .arg( pointCount )
+      .arg( fileName )
+  );
+}
+// ========================Batch DL Dataset====================
+static QString safeClassDirName( const QString &primitiveType )
+{
+  QString safe = primitiveType;
+  safe.replace( QRegularExpression( "[^A-Za-z0-9_\\-]" ), "_" );
+  return safe;
+}
+
+static QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModelerDock *dock )
+{
+  QJsonObject params;
+  if ( prim == "Cuboid" )
+  {
+    params["length"] = dock->cuboidLength();
+    params["width"] = dock->cuboidWidth();
+    params["height"] = dock->cuboidHeight();
+  }
+  else if ( prim == "Cylinder" )
+  {
+    params["radius"] = dock->cylinderRadius();
+    params["height"] = dock->cylinderHeight();
+  }
+  else if ( prim == "LHouse" )
+  {
+    params["mainLength"] = dock->LMainLength();
+    params["mainWidth"] = dock->LMainWidth();
+    params["wingLength"] = dock->LWingLength();
+    params["wingWidth"] = dock->LWingWidth();
+    params["height"] = dock->LHeight();
+  }
+  else if ( prim == "ConeCylinder" )
+  {
+    params["radius"] = dock->coneCylRadius();
+    const double cylH = dock->coneCylCylHeight();
+    const double coneH = dock->coneCylConeHeight();
+    const double totalH = cylH + coneH;
+    params["totalHeight"] = totalH;
+    params["cylinderRatio"] = totalH > 1e-6 ? cylH / totalH : 0.7;
+  }
+  else if ( prim == "GabledRoof" )
+  {
+    params["length"] = dock->gabledRoofLength();
+    params["width"] = dock->gabledRoofWidth();
+    const double wallH = dock->gabledRoofWallHeight();
+    const double roofH = dock->gabledRoofRoofHeight();
+    const double totalH = wallH + roofH;
+    params["totalHeight"] = totalH;
+    params["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
+  }
+  else if ( prim == "PyramidRoof" )
+  {
+    params["length"] = dock->pyramidLength();
+    params["width"] = dock->pyramidWidth();
+    const double wallH = dock->pyramidWallHeight();
+    const double roofH = dock->pyramidRoofHeight();
+    const double totalH = wallH + roofH;
+    params["totalHeight"] = totalH;
+    params["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
+  }
+  else if ( prim == "TruncatedPyramidRoof" )
+  {
+    params["bottomLength"] = dock->tpBottomLength();
+    params["bottomWidth"] = dock->tpBottomWidth();
+    params["topLength"] = dock->tpTopLength();
+    params["topWidth"] = dock->tpTopWidth();
+    const double wallH = dock->tpWallHeight();
+    const double roofH = dock->tpRoofHeight();
+    const double totalH = wallH + roofH;
+    params["totalHeight"] = totalH;
+    params["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
+  }
+  else if ( prim == "HalfCylinderRoof" )
+  {
+    params["length"] = dock->hcrLength();
+    params["width"] = dock->hcrWidth();
+    params["wallHeight"] = dock->hcrWallHeight();
+    params["radius"] = dock->hcrRadius();
+  }
+  else if ( prim == "CylinderDome" || prim == "CylinderHemisphere" )
+  {
+    params["radius"] = dock->cylHemiRadius();
+    const double cylH = dock->cylHemiHeight();
+    const double domeH = dock->cylHemiDomeHeight();
+    const double totalH = cylH + domeH;
+    params["totalHeight"] = totalH;
+    params["cylinderRatio"] = totalH > 1e-6 ? cylH / totalH : 0.7;
+    params["bulge"] = dock->cylHemiBulge();
+  }
+  else if ( prim == "IndentedCuboid" )
+  {
+    params["outerLength"] = dock->icOuterLength();
+    params["outerWidth"] = dock->icOuterWidth();
+    params["outerHeight"] = dock->icOuterHeight();
+    params["innerLength"] = dock->icInnerLength();
+    params["innerWidth"] = dock->icInnerWidth();
+    params["innerHeight"] = dock->icInnerHeight();
+    params["offsetX"] = dock->icOffsetX();
+    params["offsetY"] = dock->icOffsetY();
+  }
+  else if ( prim == "AsymmetricGableHouse" )
+  {
+    params["length"] = dock->aghLength();
+    params["width"] = dock->aghWidth();
+    const double wallH = dock->aghWallHeight();
+    const double roofH = dock->aghRoofHeight();
+    const double totalH = wallH + roofH;
+    params["totalHeight"] = totalH;
+    params["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
+    params["ridgeLength"] = dock->aghRidgeLength();
+    params["ridgeRatio"] = dock->aghRidgeRatio();
+  }
+  else if ( prim == "FourStageRoundTower" )
+  {
+    params["baseRadius"] = dock->ftBaseRadius();
+    params["baseHeight"] = dock->ftBaseHeight();
+    params["middleHeight"] = dock->ftMiddleHeight();
+    params["middleTopRadius"] = dock->ftMiddleTopRadius();
+    params["middleBulge"] = dock->ftMiddleBulge();
+    params["coneHeight"] = dock->ftConeHeight();
+  }
+  else if ( prim == "TwoGableHouses" )
+  {
+    params["length1"] = dock->tgLength1();
+    params["length2"] = dock->tgLength2();
+    params["width"] = dock->tgWidth();
+    const double wallH = dock->tgWallHeight();
+    const double roofH = dock->tgRoofHeight();
+    const double totalH = wallH + roofH;
+    params["totalHeight"] = totalH;
+    params["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
+    params["angle"] = dock->tgAngle();
+    params["ridgeRatio"] = dock->tgRidgeRatio();
+  }
+  return params;
+}
+
+void ParamModelerDock::onExportDLDatasetClicked()
+{
+  bool ok = false;
+  const int samplesPerClass = QInputDialog::getInt(
+    this, tr( "Generate DL Dataset" ), tr( "Samples per primitive:" ), 50, 1, 10000, 1, &ok );
+  if ( !ok )
+    return;
+
+  const QString rootPath = QFileDialog::getExistingDirectory( this, tr( "Select Dataset Output Folder" ) );
+  if ( rootPath.isEmpty() )
+    return;
+
+  const int pointCount = 2048;
+  const QString originalPrimitive = ui->comboPrimitive->currentText();
+  const bool previousUpdating = m_isUpdating;
+  m_isUpdating = true;
+  if ( m_previewTimer )
+    m_previewTimer->stop();
+
+  QStringList primitiveTypes;
+  for ( int i = 0; i < ui->comboPrimitive->count(); ++i )
+  {
+    const QString prim = ui->comboPrimitive->itemText( i );
+    if ( !prim.isEmpty() && !primitiveTypes.contains( prim ) && prim != "CylinderHemisphere" )
+      primitiveTypes << prim;
+  }
+
+  QDir rootDir( rootPath );
+  rootDir.mkpath( "train" );
+  rootDir.mkpath( "val" );
+  rootDir.mkpath( "test" );
+  rootDir.mkpath( "metadata" );
+
+  QFile classFile( rootDir.filePath( "metadata/class_names.txt" ) );
+  if ( classFile.open( QIODevice::WriteOnly | QIODevice::Text ) )
+  {
+    QTextStream out( &classFile );
+    for ( const QString &prim : primitiveTypes )
+      out << prim << "\n";
+  }
+
+  QJsonArray metadata;
+  QProgressDialog progress( tr( "Generating dataset..." ), tr( "Cancel" ), 0,
+                            static_cast<int>( primitiveTypes.size() ) * samplesPerClass, this );
+  progress.setWindowModality( Qt::WindowModal );
+
+  int generated = 0;
+  int failed = 0;
+  for ( const QString &prim : primitiveTypes )
+  {
+    const QString classDir = safeClassDirName( prim );
+    rootDir.mkpath( "train/" + classDir );
+    rootDir.mkpath( "val/" + classDir );
+    rootDir.mkpath( "test/" + classDir );
+
+    ui->comboPrimitive->setCurrentText( prim );
+    for ( int i = 0; i < samplesPerClass; ++i )
+    {
+      if ( progress.wasCanceled() )
+        break;
+
+      randomizeCurrentPrimitiveParams( false );
+      const QString split = ( i < samplesPerClass * 8 / 10 ) ? "train"
+                            : ( i < samplesPerClass * 9 / 10 ) ? "val"
+                            : "test";
+      const QString fileName = QString( "sample_%1.txt" ).arg( i + 1, 5, 10, QChar( '0' ) );
+      const QString relativePath = split + "/" + classDir + "/" + fileName;
+      const QString fullPath = rootDir.filePath( relativePath );
+
+      if ( ExportPointCloud::exportDLInputTXT( fullPath, prim, this, pointCount ) )
+      {
+        QJsonObject item;
+        item["file"] = relativePath;
+        item["type"] = prim;
+        item["split"] = split;
+        item["pointCount"] = pointCount;
+        item["params"] = currentPrimitiveParamsObject( prim, this );
+        metadata.append( item );
+        generated++;
+      }
+      else
+      {
+        failed++;
+      }
+      progress.setValue( generated + failed );
+    }
+    if ( progress.wasCanceled() )
+      break;
+  }
+
+  QFile metadataFile( rootDir.filePath( "metadata/sample_params.json" ) );
+  if ( metadataFile.open( QIODevice::WriteOnly | QIODevice::Text ) )
+  {
+    QJsonDocument doc( metadata );
+    metadataFile.write( doc.toJson( QJsonDocument::Indented ) );
+  }
+
+  ui->comboPrimitive->setCurrentText( originalPrimitive );
+  m_isUpdating = previousUpdating;
+  if ( m_previewTimer )
+    m_previewTimer->stop();
+  onUpdatePreview();
+
+  QMessageBox::information(
+    this,
+    tr( "Done" ),
+    tr( "Dataset generated.\nSuccess: %1\nFailed: %2\nOutput folder: %3" ).arg( generated ).arg( failed ).arg( rootPath )
+  );
+}
+
+// ========================Export Mesh====================
 void ParamModelerDock::onExportMeshClicked()
 {
     DEBUG_LOG( L"[Export] STL Mesh 导出开始\n" );
@@ -779,44 +1321,114 @@ double ParamModelerDock::LWingLength() const { return ui->spinBoxLWingLength->va
 double ParamModelerDock::LWingWidth() const { return ui->spinBoxLWingWidth->value(); }
 double ParamModelerDock::LHeight() const { return ui->spinBoxLHeight->value(); }
 double ParamModelerDock::coneCylRadius() const { return ui->spinBoxConeCylRadius->value(); }
-double ParamModelerDock::coneCylCylHeight() const { return ui->spinBoxConeCylCylHeight->value(); }
-double ParamModelerDock::coneCylConeHeight() const { return ui->spinBoxConeCylConeHeight->value(); }
+double ParamModelerDock::coneCylCylHeight() const
+{
+  const double totalH = ui->spinBoxConeCylCylHeight->value();
+  const double cylRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxConeCylConeHeight->value() ) );
+  return totalH * cylRatio;
+}
+double ParamModelerDock::coneCylConeHeight() const
+{
+  const double totalH = ui->spinBoxConeCylCylHeight->value();
+  const double cylRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxConeCylConeHeight->value() ) );
+  return totalH * ( 1.0 - cylRatio );
+}
 double ParamModelerDock::gabledRoofLength() const { return ui->spinBoxGRLength->value(); }
 double ParamModelerDock::gabledRoofWidth() const { return ui->spinBoxGRWidth->value(); }
-double ParamModelerDock::gabledRoofWallHeight() const { return ui->spinBoxGRHeightWall->value(); }
-double ParamModelerDock::gabledRoofRoofHeight() const { return ui->spinBoxGRHeightRoof->value(); }
+double ParamModelerDock::gabledRoofWallHeight() const
+{
+  const double totalH = ui->spinBoxGRHeightWall->value();
+  const double wallRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxGRHeightRoof->value() ) );
+  return totalH * wallRatio;
+}
+double ParamModelerDock::gabledRoofRoofHeight() const
+{
+  const double totalH = ui->spinBoxGRHeightWall->value();
+  const double wallRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxGRHeightRoof->value() ) );
+  return totalH * ( 1.0 - wallRatio );
+}
 double ParamModelerDock::pyramidLength() const { return ui->spinBoxPRLength->value(); }
 double ParamModelerDock::pyramidWidth() const { return ui->spinBoxPRWidth->value(); }
-double ParamModelerDock::pyramidWallHeight() const { return ui->spinBoxPRHeightWall->value(); }
-double ParamModelerDock::pyramidRoofHeight() const { return ui->spinBoxPRHeightRoof->value(); }
+double ParamModelerDock::pyramidWallHeight() const
+{
+  const double totalH = ui->spinBoxPRHeightWall->value();
+  const double wallRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxPRHeightRoof->value() ) );
+  return totalH * wallRatio;
+}
+double ParamModelerDock::pyramidRoofHeight() const
+{
+  const double totalH = ui->spinBoxPRHeightWall->value();
+  const double wallRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxPRHeightRoof->value() ) );
+  return totalH * ( 1.0 - wallRatio );
+}
 double ParamModelerDock::tpBottomLength() const { return ui->spinBoxTPRBottomLength->value(); }
 double ParamModelerDock::tpBottomWidth() const { return ui->spinBoxTPRBottomWidth->value(); }
 double ParamModelerDock::tpTopLength() const { return ui->spinBoxTPRTopLength->value(); }
 double ParamModelerDock::tpTopWidth() const { return ui->spinBoxTPRTopWidth->value(); }
-double ParamModelerDock::tpWallHeight() const { return ui->spinBoxTPRHeightWall->value(); }
-double ParamModelerDock::tpRoofHeight() const { return ui->spinBoxTPRHeightRoof->value(); }
+double ParamModelerDock::tpWallHeight() const
+{
+  const double totalH = ui->spinBoxTPRHeightWall->value();
+  const double wallRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxTPRHeightRoof->value() ) );
+  return totalH * wallRatio;
+}
+double ParamModelerDock::tpRoofHeight() const
+{
+  const double totalH = ui->spinBoxTPRHeightWall->value();
+  const double wallRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxTPRHeightRoof->value() ) );
+  return totalH * ( 1.0 - wallRatio );
+}
 double ParamModelerDock::hcrLength() const { return ui->spinBoxHCRLength->value(); }
 double ParamModelerDock::hcrWidth() const { return ui->spinBoxHCRWidth->value(); }
 double ParamModelerDock::hcrWallHeight() const { return ui->spinBoxHCRHeightWall->value(); }
-double ParamModelerDock::hcrRadius() const { return ui->spinBoxHCRRadius->value(); }
+double ParamModelerDock::hcrRadius() const { return hcrWidth() / 2.0; }
 double ParamModelerDock::icOuterLength() const { return ui->spinBoxICLength->value(); }
 double ParamModelerDock::icOuterWidth() const { return ui->spinBoxICWidth->value(); }
 double ParamModelerDock::icOuterHeight() const { return ui->spinBoxICHeight->value(); }
 double ParamModelerDock::icInnerLength() const { return ui->spinBoxICInnerLength->value(); }
 double ParamModelerDock::icInnerWidth() const { return ui->spinBoxICInnerWidth->value(); }
 double ParamModelerDock::icInnerHeight() const { return ui->spinBoxICInnerHeight->value(); }
-double ParamModelerDock::icOffsetX() const { return ui->spinBoxICOffsetX->value(); }
-double ParamModelerDock::icOffsetY() const { return ui->spinBoxICOffsetY->value(); }
+double ParamModelerDock::icOffsetX() const
+{
+  const double movable = std::max( 0.0, icOuterLength() - icInnerLength() );
+  const double ratio = std::max( 0.0, std::min( 1.0, ui->spinBoxICOffsetX->value() ) );
+  return movable * ratio;
+}
+double ParamModelerDock::icOffsetY() const
+{
+  const double movable = std::max( 0.0, icOuterWidth() - icInnerWidth() );
+  const double ratio = std::max( 0.0, std::min( 1.0, ui->spinBoxICOffsetY->value() ) );
+  return movable * ratio;
+}
 double ParamModelerDock::aghLength() const { return ui->spinBoxAGHLength->value(); }
 double ParamModelerDock::aghWidth() const { return ui->spinBoxAGHWidth->value(); }
-double ParamModelerDock::aghWallHeight() const { return ui->spinBoxAGHHeightWall->value(); }
-double ParamModelerDock::aghRoofHeight() const { return ui->spinBoxAGHRoofHeight->value(); }
+double ParamModelerDock::aghWallHeight() const
+{
+  const double totalH = ui->spinBoxAGHHeightWall->value();
+  const double wallRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxAGHRoofHeight->value() ) );
+  return totalH * wallRatio;
+}
+double ParamModelerDock::aghRoofHeight() const
+{
+  const double totalH = ui->spinBoxAGHHeightWall->value();
+  const double wallRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxAGHRoofHeight->value() ) );
+  return totalH * ( 1.0 - wallRatio );
+}
 double ParamModelerDock::aghRidgeLength() const { return ui->spinBoxAGHRidgeLength->value(); }
 double ParamModelerDock::aghRidgeOffset() const { return ( aghRidgeRatio() - 0.5 ) * aghWidth(); }
 double ParamModelerDock::aghRidgeRatio() const { return ui->spinBoxAGHRidgeOffset->value(); }
 double ParamModelerDock::cylHemiRadius() const { return ui->spinBoxCylHemiRadius->value(); }
-double ParamModelerDock::cylHemiHeight() const { return ui->spinBoxCylHemiHeight->value(); }
-double ParamModelerDock::cylHemiDomeHeight() const { return ui->spinBoxCylHemiDomeHeight->value(); }
+double ParamModelerDock::cylHemiHeight() const
+{
+  const double totalH = ui->spinBoxCylHemiHeight->value();
+  const double cylRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxCylHemiDomeHeight->value() ) );
+  return totalH * cylRatio;
+}
+double ParamModelerDock::cylHemiDomeHeight() const
+{
+  const double totalH = ui->spinBoxCylHemiHeight->value();
+  const double cylRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxCylHemiDomeHeight->value() ) );
+  return totalH * ( 1.0 - cylRatio );
+}
 double ParamModelerDock::cylHemiBulge() const { return ui->spinBoxCylHemiBulge->value(); }
 double ParamModelerDock::ftBaseRadius() const { return ui->spinBoxFTBaseRadius->value(); }
 double ParamModelerDock::ftBaseHeight() const { return ui->spinBoxFTBaseHeight->value(); }
@@ -827,8 +1439,18 @@ double ParamModelerDock::ftConeHeight() const { return ui->spinBoxFTConeHeight->
 double ParamModelerDock::tgLength1() const { return ui->spinBoxTGLength1->value(); }
 double ParamModelerDock::tgLength2() const { return ui->spinBoxTGLength2->value(); }
 double ParamModelerDock::tgWidth() const { return ui->spinBoxTGWidth->value(); }
-double ParamModelerDock::tgWallHeight() const { return ui->spinBoxTGHeightWall->value(); }
-double ParamModelerDock::tgRoofHeight() const { return ui->spinBoxTGRoofHeight->value(); }
+double ParamModelerDock::tgWallHeight() const
+{
+  const double totalH = ui->spinBoxTGHeightWall->value();
+  const double wallRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxTGRoofHeight->value() ) );
+  return totalH * wallRatio;
+}
+double ParamModelerDock::tgRoofHeight() const
+{
+  const double totalH = ui->spinBoxTGHeightWall->value();
+  const double wallRatio = std::max( 0.05, std::min( 0.95, ui->spinBoxTGRoofHeight->value() ) );
+  return totalH * ( 1.0 - wallRatio );
+}
 double ParamModelerDock::tgAngle() const { return ui->spinBoxTGAngle->value(); }
 double ParamModelerDock::tgRidgeRatio() const { return ui->spinBoxTGRidgeRatio->value(); }
 
@@ -852,33 +1474,53 @@ void ParamModelerDock::onLoadInputData()
     ui->tableInverseParams->setRowCount( 0 );
 
     // 加载完才能识别，识别完才能反演
-    ui->btnClassifyPrimitive->setEnabled( true );
+    ui->btnPointNetClassify->setEnabled( true );
     ui->btnInverseParams->setEnabled(  false );
 }
-// ========================================================================
-// 基元类型自动识别（调用分类模块）
-// ========================================================================
-void ParamModelerDock::onClassifyPrimitive()
+
+void ParamModelerDock::onPointNetClassify()
 {
     if ( m_inputDataPath.isEmpty() ) return;
 
-    DEBUG_LOG( QString( "[Tab2] 开始基元分类, 文件: %1\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
-    PcdResult result = PrimitiveClassifier::classify( m_inputDataPath );
+    ui->progressInversion->setRange( 0, 0 );
+    ui->progressInversion->setVisible( true );
+    ui->labelPrimitiveType->setText( tr( "PointNet 分类中..." ) );
+    ui->btnPointNetClassify->setEnabled( false );
+    ui->btnInverseParams->setEnabled( false );
+    QApplication::processEvents();
 
-    DEBUG_LOG( QString( "[Tab2] 分类完成: %1, 置信度: %2%\n" )
-      .arg( result.primitiveType )
-      .arg( result.confidence * 100, 0, 'f', 1 )
-      .toStdWString().c_str() );
+    DEBUG_LOG( QString( "[PointNet] predict input: %1\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
+    PointNetPredictResult result = PointNetRunner::predict( m_inputDataPath, 1024, 3 );
+    ui->progressInversion->setRange( 0, 100 );
+    ui->progressInversion->setValue( 100 );
+    ui->progressInversion->setVisible( false );
+    ui->btnPointNetClassify->setEnabled( true );
 
+    if ( !result.errorMessage.isEmpty() )
+    {
+        QMessageBox::warning( this, tr( "PointNet failed" ), result.errorMessage );
+        return;
+    }
+    if ( result.predictions.isEmpty() )
+    {
+        QMessageBox::warning( this, tr( "PointNet failed" ), tr( "No prediction returned." ) );
+        return;
+    }
+
+    const PointNetPrediction top1 = result.predictions.first();
     ui->labelPrimitiveType->setText(
-      tr( "识别结果：%1（%2%）" )
-        .arg( result.primitiveType )
-        .arg( result.confidence * 100, 0, 'f', 0 )
-    ); // 0位小数
+        tr( "识别结果：%1（%2%）" )
+          .arg( top1.className )
+          .arg( top1.probability * 100.0, 0, 'f', 1 )
+    );
 
-    ui->comboPrimitive->setCurrentText( result.primitiveType );
-
+    ui->comboPrimitive->setCurrentText( top1.className );
     ui->btnInverseParams->setEnabled( true );
+
+    DEBUG_LOG( QString( "[PointNet] top1: %1, prob: %2\n" )
+      .arg( top1.className )
+      .arg( top1.probability )
+      .toStdWString().c_str() );
 }
 // ========================================================================
 // 参数反演（调用反演模块）
@@ -914,4 +1556,3 @@ void ParamModelerDock::onInverseParams()
 
     onUpdatePreview();
 }
-

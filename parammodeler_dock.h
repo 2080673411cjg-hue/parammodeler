@@ -127,20 +127,25 @@ private slots:
   void onExportJSONClicked();
   void onExportPLYClicked();
   void onExportDLPointCloudClicked();
+  void onExportLoadedDLPointCloudClicked();
+  void onExportDLDatasetClicked();
 	void onExportMeshClicked();
 	void onLoadToQGIS3D(bool zoomToLayer = true); // 将模型加载/同步到QGIS 3D视图，增加默认参数，true 表示缩放相机          
 	void onLoadExternalPointCloud();
 		
 		
   void onLoadInputData();
-  void onClassifyPrimitive();
+  void onPointNetClassify();
   void onInverseParams();
+  void onOpenPointCloudEstimateDialog();
   void onRandomizeCurrentPrimitive();
 		
   void onUpdatePreview();//主刷新入口
 
 
 private:
+  void randomizeCurrentPrimitiveParams( bool refreshPreview );
+
   Ui::ParamModelerDock *ui;
   QgisInterface *mIface;
 		QString m_currentPrimitive;                  // 记录当前基元名

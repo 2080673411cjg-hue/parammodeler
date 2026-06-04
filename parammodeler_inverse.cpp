@@ -125,6 +125,40 @@ void ParamInverter::applyToUI( ParamModelerDock *dock,
             edit->setText( QString::number( params[key], 'f', 2 ) );
     };
 
+    auto setTotalAndWallRatio = [&]( const QString &wallKey, const QString &roofKey,
+                                     QDoubleSpinBox *totalSpin, QSlider *totalSlider,
+                                     QDoubleSpinBox *ratioSpin, QSlider *ratioSlider ) {
+        if ( !params.contains( wallKey ) && !params.contains( roofKey ) )
+            return;
+        const double currentTotal = totalSpin ? totalSpin->value() : 0.0;
+        const double currentRatio = ratioSpin ? ratioSpin->value() : 0.7;
+        const double wallH = params.value( wallKey, currentTotal * currentRatio );
+        const double roofH = params.value( roofKey, currentTotal * ( 1.0 - currentRatio ) );
+        const double totalH = std::max( 0.0, wallH + roofH );
+        const double wallRatio = totalH > 1e-6 ? std::max( 0.2, std::min( 0.9, wallH / totalH ) ) : 0.7;
+        if ( totalSpin ) totalSpin->setValue( totalH );
+        if ( totalSlider ) totalSlider->setValue( static_cast<int>( totalH * 100 ) );
+        if ( ratioSpin ) ratioSpin->setValue( wallRatio );
+        if ( ratioSlider ) ratioSlider->setValue( static_cast<int>( wallRatio * 100 ) );
+    };
+
+    auto setTotalAndCylinderRatio = [&]( const QString &cylKey, const QString &upperKey,
+                                         QDoubleSpinBox *totalSpin, QSlider *totalSlider,
+                                         QDoubleSpinBox *ratioSpin, QSlider *ratioSlider ) {
+        if ( !params.contains( cylKey ) && !params.contains( upperKey ) )
+            return;
+        const double currentTotal = totalSpin ? totalSpin->value() : 0.0;
+        const double currentRatio = ratioSpin ? ratioSpin->value() : 0.7;
+        const double cylH = params.value( cylKey, currentTotal * currentRatio );
+        const double upperH = params.value( upperKey, currentTotal * ( 1.0 - currentRatio ) );
+        const double totalH = std::max( 0.0, cylH + upperH );
+        const double cylRatio = totalH > 1e-6 ? std::max( 0.2, std::min( 0.9, cylH / totalH ) ) : 0.7;
+        if ( totalSpin ) totalSpin->setValue( totalH );
+        if ( totalSlider ) totalSlider->setValue( static_cast<int>( totalH * 100 ) );
+        if ( ratioSpin ) ratioSpin->setValue( cylRatio );
+        if ( ratioSlider ) ratioSlider->setValue( static_cast<int>( cylRatio * 100 ) );
+    };
+
     set( "length",     dock->ui->spinBoxCLength,     dock->ui->sliderCLength );
     set( "width",     dock->ui->spinBoxCWidth,     dock->ui->sliderCWidth );
     set( "height",    dock->ui->spinBoxCHeight,    dock->ui->sliderCHeight );
@@ -136,29 +170,23 @@ void ParamInverter::applyToUI( ParamModelerDock *dock,
     set( "lWingW",    dock->ui->spinBoxLWingWidth,  dock->ui->sliderLWingWidth );
     set( "lHeight",   dock->ui->spinBoxLHeight,     dock->ui->sliderLHeight );
     set( "ccRadius",      dock->ui->spinBoxConeCylRadius,    dock->ui->sliderConeCylRadius );
-    set( "ccCylHeight",   dock->ui->spinBoxConeCylCylHeight, dock->ui->sliderConeCylCylHeight );
-    set( "ccConeHeight",  dock->ui->spinBoxConeCylConeHeight,dock->ui->sliderConeCylConeHeight );
+    setTotalAndCylinderRatio( "ccCylHeight", "ccConeHeight", dock->ui->spinBoxConeCylCylHeight, dock->ui->sliderConeCylCylHeight, dock->ui->spinBoxConeCylConeHeight, dock->ui->sliderConeCylConeHeight );
     set( "grLength",       dock->ui->spinBoxGRLength,      dock->ui->sliderGRLength );
     set( "grWidth",       dock->ui->spinBoxGRWidth,      dock->ui->sliderGRWidth );
-    set( "grWallHeight",  dock->ui->spinBoxGRHeightWall, dock->ui->sliderGRHeightWall );
-    set( "grRoofHeight",  dock->ui->spinBoxGRHeightRoof, dock->ui->sliderGRHeightRoof );
+    setTotalAndWallRatio( "grWallHeight", "grRoofHeight", dock->ui->spinBoxGRHeightWall, dock->ui->sliderGRHeightWall, dock->ui->spinBoxGRHeightRoof, dock->ui->sliderGRHeightRoof );
     set( "prLength",       dock->ui->spinBoxPRLength,      dock->ui->sliderPRLength );
     set( "prWidth",       dock->ui->spinBoxPRWidth,      dock->ui->sliderPRWidth );
-    set( "prWallHeight",  dock->ui->spinBoxPRHeightWall, dock->ui->sliderPRHeightWall );
-    set( "prRoofHeight",  dock->ui->spinBoxPRHeightRoof, dock->ui->sliderPRHeightRoof );
+    setTotalAndWallRatio( "prWallHeight", "prRoofHeight", dock->ui->spinBoxPRHeightWall, dock->ui->sliderPRHeightWall, dock->ui->spinBoxPRHeightRoof, dock->ui->sliderPRHeightRoof );
     set( "tpBottomLength",  dock->ui->spinBoxTPRBottomLength,  dock->ui->sliderTPRBottomLength );
     set( "tpBottomWidth",  dock->ui->spinBoxTPRBottomWidth,  dock->ui->sliderTPRBottomWidth );
     set( "tpTopLength",     dock->ui->spinBoxTPRTopLength,     dock->ui->sliderTPRTopLength );
     set( "tpTopWidth",     dock->ui->spinBoxTPRTopWidth,     dock->ui->sliderTPRTopWidth );
-    set( "tpWallHeight",   dock->ui->spinBoxTPRHeightWall,   dock->ui->sliderTPRHeightWall );
-    set( "tpRoofHeight",   dock->ui->spinBoxTPRHeightRoof,   dock->ui->sliderTPRHeightRoof );
+    setTotalAndWallRatio( "tpWallHeight", "tpRoofHeight", dock->ui->spinBoxTPRHeightWall, dock->ui->sliderTPRHeightWall, dock->ui->spinBoxTPRHeightRoof, dock->ui->sliderTPRHeightRoof );
     set( "hcrLength",        dock->ui->spinBoxHCRLength,      dock->ui->sliderHCRLength );
     set( "hcrWidth",        dock->ui->spinBoxHCRWidth,      dock->ui->sliderHCRWidth );
     set( "hcrWallHeight",   dock->ui->spinBoxHCRHeightWall, dock->ui->sliderHCRHeightWall );
-    set( "hcrRadius",       dock->ui->spinBoxHCRRadius,     dock->ui->sliderHCRRadius );
     set( "chRadius",     dock->ui->spinBoxCylHemiRadius,     dock->ui->sliderCylHemiRadius );
-    set( "chCylHeight",  dock->ui->spinBoxCylHemiHeight,     dock->ui->sliderCylHemiHeight );
-    set( "chDomeHeight", dock->ui->spinBoxCylHemiDomeHeight, dock->ui->sliderCylHemiDomeHeight );
+    setTotalAndCylinderRatio( "chCylHeight", "chDomeHeight", dock->ui->spinBoxCylHemiHeight, dock->ui->sliderCylHemiHeight, dock->ui->spinBoxCylHemiDomeHeight, dock->ui->sliderCylHemiDomeHeight );
     set( "chBulge",      dock->ui->spinBoxCylHemiBulge,      dock->ui->sliderCylHemiBulge );
     set( "icOuterL",    dock->ui->spinBoxICLength,       dock->ui->sliderICLength );
     set( "icOuterW",    dock->ui->spinBoxICWidth,       dock->ui->sliderICWidth );
@@ -166,12 +194,23 @@ void ParamInverter::applyToUI( ParamModelerDock *dock,
     set( "icInnerL",    dock->ui->spinBoxICInnerLength,  dock->ui->sliderICInnerLength );
     set( "icInnerW",    dock->ui->spinBoxICInnerWidth,  dock->ui->sliderICInnerWidth );
     set( "icInnerH",    dock->ui->spinBoxICInnerHeight, dock->ui->sliderICInnerHeight );
-    set( "icOffsetX",   dock->ui->spinBoxICOffsetX,     dock->ui->sliderICOffsetX );
-    set( "icOffsetY",   dock->ui->spinBoxICOffsetY,     dock->ui->sliderICOffsetY );
+    if ( params.contains( "icOffsetX" ) )
+    {
+        const double movable = std::max( 0.0, dock->ui->spinBoxICLength->value() - dock->ui->spinBoxICInnerLength->value() );
+        const double ratio = movable > 1e-6 ? std::max( 0.0, std::min( 1.0, params["icOffsetX"] / movable ) ) : 0.0;
+        dock->ui->spinBoxICOffsetX->setValue( ratio );
+        dock->ui->sliderICOffsetX->setValue( static_cast<int>( ratio * 100 ) );
+    }
+    if ( params.contains( "icOffsetY" ) )
+    {
+        const double movable = std::max( 0.0, dock->ui->spinBoxICWidth->value() - dock->ui->spinBoxICInnerWidth->value() );
+        const double ratio = movable > 1e-6 ? std::max( 0.0, std::min( 1.0, params["icOffsetY"] / movable ) ) : 0.0;
+        dock->ui->spinBoxICOffsetY->setValue( ratio );
+        dock->ui->sliderICOffsetY->setValue( static_cast<int>( ratio * 100 ) );
+    }
     set( "aghLength",       dock->ui->spinBoxAGHLength,       dock->ui->sliderAGHLength );
     set( "aghWidth",       dock->ui->spinBoxAGHWidth,       dock->ui->sliderAGHWidth );
-    set( "aghWallHeight",  dock->ui->spinBoxAGHHeightWall,  dock->ui->sliderAGHHeightWall );
-    set( "aghRoofHeight",  dock->ui->spinBoxAGHRoofHeight,  dock->ui->sliderAGHRoofHeight );
+    setTotalAndWallRatio( "aghWallHeight", "aghRoofHeight", dock->ui->spinBoxAGHHeightWall, dock->ui->sliderAGHHeightWall, dock->ui->spinBoxAGHRoofHeight, dock->ui->sliderAGHRoofHeight );
     set( "aghRidgeLen",    dock->ui->spinBoxAGHRidgeLength, dock->ui->sliderAGHRidgeLength );
     set( "aghRidgeRatio",  dock->ui->spinBoxAGHRidgeOffset, dock->ui->sliderAGHRidgeOffset );
     set( "ftBaseR",       dock->ui->spinBoxFTBaseRadius,     dock->ui->sliderFTBaseRadius );
@@ -183,8 +222,7 @@ void ParamInverter::applyToUI( ParamModelerDock *dock,
     set( "tgLength1",      dock->ui->spinBoxTGLength1,     dock->ui->sliderTGLength1 );
     set( "tgLength2",      dock->ui->spinBoxTGLength2,     dock->ui->sliderTGLength2 );
     set( "tgWidth",       dock->ui->spinBoxTGWidth,      dock->ui->sliderTGWidth );
-    set( "tgWallHeight",  dock->ui->spinBoxTGHeightWall, dock->ui->sliderTGHeightWall );
-    set( "tgRoofHeight",  dock->ui->spinBoxTGRoofHeight, dock->ui->sliderTGRoofHeight );
+    setTotalAndWallRatio( "tgWallHeight", "tgRoofHeight", dock->ui->spinBoxTGHeightWall, dock->ui->sliderTGHeightWall, dock->ui->spinBoxTGRoofHeight, dock->ui->sliderTGRoofHeight );
     set( "tgAngle",       dock->ui->spinBoxTGAngle,      dock->ui->sliderTGAngle );
 
     // 位姿参数

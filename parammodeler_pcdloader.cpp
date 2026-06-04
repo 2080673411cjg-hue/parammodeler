@@ -11,6 +11,7 @@
 
 #include <QFile>
 #include <QFileInfo>
+#include <QRegularExpression>
 #include <QTextStream>
 #include <algorithm>
 #include <cmath>
@@ -191,6 +192,32 @@ PointCloud PointCloudLoader::load( const QString &filePath )
                 pc.points.append( QVector3D( x, y, z ) );
             }
         }
+        file.close();
+    }
+    else if ( suffix == "txt" || suffix == "xyz" || suffix == "pts" )
+    {
+        QFile file( filePath );
+        if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) ) return pc;
+
+        QTextStream in( &file );
+        while ( !in.atEnd() )
+        {
+            const QString line = in.readLine().trimmed();
+            if ( line.isEmpty() || line.startsWith( "#" ) )
+                continue;
+
+            QStringList parts = line.split( QRegularExpression( "[\\s,]+" ), Qt::SkipEmptyParts );
+            if ( parts.size() < 3 )
+                continue;
+
+            bool okX = false, okY = false, okZ = false;
+            const double x = parts[0].toDouble( &okX );
+            const double y = parts[1].toDouble( &okY );
+            const double z = parts[2].toDouble( &okZ );
+            if ( okX && okY && okZ )
+                pc.points.append( QVector3D( x, y, z ) );
+        }
+        pc.originalCount = pc.points.size();
         file.close();
     }
     else if ( suffix == "las" || suffix == "laz" )

@@ -50,6 +50,8 @@
        <addaction name="actJSON"/>
        <addaction name="actPLY"/>
        <addaction name="actDLPointCloud"/>
+       <addaction name="actLoadedDLPointCloud"/>
+       <addaction name="actDLDataset"/>
       </widget>
       <widget class="QMenu" name="menuLoad3D">
        <property name="title">
@@ -76,6 +78,16 @@
       <action name="actDLPointCloud">
        <property name="text">
         <string>导出深度学习点云 TXT (*.txt)</string>
+       </property>
+      </action>
+      <action name="actLoadedDLPointCloud">
+       <property name="text">
+        <string>Export Loaded Point Cloud DL TXT (*.txt)</string>
+       </property>
+      </action>
+      <action name="actDLDataset">
+       <property name="text">
+        <string>Batch Generate DL Dataset</string>
        </property>
       </action>
       <action name="actMesh">
@@ -668,7 +680,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelConeCylCylHeight">
                   <property name="text">
-                   <string>圆柱高度：</string>
+                   <string>总高度：</string>
                   </property>
                  </widget>
                 </item>
@@ -689,7 +701,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelConeCylConeHeight">
                   <property name="text">
-                   <string>圆锥高度：</string>
+                   <string>圆柱高比例：</string>
                   </property>
                  </widget>
                 </item>
@@ -764,7 +776,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelGRHeightWall">
                   <property name="text">
-                   <string>墙高：</string>
+                    <string>总高度：</string>
                   </property>
                  </widget>
                 </item>
@@ -789,7 +801,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelGRHeightRoof">
                   <property name="text">
-                   <string>屋顶高：</string>
+                    <string>墙高比例：</string>
                   </property>
                  </widget>
                 </item>
@@ -868,7 +880,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelPRHeightWall">
                   <property name="text">
-                   <string>墙高：</string>
+                   <string>墙体高度：</string>
                   </property>
                  </widget>
                 </item>
@@ -893,7 +905,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelPRHeightRoof">
                   <property name="text">
-                   <string>屋顶高：</string>
+                   <string>拱顶半径：</string>
                   </property>
                  </widget>
                 </item>
@@ -1022,7 +1034,7 @@
                 <item row="4" column="0">
                  <widget class="QLabel" name="labelTPRHeightWall">
                   <property name="text">
-                   <string>墙高：</string>
+                   <string>总高度：</string>
                   </property>
                  </widget>
                 </item>
@@ -1047,7 +1059,7 @@
                 <item row="5" column="0">
                  <widget class="QLabel" name="labelTPRHeightRoof">
                   <property name="text">
-                   <string>屋顶高：</string>
+                   <string>墙高比例：</string>
                   </property>
                  </widget>
                 </item>
@@ -1205,7 +1217,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelCylHemiHeight">
                   <property name="text">
-                   <string>圆柱高度：</string>
+                   <string>总高度：</string>
                   </property>
                  </widget>
                 </item>
@@ -1230,7 +1242,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelCylHemiDomeHeight">
                   <property name="text">
-                   <string>穹顶高度：</string>
+                   <string>圆柱高比例：</string>
                   </property>
                  </widget>
                 </item>
@@ -1439,9 +1451,9 @@
                 </item>
                 <item row="6" column="0">
                  <widget class="QLabel" name="labelICOffsetX">
-                  <property name="text">
-                   <string>相对外壳左侧的偏移：</string>
-                  </property>
+                   <property name="text">
+                    <string>位置比例 X：</string>
+                   </property>
                  </widget>
                 </item>
                 <item row="6" column="1">
@@ -1456,7 +1468,10 @@
                   <item>
                    <widget class="QDoubleSpinBox" name="spinBoxICOffsetX">
                     <property name="singleStep">
-                     <double>0.100000000000000</double>
+                     <double>0.010000000000000</double>
+                    </property>
+                    <property name="maximum">
+                     <double>1.000000000000000</double>
                     </property>
                    </widget>
                   </item>
@@ -1464,9 +1479,9 @@
                 </item>
                 <item row="7" column="0">
                  <widget class="QLabel" name="labelICOffsetY">
-                  <property name="text">
-                   <string>相对外壳前侧的偏移：</string>
-                  </property>
+                   <property name="text">
+                    <string>位置比例 Y：</string>
+                   </property>
                  </widget>
                 </item>
                 <item row="7" column="1">
@@ -1481,7 +1496,10 @@
                   <item>
                    <widget class="QDoubleSpinBox" name="spinBoxICOffsetY">
                     <property name="singleStep">
-                     <double>0.100000000000000</double>
+                     <double>0.010000000000000</double>
+                    </property>
+                    <property name="maximum">
+                     <double>1.000000000000000</double>
                     </property>
                    </widget>
                   </item>
@@ -1544,7 +1562,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelAGHHeightWall">
                   <property name="text">
-                   <string>墙体高度：</string>
+                   <string>总高度：</string>
                   </property>
                  </widget>
                 </item>
@@ -1569,7 +1587,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelAGHRoofHeight">
                   <property name="text">
-                   <string>屋顶高度：</string>
+                   <string>墙高比例：</string>
                   </property>
                  </widget>
                 </item>
@@ -1622,7 +1640,7 @@
                 <item row="5" column="0">
                  <widget class="QLabel" name="labelAGHRidgeOffset">
                   <property name="text">
-                   <string>屋脊位置比例：</string>
+                    <string>屋脊比例：</string>
                   </property>
                  </widget>
                 </item>
@@ -1901,7 +1919,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelTGHeightWall">
                   <property name="text">
-                   <string>房屋高度：</string>
+                   <string>总高度：</string>
                   </property>
                  </widget>
                 </item>
@@ -1926,7 +1944,7 @@
                 <item row="4" column="0">
                  <widget class="QLabel" name="labelTGRoofHeight">
                   <property name="text">
-                   <string>屋顶高度：</string>
+                   <string>墙高比例：</string>
                   </property>
                  </widget>
                 </item>
@@ -2069,16 +2087,16 @@
                <string>QPushButton { text-align: left; font-weight: bold; padding: 4px; border-bottom: 1px solid #aaa; }</string>
               </property>
               <property name="text">
-               <string>▶ 点云反演</string>
+                <string>点云分类与参数估计</string>
               </property>
               <property name="checkable">
-               <bool>true</bool>
+               <bool>false</bool>
               </property>
               <property name="checked">
                <bool>false</bool>
               </property>
               <property name="flat">
-               <bool>true</bool>
+               <bool>false</bool>
               </property>
              </widget>
             </item>
@@ -2158,12 +2176,12 @@
                <item>
                 <layout class="QHBoxLayout" name="layoutInversionBtns">
                  <item>
-                  <widget class="QPushButton" name="btnClassifyPrimitive">
+                  <widget class="QPushButton" name="btnPointNetClassify">
                    <property name="enabled">
                     <bool>false</bool>
                    </property>
                    <property name="text">
-                    <string>🔍 识别</string>
+                    <string>PointNet 分类</string>
                    </property>
                   </widget>
                  </item>
@@ -2173,7 +2191,7 @@
                     <bool>false</bool>
                    </property>
                    <property name="text">
-                    <string>⚙ 反演</string>
+                    <string>参数反演</string>
                    </property>
                   </widget>
                  </item>
