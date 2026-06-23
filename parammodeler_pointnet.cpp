@@ -1,72 +1,277 @@
 #include "parammodeler_pointnet.h"
+#include "parammodeler_pcdloader.h"
 
 #include <QCoreApplication>
+#include <QDir>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QProcess>
+#include <QTemporaryFile>
+#include <QTextStream>
+#include <QJsonParseError>
+#include <algorithm>
+#include <cmath>
+#include <memory>
 
 namespace
 {
+struct PointNetBackendConfig
+{
+  QString name;
+  QString scriptPath;
+  QString logDir;
+};
+
+struct PointNetRegressionConfig
+{
+  QString modelName;
+  QString className;
+  QString scriptPath;
+  QString logDir;
+};
+
+struct PreparedPointCloudInput
+{
+  QString pythonInputPath;
+  PointCloud pointCloud;
+  std::unique_ptr<QTemporaryFile> tempFile;
+  QString errorMessage;
+};
+
 const QString defaultPythonExe()
 {
   return QStringLiteral( "E:/mambaforge/envs/pointnet_train/python.exe" );
 }
 
-const QString defaultScriptPath()
+PointNetBackendConfig backendConfig( PointNetBackend backend )
 {
-  return QStringLiteral( "E:/pointnet/pointnet_simple/main.py" );
+  if ( backend == PointNetBackend::PointNet )
+  {
+    return {
+      QStringLiteral( "PointNet" ),
+      QStringLiteral( "E:/pointnet/pointnet_simple/main.py" ),
+      QStringLiteral( "E:/pointnet/pointnet_simple/logs/pointnet_aug_roof_guard_v1" )
+    };
+  }
+  if ( backend == PointNetBackend::PointNeXt )
+  {
+    return {
+      QStringLiteral( "PointNeXt" ),
+      QStringLiteral( "E:/pointnet/pointnext_simple/main.py" ),
+      QStringLiteral( "E:/pointnet/pointnext_simple/logs/pointnext_cls_coordfix_v1" )
+    };
+  }
+
+  return {
+    QStringLiteral( "PointNet++" ),
+    QStringLiteral( "E:/pointnet/pointnet2_simple/main.py" ),
+    QStringLiteral( "E:/pointnet/pointnet2_simple/logs/pointnet2_cls_auxdata_250" )
+  };
 }
 
-const QString defaultLogDir()
+QString normalizedPrimitiveType( const QString &primitiveType )
 {
-  return QStringLiteral( "E:/pointnet/pointnet_simple/logs/pointnet_aug_250_gpu" );
-}
+  if ( primitiveType == QStringLiteral( "CylinderHemisphere" ) )
+    return QStringLiteral( "CylinderDome" );
+  return primitiveType;
 }
 
-PointNetPredictResult PointNetRunner::predict( const QString &inputTxt, int numPoints, int topK )
+PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QString &primitiveType )
 {
-  PointNetPredictResult result;
+  const QString prim = normalizedPrimitiveType( primitiveType );
+  if ( backend == PointNetBackend::PointNet )
+    return { QStringLiteral( "PointNet" ), prim, QString(), QString() };
 
-  if ( !QFileInfo::exists( inputTxt ) )
+  const bool usePointNeXt = backend == PointNetBackend::PointNeXt;
+  const QString modelName = usePointNeXt ? QStringLiteral( "PointNeXt" ) : QStringLiteral( "PointNet++" );
+  const QString script = usePointNeXt
+                           ? QStringLiteral( "E:/pointnet/pointnext_simple/main_reg.py" )
+                           : QStringLiteral( "E:/pointnet/pointnet2_simple/main_reg.py" );
+  const QString base = usePointNeXt
+                         ? QStringLiteral( "E:/pointnet/pointnext_simple/logs/" )
+                         : QStringLiteral( "E:/pointnet/pointnet2_simple/logs/" );
+  static const QMap<QString, QString> pointnextDirs = {
+    { QStringLiteral( "Cuboid" ), QStringLiteral( "pointnext_reg_cuboid_aux" ) },
+    { QStringLiteral( "Cylinder" ), QStringLiteral( "pointnext_reg_cylinder_aux" ) },
+    { QStringLiteral( "LHouse" ), QStringLiteral( "pointnext_reg_lhouse_aux" ) },
+    { QStringLiteral( "ConeCylinder" ), QStringLiteral( "pointnext_reg_conecylinder_aux" ) },
+    { QStringLiteral( "GabledRoof" ), QStringLiteral( "pointnext_reg_gabledroof_aux" ) },
+    { QStringLiteral( "PyramidRoof" ), QStringLiteral( "pointnext_reg_pyramidroof_aux" ) },
+    { QStringLiteral( "TruncatedPyramidRoof" ), QStringLiteral( "pointnext_reg_truncatedpyramid_aux" ) },
+    { QStringLiteral( "HalfCylinderRoof" ), QStringLiteral( "pointnext_reg_halfcylinder_aux" ) },
+    { QStringLiteral( "CylinderDome" ), QStringLiteral( "pointnext_reg_cylinderdome_aux" ) },
+    { QStringLiteral( "IndentedCuboid" ), QStringLiteral( "pointnext_reg_indentedcuboid_aux" ) },
+    { QStringLiteral( "AsymmetricGableHouse" ), QStringLiteral( "pointnext_reg_asymgable_aux" ) },
+    { QStringLiteral( "FourStageRoundTower" ), QStringLiteral( "pointnext_reg_fourstage_aux" ) },
+    { QStringLiteral( "TwoGableHouses" ), QStringLiteral( "pointnext_reg_twogable_aux" ) }
+  };
+  static const QMap<QString, QString> pointnet2Dirs = {
+    { QStringLiteral( "Cuboid" ), QStringLiteral( "reg_cuboid_aux" ) },
+    { QStringLiteral( "Cylinder" ), QStringLiteral( "reg_cylinder_aux" ) },
+    { QStringLiteral( "LHouse" ), QStringLiteral( "reg_lhouse_aux" ) },
+    { QStringLiteral( "ConeCylinder" ), QStringLiteral( "reg_conecylinder_aux" ) },
+    { QStringLiteral( "GabledRoof" ), QStringLiteral( "reg_gabledroof_aux" ) },
+    { QStringLiteral( "PyramidRoof" ), QStringLiteral( "reg_pyramidroof_aux" ) },
+    { QStringLiteral( "TruncatedPyramidRoof" ), QStringLiteral( "reg_truncatedpyramid_aux" ) },
+    { QStringLiteral( "HalfCylinderRoof" ), QStringLiteral( "reg_halfcylinder_aux" ) },
+    { QStringLiteral( "CylinderDome" ), QStringLiteral( "reg_cylinderdome_aux" ) },
+    { QStringLiteral( "IndentedCuboid" ), QStringLiteral( "reg_indentedcuboid_aux" ) },
+    { QStringLiteral( "AsymmetricGableHouse" ), QStringLiteral( "reg_asymgable_aux" ) },
+    { QStringLiteral( "FourStageRoundTower" ), QStringLiteral( "reg_fourstage_aux" ) },
+    { QStringLiteral( "TwoGableHouses" ), QStringLiteral( "reg_twogable_aux" ) }
+  };
+
+  const QMap<QString, QString> &dirs = usePointNeXt ? pointnextDirs : pointnet2Dirs;
+  return { modelName, prim, script, dirs.contains( prim ) ? base + dirs.value( prim ) : QString() };
+}
+
+bool vectorFromJsonArray( const QJsonValue &value, QVector3D &out )
+{
+  if ( !value.isArray() )
+    return false;
+  const QJsonArray arr = value.toArray();
+  if ( arr.size() < 3 )
+    return false;
+  out = QVector3D( arr.at( 0 ).toDouble(), arr.at( 1 ).toDouble(), arr.at( 2 ).toDouble() );
+  return true;
+}
+
+QString metadataRelativePathForPointCloud( const QString &filePath )
+{
+  QString normalized = QDir::fromNativeSeparators( QFileInfo( filePath ).absoluteFilePath() );
+  const QString lower = normalized.toLower();
+  QString rel;
+
+  const QString previewMarker = QStringLiteral( "/ply_preview/datasets_aug/" );
+  const int previewIdx = lower.indexOf( previewMarker );
+  if ( previewIdx >= 0 )
+    rel = normalized.mid( previewIdx + previewMarker.size() );
+
+  const QString datasetMarker = QStringLiteral( "/datasets_aug/" );
+  const int datasetIdx = lower.indexOf( datasetMarker );
+  if ( rel.isEmpty() && datasetIdx >= 0 )
+    rel = normalized.mid( datasetIdx + datasetMarker.size() );
+
+  if ( rel.isEmpty() || rel.startsWith( QStringLiteral( "metadata/" ), Qt::CaseInsensitive ) )
+    return QString();
+
+  QFileInfo relInfo( rel );
+  const QString dir = relInfo.path() == QStringLiteral( "." ) ? QString() : relInfo.path() + QStringLiteral( "/" );
+  return dir + relInfo.completeBaseName() + QStringLiteral( ".txt" );
+}
+
+bool metadataAuxForInput( const QString &filePath, QVector3D &bboxSize, double &scale )
+{
+  const QString rel = metadataRelativePathForPointCloud( filePath );
+  if ( rel.isEmpty() )
+    return false;
+
+  QFile metadataFile( QStringLiteral( "E:/pointnet/datasets_aug/metadata/sample_params.json" ) );
+  if ( !metadataFile.open( QIODevice::ReadOnly ) )
+    return false;
+
+  QJsonParseError parseError;
+  const QJsonDocument doc = QJsonDocument::fromJson( metadataFile.readAll(), &parseError );
+  if ( parseError.error != QJsonParseError::NoError || !doc.isArray() )
+    return false;
+
+  const QString relLower = rel.toLower();
+  const QJsonArray records = doc.array();
+  for ( const QJsonValue &value : records )
   {
-    result.errorMessage = QStringLiteral( "Input TXT does not exist: %1" ).arg( inputTxt );
-    return result;
-  }
-  if ( !QFileInfo::exists( defaultPythonExe() ) )
-  {
-    result.errorMessage = QStringLiteral( "PointNet python.exe does not exist: %1" ).arg( defaultPythonExe() );
-    return result;
-  }
-  if ( !QFileInfo::exists( defaultScriptPath() ) )
-  {
-    result.errorMessage = QStringLiteral( "PointNet main.py does not exist: %1" ).arg( defaultScriptPath() );
-    return result;
-  }
-  if ( !QFileInfo::exists( defaultLogDir() + QStringLiteral( "/best_model.pth" ) ) )
-  {
-    result.errorMessage = QStringLiteral( "PointNet model does not exist: %1/best_model.pth" ).arg( defaultLogDir() );
-    return result;
+    const QJsonObject obj = value.toObject();
+    if ( obj.value( QStringLiteral( "file" ) ).toString().toLower() != relLower )
+      continue;
+
+    const QJsonObject info = obj.value( QStringLiteral( "pointCloudInfo" ) ).toObject();
+    if ( !vectorFromJsonArray( info.value( QStringLiteral( "bboxSize" ) ), bboxSize ) )
+      return false;
+    scale = info.value( QStringLiteral( "scale" ) ).toDouble( 1.0 );
+    return scale > 1e-9;
   }
 
-  QStringList args;
-  args << defaultScriptPath()
-       << QStringLiteral( "--mode" ) << QStringLiteral( "predict" )
-       << QStringLiteral( "--input" ) << inputTxt
-       << QStringLiteral( "--log_dir" ) << defaultLogDir()
-       << QStringLiteral( "--num_points" ) << QString::number( numPoints )
-       << QStringLiteral( "--topk" ) << QString::number( topK )
-       << QStringLiteral( "--cpu" );
+  return false;
+}
 
+bool isTextPointCloudFile( const QString &path )
+{
+  const QString suffix = QFileInfo( path ).suffix().toLower();
+  return suffix == QStringLiteral( "txt" ) || suffix == QStringLiteral( "xyz" ) || suffix == QStringLiteral( "pts" );
+}
+
+PreparedPointCloudInput preparePointCloudInput( const QString &inputPath )
+{
+  PreparedPointCloudInput prepared;
+  if ( !QFileInfo::exists( inputPath ) )
+  {
+    prepared.errorMessage = QStringLiteral( "Input point cloud does not exist: %1" ).arg( inputPath );
+    return prepared;
+  }
+
+  prepared.pointCloud = PointCloudLoader::load( inputPath );
+  if ( prepared.pointCloud.points.isEmpty() )
+  {
+    prepared.errorMessage = QStringLiteral( "Failed to load point cloud or point count is 0: %1" ).arg( inputPath );
+    return prepared;
+  }
+
+  if ( isTextPointCloudFile( inputPath ) )
+  {
+    prepared.pythonInputPath = inputPath;
+    return prepared;
+  }
+
+  prepared.tempFile.reset( new QTemporaryFile( QDir::tempPath() + QStringLiteral( "/parammodeler_pointnet_XXXXXX.txt" ) ) );
+  prepared.tempFile->setAutoRemove( true );
+  if ( !prepared.tempFile->open() )
+  {
+    prepared.errorMessage = QStringLiteral( "Failed to create temporary TXT for PointNet: %1" )
+      .arg( prepared.tempFile->errorString() );
+    return prepared;
+  }
+
+  QTextStream out( prepared.tempFile.get() );
+  for ( const QVector3D &p : prepared.pointCloud.points )
+    out << p.x() << ' ' << p.y() << ' ' << p.z() << '\n';
+  out.flush();
+  prepared.tempFile->flush();
+  prepared.pythonInputPath = prepared.tempFile->fileName();
+  return prepared;
+}
+
+double pointCloudNormalizationScale( const QVector<QVector3D> &points )
+{
+  if ( points.isEmpty() )
+    return 1.0;
+
+  QVector3D center;
+  for ( const QVector3D &p : points )
+    center += p;
+  center /= static_cast<float>( points.size() );
+
+  double scale = 0.0;
+  for ( const QVector3D &p : points )
+    scale = std::max( scale, static_cast<double>( ( p - center ).length() ) );
+  return scale > 1e-9 ? scale : 1.0;
+}
+
+bool runPythonProcess( const QString &scriptPath,
+                       const QStringList &args,
+                       const QString &name,
+                       QString &stdoutText,
+                       QString &errorMessage )
+{
   QProcess process;
-  process.setWorkingDirectory( QFileInfo( defaultScriptPath() ).absolutePath() );
+  process.setWorkingDirectory( QFileInfo( scriptPath ).absolutePath() );
   process.start( defaultPythonExe(), args );
   if ( !process.waitForStarted( 5000 ) )
   {
-    result.errorMessage = QStringLiteral( "Failed to start PointNet process: %1" ).arg( process.errorString() );
-    return result;
+    errorMessage = QStringLiteral( "Failed to start %1 process: %2" ).arg( name, process.errorString() );
+    return false;
   }
+
   const int timeoutMs = 120000;
   int elapsedMs = 0;
   while ( process.state() != QProcess::NotRunning && elapsedMs < timeoutMs )
@@ -80,25 +285,83 @@ PointNetPredictResult PointNetRunner::predict( const QString &inputTxt, int numP
   {
     process.kill();
     process.waitForFinished( 3000 );
-    result.errorMessage = QStringLiteral( "PointNet predict timed out." );
-    return result;
+    errorMessage = QStringLiteral( "%1 predict timed out." ).arg( name );
+    return false;
   }
 
-  const QString stdoutText = QString::fromUtf8( process.readAllStandardOutput() ).trimmed();
+  stdoutText = QString::fromUtf8( process.readAllStandardOutput() ).trimmed();
   const QString stderrText = QString::fromUtf8( process.readAllStandardError() ).trimmed();
-  result.rawOutput = stdoutText;
 
   if ( process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0 )
   {
-    result.errorMessage = QStringLiteral( "PointNet predict failed.\n%1" ).arg( stderrText );
+    errorMessage = QStringLiteral( "%1 predict failed.\n%2" ).arg( name, stderrText );
+    return false;
+  }
+  return true;
+}
+}
+
+PointNetPredictResult PointNetRunner::predict ( const QString &inputTxt, int numPoints, int topK )
+{
+  return predict( inputTxt, PointNetBackend::PointNeXt, numPoints, topK );
+}
+
+PointNetPredictResult PointNetRunner::predict( const QString &inputTxt,
+                                               PointNetBackend backend,
+                                               int numPoints,
+                                               int topK )
+{
+  PointNetPredictResult result;
+  const PointNetBackendConfig config = backendConfig( backend );
+
+  if ( !QFileInfo::exists( inputTxt ) )
+  {
+    result.errorMessage = QStringLiteral( "Input TXT does not exist: %1" ).arg( inputTxt );
     return result;
   }
+  if ( !QFileInfo::exists( defaultPythonExe() ) )
+  {
+    result.errorMessage = QStringLiteral( "PointNet python.exe does not exist: %1" ).arg( defaultPythonExe() );
+    return result;
+  }
+  if ( !QFileInfo::exists( config.scriptPath ) )
+  {
+    result.errorMessage = QStringLiteral( "%1 main.py does not exist: %2" ).arg( config.name, config.scriptPath );
+    return result;
+  }
+  if ( !QFileInfo::exists( config.logDir + QStringLiteral( "/best_model.pth" ) ) )
+  {
+    result.errorMessage = QStringLiteral( "%1 model does not exist: %2/best_model.pth" ).arg( config.name, config.logDir );
+    return result;
+  }
+
+  PreparedPointCloudInput prepared = preparePointCloudInput( inputTxt );
+  if ( !prepared.errorMessage.isEmpty() )
+  {
+    result.errorMessage = prepared.errorMessage;
+    return result;
+  }
+
+  QStringList args;
+  args << config.scriptPath
+       << QStringLiteral( "--mode" ) << QStringLiteral( "predict" )
+       << QStringLiteral( "--input" ) << prepared.pythonInputPath
+       << QStringLiteral( "--log_dir" ) << config.logDir
+       << QStringLiteral( "--num_points" ) << QString::number( numPoints )
+       << QStringLiteral( "--topk" ) << QString::number( topK )
+       << QStringLiteral( "--cpu" );
+
+  QString stdoutText;
+  if ( !runPythonProcess( config.scriptPath, args, config.name, stdoutText, result.errorMessage ) )
+    return result;
+  result.rawOutput = stdoutText;
 
   QJsonParseError parseError;
   const QJsonDocument doc = QJsonDocument::fromJson( stdoutText.toUtf8(), &parseError );
   if ( parseError.error != QJsonParseError::NoError || !doc.isArray() )
   {
-    result.errorMessage = QStringLiteral( "Failed to parse PointNet JSON output: %1\n%2" )
+    result.errorMessage = QStringLiteral( "Failed to parse %1 JSON output: %2\n%3" )
+      .arg( config.name )
       .arg( parseError.errorString(), stdoutText );
     return result;
   }
@@ -115,7 +378,97 @@ PointNetPredictResult PointNetRunner::predict( const QString &inputTxt, int numP
   }
 
   if ( result.predictions.isEmpty() )
-    result.errorMessage = QStringLiteral( "PointNet returned no predictions." );
+    result.errorMessage = QStringLiteral( "%1 returned no predictions." ).arg( config.name );
+
+  return result;
+}
+
+PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
+                                                        const QString &primitiveType,
+                                                        int numPoints )
+{
+  return predictParams( inputTxt, PointNetBackend::PointNeXt, primitiveType, numPoints );
+}
+
+PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
+                                                        PointNetBackend backend,
+                                                        const QString &primitiveType,
+                                                        int numPoints )
+{
+  PointNetRegressionResult result;
+  const PointNetRegressionConfig config = regressionConfig( backend, primitiveType );
+
+  if ( config.logDir.isEmpty() )
+  {
+    result.errorMessage = QStringLiteral( "%1 regression model is not configured for primitive: %2" )
+      .arg( config.modelName, primitiveType );
+    return result;
+  }
+  if ( !QFileInfo::exists( defaultPythonExe() ) )
+  {
+    result.errorMessage = QStringLiteral( "PointNet python.exe does not exist: %1" ).arg( defaultPythonExe() );
+    return result;
+  }
+  if ( !QFileInfo::exists( config.scriptPath ) )
+  {
+    result.errorMessage = QStringLiteral( "%1 regression script does not exist: %2" ).arg( config.modelName, config.scriptPath );
+    return result;
+  }
+  if ( !QFileInfo::exists( config.logDir + QStringLiteral( "/best_model.pth" ) ) )
+  {
+    result.errorMessage = QStringLiteral( "%1 %2 regression model does not exist: %3/best_model.pth" )
+      .arg( config.modelName, config.className, config.logDir );
+    return result;
+  }
+
+  PreparedPointCloudInput prepared = preparePointCloudInput( inputTxt );
+  if ( !prepared.errorMessage.isEmpty() )
+  {
+    result.errorMessage = prepared.errorMessage;
+    return result;
+  }
+
+  QVector3D bboxSize = prepared.pointCloud.bboxMax - prepared.pointCloud.bboxMin;
+  double scale = pointCloudNormalizationScale( prepared.pointCloud.points );
+  metadataAuxForInput( inputTxt, bboxSize, scale );
+
+  QStringList args;
+  args << config.scriptPath
+       << QStringLiteral( "--mode" ) << QStringLiteral( "predict" )
+       << QStringLiteral( "--input" ) << prepared.pythonInputPath
+       << QStringLiteral( "--data_root" ) << QStringLiteral( "E:/pointnet/datasets_aug" )
+       << QStringLiteral( "--metadata" ) << QStringLiteral( "E:/pointnet/datasets_aug/metadata/sample_params.json" )
+       << QStringLiteral( "--log_dir" ) << config.logDir
+       << QStringLiteral( "--num_points" ) << QString::number( numPoints )
+       << QStringLiteral( "--bbox_x" ) << QString::number( bboxSize.x(), 'g', 12 )
+       << QStringLiteral( "--bbox_y" ) << QString::number( bboxSize.y(), 'g', 12 )
+       << QStringLiteral( "--bbox_z" ) << QString::number( bboxSize.z(), 'g', 12 )
+       << QStringLiteral( "--scale" ) << QString::number( scale, 'g', 12 )
+       << QStringLiteral( "--cpu" );
+
+  QString stdoutText;
+  if ( !runPythonProcess( config.scriptPath, args, config.modelName + QStringLiteral( " parameter regression" ), stdoutText, result.errorMessage ) )
+    return result;
+  result.rawOutput = stdoutText;
+
+  QJsonParseError parseError;
+  const QJsonDocument doc = QJsonDocument::fromJson( stdoutText.toUtf8(), &parseError );
+  if ( parseError.error != QJsonParseError::NoError || !doc.isObject() )
+  {
+    result.errorMessage = QStringLiteral( "Failed to parse %1 regression JSON output: %2\n%3" )
+      .arg( config.modelName )
+      .arg( parseError.errorString(), stdoutText );
+    return result;
+  }
+
+  const QJsonObject obj = doc.object();
+  result.className = obj.value( QStringLiteral( "class" ) ).toString( config.className );
+  const QJsonObject paramsObj = obj.value( QStringLiteral( "params" ) ).toObject();
+  for ( auto it = paramsObj.constBegin(); it != paramsObj.constEnd(); ++it )
+    result.params.insert( it.key(), it.value().toDouble() );
+
+  if ( result.params.isEmpty() )
+    result.errorMessage = QStringLiteral( "%1 regression returned no parameters." ).arg( config.modelName );
 
   return result;
 }

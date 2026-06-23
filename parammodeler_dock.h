@@ -129,6 +129,7 @@ private slots:
   void onExportDLPointCloudClicked();
   void onExportLoadedDLPointCloudClicked();
   void onExportDLDatasetClicked();
+  void onExportCurrentPrimitiveDLDatasetClicked();
 	void onExportMeshClicked();
 	void onLoadToQGIS3D(bool zoomToLayer = true); // 将模型加载/同步到QGIS 3D视图，增加默认参数，true 表示缩放相机          
 	void onLoadExternalPointCloud();
@@ -145,6 +146,7 @@ private slots:
 
 private:
   void randomizeCurrentPrimitiveParams( bool refreshPreview );
+  bool loadPointCloudToQGIS3D( const QString &filePath, bool showMessage );
 
   Ui::ParamModelerDock *ui;
   QgisInterface *mIface;

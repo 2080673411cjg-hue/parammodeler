@@ -224,6 +224,7 @@ void ParamInverter::applyToUI( ParamModelerDock *dock,
     set( "tgWidth",       dock->ui->spinBoxTGWidth,      dock->ui->sliderTGWidth );
     setTotalAndWallRatio( "tgWallHeight", "tgRoofHeight", dock->ui->spinBoxTGHeightWall, dock->ui->sliderTGHeightWall, dock->ui->spinBoxTGRoofHeight, dock->ui->sliderTGRoofHeight );
     set( "tgAngle",       dock->ui->spinBoxTGAngle,      dock->ui->sliderTGAngle );
+    set( "tgRidgeRatio",  dock->ui->spinBoxTGRidgeRatio, dock->ui->sliderTGRidgeRatio );
 
     // 位姿参数
     setLE( "tx", dock->ui->lineEditTX );

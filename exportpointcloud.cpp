@@ -186,6 +186,38 @@ static void normalizeForDL( QVector<QVector3D> &points )
     p = ( p - center ) / maxRadius;
 }
 
+static DLPointCloudInfo computeDLPointCloudInfo( const QVector<QVector3D> &points )
+{
+  DLPointCloudInfo info;
+  if ( points.isEmpty() )
+    return info;
+
+  info.bboxMin = points.first();
+  info.bboxMax = points.first();
+  info.center = QVector3D( 0, 0, 0 );
+
+  for ( const QVector3D &p : points )
+  {
+    info.bboxMin.setX( qMin( info.bboxMin.x(), p.x() ) );
+    info.bboxMin.setY( qMin( info.bboxMin.y(), p.y() ) );
+    info.bboxMin.setZ( qMin( info.bboxMin.z(), p.z() ) );
+    info.bboxMax.setX( qMax( info.bboxMax.x(), p.x() ) );
+    info.bboxMax.setY( qMax( info.bboxMax.y(), p.y() ) );
+    info.bboxMax.setZ( qMax( info.bboxMax.z(), p.z() ) );
+    info.center += p;
+  }
+
+  info.center /= float( points.size() );
+  info.bboxSize = info.bboxMax - info.bboxMin;
+
+  double maxRadius = 0.0;
+  for ( const QVector3D &p : points )
+    maxRadius = qMax( maxRadius, double( ( p - info.center ).length() ) );
+  info.scale = maxRadius > 1e-8 ? maxRadius : 1.0;
+
+  return info;
+}
+
 bool ExportPointCloud::exportPLY( const QString &fileName, const QString &primitiveType, ParamModelerDock *dock, int sampleCount )
 {
   {
@@ -232,7 +264,11 @@ bool ExportPointCloud::exportPLY( const QString &fileName, const QString &primit
   return true;
 }
 
-bool ExportPointCloud::exportDLInputTXT( const QString &fileName, const QString &primitiveType, ParamModelerDock *dock, int pointCount )
+bool ExportPointCloud::exportDLInputTXT( const QString &fileName,
+                                         const QString &primitiveType,
+                                         ParamModelerDock *dock,
+                                         int pointCount,
+                                         DLPointCloudInfo *info )
 {
   QString errorMessage;
   QVector<QVector3D> points = sampleCurrentPrimitive( primitiveType, dock, pointCount, true, &errorMessage );
@@ -241,6 +277,9 @@ bool ExportPointCloud::exportDLInputTXT( const QString &fileName, const QString 
     QMessageBox::warning( nullptr, "Warning", errorMessage );
     return false;
   }
+
+  if ( info )
+    *info = computeDLPointCloudInfo( points );
 
   normalizeForDL( points );
 

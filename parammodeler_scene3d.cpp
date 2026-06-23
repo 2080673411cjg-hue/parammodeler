@@ -10,10 +10,12 @@
 #include <QMessageBox>
 #include <QObject>
 #include <QColor>
+#include <QMap>
 #include <QStringList>
 #include <QVariantMap>
 #include <QVector3D>
 #include <algorithm>
+#include <cmath>
 
 #include <qgis.h>
 #include <qgisinterface.h>
@@ -28,6 +30,7 @@
 #include <qgsmultipolygon.h>
 #include <QgsVectorLayer.h>
 #include <qgsvectordataprovider.h>
+#include <qgsline3dsymbol.h>
 #include <QgsPolygon3DSymbol.h>
 #include <QgsPoint3DSymbol.h>
 #include <QgsVectorLayer3DRenderer.h>
@@ -41,6 +44,31 @@
 
 namespace
 {
+struct MeshEdgeRecord
+{
+  int count = 0;
+  QVector3D p0;
+  QVector3D p1;
+  QVector3D firstNormal;
+  bool crease = false;
+};
+
+QString meshPointKey( const QVector3D &p )
+{
+  constexpr double scale = 1000000.0;
+  return QStringLiteral( "%1,%2,%3" )
+    .arg( qRound64( p.x() * scale ) )
+    .arg( qRound64( p.y() * scale ) )
+    .arg( qRound64( p.z() * scale ) );
+}
+
+QString meshEdgeKey( const QVector3D &a, const QVector3D &b )
+{
+  const QString ka = meshPointKey( a );
+  const QString kb = meshPointKey( b );
+  return ka < kb ? ka + QStringLiteral( "|" ) + kb : kb + QStringLiteral( "|" ) + ka;
+}
+
 void removeTempGpkgPaths( const QString &paths )
 {
   for ( const QString &path : paths.split( '\n' ) )
@@ -92,11 +120,78 @@ QgsVectorLayer *writeMeshLayer( QgsMultiPolygon *multiPoly,
   return layer;
 }
 
+QgsVectorLayer *makeMeshEdgeLayer( const MeshData &mesh,
+                                   const QMatrix4x4 &mat,
+                                   const QString &layerName )
+{
+  QMap<QString, MeshEdgeRecord> edgeMap;
+  const int triCount = mesh.indices.size() / 3;
+  for ( int i = 0; i < triCount; ++i )
+  {
+    const int idx0 = mesh.indices[i * 3];
+    const int idx1 = mesh.indices[i * 3 + 1];
+    const int idx2 = mesh.indices[i * 3 + 2];
+    const QVector3D local0 = mesh.vertices[idx0];
+    const QVector3D local1 = mesh.vertices[idx1];
+    const QVector3D local2 = mesh.vertices[idx2];
+    const QVector3D normal = QVector3D::crossProduct( local1 - local0, local2 - local0 ).normalized();
+
+    const QVector3D points[3] = { local0, local1, local2 };
+    const int edges[3][2] = { { 0, 1 }, { 1, 2 }, { 2, 0 } };
+    for ( const auto &edge : edges )
+    {
+      const QVector3D p0 = points[edge[0]];
+      const QVector3D p1 = points[edge[1]];
+      const QString key = meshEdgeKey( p0, p1 );
+      MeshEdgeRecord record = edgeMap.value( key );
+      if ( record.count == 0 )
+      {
+        record.p0 = p0;
+        record.p1 = p1;
+        record.firstNormal = normal;
+      }
+      else if ( std::abs( QVector3D::dotProduct( record.firstNormal, normal ) ) < 0.985f )
+      {
+        record.crease = true;
+      }
+      record.count++;
+      edgeMap.insert( key, record );
+    }
+  }
+
+  QgsVectorLayer *edgeLayer = new QgsVectorLayer( "LineStringZ?crs=EPSG:3857", layerName, "memory" );
+  QgsFeatureList features;
+  features.reserve( edgeMap.size() );
+  for ( const MeshEdgeRecord &record : edgeMap )
+  {
+    if ( record.count > 1 && !record.crease )
+      continue;
+
+    const QVector3D p0 = mat.map( record.p0 );
+    const QVector3D p1 = mat.map( record.p1 );
+    QgsFeature feat;
+    feat.setGeometry( QgsGeometry( new QgsLineString(
+      QgsPoint( p0.x(), p0.y(), p0.z() ),
+      QgsPoint( p1.x(), p1.y(), p1.z() )
+    ) ) );
+    features.append( feat );
+  }
+
+  if ( !features.isEmpty() )
+    edgeLayer->dataProvider()->addFeatures( features );
+  edgeLayer->updateExtents();
+  return edgeLayer;
+}
+
 void applyPolygon3DMaterial( QgsVectorLayer *layer,
                              const QColor &diffuse,
                              const QColor &ambient,
-                             const QColor &specular )
+                             const QColor &specular,
+                             double opacity )
 {
+  if ( !layer )
+    return;
+
   QgsPolygon3DSymbol *symbol3D = new QgsPolygon3DSymbol();
   symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
   symbol3D->setAltitudeBinding( Qgis::AltitudeBinding::Vertex );
@@ -112,6 +207,32 @@ void applyPolygon3DMaterial( QgsVectorLayer *layer,
   QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
   renderer3D->setSymbol( symbol3D );
   layer->setRenderer3D( renderer3D );
+  layer->setOpacity( opacity );
+}
+
+void applyLine3DMaterial( QgsVectorLayer *layer )
+{
+  if ( !layer )
+    return;
+
+  QgsLine3DSymbol *symbol3D = new QgsLine3DSymbol();
+  symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
+  symbol3D->setAltitudeBinding( Qgis::AltitudeBinding::Vertex );
+  symbol3D->setRenderAsSimpleLines( true );
+  symbol3D->setWidth( 0.08f );
+
+  QgsPhongMaterialSettings material;
+  const QColor edgeColor( 28, 24, 22, 255 );
+  material.setAmbient( edgeColor );
+  material.setDiffuse( edgeColor );
+  material.setSpecular( Qt::black );
+  material.setShininess( 0.0 );
+  symbol3D->setMaterialSettings( material.clone() );
+
+  QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
+  renderer3D->setSymbol( symbol3D );
+  layer->setRenderer3D( renderer3D );
+  layer->setOpacity( 1.0 );
 }
 
 QgsRectangle padded3DViewExtent( const QgsRectangle &extent )
@@ -137,6 +258,7 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
   ParamModelerModelLoadResult result;
   const QString layerName = "ParamModeler_Model";
   const QString roofLayerName = "ParamModeler_Model_Roof";
+  const QString edgeLayerName = "ParamModeler_Model_Edges";
 
   if ( !iface )
   {
@@ -211,29 +333,44 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
     roofGpkgPath.clear();
   }
 
+  QgsVectorLayer *edgeLayer = makeMeshEdgeLayer( mesh, mat, edgeLayerName );
+  if ( edgeLayer && edgeLayer->featureCount() <= 0 )
+  {
+    delete edgeLayer;
+    edgeLayer = nullptr;
+  }
+
   applyPolygon3DMaterial( layer,
-                          QColor( 168, 158, 138, 225 ),
-                          QColor( 92, 84, 70, 225 ),
-                          QColor( 18, 15, 12, 45 ) );
+                          QColor( 198, 192, 178, 42 ),
+                          QColor( 126, 120, 108, 42 ),
+                          QColor( 20, 18, 15, 10 ),
+                          0.16 );
   if ( roofLayer )
   {
     applyPolygon3DMaterial( roofLayer,
-                            QColor( 132, 50, 42, 235 ),
-                            QColor( 72, 28, 24, 235 ),
-                            QColor( 18, 8, 6, 45 ) );
+                            QColor( 154, 50, 46, 58 ),
+                            QColor( 88, 28, 26, 58 ),
+                            QColor( 18, 8, 6, 12 ),
+                            0.22 );
   }
+  applyLine3DMaterial( edgeLayer );
 
   if ( previousModelLayer )
     QgsProject::instance()->removeMapLayer( previousModelLayer->id() );
   removeLayerByName( roofLayerName );
+  removeLayerByName( edgeLayerName );
 
   QgsProject::instance()->addMapLayer( layer );
   if ( roofLayer )
     QgsProject::instance()->addMapLayer( roofLayer );
+  if ( edgeLayer )
+    QgsProject::instance()->addMapLayer( edgeLayer );
 
   QgsRectangle viewExtent = layer->extent();
   if ( roofLayer )
     viewExtent.combineExtentWith( roofLayer->extent() );
+  if ( edgeLayer )
+    viewExtent.combineExtentWith( edgeLayer->extent() );
   viewExtent = padded3DViewExtent( viewExtent );
 
   if ( !previousGpkgPath.isEmpty() )
@@ -259,21 +396,26 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
       std::remove_if( curLayers.begin(), curLayers.end(),
                       [&]( QgsMapLayer *l ) {
                         return l && ( ( l->name() == layerName && l->id() != layer->id() ) ||
-                                      ( l->name() == roofLayerName && ( !roofLayer || l->id() != roofLayer->id() ) ) );
+                                      ( l->name() == roofLayerName && ( !roofLayer || l->id() != roofLayer->id() ) ) ||
+                                      ( l->name() == edgeLayerName && ( !edgeLayer || l->id() != edgeLayer->id() ) ) );
                       } ),
       curLayers.end() );
     if ( !curLayers.contains( layer ) )
       curLayers.append( layer );
     if ( roofLayer && !curLayers.contains( roofLayer ) )
       curLayers.append( roofLayer );
+    if ( edgeLayer && !curLayers.contains( edgeLayer ) )
+      curLayers.append( edgeLayer );
     settings->setLayers( curLayers );
-    if ( !viewExtent.isNull() )
+    if ( zoomToLayer && !viewExtent.isNull() )
       canvas3D->setViewFrom2DExtent( viewExtent );
   }
 
   layer->triggerRepaint();
   if ( roofLayer )
     roofLayer->triggerRepaint();
+  if ( edgeLayer )
+    edgeLayer->triggerRepaint();
 
   if ( zoomToLayer && iface->mapCanvas() )
   {
@@ -304,7 +446,8 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
   }
 
   const QString suffix = QFileInfo( filePath ).suffix().toLower();
-  if ( suffix != "ply" && suffix != "las" && suffix != "laz" )
+  if ( suffix != "ply" && suffix != "las" && suffix != "laz" &&
+       suffix != "txt" && suffix != "xyz" && suffix != "pts" )
   {
     if ( errorMessage )
       *errorMessage = QObject::tr( "暂不支持该点云格式：%1" ).arg( suffix );
@@ -325,7 +468,11 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
   symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
   symbol3D->setShape( Qgis::Point3DShape::Sphere );
   QVariantMap props;
-  props["radius"] = 0.03;
+  const QVector3D bboxSize = pc.bboxMax - pc.bboxMin;
+  const double maxDim = std::max( { std::abs( static_cast<double>( bboxSize.x() ) ),
+                                    std::abs( static_cast<double>( bboxSize.y() ) ),
+                                    std::abs( static_cast<double>( bboxSize.z() ) ) } );
+  props["radius"] = std::max( maxDim / 350.0, 0.003 );
   symbol3D->setShapeProperties( props );
 
   QgsPhongMaterialSettings material;

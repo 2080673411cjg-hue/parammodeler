@@ -2,6 +2,7 @@
 #define PARAMMODELER_POINTNET_H
 
 #include <QString>
+#include <QMap>
 #include <QVector>
 
 struct PointNetPrediction
@@ -17,12 +18,38 @@ struct PointNetPredictResult
   QString errorMessage;
 };
 
+struct PointNetRegressionResult
+{
+  QString className;
+  QMap<QString, double> params;
+  QString rawOutput;
+  QString errorMessage;
+};
+
+enum class PointNetBackend
+{
+  PointNet,
+  PointNet2,
+  PointNeXt
+};
+
 class PointNetRunner
 {
 public:
   static PointNetPredictResult predict( const QString &inputTxt,
                                         int numPoints = 1024,
                                         int topK = 3 );
+  static PointNetPredictResult predict( const QString &inputTxt,
+                                        PointNetBackend backend,
+                                        int numPoints = 1024,
+                                        int topK = 3 );
+  static PointNetRegressionResult predictParams( const QString &inputTxt,
+                                                 const QString &primitiveType,
+                                                 int numPoints = 2048 );
+  static PointNetRegressionResult predictParams( const QString &inputTxt,
+                                                 PointNetBackend backend,
+                                                 const QString &primitiveType,
+                                                 int numPoints = 2048 );
 };
 
 #endif // PARAMMODELER_POINTNET_H

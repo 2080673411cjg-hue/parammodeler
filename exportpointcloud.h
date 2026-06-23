@@ -2,8 +2,18 @@
 #define EXPORTPOINTCLOUD_H
 
 #include <QString>
+#include <QVector3D>
 
 class ParamModelerDock;
+
+struct DLPointCloudInfo
+{
+    QVector3D bboxMin;
+    QVector3D bboxMax;
+    QVector3D bboxSize;
+    QVector3D center;
+    double scale = 1.0;
+};
 
 class ExportPointCloud
 {
@@ -19,7 +29,8 @@ public:
     static bool exportDLInputTXT( const QString    &fileName,
                                   const QString    &primitiveType,
                                   ParamModelerDock *dock,
-                                  int               pointCount = 2048 );
+                                  int               pointCount = 2048,
+                                  DLPointCloudInfo *info = nullptr );
 };
 
 #endif // EXPORTPOINTCLOUD_H

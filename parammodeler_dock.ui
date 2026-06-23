@@ -43,66 +43,84 @@
       </property>
       <widget class="QMenu" name="menuExport">
        <property name="title">
-        <string>导出</string>
+         <string>Export</string>
        </property>
-       <addaction name="actOBJ"/>
-       <addaction name="actMesh"/>
-       <addaction name="actJSON"/>
-       <addaction name="actPLY"/>
-       <addaction name="actDLPointCloud"/>
-       <addaction name="actLoadedDLPointCloud"/>
-       <addaction name="actDLDataset"/>
-      </widget>
+       <widget class="QMenu" name="menuModelExport">
+        <property name="title">
+          <string>Model Export</string>
+        </property>
+        <addaction name="actOBJ"/>
+        <addaction name="actMesh"/>
+        <addaction name="actJSON"/>
+       </widget>
+       <widget class="QMenu" name="menuPointCloudExport">
+        <property name="title">
+          <string>Point Cloud / Dataset Export</string>
+        </property>
+        <addaction name="actPLY"/>
+        <addaction name="actDLPointCloud"/>
+        <addaction name="actLoadedDLPointCloud"/>
+        <addaction name="actDLDataset"/>
+        <addaction name="actCurrentPrimitiveDLDataset"/>
+       </widget>
+       <addaction name="menuModelExport"/>
+       <addaction name="menuPointCloudExport"/>
+       </widget>
       <widget class="QMenu" name="menuLoad3D">
        <property name="title">
-        <string>加载到 3D</string>
+         <string>Load to 3D</string>
        </property>
        <addaction name="actTo3D"/>
        <addaction name="actLoadPC"/>
       </widget>
       <action name="actOBJ">
        <property name="text">
-        <string>导出 OBJ 文件 (*.obj)</string>
+         <string>Export OBJ file (*.obj)</string>
        </property>
       </action>
       <action name="actJSON">
        <property name="text">
-        <string>导出 JSON 参数 (*.json)</string>
+         <string>Export JSON parameters (*.json)</string>
        </property>
       </action>
       <action name="actPLY">
        <property name="text">
-        <string>导出点云 PLY (*.ply)</string>
+         <string>Export point cloud PLY (*.ply)</string>
        </property>
       </action>
       <action name="actDLPointCloud">
        <property name="text">
-        <string>导出深度学习点云 TXT (*.txt)</string>
+         <string>Export DL point cloud TXT (*.txt)</string>
        </property>
       </action>
       <action name="actLoadedDLPointCloud">
        <property name="text">
-        <string>Export Loaded Point Cloud DL TXT (*.txt)</string>
+          <string>Export loaded point cloud as DL TXT (*.txt)</string>
        </property>
       </action>
-      <action name="actDLDataset">
+       <action name="actDLDataset">
+        <property name="text">
+          <string>Batch generate all primitive dataset</string>
+        </property>
+       </action>
+       <action name="actCurrentPrimitiveDLDataset">
+        <property name="text">
+          <string>Batch generate current primitive dataset</string>
+        </property>
+       </action>
+       <action name="actMesh">
        <property name="text">
-        <string>Batch Generate DL Dataset</string>
-       </property>
-      </action>
-      <action name="actMesh">
-       <property name="text">
-        <string>导出 STL Mesh 文件 (*.stl)</string>
+         <string>Export STL Mesh file (*.stl)</string>
        </property>
       </action>
       <action name="actTo3D">
        <property name="text">
-        <string>加载当前模型到 QGIS 3D 场景</string>
+         <string>Load current model to QGIS 3D scene</string>
        </property>
       </action>
       <action name="actLoadPC">
        <property name="text">
-        <string>加载外部点云到 QGIS 3D 场景</string>
+         <string>Load external point cloud to QGIS 3D scene</string>
        </property>
       </action>
       <addaction name="menuExport"/>
@@ -127,13 +145,13 @@
         <item>
          <widget class="QGroupBox" name="groupBoxPrimitive">
           <property name="title">
-           <string>基元类型</string>
+           <string>Primitive Type</string>
           </property>
           <layout class="QFormLayout" name="formLayoutPrimitive">
            <item row="0" column="0">
             <widget class="QLabel" name="labelPrimitive">
              <property name="text">
-              <string>基元：</string>
+              <string>Primitive:</string>
              </property>
             </widget>
            </item>
@@ -209,7 +227,7 @@
            <item row="1" column="1">
             <widget class="QPushButton" name="btnRandomParams">
              <property name="text">
-              <string>随机参数</string>
+              <string>Random Parameters</string>
              </property>
             </widget>
            </item>
@@ -219,7 +237,7 @@
         <item>
          <widget class="QGroupBox" name="groupBoxTransform">
           <property name="title">
-           <string>位姿（Transform）</string>
+           <string>Pose Transform</string>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout">
            <item>
@@ -227,7 +245,7 @@
              <item>
               <widget class="QLabel" name="labelTX">
                <property name="text">
-                <string>平移 X：</string>
+                <string>Translate X:</string>
                </property>
               </widget>
              </item>
@@ -237,7 +255,7 @@
              <item>
               <widget class="QLabel" name="labelTY">
                <property name="text">
-                <string>平移 Y：</string>
+                <string>Translate Y:</string>
                </property>
               </widget>
              </item>
@@ -247,7 +265,7 @@
              <item>
               <widget class="QLabel" name="labelTZ">
                <property name="text">
-                <string>平移 Z：</string>
+                <string>Translate Z:</string>
                </property>
               </widget>
              </item>
@@ -269,7 +287,7 @@
                   </size>
                  </property>
                  <property name="text">
-                  <string>旋转角(ω):</string>
+                  <string>Rotate X:</string>
                  </property>
                 </widget>
                </item>
@@ -312,7 +330,7 @@
                   </size>
                  </property>
                  <property name="text">
-                  <string>旋转角(φ):</string>
+                  <string>Rotate Y:</string>
                  </property>
                 </widget>
                </item>
@@ -355,7 +373,7 @@
                   </size>
                  </property>
                  <property name="text">
-                  <string>旋转角(κ):</string>
+                  <string>Rotate Z:</string>
                  </property>
                 </widget>
                </item>
@@ -402,7 +420,7 @@
           </property>
           <widget class="QGroupBox" name="groupBoxParameters">
            <property name="title">
-            <string>模型参数</string>
+            <string>Model Parameters</string>
            </property>
            <layout class="QVBoxLayout" name="layoutParameters">
             <item>
@@ -433,7 +451,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelWidth">
                   <property name="text">
-                   <string>宽度：</string>
+                   <string>Width:</string>
                   </property>
                  </widget>
                 </item>
@@ -454,7 +472,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelHeight">
                   <property name="text">
-                   <string>高度：</string>
+                   <string>Height:</string>
                   </property>
                  </widget>
                 </item>
@@ -475,7 +493,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelLength">
                   <property name="text">
-                   <string>长度：</string>
+                   <string>Length:</string>
                   </property>
                  </widget>
                 </item>
@@ -486,7 +504,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelCylRadius">
                   <property name="text">
-                   <string>半径：</string>
+                   <string>Radius:</string>
                   </property>
                  </widget>
                 </item>
@@ -514,7 +532,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelCylHeight">
                   <property name="text">
-                   <string>高度：</string>
+                   <string>Height:</string>
                   </property>
                  </widget>
                 </item>
@@ -546,7 +564,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelLMainLength">
                   <property name="text">
-                   <string>主体长度：</string>
+                   <string>Main length:</string>
                   </property>
                  </widget>
                 </item>
@@ -571,7 +589,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelLMainWidth">
                   <property name="text">
-                   <string>主体宽度：</string>
+                   <string>Main width:</string>
                   </property>
                  </widget>
                 </item>
@@ -592,7 +610,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelLWingLength">
                   <property name="text">
-                   <string>L臂长度：</string>
+                   <string>Wing length:</string>
                   </property>
                  </widget>
                 </item>
@@ -613,7 +631,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelLWingWidth">
                   <property name="text">
-                   <string>L臂宽度：</string>
+                   <string>Wing width:</string>
                   </property>
                  </widget>
                 </item>
@@ -634,7 +652,7 @@
                 <item row="4" column="0">
                  <widget class="QLabel" name="labelLHeight">
                   <property name="text">
-                   <string>整体高度：</string>
+                   <string>Height:</string>
                   </property>
                  </widget>
                 </item>
@@ -659,7 +677,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelConeCylRadius">
                   <property name="text">
-                   <string>底面半径：</string>
+                   <string>Radius:</string>
                   </property>
                  </widget>
                 </item>
@@ -680,7 +698,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelConeCylCylHeight">
                   <property name="text">
-                   <string>总高度：</string>
+                   <string>Total height:</string>
                   </property>
                  </widget>
                 </item>
@@ -701,7 +719,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelConeCylConeHeight">
                   <property name="text">
-                   <string>圆柱高比例：</string>
+                   <string>Cylinder ratio:</string>
                   </property>
                  </widget>
                 </item>
@@ -726,7 +744,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelGRLength">
                   <property name="text">
-                   <string>长度：</string>
+                   <string>Length:</string>
                   </property>
                  </widget>
                 </item>
@@ -751,7 +769,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelGRWidth">
                   <property name="text">
-                   <string>宽度：</string>
+                   <string>Width:</string>
                   </property>
                  </widget>
                 </item>
@@ -776,7 +794,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelGRHeightWall">
                   <property name="text">
-                    <string>总高度：</string>
+                    <string>Total height:</string>
                   </property>
                  </widget>
                 </item>
@@ -801,7 +819,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelGRHeightRoof">
                   <property name="text">
-                    <string>墙高比例：</string>
+                    <string>Wall ratio:</string>
                   </property>
                  </widget>
                 </item>
@@ -830,7 +848,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelPRLength">
                   <property name="text">
-                   <string>长度：</string>
+                   <string>Length:</string>
                   </property>
                  </widget>
                 </item>
@@ -855,7 +873,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelPRWidth">
                   <property name="text">
-                   <string>宽度：</string>
+                   <string>Width:</string>
                   </property>
                  </widget>
                 </item>
@@ -880,7 +898,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelPRHeightWall">
                   <property name="text">
-                   <string>墙体高度：</string>
+                   <string>Total height:</string>
                   </property>
                  </widget>
                 </item>
@@ -905,7 +923,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelPRHeightRoof">
                   <property name="text">
-                   <string>拱顶半径：</string>
+                   <string>Wall ratio:</string>
                   </property>
                  </widget>
                 </item>
@@ -934,7 +952,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelTPRBottomLength">
                   <property name="text">
-                   <string>底部长度：</string>
+                   <string>Bottom length:</string>
                   </property>
                  </widget>
                 </item>
@@ -959,7 +977,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelTPRBottomWidth">
                   <property name="text">
-                   <string>底部宽度：</string>
+                   <string>Bottom width:</string>
                   </property>
                  </widget>
                 </item>
@@ -984,7 +1002,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelTPRTopLength">
                   <property name="text">
-                   <string>顶部长度：</string>
+                   <string>Top length:</string>
                   </property>
                  </widget>
                 </item>
@@ -1009,7 +1027,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelTPRTopWidth">
                   <property name="text">
-                   <string>顶部宽度：</string>
+                   <string>Top width:</string>
                   </property>
                  </widget>
                 </item>
@@ -1034,7 +1052,7 @@
                 <item row="4" column="0">
                  <widget class="QLabel" name="labelTPRHeightWall">
                   <property name="text">
-                   <string>总高度：</string>
+                   <string>Total height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1059,7 +1077,7 @@
                 <item row="5" column="0">
                  <widget class="QLabel" name="labelTPRHeightRoof">
                   <property name="text">
-                   <string>墙高比例：</string>
+                   <string>Wall ratio:</string>
                   </property>
                  </widget>
                 </item>
@@ -1088,7 +1106,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelHCRLength">
                   <property name="text">
-                   <string>底部长度：</string>
+                   <string>Length:</string>
                   </property>
                  </widget>
                 </item>
@@ -1113,7 +1131,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelHCRWidth">
                   <property name="text">
-                   <string>底部宽度：</string>
+                   <string>Width:</string>
                   </property>
                  </widget>
                 </item>
@@ -1138,7 +1156,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelHCRHeightWall">
                   <property name="text">
-                   <string>墙体高度：</string>
+                   <string>Wall height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1163,7 +1181,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelHCRRadius">
                   <property name="text">
-                   <string>拱顶半径：</string>
+                   <string>Roof radius:</string>
                   </property>
                  </widget>
                 </item>
@@ -1192,7 +1210,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelCylHemiRadius">
                   <property name="text">
-                   <string>圆柱半径：</string>
+                   <string>Outer length:</string>
                   </property>
                  </widget>
                 </item>
@@ -1217,7 +1235,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelCylHemiHeight">
                   <property name="text">
-                   <string>总高度：</string>
+                   <string>Outer height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1242,7 +1260,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelCylHemiDomeHeight">
                   <property name="text">
-                   <string>圆柱高比例：</string>
+                   <string>Inner length:</string>
                   </property>
                  </widget>
                 </item>
@@ -1267,7 +1285,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelCylHemiBulge">
                   <property name="text">
-                   <string>穹顶鼓包程度：</string>
+                   <string>Inner width:</string>
                   </property>
                  </widget>
                 </item>
@@ -1302,7 +1320,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelICLength">
                   <property name="text">
-                   <string>外部长方体长度：</string>
+                   <string>Inner length:</string>
                   </property>
                  </widget>
                 </item>
@@ -1327,7 +1345,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelICWidth">
                   <property name="text">
-                   <string>外部长方体宽度：</string>
+                   <string>Inner width:</string>
                   </property>
                  </widget>
                 </item>
@@ -1352,7 +1370,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelICHeight">
                   <property name="text">
-                   <string>外部长方体高度：</string>
+                   <string>Inner height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1377,7 +1395,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelICInnerLength">
                   <property name="text">
-                   <string>凹陷长方体长度：</string>
+                   <string>Offset X ratio:</string>
                   </property>
                  </widget>
                 </item>
@@ -1402,7 +1420,7 @@
                 <item row="4" column="0">
                  <widget class="QLabel" name="labelICInnerWidth">
                   <property name="text">
-                   <string>凹陷长方体宽度：</string>
+                   <string>Inner height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1427,7 +1445,7 @@
                 <item row="5" column="0">
                  <widget class="QLabel" name="labelICInnerHeight">
                   <property name="text">
-                   <string>凹陷长方体高度：</string>
+                   <string>Offset Y ratio:</string>
                   </property>
                  </widget>
                 </item>
@@ -1452,7 +1470,7 @@
                 <item row="6" column="0">
                  <widget class="QLabel" name="labelICOffsetX">
                    <property name="text">
-                    <string>位置比例 X：</string>
+                    <string>Offset X ratio:</string>
                    </property>
                  </widget>
                 </item>
@@ -1480,7 +1498,7 @@
                 <item row="7" column="0">
                  <widget class="QLabel" name="labelICOffsetY">
                    <property name="text">
-                    <string>位置比例 Y：</string>
+                    <string>Offset Y ratio:</string>
                    </property>
                  </widget>
                 </item>
@@ -1512,7 +1530,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelAGHLength">
                   <property name="text">
-                   <string>房屋长度：</string>
+                   <string>Length:</string>
                   </property>
                  </widget>
                 </item>
@@ -1537,7 +1555,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelAGHWidth">
                   <property name="text">
-                   <string>房屋宽度：</string>
+                   <string>Width:</string>
                   </property>
                  </widget>
                 </item>
@@ -1562,7 +1580,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelAGHHeightWall">
                   <property name="text">
-                   <string>总高度：</string>
+                   <string>Total height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1587,7 +1605,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelAGHRoofHeight">
                   <property name="text">
-                   <string>墙高比例：</string>
+                   <string>Wall ratio:</string>
                   </property>
                  </widget>
                 </item>
@@ -1612,7 +1630,7 @@
                 <item row="4" column="0">
                  <widget class="QLabel" name="labelAGHRidgeLength">
                   <property name="text">
-                   <string>屋脊长度：</string>
+                   <string>Ridge length:</string>
                   </property>
                  </widget>
                 </item>
@@ -1640,7 +1658,7 @@
                 <item row="5" column="0">
                  <widget class="QLabel" name="labelAGHRidgeOffset">
                   <property name="text">
-                    <string>屋脊比例：</string>
+                    <string>Ridge ratio:</string>
                   </property>
                  </widget>
                 </item>
@@ -1684,7 +1702,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelFTBaseRadius">
                   <property name="text">
-                   <string>底部圆柱半径：</string>
+                   <string>Radius:</string>
                   </property>
                  </widget>
                 </item>
@@ -1709,7 +1727,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelFTBaseHeight">
                   <property name="text">
-                   <string>底部圆柱高度：</string>
+                   <string>Total height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1734,7 +1752,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelFTMiddleHeight">
                   <property name="text">
-                   <string>弧面屋顶高度：</string>
+                   <string>Cylinder ratio:</string>
                   </property>
                  </widget>
                 </item>
@@ -1759,7 +1777,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelFTMiddleTopRadius">
                   <property name="text">
-                   <string>小尖锥底半径：</string>
+                   <string>Dome height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1784,7 +1802,7 @@
                 <item row="4" column="0">
                  <widget class="QLabel" name="labelFTMiddleBulge">
                   <property name="text">
-                   <string>屋顶弧度系数：</string>
+                   <string>Bulge:</string>
                   </property>
                  </widget>
                 </item>
@@ -1815,7 +1833,7 @@
                 <item row="5" column="0">
                  <widget class="QLabel" name="labelFTConeHeight">
                   <property name="text">
-                   <string>小尖锥高度：</string>
+                   <string>Cone height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1844,7 +1862,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelTGLength1">
                   <property name="text">
-                   <string>房屋1长度：</string>
+                   <string>House 1 length:</string>
                   </property>
                  </widget>
                 </item>
@@ -1869,7 +1887,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelTGLength2">
                   <property name="text">
-                   <string>房屋2长度：</string>
+                   <string>House 2 length:</string>
                   </property>
                  </widget>
                 </item>
@@ -1894,7 +1912,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelTGWidth">
                   <property name="text">
-                   <string>房屋宽度：</string>
+                   <string>Width:</string>
                   </property>
                  </widget>
                 </item>
@@ -1919,7 +1937,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelTGHeightWall">
                   <property name="text">
-                   <string>总高度：</string>
+                   <string>Total height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1944,7 +1962,7 @@
                 <item row="4" column="0">
                  <widget class="QLabel" name="labelTGRoofHeight">
                   <property name="text">
-                   <string>墙高比例：</string>
+                   <string>Wall ratio:</string>
                   </property>
                  </widget>
                 </item>
@@ -1969,7 +1987,7 @@
                 <item row="5" column="0">
                  <widget class="QLabel" name="labelTGAngle">
                   <property name="text">
-                   <string>两房屋夹角：</string>
+                   <string>Angle:</string>
                   </property>
                  </widget>
                 </item>
@@ -2009,7 +2027,7 @@
                 <item row="6" column="0">
                  <widget class="QLabel" name="labelTGRidgeRatio">
                   <property name="text">
-                   <string>屋脊位置比例：</string>
+                   <string>Ridge ratio:</string>
                   </property>
                  </widget>
                 </item>
@@ -2087,7 +2105,7 @@
                <string>QPushButton { text-align: left; font-weight: bold; padding: 4px; border-bottom: 1px solid #aaa; }</string>
               </property>
               <property name="text">
-                <string>点云分类与参数估计</string>
+                <string>Point Cloud Classification and Parameter Estimation</string>
               </property>
               <property name="checkable">
                <bool>false</bool>
@@ -2127,7 +2145,7 @@
                <item>
                 <widget class="QPushButton" name="btnLoadPointCloud">
                  <property name="text">
-                  <string>📂 导入点云</string>
+                  <string>Load point cloud</string>
                  </property>
                 </widget>
                </item>
@@ -2137,7 +2155,7 @@
                   <string>color: #666; font-size: 11px;</string>
                  </property>
                  <property name="text">
-                  <string>未加载</string>
+                  <string>No point cloud loaded</string>
                  </property>
                  <property name="wordWrap">
                   <bool>true</bool>
@@ -2150,7 +2168,7 @@
                   <string>font-weight: bold;</string>
                  </property>
                  <property name="text">
-                  <string>识别结果：-</string>
+                  <string>Result: -</string>
                  </property>
                  <property name="wordWrap">
                   <bool>true</bool>
@@ -2181,7 +2199,7 @@
                     <bool>false</bool>
                    </property>
                    <property name="text">
-                    <string>PointNet 分类</string>
+                     <string>Classify</string>
                    </property>
                   </widget>
                  </item>
@@ -2191,7 +2209,7 @@
                     <bool>false</bool>
                    </property>
                    <property name="text">
-                    <string>参数反演</string>
+                     <string>Estimate parameters</string>
                    </property>
                   </widget>
                  </item>
@@ -2216,12 +2234,12 @@
                  </property>
                  <column>
                   <property name="text">
-                   <string>参数名</string>
+                   <string>Parameter</string>
                   </property>
                  </column>
                  <column>
                   <property name="text">
-                   <string>参数值</string>
+                   <string>Value</string>
                   </property>
                  </column>
                 </widget>
@@ -2259,10 +2277,10 @@
         <item>
          <widget class="QCheckBox" name="checkBoxAutoSync">
           <property name="toolTip">
-           <string>开启后，调整参数会实时更新 QGIS 3D 场景</string>
+           <string>Automatically sync model updates to QGIS 3D scene</string>
           </property>
           <property name="text">
-           <string>实时同步至 3D 视图</string>
+           <string>Auto sync to 3D</string>
           </property>
          </widget>
         </item>
