@@ -1,6 +1,6 @@
 ########################################################
 # Files
-find_package(Qt5 COMPONENTS OpenGL REQUIRED)
+find_package(Qt5 COMPONENTS OpenGL 3DCore 3DRender 3DExtras REQUIRED)
 
 set(CMAKE_AUTOMOC ON)
 set (parammodeler_SRCS
@@ -41,6 +41,9 @@ target_link_libraries(plugin_parammodeler
   qgis_core
   qgis_gui
 		Qt5::OpenGL
+		Qt5::3DCore
+		Qt5::3DRender
+		Qt5::3DExtras
   opengl32
 		qgis_3d
 )

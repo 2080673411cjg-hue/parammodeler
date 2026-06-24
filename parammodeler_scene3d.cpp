@@ -9,13 +9,17 @@
 #include <QMatrix4x4>
 #include <QMessageBox>
 #include <QObject>
+#include <QByteArray>
 #include <QColor>
+#include <QHash>
 #include <QMap>
+#include <QPointer>
 #include <QStringList>
 #include <QVariantMap>
 #include <QVector3D>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 
 #include <qgis.h>
 #include <qgisinterface.h>
@@ -35,12 +39,20 @@
 #include <QgsPoint3DSymbol.h>
 #include <QgsVectorLayer3DRenderer.h>
 #include <Qgs3DMapCanvas.h>
+#include <qgs3dmapscene.h>
 #include <qgs3dmapsettings.h>
 #include <qgs3dtypes.h>
 #include <qgsphongmaterialsettings.h>
 #include <qgsvectorfilewriter.h>
 #include <qgsmapcanvas.h>
 #include <qgsrectangle.h>
+
+#include <Qt3DCore/QEntity>
+#include <Qt3DExtras/QPhongMaterial>
+#include <Qt3DRender/QAttribute>
+#include <Qt3DRender/QBuffer>
+#include <Qt3DRender/QGeometry>
+#include <Qt3DRender/QGeometryRenderer>
 
 namespace
 {
@@ -52,6 +64,25 @@ struct MeshEdgeRecord
   QVector3D firstNormal;
   bool crease = false;
 };
+
+struct RealtimePreviewPart
+{
+  QPointer<Qt3DCore::QEntity> entity;
+  QPointer<Qt3DRender::QGeometryRenderer> renderer;
+  QPointer<Qt3DRender::QBuffer> buffer;
+  QPointer<Qt3DRender::QAttribute> positionAttribute;
+  QPointer<Qt3DRender::QAttribute> normalAttribute;
+};
+
+struct RealtimePreviewState
+{
+  QPointer<Qt3DCore::QEntity> root;
+  RealtimePreviewPart body;
+  RealtimePreviewPart roof;
+};
+
+QHash<Qgs3DMapScene *, RealtimePreviewState> sRealtimePreviewMeshes;
+const QString REALTIME_ANCHOR_LAYER_NAME = QStringLiteral( "ParamModeler_3D_Anchor" );
 
 QString meshPointKey( const QVector3D &p )
 {
@@ -245,6 +276,152 @@ QgsRectangle padded3DViewExtent( const QgsRectangle &extent )
   padded.grow( pad );
   return padded;
 }
+
+QByteArray makeRealtimeVertexBytes( const QVector<float> &values )
+{
+  QByteArray bytes;
+  bytes.resize( values.size() * static_cast<int>( sizeof( float ) ) );
+  if ( !values.isEmpty() )
+    std::memcpy( bytes.data(), values.constData(), static_cast<size_t>( bytes.size() ) );
+  return bytes;
+}
+
+void appendRealtimeTriangle( QVector<float> &values,
+                             const QVector3D &v0,
+                             const QVector3D &v1,
+                             const QVector3D &v2 )
+{
+  QVector3D normal = QVector3D::crossProduct( v1 - v0, v2 - v0 ).normalized();
+  if ( normal.lengthSquared() <= 0.000001f )
+    normal = QVector3D( 0.0f, 0.0f, 1.0f );
+
+  auto appendVertex = [&]( const QVector3D &v )
+  {
+    values << v.x() << v.y() << v.z()
+           << normal.x() << normal.y() << normal.z();
+  };
+  appendVertex( v0 );
+  appendVertex( v1 );
+  appendVertex( v2 );
+}
+
+void updateRealtimePart( RealtimePreviewPart &part,
+                         Qt3DCore::QEntity *root,
+                         const QVector<float> &values,
+                         const QColor &color,
+                         const QString &objectName )
+{
+  const int vertexCount = values.size() / 6;
+
+  if ( !part.entity )
+  {
+    part.entity = new Qt3DCore::QEntity( root );
+    part.entity->setObjectName( objectName );
+
+    Qt3DRender::QGeometry *geometry = new Qt3DRender::QGeometry( part.entity );
+    part.buffer = new Qt3DRender::QBuffer( geometry );
+
+    part.positionAttribute = new Qt3DRender::QAttribute( geometry );
+    part.positionAttribute->setName( Qt3DRender::QAttribute::defaultPositionAttributeName() );
+    part.positionAttribute->setVertexBaseType( Qt3DRender::QAttribute::Float );
+    part.positionAttribute->setVertexSize( 3 );
+    part.positionAttribute->setAttributeType( Qt3DRender::QAttribute::VertexAttribute );
+    part.positionAttribute->setBuffer( part.buffer );
+    part.positionAttribute->setByteOffset( 0 );
+    part.positionAttribute->setByteStride( 6 * sizeof( float ) );
+    geometry->addAttribute( part.positionAttribute );
+
+    part.normalAttribute = new Qt3DRender::QAttribute( geometry );
+    part.normalAttribute->setName( Qt3DRender::QAttribute::defaultNormalAttributeName() );
+    part.normalAttribute->setVertexBaseType( Qt3DRender::QAttribute::Float );
+    part.normalAttribute->setVertexSize( 3 );
+    part.normalAttribute->setAttributeType( Qt3DRender::QAttribute::VertexAttribute );
+    part.normalAttribute->setBuffer( part.buffer );
+    part.normalAttribute->setByteOffset( 3 * sizeof( float ) );
+    part.normalAttribute->setByteStride( 6 * sizeof( float ) );
+    geometry->addAttribute( part.normalAttribute );
+
+    part.renderer = new Qt3DRender::QGeometryRenderer( part.entity );
+    part.renderer->setGeometry( geometry );
+    part.renderer->setPrimitiveType( Qt3DRender::QGeometryRenderer::Triangles );
+    part.entity->addComponent( part.renderer );
+
+    Qt3DExtras::QPhongMaterial *material = new Qt3DExtras::QPhongMaterial( part.entity );
+    material->setAmbient( color.darker( 135 ) );
+    material->setDiffuse( color );
+    material->setSpecular( QColor( 20, 18, 16, color.alpha() ) );
+    material->setShininess( 1.0f );
+    part.entity->addComponent( material );
+  }
+
+  part.buffer->setData( makeRealtimeVertexBytes( values ) );
+  part.positionAttribute->setCount( vertexCount );
+  part.normalAttribute->setCount( vertexCount );
+  part.renderer->setVertexCount( vertexCount );
+  part.entity->setEnabled( vertexCount > 0 );
+}
+
+void ensureRealtimeAnchorLayer( QgisInterface *iface, const QgsRectangle &extent )
+{
+  if ( extent.isNull() )
+    return;
+
+  ParamModelerScene3D::removeLayerByName( REALTIME_ANCHOR_LAYER_NAME );
+
+  QgsVectorLayer *anchorLayer = new QgsVectorLayer( "PointZ?crs=EPSG:3857", REALTIME_ANCHOR_LAYER_NAME, "memory" );
+  if ( !anchorLayer || !anchorLayer->isValid() )
+  {
+    delete anchorLayer;
+    return;
+  }
+
+  QgsFeature f0;
+  f0.setGeometry( QgsGeometry( new QgsPoint( extent.xMinimum(), extent.yMinimum(), 0.0 ) ) );
+  QgsFeature f1;
+  f1.setGeometry( QgsGeometry( new QgsPoint( extent.xMaximum(), extent.yMaximum(), 0.0 ) ) );
+  QgsFeatureList anchorFeatures;
+  anchorFeatures << f0 << f1;
+  anchorLayer->dataProvider()->addFeatures( anchorFeatures );
+  anchorLayer->updateExtents();
+  anchorLayer->setOpacity( 0.0 );
+  QgsProject::instance()->addMapLayer( anchorLayer, false );
+
+  if ( iface && iface->mapCanvas() )
+  {
+    QList<QgsMapLayer *> layers = iface->mapCanvas()->layers();
+    if ( !layers.contains( anchorLayer ) )
+      layers.append( anchorLayer );
+    iface->mapCanvas()->setLayers( layers );
+    iface->mapCanvas()->setExtent( extent );
+    iface->mapCanvas()->refresh();
+  }
+}
+
+Qgs3DMapCanvas *ensureRealtimePreviewCanvas( QgisInterface *iface, const QgsRectangle &extent )
+{
+  if ( !iface )
+    return nullptr;
+
+  const QList<Qgs3DMapCanvas *> existingCanvases = iface->mapCanvases3D();
+  for ( Qgs3DMapCanvas *canvas : existingCanvases )
+  {
+    if ( canvas && canvas->scene() )
+      return canvas;
+  }
+
+  ensureRealtimeAnchorLayer( iface, extent );
+
+  if ( iface->mapCanvases3D().isEmpty() )
+    iface->createNewMapCanvas3D( QObject::tr( "ParamModeler 3D" ) );
+
+  const QList<Qgs3DMapCanvas *> canvases = iface->mapCanvases3D();
+  for ( Qgs3DMapCanvas *canvas : canvases )
+  {
+    if ( canvas && canvas->scene() )
+      return canvas;
+  }
+  return nullptr;
+}
 }
 
 ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *iface,
@@ -430,6 +607,147 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
     result.gpkgPath += "\n" + roofGpkgPath;
   result.triangleCount = triCount;
   return result;
+}
+
+bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
+                                                     const MeshData &mesh,
+                                                     const ParamModelerPose &pose,
+                                                     QString *errorMessage )
+{
+  if ( !iface )
+  {
+    if ( errorMessage )
+      *errorMessage = "QGIS interface is unavailable.";
+    return false;
+  }
+  if ( mesh.isEmpty() )
+  {
+    if ( errorMessage )
+      *errorMessage = "Mesh is empty.";
+    return false;
+  }
+
+  QMatrix4x4 mat;
+  mat.setToIdentity();
+  mat.translate( pose.tx, pose.ty, pose.tz );
+  mat.rotate( pose.rx, 1, 0, 0 );
+  mat.rotate( pose.ry, 0, 1, 0 );
+  mat.rotate( pose.rz, 0, 0, 1 );
+
+  QVector<float> bodyValues;
+  QVector<float> roofValues;
+  bodyValues.reserve( mesh.indices.size() * 6 );
+  roofValues.reserve( mesh.indices.size() * 6 );
+
+  bool hasExtent = false;
+  double xmin = 0.0;
+  double ymin = 0.0;
+  double xmax = 0.0;
+  double ymax = 0.0;
+  auto addToExtent = [&]( const QVector3D &v )
+  {
+    if ( !hasExtent )
+    {
+      xmin = xmax = v.x();
+      ymin = ymax = v.y();
+      hasExtent = true;
+      return;
+    }
+    xmin = std::min( xmin, static_cast<double>( v.x() ) );
+    ymin = std::min( ymin, static_cast<double>( v.y() ) );
+    xmax = std::max( xmax, static_cast<double>( v.x() ) );
+    ymax = std::max( ymax, static_cast<double>( v.y() ) );
+  };
+
+  const int triCount = mesh.indices.size() / 3;
+  for ( int i = 0; i < triCount; ++i )
+  {
+    const int idx0 = mesh.indices[i * 3];
+    const int idx1 = mesh.indices[i * 3 + 1];
+    const int idx2 = mesh.indices[i * 3 + 2];
+    if ( idx0 < 0 || idx1 < 0 || idx2 < 0 ||
+         idx0 >= mesh.vertices.size() || idx1 >= mesh.vertices.size() || idx2 >= mesh.vertices.size() )
+      continue;
+
+    const QVector3D local0 = mesh.vertices[idx0];
+    const QVector3D local1 = mesh.vertices[idx1];
+    const QVector3D local2 = mesh.vertices[idx2];
+    const QVector3D v0 = mat.map( local0 );
+    const QVector3D v1 = mat.map( local1 );
+    const QVector3D v2 = mat.map( local2 );
+
+    addToExtent( v0 );
+    addToExtent( v1 );
+    addToExtent( v2 );
+
+    const QVector3D localNormal = QVector3D::crossProduct( local1 - local0, local2 - local0 ).normalized();
+    QVector<float> &target = localNormal.z() > 0.15f ? roofValues : bodyValues;
+    appendRealtimeTriangle( target, v0, v1, v2 );
+  }
+
+  if ( !hasExtent )
+  {
+    if ( errorMessage )
+      *errorMessage = "Mesh has no valid triangles.";
+    return false;
+  }
+
+  QgsRectangle previewExtent( xmin, ymin, xmax, ymax );
+  previewExtent = padded3DViewExtent( previewExtent );
+
+  Qgs3DMapCanvas *canvas = ensureRealtimePreviewCanvas( iface, previewExtent );
+  if ( !canvas || !canvas->scene() )
+  {
+    if ( errorMessage )
+      *errorMessage = "QGIS 3D scene is unavailable.";
+    return false;
+  }
+
+  Qgs3DMapScene *scene = canvas->scene();
+  RealtimePreviewState state = sRealtimePreviewMeshes.value( scene );
+  const bool newPreviewRoot = !state.root;
+  if ( newPreviewRoot )
+  {
+    state.root = new Qt3DCore::QEntity( scene );
+    state.root->setObjectName( QStringLiteral( "ParamModeler_Qt3D_RealtimePreview" ) );
+  }
+
+  updateRealtimePart( state.body,
+                      state.root,
+                      bodyValues,
+                      QColor( 198, 192, 178, 70 ),
+                      QStringLiteral( "ParamModeler_Qt3D_RealtimePreview_Body" ) );
+  updateRealtimePart( state.roof,
+                      state.root,
+                      roofValues,
+                      QColor( 154, 50, 46, 86 ),
+                      QStringLiteral( "ParamModeler_Qt3D_RealtimePreview_Roof" ) );
+  sRealtimePreviewMeshes.insert( scene, state );
+
+  if ( newPreviewRoot )
+    canvas->setViewFrom2DExtent( previewExtent );
+
+  return true;
+}
+
+void ParamModelerScene3D::clearRealtimePreviewMesh( QgisInterface *iface )
+{
+  if ( !iface )
+    return;
+
+  const QList<Qgs3DMapCanvas *> canvases = iface->mapCanvases3D();
+  for ( Qgs3DMapCanvas *canvas : canvases )
+  {
+    if ( !canvas || !canvas->scene() )
+      continue;
+
+    Qgs3DMapScene *scene = canvas->scene();
+    RealtimePreviewState state = sRealtimePreviewMeshes.take( scene );
+    if ( state.root )
+      delete state.root;
+  }
+
+  removeLayerByName( REALTIME_ANCHOR_LAYER_NAME );
 }
 
 QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,

@@ -39,6 +39,13 @@ public:
                                                     bool zoomToLayer,
                                                     QWidget *parent );
 
+  static bool updateRealtimePreviewMesh( QgisInterface *iface,
+                                         const MeshData &mesh,
+                                         const ParamModelerPose &pose,
+                                         QString *errorMessage = nullptr );
+
+  static void clearRealtimePreviewMesh( QgisInterface *iface );
+
   static QgsMapLayer *loadExternalPointCloud( QgisInterface *iface,
                                               const QString &filePath,
                                               const QString &layerName,

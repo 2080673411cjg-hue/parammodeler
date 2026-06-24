@@ -366,6 +366,69 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderRPhi, ui->spinBoxRPhi, 10.0, 180.0, -180.0 );
   bindSliderSpin( ui->sliderRKappa, ui->spinBoxRKappa, 10.0, 180.0, -180.0 );
 
+  ui->labelWidth->setText( tr( "Width:" ) );
+  ui->labelHeight->setText( tr( "Height:" ) );
+  ui->labelLength->setText( tr( "Length:" ) );
+  ui->labelCylRadius->setText( tr( "Radius:" ) );
+  ui->labelCylHeight->setText( tr( "Height:" ) );
+  ui->labelLMainLength->setText( tr( "Main length:" ) );
+  ui->labelLMainWidth->setText( tr( "Main width:" ) );
+  ui->labelLWingLength->setText( tr( "Wing length:" ) );
+  ui->labelLWingWidth->setText( tr( "Wing width:" ) );
+  ui->labelLHeight->setText( tr( "Height:" ) );
+  ui->labelConeCylRadius->setText( tr( "Radius:" ) );
+  ui->labelConeCylCylHeight->setText( tr( "Total height:" ) );
+  ui->labelConeCylConeHeight->setText( tr( "Cylinder ratio:" ) );
+  ui->labelGRLength->setText( tr( "Length:" ) );
+  ui->labelGRWidth->setText( tr( "Width:" ) );
+  ui->labelGRHeightWall->setText( tr( "Total height:" ) );
+  ui->labelGRHeightRoof->setText( tr( "Wall ratio:" ) );
+  ui->labelPRLength->setText( tr( "Length:" ) );
+  ui->labelPRWidth->setText( tr( "Width:" ) );
+  ui->labelPRHeightWall->setText( tr( "Total height:" ) );
+  ui->labelPRHeightRoof->setText( tr( "Wall ratio:" ) );
+  ui->labelTPRBottomLength->setText( tr( "Bottom length:" ) );
+  ui->labelTPRBottomWidth->setText( tr( "Bottom width:" ) );
+  ui->labelTPRTopLength->setText( tr( "Top length:" ) );
+  ui->labelTPRTopWidth->setText( tr( "Top width:" ) );
+  ui->labelTPRHeightWall->setText( tr( "Total height:" ) );
+  ui->labelTPRHeightRoof->setText( tr( "Wall ratio:" ) );
+  ui->labelHCRLength->setText( tr( "Length:" ) );
+  ui->labelHCRWidth->setText( tr( "Width:" ) );
+  ui->labelHCRHeightWall->setText( tr( "Wall height:" ) );
+  ui->labelHCRRadius->setText( tr( "Roof radius:" ) );
+  ui->labelCylHemiRadius->setText( tr( "Radius:" ) );
+  ui->labelCylHemiHeight->setText( tr( "Total height:" ) );
+  ui->labelCylHemiDomeHeight->setText( tr( "Cylinder ratio:" ) );
+  ui->labelCylHemiBulge->setText( tr( "Bulge:" ) );
+  ui->labelICLength->setText( tr( "Outer length:" ) );
+  ui->labelICWidth->setText( tr( "Outer width:" ) );
+  ui->labelICHeight->setText( tr( "Outer height:" ) );
+  ui->labelICInnerLength->setText( tr( "Inner length:" ) );
+  ui->labelICInnerWidth->setText( tr( "Inner width:" ) );
+  ui->labelICInnerHeight->setText( tr( "Inner height:" ) );
+  ui->labelICOffsetX->setText( tr( "Offset X ratio:" ) );
+  ui->labelICOffsetY->setText( tr( "Offset Y ratio:" ) );
+  ui->labelAGHLength->setText( tr( "Length:" ) );
+  ui->labelAGHWidth->setText( tr( "Width:" ) );
+  ui->labelAGHHeightWall->setText( tr( "Total height:" ) );
+  ui->labelAGHRoofHeight->setText( tr( "Wall ratio:" ) );
+  ui->labelAGHRidgeLength->setText( tr( "Ridge length:" ) );
+  ui->labelAGHRidgeOffset->setText( tr( "Ridge ratio:" ) );
+  ui->labelFTBaseRadius->setText( tr( "Base radius:" ) );
+  ui->labelFTBaseHeight->setText( tr( "Base height:" ) );
+  ui->labelFTMiddleHeight->setText( tr( "Middle height:" ) );
+  ui->labelFTMiddleTopRadius->setText( tr( "Middle top radius:" ) );
+  ui->labelFTMiddleBulge->setText( tr( "Middle bulge:" ) );
+  ui->labelFTConeHeight->setText( tr( "Cone height:" ) );
+  ui->labelTGLength1->setText( tr( "House 1 length:" ) );
+  ui->labelTGLength2->setText( tr( "House 2 length:" ) );
+  ui->labelTGWidth->setText( tr( "Width:" ) );
+  ui->labelTGHeightWall->setText( tr( "Total height:" ) );
+  ui->labelTGRoofHeight->setText( tr( "Wall ratio:" ) );
+  ui->labelTGAngle->setText( tr( "Angle:" ) );
+  ui->labelTGRidgeRatio->setText( tr( "Ridge ratio:" ) );
+
 
   connect( ui->actOBJ, &QAction::triggered, this, &ParamModelerDock::onExportOBJClicked );
   connect( ui->actJSON, &QAction::triggered, this, &ParamModelerDock::onExportJSONClicked );
@@ -400,10 +463,11 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
     }
   }
   ui->checkBoxAutoSync->setChecked( false );
+  ui->checkBoxAutoSync->setVisible( false );
 
   m_previewTimer = new QTimer( this );
   m_previewTimer->setSingleShot( true );
-  m_previewTimer->setInterval( 1000 );
+  m_previewTimer->setInterval( 50 );
   connect( m_previewTimer, &QTimer::timeout, this, &ParamModelerDock::onUpdatePreview );
 
   auto schedulePreview = [this]( int ) { m_previewTimer->start(); };
@@ -504,6 +568,7 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
 
 ParamModelerDock::~ParamModelerDock()
 {
+  ParamModelerScene3D::clearRealtimePreviewMesh( mIface );
   m_modelLayer = nullptr;
   delete ui;
 }
@@ -1895,26 +1960,38 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
   pose.ry = poseRotateY();
   pose.rz = poseRotateZ();
 
-  ParamModelerModelLoadResult loadResult = ParamModelerScene3D::loadModelMesh(
-    mIface, mesh, pose, m_modelLayer, m_lastGpkgPath, zoomToLayer, this
-  );
+  if ( m_modelLayer )
+  {
+    QgsProject::instance()->removeMapLayer( m_modelLayer->id() );
+    m_modelLayer = nullptr;
+  }
+  ParamModelerScene3D::removeLayerByName( QStringLiteral( "ParamModeler_Model" ) );
+  ParamModelerScene3D::removeLayerByName( QStringLiteral( "ParamModeler_Model_Roof" ) );
+  ParamModelerScene3D::removeLayerByName( QStringLiteral( "ParamModeler_Model_Edges" ) );
+  for ( const QString &path : m_lastGpkgPath.split( '\n' ) )
+  {
+    const QString trimmed = path.trimmed();
+    if ( !trimmed.isEmpty() )
+      QFile::remove( trimmed );
+  }
+  m_lastGpkgPath.clear();
 
-  if ( !loadResult.layer )
+  ParamModelerScene3D::clearRealtimePreviewMesh( mIface );
+
+  QString errorMessage;
+  if ( !ParamModelerScene3D::updateRealtimePreviewMesh( mIface, mesh, pose, &errorMessage ) )
   {
     if ( zoomToLayer )
-      QMessageBox::warning( this, tr( "Load failed" ), loadResult.errorMessage );
+      QMessageBox::warning( this, tr( "Load failed" ), errorMessage );
+    m_realtimeModelLoaded = false;
     m_isUpdating = false;
     return;
   }
 
-  m_modelLayer = loadResult.layer;
-  m_lastGpkgPath = loadResult.gpkgPath;
-  connect( m_modelLayer, &QgsMapLayer::willBeDeleted, this, [this]() {
-    m_modelLayer = nullptr;
-  } );
+  m_realtimeModelLoaded = true;
 
   if ( zoomToLayer )
-    QMessageBox::information( this, tr( "Loaded to QGIS 3D" ), tr( "Model loaded successfully.\nTriangles: %1" ).arg( loadResult.triangleCount ) );
+    QMessageBox::information( this, tr( "Loaded to QGIS 3D" ), tr( "Realtime model loaded successfully.\nTriangles: %1" ).arg( mesh.indices.size() / 3 ) );
 
   m_isUpdating = false;
 }
@@ -1986,18 +2063,25 @@ void ParamModelerDock::onLoadExternalPointCloud()
 
 void ParamModelerDock::onUpdatePreview()
 {
-  if ( !m_previewWidget )
-    return;
-
-
   QString prim = ui->comboPrimitive->currentText();
   MeshData mesh = BuildMesh::build( prim, this );
-  m_previewWidget->setMesh( mesh );
+  if ( m_previewWidget )
+    m_previewWidget->setMesh( mesh );
 
 
-  if ( ui->checkBoxAutoSync && ui->checkBoxAutoSync->isChecked() )
+  if ( m_realtimeModelLoaded )
   {
-    this->onLoadToQGIS3D( false );
+    ParamModelerPose pose;
+    pose.tx = poseTranslateX();
+    pose.ty = poseTranslateY();
+    pose.tz = poseTranslateZ();
+    pose.rx = poseRotateX();
+    pose.ry = poseRotateY();
+    pose.rz = poseRotateZ();
+
+    QString errorMessage;
+    if ( !ParamModelerScene3D::updateRealtimePreviewMesh( mIface, mesh, pose, &errorMessage ) )
+      DEBUG_LOG( QString( "[3D] realtime Qt3D preview update failed: %1\n" ).arg( errorMessage ).toStdWString().c_str() );
   }
 }
 

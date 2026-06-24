@@ -163,6 +163,7 @@ private:
   QgsVectorLayer *m_modelLayer = nullptr;//新增一个成员变量，缓存图层指针
 		bool            m_isUpdating = false; 
 			QString         m_lastGpkgPath;             // 上一次临时 GPKG 文件路径，用于清理
+  bool m_realtimeModelLoaded = false;
 };
 
 #endif // PARAMMODELER_DOCK_H
