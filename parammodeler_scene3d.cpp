@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <functional>
 
 #include <qgis.h>
 #include <qgisinterface.h>
@@ -708,6 +709,10 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
   const bool newPreviewRoot = !state.root;
   if ( newPreviewRoot )
   {
+    QObject::connect( scene, &QObject::destroyed, scene, [scene]() {
+      sRealtimePreviewMeshes.remove( scene );
+    }, Qt::UniqueConnection );
+
     state.root = new Qt3DCore::QEntity( scene );
     state.root->setObjectName( QStringLiteral( "ParamModeler_Qt3D_RealtimePreview" ) );
   }
@@ -831,6 +836,7 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
     return nullptr;
   }
 
+  removeLayersByNamePrefix( QStringLiteral( "External point cloud - " ) );
   removeLayerByName( layerName );
   QgsProject::instance()->addMapLayer( vl );
 
@@ -888,15 +894,34 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
   return vl;
 }
 
-void ParamModelerScene3D::removeLayerByName( const QString &name, const QString &excludeId )
+namespace
+{
+void removeProjectLayersMatching( const std::function<bool( QgsMapLayer * )> &matches, const QString &excludeId )
 {
   QStringList toRemove;
   const auto layers = QgsProject::instance()->mapLayers();
   for ( auto it = layers.cbegin(); it != layers.cend(); ++it )
   {
-    if ( it.value()->name() == name && it.key() != excludeId )
+    QgsMapLayer *layer = it.value();
+    if ( layer && matches( layer ) && it.key() != excludeId )
       toRemove << it.key();
   }
+
   for ( const QString &id : toRemove )
     QgsProject::instance()->removeMapLayer( id );
+}
+}
+
+void ParamModelerScene3D::removeLayerByName( const QString &name, const QString &excludeId )
+{
+  removeProjectLayersMatching( [&]( QgsMapLayer *layer ) {
+    return layer && layer->name() == name;
+  }, excludeId );
+}
+
+void ParamModelerScene3D::removeLayersByNamePrefix( const QString &prefix, const QString &excludeId )
+{
+  removeProjectLayersMatching( [&]( QgsMapLayer *layer ) {
+    return layer && layer->name().startsWith( prefix );
+  }, excludeId );
 }

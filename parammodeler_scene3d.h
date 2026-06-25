@@ -53,6 +53,7 @@ public:
                                               QString *errorMessage = nullptr );
 
   static void removeLayerByName( const QString &name, const QString &excludeId = QString() );
+  static void removeLayersByNamePrefix( const QString &prefix, const QString &excludeId = QString() );
 };
 
 #endif // PARAMMODELER_SCENE3D_H

@@ -145,6 +145,7 @@ private slots:
 
 
 private:
+  void schedulePreviewUpdate();
   void randomizeCurrentPrimitiveParams( bool refreshPreview );
   bool loadPointCloudToQGIS3D( const QString &filePath, bool showMessage );
 
@@ -159,6 +160,8 @@ private:
   // ===== 预览 =====
   PreviewGLWidget *m_previewWidget = nullptr;
   QTimer          *m_previewTimer  = nullptr;
+  bool             m_previewUpdatePending = false;
+  bool             m_previewUpdateInProgress = false;
 		
   QgsVectorLayer *m_modelLayer = nullptr;//新增一个成员变量，缓存图层指针
 		bool            m_isUpdating = false; 

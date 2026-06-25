@@ -459,6 +459,8 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
         if ( m_previewWidget )
           m_previewWidget->setVisible( checked );
         togglePreviewButton->setText( checked ? tr( "Hide local preview" ) : tr( "Show local preview" ) );
+        if ( checked )
+          onUpdatePreview();
       } );
     }
   }
@@ -467,12 +469,17 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
 
   m_previewTimer = new QTimer( this );
   m_previewTimer->setSingleShot( true );
-  m_previewTimer->setInterval( 50 );
-  connect( m_previewTimer, &QTimer::timeout, this, &ParamModelerDock::onUpdatePreview );
+  m_previewTimer->setInterval( 33 );
+  connect( m_previewTimer, &QTimer::timeout, this, [this]() {
+    if ( !m_previewUpdatePending )
+      return;
 
-  auto schedulePreview = [this]( int ) { m_previewTimer->start(); };
+    onUpdatePreview();
+  } );
 
-  auto schedulePreviewD = [this]( double ) { m_previewTimer->start(); };
+  auto schedulePreview = [this]( int ) { schedulePreviewUpdate(); };
+
+  auto schedulePreviewD = [this]( double ) { schedulePreviewUpdate(); };
   connect( ui->spinBoxROmega, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
   connect( ui->spinBoxRPhi, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
   connect( ui->spinBoxRKappa, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
@@ -1976,9 +1983,9 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
   }
   m_lastGpkgPath.clear();
 
-  ParamModelerScene3D::clearRealtimePreviewMesh( mIface );
-
   QString errorMessage;
+  // Keep the existing Qt3D preview entity alive so repeated loads and parameter
+  // edits can update the same QBuffer instead of rebuilding the scene object.
   if ( !ParamModelerScene3D::updateRealtimePreviewMesh( mIface, mesh, pose, &errorMessage ) )
   {
     if ( zoomToLayer )
@@ -2061,11 +2068,26 @@ void ParamModelerDock::onLoadExternalPointCloud()
 }
 
 
+void ParamModelerDock::schedulePreviewUpdate()
+{
+  m_previewUpdatePending = true;
+
+  if ( m_previewUpdateInProgress )
+    return;
+
+  if ( m_previewTimer && !m_previewTimer->isActive() )
+    m_previewTimer->start();
+}
+
+
 void ParamModelerDock::onUpdatePreview()
 {
+  m_previewUpdatePending = false;
+  m_previewUpdateInProgress = true;
+
   QString prim = ui->comboPrimitive->currentText();
   MeshData mesh = BuildMesh::build( prim, this );
-  if ( m_previewWidget )
+  if ( m_previewWidget && m_previewWidget->isVisible() )
     m_previewWidget->setMesh( mesh );
 
 
@@ -2083,6 +2105,10 @@ void ParamModelerDock::onUpdatePreview()
     if ( !ParamModelerScene3D::updateRealtimePreviewMesh( mIface, mesh, pose, &errorMessage ) )
       DEBUG_LOG( QString( "[3D] realtime Qt3D preview update failed: %1\n" ).arg( errorMessage ).toStdWString().c_str() );
   }
+
+  m_previewUpdateInProgress = false;
+  if ( m_previewUpdatePending && m_previewTimer && !m_previewTimer->isActive() )
+    m_previewTimer->start();
 }
 
 
