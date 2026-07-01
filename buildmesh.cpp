@@ -96,8 +96,8 @@ MeshData BuildMesh::buildCylinder( ParamModelerDock *dock )
     for ( int i = 0; i < seg; i++ )
     {
         int n = (i+1)%seg;
-        m.addTriangle( bc, bot[i], bot[n] );       // 底面（法线朝下）
-        m.addTriangle( tc, top[n], top[i] );       // 顶面（法线朝上）
+        m.addTriangle( bc, bot[n], bot[i] );       // 底面（法线朝下）
+        m.addTriangle( tc, top[i], top[n] );       // 顶面（法线朝上）
         m.addTriangle( bot[i], bot[n], top[n] );   // 侧面
         m.addTriangle( bot[i], top[n], top[i] );
     }

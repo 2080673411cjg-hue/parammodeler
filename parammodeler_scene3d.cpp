@@ -49,6 +49,7 @@
 #include <qgsrectangle.h>
 
 #include <Qt3DCore/QEntity>
+#include <Qt3DCore/QTransform>
 #include <Qt3DExtras/QPhongMaterial>
 #include <Qt3DRender/QAttribute>
 #include <Qt3DRender/QBuffer>
@@ -455,6 +456,7 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
   mat.rotate( pose.rx, 1, 0, 0 );
   mat.rotate( pose.ry, 0, 1, 0 );
   mat.rotate( pose.rz, 0, 0, 1 );
+  mat.scale( pose.scale );
 
   QgsMultiPolygon *bodyMultiPoly = new QgsMultiPolygon();
   QgsMultiPolygon *roofMultiPoly = new QgsMultiPolygon();
@@ -634,6 +636,7 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
   mat.rotate( pose.rx, 1, 0, 0 );
   mat.rotate( pose.ry, 0, 1, 0 );
   mat.rotate( pose.rz, 0, 0, 1 );
+  mat.scale( pose.scale );
 
   QVector<float> bodyValues;
   QVector<float> roofValues;
@@ -715,6 +718,34 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
 
     state.root = new Qt3DCore::QEntity( scene );
     state.root->setObjectName( QStringLiteral( "ParamModeler_Qt3D_RealtimePreview" ) );
+  }
+
+  // Align Qt3D entity coordinates with QGIS layer coordinates.
+  // QGIS 3D layers are rendered relative to the map origin, but raw Qt3D entities
+  // are not.  Offset the root entity by -origin so the model and point-cloud layers
+  // share the same coordinate frame.
+  {
+    Qgs3DMapSettings *mapSettings = canvas->mapSettings();
+    if ( mapSettings )
+    {
+      const QgsVector3D origin = mapSettings->origin();
+      Qt3DCore::QTransform *rootTransform = nullptr;
+      for ( Qt3DCore::QComponent *comp : state.root->components() )
+      {
+        rootTransform = qobject_cast<Qt3DCore::QTransform *>( comp );
+        if ( rootTransform )
+          break;
+      }
+      if ( !rootTransform )
+      {
+        rootTransform = new Qt3DCore::QTransform( state.root );
+        state.root->addComponent( rootTransform );
+      }
+      rootTransform->setTranslation(
+        QVector3D( -static_cast<float>( origin.x() ),
+                   -static_cast<float>( origin.y() ),
+                   -static_cast<float>( origin.z() ) ) );
+    }
   }
 
   updateRealtimePart( state.body,

@@ -27,6 +27,7 @@
 #include "parammodeler_pointnet.h"
 #include "parammodeler_scene3d.h"
 
+#include <limits>
 
 #include <QFileInfo>
 #include <QDir>
@@ -110,9 +111,6 @@ static bool metadataPointCloudInfoForInput( const QString &filePath,
                                             QVector3D *bboxMin,
                                             QVector3D *center,
                                             double *scale );
-static QVector3D modelTranslationForTargetBboxMin( ParamModelerDock *dock,
-                                                   const QString &primitiveType,
-                                                   const QVector3D &targetBboxMin );
 
 static QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType, const QMap<QString, double> &nn )
 {
@@ -240,6 +238,9 @@ static QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveT
     put( QStringLiteral( "ridgeRatio" ), QStringLiteral( "tgRidgeRatio" ) );
   }
 
+  // 水平朝向（所有基元通用）
+  put( QStringLiteral( "rz" ), QStringLiteral( "poseRotateZ" ) );
+
   return uiParams;
 }
 
@@ -366,6 +367,10 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   bindSliderSpin( ui->sliderRPhi, ui->spinBoxRPhi, 10.0, 180.0, -180.0 );
   bindSliderSpin( ui->sliderRKappa, ui->spinBoxRKappa, 10.0, 180.0, -180.0 );
 
+  bindSliderSpin( ui->sliderTX, ui->spinBoxTX, 10.0, 100.0, -100.0 );
+  bindSliderSpin( ui->sliderTY, ui->spinBoxTY, 10.0, 100.0, -100.0 );
+  bindSliderSpin( ui->sliderTZ, ui->spinBoxTZ, 10.0, 100.0, -100.0 );
+
   ui->labelWidth->setText( tr( "Width:" ) );
   ui->labelHeight->setText( tr( "Height:" ) );
   ui->labelLength->setText( tr( "Length:" ) );
@@ -483,6 +488,10 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   connect( ui->spinBoxROmega, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
   connect( ui->spinBoxRPhi, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
   connect( ui->spinBoxRKappa, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
+
+  connect( ui->spinBoxTX, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, schedulePreviewD );
+  connect( ui->spinBoxTY, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, schedulePreviewD );
+  connect( ui->spinBoxTZ, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, schedulePreviewD );
   connect( ui->sliderCLength, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCWidth, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCHeight, &QSlider::valueChanged, this, schedulePreview );
@@ -589,9 +598,9 @@ void ParamModelerDock::onPrimitiveChanged( const QString &prim )
   if ( !m_currentPrimitive.isEmpty() )
   {
     m_poseMap[m_currentPrimitive] = {
-      ui->lineEditTX->text().toDouble(),
-      ui->lineEditTY->text().toDouble(),
-      ui->lineEditTZ->text().toDouble(),
+      ui->spinBoxTX->value(),
+      ui->spinBoxTY->value(),
+      ui->spinBoxTZ->value(),
       ui->spinBoxROmega->value(),
       ui->spinBoxRPhi->value(),
       ui->spinBoxRKappa->value()
@@ -624,18 +633,18 @@ void ParamModelerDock::onPrimitiveChanged( const QString &prim )
   if ( m_poseMap.contains( prim ) )
   {
     const auto &p = m_poseMap[prim];
-    ui->lineEditTX->setText( QString::number( p[0] ) );
-    ui->lineEditTY->setText( QString::number( p[1] ) );
-    ui->lineEditTZ->setText( QString::number( p[2] ) );
+    ui->spinBoxTX->setValue( p[0] );
+    ui->spinBoxTY->setValue( p[1] );
+    ui->spinBoxTZ->setValue( p[2] );
     ui->spinBoxROmega->setValue( p[3] );
     ui->spinBoxRPhi->setValue( p[4] );
     ui->spinBoxRKappa->setValue( p[5] );
   }
   else
   {
-    ui->lineEditTX->setText( "0" );
-    ui->lineEditTY->setText( "0" );
-    ui->lineEditTZ->setText( "0" );
+    ui->spinBoxTX->setValue( 0.0 );
+    ui->spinBoxTY->setValue( 0.0 );
+    ui->spinBoxTZ->setValue( 0.0 );
     ui->spinBoxROmega->setValue( 0 );
     ui->spinBoxRPhi->setValue( 0 );
     ui->spinBoxRKappa->setValue( 0 );
@@ -661,7 +670,7 @@ void ParamModelerDock::onRandomizeCurrentPrimitive()
   randomizeCurrentPrimitiveParams( true );
 }
 
-void ParamModelerDock::randomizeCurrentPrimitiveParams( bool refreshPreview )
+void ParamModelerDock::randomizeCurrentPrimitiveParams( bool refreshPreview, bool randomizePose )
 {
   auto rnd = []( double minVal, double maxVal, double step = 0.1 ) {
     const double raw = minVal + QRandomGenerator::global()->generateDouble() * ( maxVal - minVal );
@@ -799,6 +808,17 @@ void ParamModelerDock::randomizeCurrentPrimitiveParams( bool refreshPreview )
     set( ui->spinBoxTGRoofHeight, rnd( 0.55, 0.82, 0.01 ) );
     set( ui->spinBoxTGAngle, rnd( 135.0, 165.0, 1.0 ) );
     set( ui->spinBoxTGRidgeRatio, rnd( 0.3, 0.7, 0.01 ) );
+  }
+
+  // --- 训练数据生成：随机水平朝向 ---
+  if ( randomizePose )
+  {
+    ui->spinBoxROmega->setValue( 0.0 );
+    ui->spinBoxRPhi->setValue( 0.0 );
+    ui->spinBoxRKappa->setValue( rnd( -180.0, 180.0, 1.0 ) );
+    ui->spinBoxTX->setValue( 0.0 );
+    ui->spinBoxTY->setValue( 0.0 );
+    ui->spinBoxTZ->setValue( 0.0 );
   }
 
   if ( refreshPreview )
@@ -1024,25 +1044,62 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       );
       if ( answer == QMessageBox::Yes )
       {
-        QVector3D targetBboxMin;
-        bool hasTargetBbox = metadataPointCloudInfoForInput( m_inputDataPath, &targetBboxMin, nullptr, nullptr );
-        if ( !hasTargetBbox )
+        // --- Auto-align model translation to point cloud center ---
+        QVector3D pcCenter;
+        double pcScale = 1.0;
+        if ( metadataPointCloudInfoForInput( m_inputDataPath, nullptr, &pcCenter, &pcScale ) )
         {
-          PointCloud pc = PointCloudLoader::load( m_inputDataPath );
-          if ( !pc.points.isEmpty() )
+          // 缓存元数据，供 onLoadToQGIS3D / onUpdatePreview 反归一化模型
+          m_metadataCenter = pcCenter;
+          m_metadataScale  = pcScale;
+          m_hasMetadata    = true;
+
+          const QString prim = ui->comboPrimitive->currentText();
+          MeshData previewMesh = BuildMesh::build( prim, this );
+          if ( !previewMesh.isEmpty() )
           {
-            targetBboxMin = pc.bboxMin;
-            hasTargetBbox = true;
+            // Compute model bbox center from vertices (normalized space)
+            QVector3D modelMin( std::numeric_limits<float>::max(),
+                                std::numeric_limits<float>::max(),
+                                std::numeric_limits<float>::max() );
+            QVector3D modelMax( std::numeric_limits<float>::lowest(),
+                                std::numeric_limits<float>::lowest(),
+                                std::numeric_limits<float>::lowest() );
+            for ( const QVector3D &v : previewMesh.vertices )
+            {
+              if ( v.x() < modelMin.x() ) modelMin.setX( v.x() );
+              if ( v.y() < modelMin.y() ) modelMin.setY( v.y() );
+              if ( v.z() < modelMin.z() ) modelMin.setZ( v.z() );
+              if ( v.x() > modelMax.x() ) modelMax.setX( v.x() );
+              if ( v.y() > modelMax.y() ) modelMax.setY( v.y() );
+              if ( v.z() > modelMax.z() ) modelMax.setZ( v.z() );
+            }
+            const QVector3D modelCenter = ( modelMin + modelMax ) * 0.5f;
+
+            // Both model vertices and point cloud are in meter/projected-meter space.
+            // Translation = pcCenter - modelCenter  (no scale factor needed)
+            const double tx = static_cast<double>( pcCenter.x() ) - static_cast<double>( modelCenter.x() );
+            const double ty = static_cast<double>( pcCenter.y() ) - static_cast<double>( modelCenter.y() );
+            const double tz = static_cast<double>( pcCenter.z() ) - static_cast<double>( modelCenter.z() );
+            setPoseTranslate( tx, ty, tz );
+
+            DEBUG_LOG( QString( "[Align] pcCenter=(%1,%2,%3) modelCenter=(%4,%5,%6) → tx=%7 ty=%8 tz=%9\n" )
+                         .arg( pcCenter.x(), 0, 'f', 2 ).arg( pcCenter.y(), 0, 'f', 2 ).arg( pcCenter.z(), 0, 'f', 2 )
+                         .arg( modelCenter.x(), 0, 'f', 2 ).arg( modelCenter.y(), 0, 'f', 2 ).arg( modelCenter.z(), 0, 'f', 2 )
+                         .arg( tx, 0, 'f', 2 ).arg( ty, 0, 'f', 2 ).arg( tz, 0, 'f', 2 )
+                         .toStdWString().c_str() );
+          }
+          else
+          {
+            DEBUG_LOG( L"[Align] mesh build failed, skipping auto-alignment\n" );
           }
         }
-        if ( hasTargetBbox )
+        else
         {
-          const QString currentPrimitive = ui->comboPrimitive->currentText();
-          const QVector3D translate = modelTranslationForTargetBboxMin( this, currentPrimitive, targetBboxMin );
-          ui->lineEditTX->setText( QString::number( translate.x(), 'f', 3 ) );
-          ui->lineEditTY->setText( QString::number( translate.y(), 'f', 3 ) );
-          ui->lineEditTZ->setText( QString::number( translate.z(), 'f', 3 ) );
+          DEBUG_LOG( QString( "[Align] no metadata for %1, skipping auto-alignment\n" )
+                       .arg( m_inputDataPath ).toStdWString().c_str() );
         }
+
         onLoadToQGIS3D( true );
         if ( !loadPointCloudToQGIS3D( m_inputDataPath, false ) )
           QMessageBox::warning( &dialog, tr( "Point cloud load failed" ), tr( "The model was loaded, but the point cloud was not loaded into QGIS 3D." ) );
@@ -1187,34 +1244,6 @@ static QVector<QVector3D> sampleFixedPointCount( const QVector<QVector3D> &sourc
     sampled.append( source[index] );
   }
   return sampled;
-}
-
-static bool meshLocalBboxMin( const MeshData &mesh, QVector3D &bboxMin )
-{
-  if ( mesh.vertices.isEmpty() )
-    return false;
-
-  bboxMin = mesh.vertices.first();
-  for ( const QVector3D &p : mesh.vertices )
-  {
-    bboxMin.setX( std::min( bboxMin.x(), p.x() ) );
-    bboxMin.setY( std::min( bboxMin.y(), p.y() ) );
-    bboxMin.setZ( std::min( bboxMin.z(), p.z() ) );
-  }
-  return true;
-}
-
-static QVector3D modelTranslationForTargetBboxMin( ParamModelerDock *dock, const QString &primitiveType, const QVector3D &targetBboxMin )
-{
-  if ( !dock )
-    return targetBboxMin;
-
-  const MeshData mesh = BuildMesh::build( primitiveType, dock );
-  QVector3D localBboxMin;
-  if ( !meshLocalBboxMin( mesh, localBboxMin ) )
-    localBboxMin = QVector3D( 0, 0, 0 );
-
-  return targetBboxMin - localBboxMin;
 }
 
 static bool writeDLPointTXT( const QString &fileName, QVector<QVector3D> points )
@@ -1371,6 +1400,91 @@ static bool vectorFromJsonArray( const QJsonValue &value, QVector3D &out )
   return true;
 }
 
+static double maxAbsComponent( const QVector3D &v )
+{
+  return std::max( { std::abs( static_cast<double>( v.x() ) ),
+                     std::abs( static_cast<double>( v.y() ) ),
+                     std::abs( static_cast<double>( v.z() ) ) } );
+}
+
+static bool pointCloudLooksNormalizedForDisplay( const PointCloud &pc )
+{
+  if ( pc.points.isEmpty() )
+    return false;
+
+  const QVector3D bboxSize = pc.bboxMax - pc.bboxMin;
+  const double maxDim = maxAbsComponent( bboxSize );
+  if ( maxDim <= 3.5 )
+    return true;
+
+  QVector3D center( 0, 0, 0 );
+  for ( const QVector3D &p : pc.points )
+    center += p;
+  center /= static_cast<float>( pc.points.size() );
+
+  double maxRadius = 0.0;
+  for ( const QVector3D &p : pc.points )
+    maxRadius = std::max( maxRadius, static_cast<double>( ( p - center ).length() ) );
+
+  return maxRadius <= 1.5;
+}
+
+static bool denormInfoFromPlyComment( const QString &filePath, QVector3D &center, double &scale )
+{
+  if ( QFileInfo( filePath ).suffix().compare( QStringLiteral( "ply" ), Qt::CaseInsensitive ) != 0 )
+    return false;
+
+  QFile file( filePath );
+  if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) )
+    return false;
+
+  bool hasCenter = false;
+  bool hasScale = false;
+  while ( !file.atEnd() )
+  {
+    const QString line = QString::fromLatin1( file.readLine() ).trimmed();
+    if ( line == QStringLiteral( "end_header" ) )
+      break;
+
+    if ( line.startsWith( QStringLiteral( "comment denorm_center " ) ) ||
+         line.startsWith( QStringLiteral( "comment center " ) ) )
+    {
+      const QStringList parts = line.split( ' ', Qt::SkipEmptyParts );
+      if ( parts.size() >= 5 )
+      {
+        bool okX = false;
+        bool okY = false;
+        bool okZ = false;
+        const double x = parts.at( 2 ).toDouble( &okX );
+        const double y = parts.at( 3 ).toDouble( &okY );
+        const double z = parts.at( 4 ).toDouble( &okZ );
+        if ( okX && okY && okZ )
+        {
+          center = QVector3D( x, y, z );
+          hasCenter = true;
+        }
+      }
+    }
+    else if ( line.startsWith( QStringLiteral( "comment denorm_scale " ) ) ||
+              line.startsWith( QStringLiteral( "comment scale " ) ) )
+    {
+      const QStringList parts = line.split( ' ', Qt::SkipEmptyParts );
+      if ( parts.size() >= 3 )
+      {
+        bool ok = false;
+        const double s = parts.at( 2 ).toDouble( &ok );
+        if ( ok && s > 1e-9 )
+        {
+          scale = s;
+          hasScale = true;
+        }
+      }
+    }
+  }
+
+  return hasCenter && hasScale;
+}
+
 static QString metadataRelativePathForPointCloud( const QString &filePath )
 {
   QString normalized = QDir::fromNativeSeparators( QFileInfo( filePath ).absoluteFilePath() );
@@ -1401,38 +1515,79 @@ static bool metadataPointCloudInfoForInput( const QString &filePath,
                                             double *scale )
 {
   const QString rel = metadataRelativePathForPointCloud( filePath );
-  if ( rel.isEmpty() )
-    return false;
-
-  QFile metadataFile( QStringLiteral( "E:/pointnet/datasets_aug/metadata/sample_params.json" ) );
-  if ( !metadataFile.open( QIODevice::ReadOnly ) )
-    return false;
-
-  QJsonParseError parseError;
-  const QJsonDocument doc = QJsonDocument::fromJson( metadataFile.readAll(), &parseError );
-  if ( parseError.error != QJsonParseError::NoError || !doc.isArray() )
-    return false;
-
-  const QString relLower = rel.toLower();
-  const QJsonArray records = doc.array();
-  for ( const QJsonValue &value : records )
+  if ( !rel.isEmpty() )
   {
-    const QJsonObject obj = value.toObject();
-    if ( obj.value( QStringLiteral( "file" ) ).toString().toLower() != relLower )
-      continue;
-
-    const QJsonObject info = obj.value( QStringLiteral( "pointCloudInfo" ) ).toObject();
-    bool ok = true;
-    if ( bboxMin )
-      ok = vectorFromJsonArray( info.value( QStringLiteral( "bboxMin" ) ), *bboxMin ) && ok;
-    if ( center )
-      ok = vectorFromJsonArray( info.value( QStringLiteral( "center" ) ), *center ) && ok;
-    if ( scale )
+    QFile metadataFile( QStringLiteral( "E:/pointnet/datasets_aug/metadata/sample_params.json" ) );
+    if ( metadataFile.open( QIODevice::ReadOnly ) )
     {
-      *scale = info.value( QStringLiteral( "scale" ) ).toDouble( 1.0 );
-      ok = *scale > 1e-9 && ok;
+      QJsonParseError parseError;
+      const QJsonDocument doc = QJsonDocument::fromJson( metadataFile.readAll(), &parseError );
+      if ( parseError.error == QJsonParseError::NoError && doc.isArray() )
+      {
+        const QString relLower = rel.toLower();
+        const QJsonArray records = doc.array();
+        for ( const QJsonValue &value : records )
+        {
+          const QJsonObject obj = value.toObject();
+          if ( obj.value( QStringLiteral( "file" ) ).toString().toLower() != relLower )
+            continue;
+
+          const QJsonObject info = obj.value( QStringLiteral( "pointCloudInfo" ) ).toObject();
+          bool ok = true;
+          if ( bboxMin )
+            ok = vectorFromJsonArray( info.value( QStringLiteral( "bboxMin" ) ), *bboxMin ) && ok;
+          if ( center )
+            ok = vectorFromJsonArray( info.value( QStringLiteral( "center" ) ), *center ) && ok;
+          if ( scale )
+          {
+            *scale = info.value( QStringLiteral( "scale" ) ).toDouble( 1.0 );
+            ok = *scale > 1e-9 && ok;
+          }
+          if ( ok )
+            return true;
+        }
+      }
     }
-    return ok;
+  }
+
+  QVector3D plyCenter;
+  double plyScale = 1.0;
+  if ( denormInfoFromPlyComment( filePath, plyCenter, plyScale ) )
+  {
+    if ( bboxMin )
+    {
+      const PointCloud pc = PointCloudLoader::load( filePath );
+      if ( pc.points.isEmpty() )
+        return false;
+      *bboxMin = pc.bboxMin * static_cast<float>( plyScale ) + plyCenter;
+    }
+    if ( center )
+      *center = plyCenter;
+    if ( scale )
+      *scale = plyScale;
+    return true;
+  }
+
+  // Fallback: compute directly from the point cloud itself (handles LAS/LAZ etc.)
+  {
+    const PointCloud pc = PointCloudLoader::load( filePath );
+    if ( !pc.points.isEmpty() )
+    {
+      const QVector3D pcCenter = ( pc.bboxMin + pc.bboxMax ) * 0.5f;
+      double maxRadius = 0.0;
+      for ( const QVector3D &p : pc.points )
+        maxRadius = qMax( maxRadius, static_cast<double>( ( p - pcCenter ).length() ) );
+      if ( maxRadius < 1e-8 )
+        maxRadius = 1.0;
+
+      if ( bboxMin )
+        *bboxMin = pc.bboxMin;
+      if ( center )
+        *center = pcCenter;
+      if ( scale )
+        *scale = maxRadius;
+      return true;
+    }
   }
 
   return false;
@@ -1563,6 +1718,7 @@ static QJsonObject currentPrimitiveParamsObject( const QString &prim, const Para
     params["angle"] = dock->tgAngle();
     params["ridgeRatio"] = dock->tgRidgeRatio();
   }
+  params["rz"] = dock->poseRotateZ();
   return params;
 }
 
@@ -1594,6 +1750,7 @@ void ParamModelerDock::onExportDLDatasetClicked()
   const QString originalPrimitive = ui->comboPrimitive->currentText();
   const bool previousUpdating = m_isUpdating;
   m_isUpdating = true;
+  const QMap<QString, QVector<double>> savedPoses = m_poseMap;
   if ( m_previewTimer )
     m_previewTimer->stop();
 
@@ -1646,7 +1803,7 @@ void ParamModelerDock::onExportDLDatasetClicked()
       if ( progress.wasCanceled() )
         break;
 
-      randomizeCurrentPrimitiveParams( false );
+      randomizeCurrentPrimitiveParams( false, true );
       const QString split = ( i < samplesPerClass * 8 / 10 )   ? "train"
                             : ( i < samplesPerClass * 9 / 10 ) ? "val"
                                                                : "test";
@@ -1681,6 +1838,7 @@ void ParamModelerDock::onExportDLDatasetClicked()
   const QString metadataPath = rootDir.filePath( "metadata/sample_params.json" );
   const bool metadataOk = writeJsonDocumentChecked( metadataPath, QJsonDocument( metadata ), &metadataError );
 
+  m_poseMap = savedPoses;
   ui->comboPrimitive->setCurrentText( originalPrimitive );
   m_isUpdating = previousUpdating;
   if ( m_previewTimer )
@@ -1750,6 +1908,7 @@ void ParamModelerDock::onExportCurrentPrimitiveDLDatasetClicked()
   const QString originalPrimitive = ui->comboPrimitive->currentText();
   const bool previousUpdating = m_isUpdating;
   m_isUpdating = true;
+  const QMap<QString, QVector<double>> savedPoses = m_poseMap;
   if ( m_previewTimer )
     m_previewTimer->stop();
 
@@ -1782,7 +1941,7 @@ void ParamModelerDock::onExportCurrentPrimitiveDLDatasetClicked()
     if ( progress.wasCanceled() )
       break;
 
-    randomizeCurrentPrimitiveParams( false );
+    randomizeCurrentPrimitiveParams( false, true );
     const QString split = ( i < samplesPerClass * 8 / 10 )   ? "train"
                           : ( i < samplesPerClass * 9 / 10 ) ? "val"
                                                              : "test";
@@ -1853,6 +2012,7 @@ void ParamModelerDock::onExportCurrentPrimitiveDLDatasetClicked()
       mergeMessage = tr( "Main sample_params.json write failed: %1" ).arg( mergeError );
   }
 
+  m_poseMap = savedPoses;
   ui->comboPrimitive->setCurrentText( originalPrimitive );
   m_isUpdating = previousUpdating;
   if ( m_previewTimer )
@@ -1966,6 +2126,7 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
   pose.rx = poseRotateX();
   pose.ry = poseRotateY();
   pose.rz = poseRotateZ();
+  pose.scale = 1.0;  // model vertices are already in meters, no extra scaling needed
 
   if ( m_modelLayer )
   {
@@ -2019,10 +2180,11 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
   QTemporaryFile denormalizedFile( QDir::tempPath() + QStringLiteral( "/parammodeler_displaypc_XXXXXX.txt" ) );
   QVector3D metadataCenter;
   double metadataScale = 1.0;
-  if ( metadataPointCloudInfoForInput( filePath, nullptr, &metadataCenter, &metadataScale ) )
+  const bool hasMetadata = metadataPointCloudInfoForInput( filePath, nullptr, &metadataCenter, &metadataScale );
+  if ( hasMetadata )
   {
     const PointCloud normalizedCloud = PointCloudLoader::load( filePath );
-    if ( !normalizedCloud.points.isEmpty() && denormalizedFile.open() )
+    if ( !normalizedCloud.points.isEmpty() && pointCloudLooksNormalizedForDisplay( normalizedCloud ) && denormalizedFile.open() )
     {
       QTextStream out( &denormalizedFile );
       for ( const QVector3D &p : normalizedCloud.points )
@@ -2034,6 +2196,10 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
       denormalizedFile.flush();
       displayPath = denormalizedFile.fileName();
       DEBUG_LOG( QString( "[PointCloud] display point cloud restored from DL normalization: %1\n" ).arg( displayPath ).toStdWString().c_str() );
+    }
+    else if ( !normalizedCloud.points.isEmpty() )
+    {
+      DEBUG_LOG( QString( "[PointCloud] metadata matched, input appears already in display scale: %1\n" ).arg( filePath ).toStdWString().c_str() );
     }
   }
 
@@ -2100,6 +2266,7 @@ void ParamModelerDock::onUpdatePreview()
     pose.rx = poseRotateX();
     pose.ry = poseRotateY();
     pose.rz = poseRotateZ();
+    pose.scale = 1.0;  // model vertices are already in meters, no extra scaling needed
 
     QString errorMessage;
     if ( !ParamModelerScene3D::updateRealtimePreviewMesh( mIface, mesh, pose, &errorMessage ) )
@@ -2112,9 +2279,16 @@ void ParamModelerDock::onUpdatePreview()
 }
 
 
-double ParamModelerDock::poseTranslateX() const { return ui->lineEditTX->text().toDouble(); }
-double ParamModelerDock::poseTranslateY() const { return ui->lineEditTY->text().toDouble(); }
-double ParamModelerDock::poseTranslateZ() const { return ui->lineEditTZ->text().toDouble(); }
+double ParamModelerDock::poseTranslateX() const { return ui->spinBoxTX->value(); }
+double ParamModelerDock::poseTranslateY() const { return ui->spinBoxTY->value(); }
+double ParamModelerDock::poseTranslateZ() const { return ui->spinBoxTZ->value(); }
+
+void ParamModelerDock::setPoseTranslate( double tx, double ty, double tz )
+{
+  ui->spinBoxTX->setValue( tx );
+  ui->spinBoxTY->setValue( ty );
+  ui->spinBoxTZ->setValue( tz );
+}
 
 double ParamModelerDock::poseRotateX() const { return ui->spinBoxROmega->value(); }
 double ParamModelerDock::poseRotateY() const { return ui->spinBoxRPhi->value(); }
@@ -2280,6 +2454,18 @@ void ParamModelerDock::onLoadInputData()
   m_inputDataPath = filePath;
   QFileInfo fi( filePath );
 
+  // 缓存元数据（center/scale），用于后续模型反归一化
+  m_hasMetadata = metadataPointCloudInfoForInput( filePath, nullptr, &m_metadataCenter, &m_metadataScale );
+  if ( m_hasMetadata )
+  {
+    DEBUG_LOG( QString( "[Meta] cached center=(%1,%2,%3) scale=%4\n" )
+                 .arg( m_metadataCenter.x(), 0, 'f', 2 )
+                 .arg( m_metadataCenter.y(), 0, 'f', 2 )
+                 .arg( m_metadataCenter.z(), 0, 'f', 2 )
+                 .arg( m_metadataScale, 0, 'f', 2 )
+                 .toStdWString().c_str() );
+  }
+
   DEBUG_LOG( QString( "[Tab2] load input data: %1\n" ).arg( filePath ).toStdWString().c_str() );
 
   ui->labelInputInfo->setText( tr( "Loaded: %1" ).arg( fi.fileName() ) );
@@ -2376,6 +2562,58 @@ void ParamModelerDock::onInverseParams()
 
   ui->progressInversion->setValue( 100 );
   ui->progressInversion->setVisible( false );
+
+  // --- Auto-align model translation to point cloud center ---
+  if ( m_hasMetadata )
+  {
+    const QString prim = ui->comboPrimitive->currentText();
+    MeshData previewMesh = BuildMesh::build( prim, this );
+    if ( !previewMesh.isEmpty() )
+    {
+      QVector3D modelMin( std::numeric_limits<float>::max(),
+                          std::numeric_limits<float>::max(),
+                          std::numeric_limits<float>::max() );
+      QVector3D modelMax( std::numeric_limits<float>::lowest(),
+                          std::numeric_limits<float>::lowest(),
+                          std::numeric_limits<float>::lowest() );
+      for ( const QVector3D &v : previewMesh.vertices )
+      {
+        if ( v.x() < modelMin.x() ) modelMin.setX( v.x() );
+        if ( v.y() < modelMin.y() ) modelMin.setY( v.y() );
+        if ( v.z() < modelMin.z() ) modelMin.setZ( v.z() );
+        if ( v.x() > modelMax.x() ) modelMax.setX( v.x() );
+        if ( v.y() > modelMax.y() ) modelMax.setY( v.y() );
+        if ( v.z() > modelMax.z() ) modelMax.setZ( v.z() );
+      }
+      const QVector3D modelCenter = ( modelMin + modelMax ) * 0.5f;
+
+      const double tx = static_cast<double>( m_metadataCenter.x() ) - static_cast<double>( modelCenter.x() );
+      const double ty = static_cast<double>( m_metadataCenter.y() ) - static_cast<double>( modelCenter.y() );
+      const double tz = static_cast<double>( m_metadataCenter.z() ) - static_cast<double>( modelCenter.z() );
+      setPoseTranslate( tx, ty, tz );
+
+      DEBUG_LOG( QString( "[Align] pcCenter=(%1,%2,%3) modelCenter=(%4,%5,%6) → tx=%7 ty=%8 tz=%9\n" )
+                   .arg( m_metadataCenter.x(), 0, 'f', 2 )
+                   .arg( m_metadataCenter.y(), 0, 'f', 2 )
+                   .arg( m_metadataCenter.z(), 0, 'f', 2 )
+                   .arg( modelCenter.x(), 0, 'f', 2 )
+                   .arg( modelCenter.y(), 0, 'f', 2 )
+                   .arg( modelCenter.z(), 0, 'f', 2 )
+                   .arg( tx, 0, 'f', 2 )
+                   .arg( ty, 0, 'f', 2 )
+                   .arg( tz, 0, 'f', 2 )
+                   .toStdWString().c_str() );
+    }
+    else
+    {
+      DEBUG_LOG( L"[Align] regression mesh build failed, skipping auto-alignment\n" );
+    }
+  }
+  else
+  {
+    DEBUG_LOG( QString( "[Align] no metadata for %1, skipping auto-alignment\n" )
+                 .arg( m_inputDataPath ).toStdWString().c_str() );
+  }
 
   onUpdatePreview();
 }

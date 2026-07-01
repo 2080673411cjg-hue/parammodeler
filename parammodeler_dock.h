@@ -27,6 +27,7 @@
 #include <QTimer>
 #include <QMap>
 #include <QVector>
+#include <QVector3D>
 
 class QgisInterface;
 class QgsVectorLayer; 
@@ -52,6 +53,7 @@ public:
   double poseTranslateX() const;
   double poseTranslateY() const;
   double poseTranslateZ() const;
+  void setPoseTranslate( double tx, double ty, double tz );
   double poseRotateX() const; // Omega
 	double poseRotateY() const; // Phi
 	double poseRotateZ() const; // Kappa
@@ -146,7 +148,7 @@ private slots:
 
 private:
   void schedulePreviewUpdate();
-  void randomizeCurrentPrimitiveParams( bool refreshPreview );
+  void randomizeCurrentPrimitiveParams( bool refreshPreview, bool randomizePose = false );
   bool loadPointCloudToQGIS3D( const QString &filePath, bool showMessage );
 
   Ui::ParamModelerDock *ui;
@@ -155,7 +157,12 @@ private:
   QMap<QString, QVector<double>> m_poseMap;    // 各基元的位姿存档
 
   // ===== Tab2：输入数据 =====
-  QString m_inputDataPath;       
+  QString m_inputDataPath;
+
+  // ===== 元数据缓存（用于模型反归一化对齐） =====
+  QVector3D m_metadataCenter;
+  double    m_metadataScale = 1.0;
+  bool      m_hasMetadata = false;
 
   // ===== 预览 =====
   PreviewGLWidget *m_previewWidget = nullptr;

@@ -18,6 +18,7 @@ struct ParamModelerPose
   double rx = 0.0;
   double ry = 0.0;
   double rz = 0.0;
+  double scale = 1.0;
 };
 
 struct ParamModelerModelLoadResult

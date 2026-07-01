@@ -120,11 +120,6 @@ void ParamInverter::applyToUI( ParamModelerDock *dock,
         }
     };
 
-    auto setLE = [&]( const QString &key, QLineEdit *edit ) {
-        if ( params.contains( key ) )
-            edit->setText( QString::number( params[key], 'f', 2 ) );
-    };
-
     auto setTotalAndWallRatio = [&]( const QString &wallKey, const QString &roofKey,
                                      QDoubleSpinBox *totalSpin, QSlider *totalSlider,
                                      QDoubleSpinBox *ratioSpin, QSlider *ratioSlider ) {
@@ -227,9 +222,13 @@ void ParamInverter::applyToUI( ParamModelerDock *dock,
     set( "tgRidgeRatio",  dock->ui->spinBoxTGRidgeRatio, dock->ui->sliderTGRidgeRatio );
 
     // 位姿参数
-    setLE( "tx", dock->ui->lineEditTX );
-    setLE( "ty", dock->ui->lineEditTY );
-    setLE( "tz", dock->ui->lineEditTZ );
+    set( "tx", dock->ui->spinBoxTX, dock->ui->sliderTX );
+    set( "ty", dock->ui->spinBoxTY, dock->ui->sliderTY );
+    set( "tz", dock->ui->spinBoxTZ, dock->ui->sliderTZ );
+
+    // DL 回归输出的水平朝向
+    if ( params.contains( QStringLiteral( "poseRotateZ" ) ) )
+      dock->ui->spinBoxRKappa->setValue( params[QStringLiteral( "poseRotateZ" )] );
 }
 
 // ====================================================================
@@ -302,9 +301,12 @@ QVector<QVector3D> ParamInverter::loadPoints( const QString &filePath )
         int zOff = propOffset["z"], zSz = propSize["z"]; bool zDbl = propIsDouble["z"];
 
         auto readD = [&]( const QByteArray &rec, int off, int sz, bool isDbl, bool bigE ) {
-            if ( isDbl ) { double v; memcpy( &v, rec.constData() + off, 8 );
+            const int bytesToRead = isDbl ? 8 : qMin( sz, 4 );
+            if ( off < 0 || sz <= 0 || bytesToRead <= 0 || off + bytesToRead > rec.size() )
+                return 0.0;
+            if ( isDbl ) { double v = 0.0; memcpy( &v, rec.constData() + off, 8 );
                 if ( bigE ) { char *b = reinterpret_cast<char*>(&v); std::reverse( b, b+8 ); } return v; }
-            else { float v; memcpy( &v, rec.constData() + off, qMin(sz,4) );
+            else { float v = 0.0f; memcpy( &v, rec.constData() + off, bytesToRead );
                 if ( bigE ) { char *b = reinterpret_cast<char*>(&v); std::reverse( b, b+4 ); } return static_cast<double>(v); }
         };
 
@@ -372,6 +374,8 @@ QVector<QVector3D> ParamInverter::loadPoints( const QString &filePath )
             if ( !block ) continue;
             const char *data = block->data();
             int pn = block->pointCount(), rs = block->pointRecordSize();
+            if ( !data || rs < 12 )
+                continue;
             for ( int i = 0; i < pn; i++ )
             {
                 const char *ptr = data + i * rs;

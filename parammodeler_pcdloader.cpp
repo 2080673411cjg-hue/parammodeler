@@ -131,17 +131,21 @@ PointCloud PointCloudLoader::load( const QString &filePath )
 
         auto readDouble = [&]( const QByteArray &rec, int off, int sz, bool isDbl, bool bigEndian ) -> double
         {
+            const int bytesToRead = isDbl ? 8 : qMin( sz, 4 );
+            if ( off < 0 || sz <= 0 || bytesToRead <= 0 || off + bytesToRead > rec.size() )
+                return 0.0;
+
             if ( isDbl )
             {
-                double v;
+                double v = 0.0;
                 memcpy( &v, rec.constData() + off, 8 );
                 if ( bigEndian ) { char *b = reinterpret_cast<char*>(&v); std::reverse( b, b + 8 ); }
                 return v;
             }
             else
             {
-                float v;
-                memcpy( &v, rec.constData() + off, qMin( sz, 4 ) );
+                float v = 0.0f;
+                memcpy( &v, rec.constData() + off, bytesToRead );
                 if ( bigEndian ) { char *b = reinterpret_cast<char*>(&v); std::reverse( b, b + 4 ); }
                 return static_cast<double>( v );
             }
@@ -262,6 +266,8 @@ PointCloud PointCloudLoader::load( const QString &filePath )
             const char *data = block->data();
             int ptCnt = block->pointCount();
             int recSz = block->pointRecordSize();
+            if ( !data || recSz < 12 )
+                continue;
 
             for ( int i = 0; i < ptCnt; i++ )
             {
