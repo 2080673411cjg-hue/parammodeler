@@ -57,6 +57,7 @@
 #include <QSplitter>
 #include <QLabel>
 #include <QPushButton>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QProgressBar>
 #include <QTableWidget>
@@ -568,6 +569,17 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   ui->btnInverseParams->setText( tr( "Estimate parameters" ) );
   ui->formLayoutPrimitive->addRow( tr( "Point cloud:" ), ui->btnToggleInversion );
   connect( ui->btnToggleInversion, &QPushButton::clicked, this, &ParamModelerDock::onOpenPointCloudEstimateDialog );
+
+  // 透明模式复选框：微调参数时让模型半透明，不挡点云
+  mGhostModeCheckBox = new QCheckBox( tr( "Ghost mode (see through model)" ), this );
+  mGhostModeCheckBox->setChecked( false );
+  mGhostModeCheckBox->setToolTip( tr( "Make the 3D model transparent so the point cloud is clearly visible during fine-tuning." ) );
+  ui->formLayoutPrimitive->addRow( tr( "3D model:" ), mGhostModeCheckBox );
+  connect( mGhostModeCheckBox, &QCheckBox::toggled, this, [this]( bool checked ) {
+    ParamModelerScene3D::setGhostMode( checked );
+    if ( m_realtimeModelLoaded )
+      onUpdatePreview();
+  } );
 
   connect( ui->btnLoadPointCloud, &QPushButton::clicked, this, &ParamModelerDock::onLoadInputData );
   connect( ui->btnPointNetClassify, &QPushButton::clicked, this, &ParamModelerDock::onPointNetClassify );

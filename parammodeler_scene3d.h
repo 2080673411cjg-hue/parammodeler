@@ -53,6 +53,9 @@ public:
                                               QWidget *parent,
                                               QString *errorMessage = nullptr );
 
+  static void setGhostMode( bool on );
+  static bool isGhostMode();
+
   static void removeLayerByName( const QString &name, const QString &excludeId = QString() );
   static void removeLayersByNamePrefix( const QString &prefix, const QString &excludeId = QString() );
 };

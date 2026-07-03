@@ -29,6 +29,8 @@
 #include <QVector>
 #include <QVector3D>
 
+class QCheckBox;
+
 class QgisInterface;
 class QgsVectorLayer; 
 class PreviewGLWidget;
@@ -174,6 +176,7 @@ private:
 		bool            m_isUpdating = false; 
 			QString         m_lastGpkgPath;             // 上一次临时 GPKG 文件路径，用于清理
   bool m_realtimeModelLoaded = false;
+  QCheckBox *mGhostModeCheckBox = nullptr;
 };
 
 #endif // PARAMMODELER_DOCK_H

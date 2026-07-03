@@ -52,9 +52,15 @@
 #include <Qt3DCore/QTransform>
 #include <Qt3DExtras/QPhongMaterial>
 #include <Qt3DRender/QAttribute>
+#include <Qt3DRender/QBlendEquation>
+#include <Qt3DRender/QBlendEquationArguments>
 #include <Qt3DRender/QBuffer>
+#include <Qt3DRender/QDepthTest>
+#include <Qt3DRender/QEffect>
 #include <Qt3DRender/QGeometry>
 #include <Qt3DRender/QGeometryRenderer>
+#include <Qt3DRender/QRenderPass>
+#include <Qt3DRender/QTechnique>
 
 namespace
 {
@@ -74,6 +80,8 @@ struct RealtimePreviewPart
   QPointer<Qt3DRender::QBuffer> buffer;
   QPointer<Qt3DRender::QAttribute> positionAttribute;
   QPointer<Qt3DRender::QAttribute> normalAttribute;
+  QPointer<Qt3DExtras::QPhongMaterial> material;
+  bool blendingSetup = false;
 };
 
 struct RealtimePreviewState
@@ -84,6 +92,7 @@ struct RealtimePreviewState
 };
 
 QHash<Qgs3DMapScene *, RealtimePreviewState> sRealtimePreviewMeshes;
+bool sGhostMode = false;
 const QString REALTIME_ANCHOR_LAYER_NAME = QStringLiteral( "ParamModeler_3D_Anchor" );
 
 QString meshPointKey( const QVector3D &p )
@@ -348,12 +357,43 @@ void updateRealtimePart( RealtimePreviewPart &part,
     part.renderer->setPrimitiveType( Qt3DRender::QGeometryRenderer::Triangles );
     part.entity->addComponent( part.renderer );
 
-    Qt3DExtras::QPhongMaterial *material = new Qt3DExtras::QPhongMaterial( part.entity );
-    material->setAmbient( color.darker( 135 ) );
-    material->setDiffuse( color );
-    material->setSpecular( QColor( 20, 18, 16, color.alpha() ) );
-    material->setShininess( 1.0f );
-    part.entity->addComponent( material );
+    part.material = new Qt3DExtras::QPhongMaterial( part.entity );
+    part.entity->addComponent( part.material );
+  }
+
+  // 开启 alpha 混合（只设置一次），否则 setDiffuse/setAmbient 的 alpha 值不生效
+  if ( !part.blendingSetup && part.material )
+  {
+    Qt3DRender::QEffect *effect = part.material->effect();
+    if ( effect )
+    {
+      Qt3DRender::QBlendEquationArguments *blendArgs = new Qt3DRender::QBlendEquationArguments();
+      blendArgs->setSourceRgb( Qt3DRender::QBlendEquationArguments::SourceAlpha );
+      blendArgs->setDestinationRgb( Qt3DRender::QBlendEquationArguments::OneMinusSourceAlpha );
+
+      Qt3DRender::QBlendEquation *blendEq = new Qt3DRender::QBlendEquation();
+      blendEq->setBlendFunction( Qt3DRender::QBlendEquation::Add );
+
+      // render state 是加到 QRenderPass 上的，不是 QEffect
+      for ( Qt3DRender::QTechnique *tech : effect->techniques() )
+      {
+        for ( Qt3DRender::QRenderPass *pass : tech->renderPasses() )
+        {
+          pass->addRenderState( blendArgs );
+          pass->addRenderState( blendEq );
+        }
+      }
+    }
+    part.blendingSetup = true;
+  }
+
+  // 每次调用都更新材质颜色（ghost mode 切换时需要）
+  if ( part.material )
+  {
+    part.material->setAmbient( color.darker( 135 ) );
+    part.material->setDiffuse( color );
+    part.material->setSpecular( QColor( 20, 18, 16, color.alpha() ) );
+    part.material->setShininess( 1.0f );
   }
 
   part.buffer->setData( makeRealtimeVertexBytes( values ) );
@@ -748,15 +788,17 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
     }
   }
 
+  const int bodyAlpha  = sGhostMode ? 20 : 70;
+  const int roofAlpha  = sGhostMode ? 25 : 86;
   updateRealtimePart( state.body,
                       state.root,
                       bodyValues,
-                      QColor( 198, 192, 178, 70 ),
+                      QColor( 198, 192, 178, bodyAlpha ),
                       QStringLiteral( "ParamModeler_Qt3D_RealtimePreview_Body" ) );
   updateRealtimePart( state.roof,
                       state.root,
                       roofValues,
-                      QColor( 154, 50, 46, 86 ),
+                      QColor( 154, 50, 46, roofAlpha ),
                       QStringLiteral( "ParamModeler_Qt3D_RealtimePreview_Roof" ) );
   sRealtimePreviewMeshes.insert( scene, state );
 
@@ -955,4 +997,14 @@ void ParamModelerScene3D::removeLayersByNamePrefix( const QString &prefix, const
   removeProjectLayersMatching( [&]( QgsMapLayer *layer ) {
     return layer && layer->name().startsWith( prefix );
   }, excludeId );
+}
+
+void ParamModelerScene3D::setGhostMode( bool on )
+{
+  sGhostMode = on;
+}
+
+bool ParamModelerScene3D::isGhostMode()
+{
+  return sGhostMode;
 }
