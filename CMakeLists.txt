@@ -6,6 +6,7 @@ set(CMAKE_AUTOMOC ON)
 set (parammodeler_SRCS
   parammodeler.cpp
   parammodeler_dock.cpp
+  parammodeler_params.cpp
   exportjson.cpp
   exportobj.cpp
 		exportpointcloud.cpp

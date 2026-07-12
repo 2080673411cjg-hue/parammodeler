@@ -90,19 +90,19 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
   const QString script = ParamModelerConfig::regressionScript( backend );
   const QString base = ParamModelerConfig::regressionLogBase( backend );
   static const QMap<QString, QString> pointnextDirs = {
-    { QStringLiteral( "Cuboid" ), QStringLiteral( "pointnext_reg_cuboid_rot" ) },
-    { QStringLiteral( "Cylinder" ), QStringLiteral( "pointnext_reg_cylinder_rot" ) },
-    { QStringLiteral( "LHouse" ), QStringLiteral( "pointnext_reg_lhouse_rot" ) },
-    { QStringLiteral( "ConeCylinder" ), QStringLiteral( "pointnext_reg_conecylinder_rot" ) },
-    { QStringLiteral( "GabledRoof" ), QStringLiteral( "pointnext_reg_gabledroof_rot" ) },
-    { QStringLiteral( "PyramidRoof" ), QStringLiteral( "pointnext_reg_pyramidroof_rot" ) },
-    { QStringLiteral( "TruncatedPyramidRoof" ), QStringLiteral( "pointnext_reg_truncatedpyramid_rot" ) },
-    { QStringLiteral( "HalfCylinderRoof" ), QStringLiteral( "pointnext_reg_halfcylinder_rot" ) },
-    { QStringLiteral( "CylinderDome" ), QStringLiteral( "pointnext_reg_cylinderdome_rot" ) },
-    { QStringLiteral( "IndentedCuboid" ), QStringLiteral( "pointnext_reg_indentedcuboid_rot" ) },
-    { QStringLiteral( "AsymmetricGableHouse" ), QStringLiteral( "pointnext_reg_asymgable_rot" ) },
-    { QStringLiteral( "FourStageRoundTower" ), QStringLiteral( "pointnext_reg_fourstage_rot" ) },
-    { QStringLiteral( "TwoGableHouses" ), QStringLiteral( "pointnext_reg_twogable_rot" ) }
+    { QStringLiteral( "Cuboid" ), QStringLiteral( "pointnext_reg_cuboid_aux" ) },
+    { QStringLiteral( "Cylinder" ), QStringLiteral( "pointnext_reg_cylinder_aux" ) },
+    { QStringLiteral( "LHouse" ), QStringLiteral( "pointnext_reg_lhouse_aux" ) },
+    { QStringLiteral( "ConeCylinder" ), QStringLiteral( "pointnext_reg_conecylinder_aux" ) },
+    { QStringLiteral( "GabledRoof" ), QStringLiteral( "pointnext_reg_gabledroof_aux" ) },
+    { QStringLiteral( "PyramidRoof" ), QStringLiteral( "pointnext_reg_pyramidroof_aux" ) },
+    { QStringLiteral( "TruncatedPyramidRoof" ), QStringLiteral( "pointnext_reg_truncatedpyramid_aux" ) },
+    { QStringLiteral( "HalfCylinderRoof" ), QStringLiteral( "pointnext_reg_halfcylinder_aux" ) },
+    { QStringLiteral( "CylinderDome" ), QStringLiteral( "pointnext_reg_cylinderdome_aux" ) },
+    { QStringLiteral( "IndentedCuboid" ), QStringLiteral( "pointnext_reg_indentedcuboid_aux" ) },
+    { QStringLiteral( "AsymmetricGableHouse" ), QStringLiteral( "pointnext_reg_asymgable_aux" ) },
+    { QStringLiteral( "FourStageRoundTower" ), QStringLiteral( "pointnext_reg_fourstage_aux" ) },
+    { QStringLiteral( "TwoGableHouses" ), QStringLiteral( "pointnext_reg_twogable_aux" ) }
   };
   static const QMap<QString, QString> pointnet2Dirs = {
     { QStringLiteral( "Cuboid" ), QStringLiteral( "reg_cuboid_aux" ) },
