@@ -48,6 +48,7 @@ class ParamModelerDock : public QDockWidget
   friend class ParamInverter;
   friend void generateFullDataset( ParamModelerDock *dock );
   friend void generateSinglePrimitiveDataset( ParamModelerDock *dock );
+  friend void randomizePrimitiveParams( ParamModelerDock *dock, bool refreshPreview, bool randomizePose );
 
 public:
   explicit ParamModelerDock( QgisInterface *iface, QWidget *parent = nullptr );

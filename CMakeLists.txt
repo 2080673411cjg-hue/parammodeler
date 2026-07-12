@@ -9,6 +9,7 @@ set (parammodeler_SRCS
   parammodeler_datasetgen.cpp
   parammodeler_dlutils.cpp
   parammodeler_params.cpp
+  parammodeler_randomizer.cpp
   exportjson.cpp
   exportobj.cpp
 		exportpointcloud.cpp
