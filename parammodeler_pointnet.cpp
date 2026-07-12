@@ -1,4 +1,5 @@
 #include "parammodeler_pointnet.h"
+#include "parammodeler_config.h"
 #include "parammodeler_pcdloader.h"
 
 #include <QCoreApplication>
@@ -42,7 +43,7 @@ struct PreparedPointCloudInput
 
 const QString defaultPythonExe()
 {
-  return QStringLiteral( "E:/mambaforge/envs/pointnet_train/python.exe" );
+  return ParamModelerConfig::pythonExe();
 }
 
 PointNetBackendConfig backendConfig( PointNetBackend backend )
@@ -51,23 +52,23 @@ PointNetBackendConfig backendConfig( PointNetBackend backend )
   {
     return {
       QStringLiteral( "PointNet" ),
-      QStringLiteral( "E:/pointnet/pointnet_simple/main.py" ),
-      QStringLiteral( "E:/pointnet/pointnet_simple/logs/pointnet_aug_roof_guard_v1" )
+      ParamModelerConfig::classifyScript( backend ),
+      ParamModelerConfig::classifyLogDir( backend )
     };
   }
   if ( backend == PointNetBackend::PointNeXt )
   {
     return {
       QStringLiteral( "PointNeXt" ),
-      QStringLiteral( "E:/pointnet/pointnext_simple/main.py" ),
-      QStringLiteral( "E:/pointnet/pointnext_simple/logs/pointnext_cls_v2" )
+      ParamModelerConfig::classifyScript( backend ),
+      ParamModelerConfig::classifyLogDir( backend )
     };
   }
 
   return {
     QStringLiteral( "PointNet++" ),
-    QStringLiteral( "E:/pointnet/pointnet2_simple/main.py" ),
-    QStringLiteral( "E:/pointnet/pointnet2_simple/logs/pointnet2_cls_auxdata_250" )
+    ParamModelerConfig::classifyScript( backend ),
+    ParamModelerConfig::classifyLogDir( backend )
   };
 }
 
@@ -86,12 +87,8 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
 
   const bool usePointNeXt = backend == PointNetBackend::PointNeXt;
   const QString modelName = usePointNeXt ? QStringLiteral( "PointNeXt" ) : QStringLiteral( "PointNet++" );
-  const QString script = usePointNeXt
-                           ? QStringLiteral( "E:/pointnet/pointnext_simple/main_reg.py" )
-                           : QStringLiteral( "E:/pointnet/pointnet2_simple/main_reg.py" );
-  const QString base = usePointNeXt
-                         ? QStringLiteral( "E:/pointnet/pointnext_simple/logs/" )
-                         : QStringLiteral( "E:/pointnet/pointnet2_simple/logs/" );
+  const QString script = ParamModelerConfig::regressionScript( backend );
+  const QString base = ParamModelerConfig::regressionLogBase( backend );
   static const QMap<QString, QString> pointnextDirs = {
     { QStringLiteral( "Cuboid" ), QStringLiteral( "pointnext_reg_cuboid_rot" ) },
     { QStringLiteral( "Cylinder" ), QStringLiteral( "pointnext_reg_cylinder_rot" ) },
@@ -168,7 +165,7 @@ bool metadataAuxForInput( const QString &filePath, QVector3D &bboxSize, double &
   if ( rel.isEmpty() )
     return false;
 
-  QFile metadataFile( QStringLiteral( "E:/pointnet/datasets_aug/metadata/sample_params.json" ) );
+  QFile metadataFile( ParamModelerConfig::metadataJsonPath() );
   if ( !metadataFile.open( QIODevice::ReadOnly ) )
     return false;
 
@@ -436,8 +433,8 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
   args << config.scriptPath
        << QStringLiteral( "--mode" ) << QStringLiteral( "predict" )
        << QStringLiteral( "--input" ) << prepared.pythonInputPath
-       << QStringLiteral( "--data_root" ) << QStringLiteral( "E:/pointnet/datasets_aug" )
-       << QStringLiteral( "--metadata" ) << QStringLiteral( "E:/pointnet/datasets_aug/metadata/sample_params.json" )
+       << QStringLiteral( "--data_root" ) << ParamModelerConfig::dataRootPath()
+       << QStringLiteral( "--metadata" ) << ParamModelerConfig::metadataJsonPath()
        << QStringLiteral( "--log_dir" ) << config.logDir
        << QStringLiteral( "--num_points" ) << QString::number( numPoints )
        << QStringLiteral( "--bbox_x" ) << QString::number( bboxSize.x(), 'g', 12 )

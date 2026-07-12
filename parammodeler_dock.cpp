@@ -105,6 +105,7 @@
 #include <qgs3dtypes.h>
 #include <qgsvectorfilewriter.h>
 #include <QDateTime>
+#include "parammodeler_config.h"
 #include <windows.h>
 #define DEBUG_LOG( msg ) OutputDebugStringW( msg )
 
@@ -585,7 +586,6 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   connect( ui->btnPointNetClassify, &QPushButton::clicked, this, &ParamModelerDock::onPointNetClassify );
   connect( ui->btnInverseParams, &QPushButton::clicked, this, &ParamModelerDock::onInverseParams );
 
-
   ui->btnPointNetClassify->setEnabled( false );
   ui->btnInverseParams->setEnabled( false );
 
@@ -862,6 +862,17 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   comboModel->setFixedWidth( 160 );
   modelLayout->addWidget( modelLabel );
   modelLayout->addWidget( comboModel );
+
+  auto *btnSettings = new QPushButton( tr( "⚙" ), &dialog );
+  btnSettings->setFixedSize( 28, 28 );
+  btnSettings->setToolTip( tr( "PointNet path settings" ) );
+  btnSettings->setCursor( Qt::PointingHandCursor );
+  btnSettings->setFlat( true );
+  connect( btnSettings, &QPushButton::clicked, &dialog, [&dialog]() {
+    ParamModelerConfig::showSettingsDialog( &dialog );
+  } );
+  modelLayout->addWidget( btnSettings );
+
   modelLayout->addStretch();
   auto *resultLabel = new QLabel( tr( "Result: -" ), &dialog );
   resultLabel->setWordWrap( true );
@@ -1529,7 +1540,7 @@ static bool metadataPointCloudInfoForInput( const QString &filePath,
   const QString rel = metadataRelativePathForPointCloud( filePath );
   if ( !rel.isEmpty() )
   {
-    QFile metadataFile( QStringLiteral( "E:/pointnet/datasets_aug/metadata/sample_params.json" ) );
+    QFile metadataFile( ParamModelerConfig::metadataJsonPath() );
     if ( metadataFile.open( QIODevice::ReadOnly ) )
     {
       QJsonParseError parseError;
