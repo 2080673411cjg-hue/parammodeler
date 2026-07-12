@@ -152,6 +152,11 @@ private slots:
 
 
 private:
+  void initUiControls();
+  void initConnections();
+  void initPreview();
+  void initPointNet();
+
   void schedulePreviewUpdate();
   void randomizeCurrentPrimitiveParams( bool refreshPreview, bool randomizePose = false );
   bool loadPointCloudToQGIS3D( const QString &filePath, bool showMessage );

@@ -156,7 +156,30 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   ui->groupBoxParameters->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Preferred );
   ui->stackedWidgetParams->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Preferred );
 
+  initUiControls();
+  initConnections();
+  initPreview();
+  initPointNet();
 
+  ui->btnPointNetClassify->setEnabled( false );
+  ui->btnInverseParams->setEnabled( false );
+
+  DEBUG_LOG( L"\n[ParamModelerDock] initialization complete\n" );
+  DEBUG_LOG( m_currentPrimitive.toStdWString().c_str() );
+  DEBUG_LOG( L"\n" );
+}
+
+ParamModelerDock::~ParamModelerDock()
+{
+  ParamModelerScene3D::clearRealtimePreviewMesh( mIface );
+  m_modelLayer = nullptr;
+  delete ui;
+}
+
+// ======================= init helpers =======================
+
+void ParamModelerDock::initUiControls()
+{
   bindSliderSpin( ui->sliderCLength, ui->spinBoxCLength, 100.0, 50.0 );
   bindSliderSpin( ui->sliderCWidth, ui->spinBoxCWidth, 100.0, 50.0 );
   bindSliderSpin( ui->sliderCHeight, ui->spinBoxCHeight, 100.0, 50.0 );
@@ -193,11 +216,6 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   ui->spinBoxHCRRadius->setReadOnly( true );
   ui->spinBoxHCRRadius->setButtonSymbols( QAbstractSpinBox::NoButtons );
   ui->spinBoxHCRRadius->setRange( 0.0, 25.0 );
-  auto syncHCRRadius = [this]() {
-    ui->spinBoxHCRRadius->setValue( ui->spinBoxHCRWidth->value() / 2.0 );
-  };
-  syncHCRRadius();
-  connect( ui->spinBoxHCRWidth, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, [syncHCRRadius]( double ) { syncHCRRadius(); } );
   bindSliderSpin( ui->sliderICLength, ui->spinBoxICLength, 100, 50 );
   bindSliderSpin( ui->sliderICWidth, ui->spinBoxICWidth, 100, 50 );
   bindSliderSpin( ui->sliderICHeight, ui->spinBoxICHeight, 100, 50 );
@@ -300,7 +318,15 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   ui->labelTGRoofHeight->setText( tr( "Wall ratio:" ) );
   ui->labelTGAngle->setText( tr( "Angle:" ) );
   ui->labelTGRidgeRatio->setText( tr( "Ridge ratio:" ) );
+}
 
+void ParamModelerDock::initConnections()
+{
+  auto syncHCRRadius = [this]() {
+    ui->spinBoxHCRRadius->setValue( ui->spinBoxHCRWidth->value() / 2.0 );
+  };
+  syncHCRRadius();
+  connect( ui->spinBoxHCRWidth, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, [syncHCRRadius]( double ) { syncHCRRadius(); } );
 
   connect( ui->actOBJ, &QAction::triggered, this, &ParamModelerDock::onExportOBJClicked );
   connect( ui->actJSON, &QAction::triggered, this, &ParamModelerDock::onExportJSONClicked );
@@ -313,52 +339,16 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   connect( ui->actTo3D, &QAction::triggered, this, [this]() { onLoadToQGIS3D( true ); } );
   connect( ui->actLoadPC, &QAction::triggered, this, &ParamModelerDock::onLoadExternalPointCloud );
 
-
-  m_previewWidget = ui->previewWidget;
-  if ( m_previewWidget )
-  {
-    QWidget *previewParent = m_previewWidget->parentWidget();
-    QVBoxLayout *previewLayout = previewParent ? qobject_cast<QVBoxLayout *>( previewParent->layout() ) : nullptr;
-    if ( previewLayout )
-    {
-      QPushButton *togglePreviewButton = new QPushButton( tr( "Show local preview" ), previewParent );
-      togglePreviewButton->setCheckable( true );
-      togglePreviewButton->setChecked( false );
-      const int previewIndex = previewLayout->indexOf( m_previewWidget );
-      previewLayout->insertWidget( previewIndex >= 0 ? previewIndex : previewLayout->count(), togglePreviewButton );
-      m_previewWidget->setVisible( false );
-      connect( togglePreviewButton, &QPushButton::toggled, this, [this, togglePreviewButton]( bool checked ) {
-        if ( m_previewWidget )
-          m_previewWidget->setVisible( checked );
-        togglePreviewButton->setText( checked ? tr( "Hide local preview" ) : tr( "Show local preview" ) );
-        if ( checked )
-          onUpdatePreview();
-      } );
-    }
-  }
-  ui->checkBoxAutoSync->setChecked( false );
-  ui->checkBoxAutoSync->setVisible( false );
-
-  m_previewTimer = new QTimer( this );
-  m_previewTimer->setSingleShot( true );
-  m_previewTimer->setInterval( 33 );
-  connect( m_previewTimer, &QTimer::timeout, this, [this]() {
-    if ( !m_previewUpdatePending )
-      return;
-
-    onUpdatePreview();
-  } );
-
   auto schedulePreview = [this]( int ) { schedulePreviewUpdate(); };
-
   auto schedulePreviewD = [this]( double ) { schedulePreviewUpdate(); };
+
   connect( ui->spinBoxROmega, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
   connect( ui->spinBoxRPhi, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
   connect( ui->spinBoxRKappa, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
-
   connect( ui->spinBoxTX, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, schedulePreviewD );
   connect( ui->spinBoxTY, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, schedulePreviewD );
   connect( ui->spinBoxTZ, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, schedulePreviewD );
+
   connect( ui->sliderCLength, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCWidth, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCHeight, &QSlider::valueChanged, this, schedulePreview );
@@ -422,10 +412,54 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   connect( ui->sliderTGRidgeRatio, &QSlider::valueChanged, this, schedulePreview );
 
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, &ParamModelerDock::onPrimitiveChanged );
-
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, [this]( const QString & ) { onUpdatePreview(); } );
   connect( ui->btnRandomParams, &QPushButton::clicked, this, &ParamModelerDock::onRandomizeCurrentPrimitive );
+  connect( ui->btnToggleInversion, &QPushButton::clicked, this, &ParamModelerDock::onOpenPointCloudEstimateDialog );
 
+  connect( ui->btnLoadPointCloud, &QPushButton::clicked, this, &ParamModelerDock::onLoadInputData );
+  connect( ui->btnPointNetClassify, &QPushButton::clicked, this, &ParamModelerDock::onPointNetClassify );
+  connect( ui->btnInverseParams, &QPushButton::clicked, this, &ParamModelerDock::onInverseParams );
+}
+
+void ParamModelerDock::initPreview()
+{
+  m_previewWidget = ui->previewWidget;
+  if ( m_previewWidget )
+  {
+    QWidget *previewParent = m_previewWidget->parentWidget();
+    QVBoxLayout *previewLayout = previewParent ? qobject_cast<QVBoxLayout *>( previewParent->layout() ) : nullptr;
+    if ( previewLayout )
+    {
+      QPushButton *togglePreviewButton = new QPushButton( tr( "Show local preview" ), previewParent );
+      togglePreviewButton->setCheckable( true );
+      togglePreviewButton->setChecked( false );
+      const int previewIndex = previewLayout->indexOf( m_previewWidget );
+      previewLayout->insertWidget( previewIndex >= 0 ? previewIndex : previewLayout->count(), togglePreviewButton );
+      m_previewWidget->setVisible( false );
+      connect( togglePreviewButton, &QPushButton::toggled, this, [this, togglePreviewButton]( bool checked ) {
+        if ( m_previewWidget )
+          m_previewWidget->setVisible( checked );
+        togglePreviewButton->setText( checked ? tr( "Hide local preview" ) : tr( "Show local preview" ) );
+        if ( checked )
+          onUpdatePreview();
+      } );
+    }
+  }
+  ui->checkBoxAutoSync->setChecked( false );
+  ui->checkBoxAutoSync->setVisible( false );
+
+  m_previewTimer = new QTimer( this );
+  m_previewTimer->setSingleShot( true );
+  m_previewTimer->setInterval( 33 );
+  connect( m_previewTimer, &QTimer::timeout, this, [this]() {
+    if ( !m_previewUpdatePending )
+      return;
+    onUpdatePreview();
+  } );
+}
+
+void ParamModelerDock::initPointNet()
+{
   ui->frameInversion->setVisible( false );
   ui->btnToggleInversion->setCheckable( false );
   ui->btnToggleInversion->setFlat( false );
@@ -434,7 +468,6 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   ui->btnPointNetClassify->setText( tr( "Classify" ) );
   ui->btnInverseParams->setText( tr( "Estimate parameters" ) );
   ui->formLayoutPrimitive->addRow( tr( "Point cloud:" ), ui->btnToggleInversion );
-  connect( ui->btnToggleInversion, &QPushButton::clicked, this, &ParamModelerDock::onOpenPointCloudEstimateDialog );
 
   // 透明模式复选框：微调参数时让模型半透明，不挡点云
   mGhostModeCheckBox = new QCheckBox( tr( "Ghost mode (see through model)" ), this );
@@ -446,24 +479,6 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
     if ( m_realtimeModelLoaded )
       onUpdatePreview();
   } );
-
-  connect( ui->btnLoadPointCloud, &QPushButton::clicked, this, &ParamModelerDock::onLoadInputData );
-  connect( ui->btnPointNetClassify, &QPushButton::clicked, this, &ParamModelerDock::onPointNetClassify );
-  connect( ui->btnInverseParams, &QPushButton::clicked, this, &ParamModelerDock::onInverseParams );
-
-  ui->btnPointNetClassify->setEnabled( false );
-  ui->btnInverseParams->setEnabled( false );
-
-  DEBUG_LOG( L"\n[ParamModelerDock] initialization complete\n" );
-  DEBUG_LOG( m_currentPrimitive.toStdWString().c_str() );
-  DEBUG_LOG( L"\n" );
-}
-
-ParamModelerDock::~ParamModelerDock()
-{
-  ParamModelerScene3D::clearRealtimePreviewMesh( mIface );
-  m_modelLayer = nullptr;
-  delete ui;
 }
 
 void ParamModelerDock::onPrimitiveChanged( const QString &prim )
