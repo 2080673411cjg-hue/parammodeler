@@ -46,6 +46,8 @@ class ParamModelerDock : public QDockWidget
   friend class ExportJSON;
   friend class ExportOBJ;
   friend class ParamInverter;
+  friend void generateFullDataset( ParamModelerDock *dock );
+  friend void generateSinglePrimitiveDataset( ParamModelerDock *dock );
 
 public:
   explicit ParamModelerDock( QgisInterface *iface, QWidget *parent = nullptr );
