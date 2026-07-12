@@ -8,12 +8,11 @@ set (parammodeler_SRCS
   parammodeler_dock.cpp
   parammodeler_datasetgen.cpp
   parammodeler_dlutils.cpp
+  parammodeler_export.cpp
   parammodeler_params.cpp
   parammodeler_randomizer.cpp
-  exportjson.cpp
-  exportobj.cpp
-		exportpointcloud.cpp
-		buildmesh.cpp
+  exportpointcloud.cpp
+  buildmesh.cpp
   previewglwidget.cpp
   parammodeler_pcdloader.cpp
   parammodeler_pointnet.cpp
@@ -45,12 +44,12 @@ include_directories(
 target_link_libraries(plugin_parammodeler
   qgis_core
   qgis_gui
-		Qt5::OpenGL
-		Qt5::3DCore
-		Qt5::3DRender
-		Qt5::3DExtras
+  Qt5::OpenGL
+  Qt5::3DCore
+  Qt5::3DRender
+  Qt5::3DExtras
   opengl32
-		qgis_3d
+  qgis_3d
 )
 ########################################################
 # Install
