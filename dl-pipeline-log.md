@@ -255,7 +255,7 @@ QProcess: python main_reg.py --mode predict
          --data_root ... --metadata ...
          --bbox_x .. --bbox_y .. --bbox_z .. --scale ..
     ↓
-JSON 输出 → pointNetParamsToUiParams() → ParamInverter::applyToUI()
+JSON 输出 → pointNetParamsToUiParams() → PointNetRunner::applyToUI()
     ↓
 auto-align: 计算 pcCenter - modelCenter → setPoseTranslate(tx,ty,tz)
 ```

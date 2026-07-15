@@ -45,7 +45,8 @@ class ParamModelerDock : public QDockWidget
   Q_OBJECT
   friend class ExportJSON;
   friend class ExportOBJ;
-  friend class ParamInverter;
+  friend class PointNetRunner;
+
   friend void generateFullDataset( ParamModelerDock *dock );
   friend void generateSinglePrimitiveDataset( ParamModelerDock *dock );
   friend void randomizePrimitiveParams( ParamModelerDock *dock, bool refreshPreview, bool randomizePose );

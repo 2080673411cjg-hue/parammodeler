@@ -21,7 +21,7 @@
 #include "buildmesh.h"
 #include "parammodeler_export.h"
 #include "exportpointcloud.h"
-#include "parammodeler_inverse.h"
+
 #include "parammodeler_pcdloader.h"
 #include "parammodeler_datasetgen.h"
 #include "parammodeler_dlutils.h"
@@ -771,7 +771,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       return;
     }
 
-    ParamInverter::applyToUI( this, params );
+    PointNetRunner::applyToUI( this, params );
     parametersApplied = true;
     table->setRowCount( params.size() );
     int row = 0;
@@ -1407,7 +1407,7 @@ void ParamModelerDock::onInverseParams()
   if ( !params.isEmpty() )
   {
     DEBUG_LOG( QString( "[PointNet] parameter regression done, returned %1 parameters\n" ).arg( params.size() ).toStdWString().c_str() );
-    ParamInverter::applyToUI( this, params );
+    PointNetRunner::applyToUI( this, params );
 
     ui->tableInverseParams->setRowCount( params.size() );
     int row = 0;

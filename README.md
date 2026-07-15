@@ -84,7 +84,7 @@ x y z
 
 ### 4. 参数估计
 
-分类完成后，插件可继续调用对应基元的参数回归模型。回归输出会经过 `pointNetParamsToUiParams()` 映射到插件 UI 参数，再由 `ParamInverter::applyToUI()` 写回界面。
+分类完成后，插件可继续调用对应基元的参数回归模型。回归输出会经过 `pointNetParamsToUiParams()` 映射到插件 UI 参数，再由 `PointNetRunner::applyToUI()` 写回界面。
 
 参数估计流程大致为：
 
@@ -162,7 +162,7 @@ parammodeler/
 ├── parammodeler_pcdloader.cpp / .h    # 外部点云读取
 ├── parammodeler_pcdtypes.h            # 点云数据结构
 ├── parammodeler_pointnet.cpp / .h     # 外部深度学习模型调用
-├── parammodeler_inverse.cpp / .h      # 传统几何反演 / baseline / fallback
+
 ├── exportjson.cpp / .h                # JSON 参数导出
 ├── exportobj.cpp / .h                 # OBJ 网格导出
 ├── exportpointcloud.cpp / .h          # PLY 和深度学习 TXT 点云导出

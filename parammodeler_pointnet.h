@@ -33,6 +33,8 @@ enum class PointNetBackend
   PointNeXt
 };
 
+class ParamModelerDock;
+
 class PointNetRunner
 {
 public:
@@ -50,6 +52,9 @@ public:
                                                  PointNetBackend backend,
                                                  const QString &primitiveType,
                                                  int numPoints = 2048 );
+
+  static void applyToUI( ParamModelerDock *dock,
+                         const QMap<QString, double> &params );
 };
 
 #endif // PARAMMODELER_POINTNET_H
