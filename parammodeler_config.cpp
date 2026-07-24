@@ -61,6 +61,28 @@ QString datasetsBaseDir()
 }
 
 // ------------------------------------------------------------------
+// model version selectors
+// ------------------------------------------------------------------
+
+QString classifyModelName()
+{
+  return setting( QStringLiteral( "parammodeler/classifyModelName" ),
+                  QStringLiteral( "pointnext_cls_v2" ) );
+}
+
+QString regressionModelPrefix()
+{
+  return setting( QStringLiteral( "parammodeler/regressionModelPrefix" ),
+                  QStringLiteral( "pointnext_reg_" ) );
+}
+
+QString regressionModelSuffix()
+{
+  return setting( QStringLiteral( "parammodeler/regressionModelSuffix" ),
+                  QStringLiteral( "_rot" ) );
+}
+
+// ------------------------------------------------------------------
 // derived classify paths
 // ------------------------------------------------------------------
 
@@ -81,7 +103,7 @@ QString classifyLogDir( PointNetBackend backend )
   switch ( backend )
   {
     case PointNetBackend::PointNet:  return base + QStringLiteral( "pointnet_simple/logs/pointnet_aug_roof_guard_v1" );
-    case PointNetBackend::PointNeXt: return base + QStringLiteral( "pointnext_simple/logs/pointnext_cls_v2" );
+    case PointNetBackend::PointNeXt: return base + QStringLiteral( "pointnext_simple/logs/" ) + classifyModelName();
     default:                         return base + QStringLiteral( "pointnet2_simple/logs/pointnet2_cls_auxdata_250" );
   }
 }
@@ -135,14 +157,20 @@ void showSettingsDialog( QWidget *parent )
   dlg.setMinimumWidth( 520 );
 
   // --- current values ---
-  const QString curPython  = pythonExe();
-  const QString curBase    = pointnetBaseDir();
-  const QString curDataset = datasetsBaseDir();
+  const QString curPython   = pythonExe();
+  const QString curBase     = pointnetBaseDir();
+  const QString curDataset  = datasetsBaseDir();
+  const QString curClsModel = classifyModelName();
+  const QString curRegPrefix = regressionModelPrefix();
+  const QString curRegSuffix = regressionModelSuffix();
 
   // --- line edits ---
-  auto *edtPython  = new QLineEdit( curPython, &dlg );
-  auto *edtBase    = new QLineEdit( curBase, &dlg );
-  auto *edtDataset = new QLineEdit( curDataset, &dlg );
+  auto *edtPython   = new QLineEdit( curPython, &dlg );
+  auto *edtBase     = new QLineEdit( curBase, &dlg );
+  auto *edtDataset  = new QLineEdit( curDataset, &dlg );
+  auto *edtClsModel = new QLineEdit( curClsModel, &dlg );
+  auto *edtRegPrefix = new QLineEdit( curRegPrefix, &dlg );
+  auto *edtRegSuffix = new QLineEdit( curRegSuffix, &dlg );
 
   auto makeBrowse = [&]( QLineEdit *edt, bool dirOnly ) {
     auto *btn = new QPushButton( QStringLiteral( "浏览..." ), &dlg );
@@ -177,6 +205,16 @@ void showSettingsDialog( QWidget *parent )
     hb->addWidget( makeBrowse( edtDataset, true ) );
     form->addRow( QStringLiteral( "数据集根目录:" ), hb );
   }
+  // --- model version settings (no browse — these are relative names) ---
+  {
+    form->addRow( QStringLiteral( "分类模型名:" ), edtClsModel );
+  }
+  {
+    auto *hb = new QHBoxLayout;
+    hb->addWidget( edtRegPrefix );
+    hb->addWidget( edtRegSuffix );
+    form->addRow( QStringLiteral( "回归模型 (前缀 + 后缀):" ), hb );
+  }
 
   auto *lblHint = new QLabel(
     QStringLiteral( "修改后需重启插件才能生效。" ), &dlg );
@@ -184,9 +222,12 @@ void showSettingsDialog( QWidget *parent )
 
   auto *btnReset = new QPushButton( QStringLiteral( "恢复默认值" ), &dlg );
   QObject::connect( btnReset, &QPushButton::clicked, [&]() {
-    edtPython->setText(  QStringLiteral( "E:/mambaforge/envs/pointnet_train/python.exe" ) );
-    edtBase->setText(    QStringLiteral( "E:/pointnet" ) );
-    edtDataset->setText( QStringLiteral( "E:/pointnet/datasets_aug" ) );
+    edtPython->setText(    QStringLiteral( "E:/mambaforge/envs/pointnet_train/python.exe" ) );
+    edtBase->setText(      QStringLiteral( "E:/pointnet" ) );
+    edtDataset->setText(   QStringLiteral( "E:/pointnet/datasets_aug" ) );
+    edtClsModel->setText(  QStringLiteral( "pointnext_cls_v2" ) );
+    edtRegPrefix->setText( QStringLiteral( "pointnext_reg_" ) );
+    edtRegSuffix->setText( QStringLiteral( "_rot" ) );
   } );
 
   auto *btnBox = new QHBoxLayout;
@@ -198,9 +239,12 @@ void showSettingsDialog( QWidget *parent )
 
   QObject::connect( btnOk, &QPushButton::clicked, [&]() {
     QgsSettings s;
-    s.setValue( QStringLiteral( "parammodeler/pythonExe" ),    edtPython->text() );
-    s.setValue( QStringLiteral( "parammodeler/pointnetBase" ), edtBase->text() );
-    s.setValue( QStringLiteral( "parammodeler/datasetsBase" ), edtDataset->text() );
+    s.setValue( QStringLiteral( "parammodeler/pythonExe" ),            edtPython->text() );
+    s.setValue( QStringLiteral( "parammodeler/pointnetBase" ),         edtBase->text() );
+    s.setValue( QStringLiteral( "parammodeler/datasetsBase" ),         edtDataset->text() );
+    s.setValue( QStringLiteral( "parammodeler/classifyModelName" ),    edtClsModel->text() );
+    s.setValue( QStringLiteral( "parammodeler/regressionModelPrefix" ), edtRegPrefix->text() );
+    s.setValue( QStringLiteral( "parammodeler/regressionModelSuffix" ), edtRegSuffix->text() );
     dlg.accept();
   } );
   QObject::connect( btnCancel, &QPushButton::clicked, &dlg, &QDialog::reject );

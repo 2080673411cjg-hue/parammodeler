@@ -56,6 +56,7 @@
 #include <Qt3DRender/QBlendEquationArguments>
 #include <Qt3DRender/QBuffer>
 #include <Qt3DRender/QDepthTest>
+#include <Qt3DRender/QNoDepthMask>
 #include <Qt3DRender/QEffect>
 #include <Qt3DRender/QGeometry>
 #include <Qt3DRender/QGeometryRenderer>
@@ -81,7 +82,12 @@ struct RealtimePreviewPart
   QPointer<Qt3DRender::QAttribute> positionAttribute;
   QPointer<Qt3DRender::QAttribute> normalAttribute;
   QPointer<Qt3DExtras::QPhongMaterial> material;
+
+  QPointer<Qt3DRender::QDepthTest> depthTest;
+  QPointer<Qt3DRender::QNoDepthMask> noDepthMask;
+
   bool blendingSetup = false;
+  bool depthStateSetup = false;
 };
 
 struct RealtimePreviewState
@@ -89,6 +95,8 @@ struct RealtimePreviewState
   QPointer<Qt3DCore::QEntity> root;
   RealtimePreviewPart body;
   RealtimePreviewPart roof;
+  QgsVector3D frozenOrigin;           // origin snapshot at entity creation
+  bool         frozenOriginValid = false;
 };
 
 QHash<Qgs3DMapScene *, RealtimePreviewState> sRealtimePreviewMeshes;
@@ -387,6 +395,66 @@ void updateRealtimePart( RealtimePreviewPart &part,
     part.blendingSetup = true;
   }
 
+  // Ghost mode 深度状态初始化（一次性）：创建 QDepthTest + QNoDepthMask，挂 depthTest 到所有 render pass
+  if ( !part.depthStateSetup && part.material )
+  {
+    Qt3DRender::QEffect *effect = part.material->effect();
+    if ( effect )
+    {
+      part.depthTest = new Qt3DRender::QDepthTest();
+      part.noDepthMask = new Qt3DRender::QNoDepthMask();
+
+      for ( Qt3DRender::QTechnique *tech : effect->techniques() )
+      {
+        for ( Qt3DRender::QRenderPass *pass : tech->renderPasses() )
+        {
+          pass->addRenderState( part.depthTest );
+        }
+      }
+
+      part.depthStateSetup = true;
+    }
+  }
+
+  // 每帧动态切换深度状态：Ghost ON → Always + 禁止写深度；Ghost OFF → Less + 正常写深度
+  if ( part.depthStateSetup && part.depthTest && part.material )
+  {
+    Qt3DRender::QEffect *effect = part.material->effect();
+    if ( effect )
+    {
+      const bool ghost = sGhostMode;
+
+      part.depthTest->setDepthFunction(
+        ghost
+          ? Qt3DRender::QDepthTest::Always
+          : Qt3DRender::QDepthTest::Less
+      );
+
+      for ( Qt3DRender::QTechnique *tech : effect->techniques() )
+      {
+        for ( Qt3DRender::QRenderPass *pass : tech->renderPasses() )
+        {
+          if ( !part.noDepthMask )
+            continue;
+
+          const QVector<Qt3DRender::QRenderState *> states = pass->renderStates();
+          const bool hasNoDepthMask = states.contains( part.noDepthMask );
+
+          if ( ghost )
+          {
+            if ( !hasNoDepthMask )
+              pass->addRenderState( part.noDepthMask );
+          }
+          else
+          {
+            if ( hasNoDepthMask )
+              pass->removeRenderState( part.noDepthMask );
+          }
+        }
+      }
+    }
+  }
+
   // 每次调用都更新材质颜色（ghost mode 切换时需要）
   if ( part.material )
   {
@@ -453,13 +521,25 @@ Qgs3DMapCanvas *ensureRealtimePreviewCanvas( QgisInterface *iface, const QgsRect
 
   ensureRealtimeAnchorLayer( iface, extent );
 
-  if ( iface->mapCanvases3D().isEmpty() )
+  const bool isNewCanvas = iface->mapCanvases3D().isEmpty();
+  if ( isNewCanvas )
     iface->createNewMapCanvas3D( QObject::tr( "ParamModeler 3D" ) );
 
   const QList<Qgs3DMapCanvas *> canvases = iface->mapCanvases3D();
   for ( Qgs3DMapCanvas *canvas : canvases )
   {
-    if ( canvas && canvas->scene() )
+    if ( !canvas )
+      continue;
+    Qgs3DMapSettings *s = canvas->mapSettings();
+    if ( !s )
+      continue;
+    // One-shot: configure scene appearance only when the canvas is first created
+    if ( isNewCanvas )
+    {
+      s->setTerrainRenderingEnabled( false );
+      s->setBackgroundColor( QColor( 45, 48, 50 ) );
+    }
+    if ( canvas->scene() )
       return canvas;
   }
   return nullptr;
@@ -768,7 +848,15 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
     Qgs3DMapSettings *mapSettings = canvas->mapSettings();
     if ( mapSettings )
     {
-      const QgsVector3D origin = mapSettings->origin();
+      // Freeze the map origin at entity creation so the model stays put
+      // even when the QGIS floating origin shifts (camera movement, terrain
+      // toggle, etc.).
+      if ( !state.frozenOriginValid )
+      {
+        state.frozenOrigin = mapSettings->origin();
+        state.frozenOriginValid = true;
+      }
+      const QgsVector3D origin = state.frozenOrigin;
       Qt3DCore::QTransform *rootTransform = nullptr;
       for ( Qt3DCore::QComponent *comp : state.root->components() )
       {
@@ -788,8 +876,8 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
     }
   }
 
-  const int bodyAlpha  = sGhostMode ? 20 : 70;
-  const int roofAlpha  = sGhostMode ? 25 : 86;
+  const int bodyAlpha  = sGhostMode ? 20 : 255;
+  const int roofAlpha  = sGhostMode ? 25 : 255;
   updateRealtimePart( state.body,
                       state.root,
                       bodyValues,

@@ -116,7 +116,7 @@ void generateFullDataset( ParamModelerDock *dock )
       const QString fullPath = rootDir.filePath( relativePath );
 
       DLPointCloudInfo pcInfo;
-      if ( ExportPointCloud::exportDLInputTXT( fullPath, prim, dock, pointCount, &pcInfo ) )
+      if ( ExportPointCloud::exportOccludedTXT( fullPath, prim, dock, pointCount, &pcInfo ) )
       {
         QJsonObject item;
         item["file"] = relativePath;
@@ -254,7 +254,7 @@ void generateSinglePrimitiveDataset( ParamModelerDock *dock )
     const QString fullPath = rootDir.filePath( relativePath );
 
     DLPointCloudInfo pcInfo;
-    if ( ExportPointCloud::exportDLInputTXT( fullPath, prim, dock, pointCount, &pcInfo ) )
+    if ( ExportPointCloud::exportOccludedTXT( fullPath, prim, dock, pointCount, &pcInfo ) )
     {
       QJsonObject item;
       item["file"] = relativePath;

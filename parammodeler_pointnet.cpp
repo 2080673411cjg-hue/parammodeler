@@ -90,40 +90,38 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
   const bool usePointNeXt = backend == PointNetBackend::PointNeXt;
   const QString modelName = usePointNeXt ? QStringLiteral( "PointNeXt" ) : QStringLiteral( "PointNet++" );
   const QString script = ParamModelerConfig::regressionScript( backend );
-  const QString base = ParamModelerConfig::regressionLogBase( backend );
-  static const QMap<QString, QString> pointnextDirs = {
-    { QStringLiteral( "Cuboid" ), QStringLiteral( "pointnext_reg_cuboid_aux" ) },
-    { QStringLiteral( "Cylinder" ), QStringLiteral( "pointnext_reg_cylinder_aux" ) },
-    { QStringLiteral( "LHouse" ), QStringLiteral( "pointnext_reg_lhouse_aux" ) },
-    { QStringLiteral( "ConeCylinder" ), QStringLiteral( "pointnext_reg_conecylinder_aux" ) },
-    { QStringLiteral( "GabledRoof" ), QStringLiteral( "pointnext_reg_gabledroof_aux" ) },
-    { QStringLiteral( "PyramidRoof" ), QStringLiteral( "pointnext_reg_pyramidroof_aux" ) },
-    { QStringLiteral( "TruncatedPyramidRoof" ), QStringLiteral( "pointnext_reg_truncatedpyramid_aux" ) },
-    { QStringLiteral( "HalfCylinderRoof" ), QStringLiteral( "pointnext_reg_halfcylinder_aux" ) },
-    { QStringLiteral( "CylinderDome" ), QStringLiteral( "pointnext_reg_cylinderdome_aux" ) },
-    { QStringLiteral( "IndentedCuboid" ), QStringLiteral( "pointnext_reg_indentedcuboid_aux" ) },
-    { QStringLiteral( "AsymmetricGableHouse" ), QStringLiteral( "pointnext_reg_asymgable_aux" ) },
-    { QStringLiteral( "FourStageRoundTower" ), QStringLiteral( "pointnext_reg_fourstage_aux" ) },
-    { QStringLiteral( "TwoGableHouses" ), QStringLiteral( "pointnext_reg_twogable_aux" ) }
-  };
-  static const QMap<QString, QString> pointnet2Dirs = {
-    { QStringLiteral( "Cuboid" ), QStringLiteral( "reg_cuboid_aux" ) },
-    { QStringLiteral( "Cylinder" ), QStringLiteral( "reg_cylinder_aux" ) },
-    { QStringLiteral( "LHouse" ), QStringLiteral( "reg_lhouse_aux" ) },
-    { QStringLiteral( "ConeCylinder" ), QStringLiteral( "reg_conecylinder_aux" ) },
-    { QStringLiteral( "GabledRoof" ), QStringLiteral( "reg_gabledroof_aux" ) },
-    { QStringLiteral( "PyramidRoof" ), QStringLiteral( "reg_pyramidroof_aux" ) },
-    { QStringLiteral( "TruncatedPyramidRoof" ), QStringLiteral( "reg_truncatedpyramid_aux" ) },
-    { QStringLiteral( "HalfCylinderRoof" ), QStringLiteral( "reg_halfcylinder_aux" ) },
-    { QStringLiteral( "CylinderDome" ), QStringLiteral( "reg_cylinderdome_aux" ) },
-    { QStringLiteral( "IndentedCuboid" ), QStringLiteral( "reg_indentedcuboid_aux" ) },
-    { QStringLiteral( "AsymmetricGableHouse" ), QStringLiteral( "reg_asymgable_aux" ) },
-    { QStringLiteral( "FourStageRoundTower" ), QStringLiteral( "reg_fourstage_aux" ) },
-    { QStringLiteral( "TwoGableHouses" ), QStringLiteral( "reg_twogable_aux" ) }
+  const QString base   = ParamModelerConfig::regressionLogBase( backend );
+
+  // Stem names (class → directory-safe short name).  These are stable
+  // across model versions; only the prefix/suffix change between runs.
+  static const QMap<QString, QString> stemNames = {
+    { QStringLiteral( "Cuboid" ),               QStringLiteral( "cuboid" ) },
+    { QStringLiteral( "Cylinder" ),             QStringLiteral( "cylinder" ) },
+    { QStringLiteral( "LHouse" ),               QStringLiteral( "lhouse" ) },
+    { QStringLiteral( "ConeCylinder" ),         QStringLiteral( "conecylinder" ) },
+    { QStringLiteral( "GabledRoof" ),           QStringLiteral( "gabledroof" ) },
+    { QStringLiteral( "PyramidRoof" ),          QStringLiteral( "pyramidroof" ) },
+    { QStringLiteral( "TruncatedPyramidRoof" ), QStringLiteral( "truncatedpyramid" ) },
+    { QStringLiteral( "HalfCylinderRoof" ),     QStringLiteral( "halfcylinder" ) },
+    { QStringLiteral( "CylinderDome" ),         QStringLiteral( "cylinderdome" ) },
+    { QStringLiteral( "IndentedCuboid" ),       QStringLiteral( "indentedcuboid" ) },
+    { QStringLiteral( "AsymmetricGableHouse" ), QStringLiteral( "asymgable" ) },
+    { QStringLiteral( "FourStageRoundTower" ),  QStringLiteral( "fourstage" ) },
+    { QStringLiteral( "TwoGableHouses" ),       QStringLiteral( "twogable" ) }
   };
 
-  const QMap<QString, QString> &dirs = usePointNeXt ? pointnextDirs : pointnet2Dirs;
-  return { modelName, prim, script, dirs.contains( prim ) ? base + dirs.value( prim ) : QString() };
+  if ( !stemNames.contains( prim ) )
+    return { modelName, prim, script, QString() };
+
+  const QString prefix = usePointNeXt
+    ? ParamModelerConfig::regressionModelPrefix()
+    : QStringLiteral( "reg_" );
+  const QString suffix = usePointNeXt
+    ? ParamModelerConfig::regressionModelSuffix()
+    : QStringLiteral( "_aux" );
+  const QString dirName = prefix + stemNames.value( prim ) + suffix;
+
+  return { modelName, prim, script, base + dirName };
 }
 
 bool vectorFromJsonArray( const QJsonValue &value, QVector3D &out )

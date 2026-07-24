@@ -1199,21 +1199,68 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
   QVector3D metadataCenter;
   double metadataScale = 1.0;
   const bool hasMetadata = metadataPointCloudInfoForInput( filePath, nullptr, &metadataCenter, &metadataScale );
+
+  // Detect buggy metadata (center ≈ 0, scale ≈ 1  →  was saved from
+  // normalised coords by the old exportOccludedTXT / exportLabeledTXT).
+  const bool metadataLooksBuggy = ( metadataScale < 2.0 && metadataCenter.lengthSquared() < 0.01 );
+
   if ( hasMetadata )
   {
     const PointCloud normalizedCloud = PointCloudLoader::load( filePath );
-    if ( !normalizedCloud.points.isEmpty() && pointCloudLooksNormalizedForDisplay( normalizedCloud ) && denormalizedFile.open() )
+    if ( !normalizedCloud.points.isEmpty() && pointCloudLooksNormalizedForDisplay( normalizedCloud ) )
     {
-      QTextStream out( &denormalizedFile );
-      for ( const QVector3D &p : normalizedCloud.points )
+      QVector3D denormCenter = metadataCenter;
+      double    denormScale  = metadataScale;
+
+      if ( metadataLooksBuggy )
       {
-        const QVector3D restored = p * static_cast<float>( metadataScale ) + metadataCenter;
-        out << restored.x() << ' ' << restored.y() << ' ' << restored.z() << '\n';
+        // Fallback: estimate real-world centre / scale from the current
+        // model mesh instead of trusting the broken metadata record.
+        const QString prim = ui->comboPrimitive->currentText();
+        const MeshData mesh = BuildMesh::build( prim, this );
+        if ( !mesh.isEmpty() )
+        {
+          QVector3D meshMin = mesh.vertices.first();
+          QVector3D meshMax = mesh.vertices.first();
+          for ( const QVector3D &v : mesh.vertices )
+          {
+            if ( v.x() < meshMin.x() ) meshMin.setX( v.x() );
+            if ( v.y() < meshMin.y() ) meshMin.setY( v.y() );
+            if ( v.z() < meshMin.z() ) meshMin.setZ( v.z() );
+            if ( v.x() > meshMax.x() ) meshMax.setX( v.x() );
+            if ( v.y() > meshMax.y() ) meshMax.setY( v.y() );
+            if ( v.z() > meshMax.z() ) meshMax.setZ( v.z() );
+          }
+          denormCenter = ( meshMin + meshMax ) * 0.5f;
+          const QVector3D meshSize = meshMax - meshMin;
+          denormScale = std::max( { static_cast<double>( meshSize.x() ),
+                                    static_cast<double>( meshSize.y() ),
+                                    static_cast<double>( meshSize.z() ) } ) * 0.8;
+          denormScale = std::max( denormScale, 1.0 );
+          DEBUG_LOG( QString( "[PointCloud] buggy metadata override: using model mesh center=(%1,%2,%3) scale=%4\n" )
+                       .arg( denormCenter.x(), 0, 'f', 2 )
+                       .arg( denormCenter.y(), 0, 'f', 2 )
+                       .arg( denormCenter.z(), 0, 'f', 2 )
+                       .arg( denormScale, 0, 'f', 2 )
+                       .toStdWString().c_str() );
+        }
       }
-      out.flush();
-      denormalizedFile.flush();
-      displayPath = denormalizedFile.fileName();
-      DEBUG_LOG( QString( "[PointCloud] display point cloud restored from DL normalization: %1\n" ).arg( displayPath ).toStdWString().c_str() );
+
+      if ( denormalizedFile.open() )
+      {
+        QTextStream out( &denormalizedFile );
+        for ( const QVector3D &p : normalizedCloud.points )
+        {
+          QVector3D restored = p * static_cast<float>( denormScale ) + denormCenter;
+          if ( restored.z() < 0.0f )
+            restored.setZ( 0.0f );
+          out << restored.x() << ' ' << restored.y() << ' ' << restored.z() << '\n';
+        }
+        out.flush();
+        denormalizedFile.flush();
+        displayPath = denormalizedFile.fileName();
+        DEBUG_LOG( QString( "[PointCloud] display point cloud restored from DL normalization: %1\n" ).arg( displayPath ).toStdWString().c_str() );
+      }
     }
     else if ( !normalizedCloud.points.isEmpty() )
     {

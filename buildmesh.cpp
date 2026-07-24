@@ -150,9 +150,9 @@ MeshData BuildMesh::buildLHouse( ParamModelerDock *dock )
     m.addTriangle( V(Aw,0,0),     V(Aw+Bw,0,0), V(Aw+Bw,0,H) );
     m.addTriangle( V(Aw,0,0),     V(Aw+Bw,0,H), V(Aw,0,H) );
 
-    // 后墙 y=Ad, 法线 +Y
-    m.addTriangle( V(0,Ad,0),   V(Aw,Ad,0),   V(Aw,Ad,H) );
-    m.addTriangle( V(0,Ad,0),   V(Aw,Ad,H),   V(0,Ad,H) );
+    // 后墙 y=Ad, 法线 +Y (CCW from +Y view)
+    m.addTriangle( V(0,Ad,0),   V(Aw,Ad,H),   V(Aw,Ad,0) );
+    m.addTriangle( V(0,Ad,0),   V(0,Ad,H),    V(Aw,Ad,H) );
 
     // 左墙 x=0, 法线 -X
     m.addTriangle( V(0,Ad,0),   V(0,0,0),     V(0,0,H) );
@@ -162,9 +162,9 @@ MeshData BuildMesh::buildLHouse( ParamModelerDock *dock )
     m.addTriangle( V(Aw,Bd,0), V(Aw,Ad,0), V(Aw,Ad,H) );
     m.addTriangle( V(Aw,Bd,0), V(Aw,Ad,H), V(Aw,Bd,H) );
 
-    // 翼部后墙 y=Bd, 法线 +Y
-    m.addTriangle( V(Aw,Bd,0),     V(Aw+Bw,Bd,0), V(Aw+Bw,Bd,H) );
-    m.addTriangle( V(Aw,Bd,0),     V(Aw+Bw,Bd,H), V(Aw,Bd,H) );
+    // 翼部后墙 y=Bd, 法线 +Y (CCW from +Y view)
+    m.addTriangle( V(Aw,Bd,0),     V(Aw+Bw,Bd,H), V(Aw+Bw,Bd,0) );
+    m.addTriangle( V(Aw,Bd,0),     V(Aw,Bd,H),     V(Aw+Bw,Bd,H) );
 
     // 翼部右墙 x=Aw+Bw, 法线 +X
     m.addTriangle( V(Aw+Bw,0,0), V(Aw+Bw,Bd,0), V(Aw+Bw,Bd,H) );
@@ -447,7 +447,7 @@ MeshData BuildMesh::buildIndentedCuboid( ParamModelerDock *dock )
     m.addQuad( v6, v7, i3, i2 ); // 后部顶面
     m.addQuad( v7, v4, i0, i3 ); // 左部顶面
     // 凹陷内部
-    m.addQuad( b0, b1, b2, b3 ); // 凹陷底面
+    m.addQuad( b0, b3, b2, b1 ); // 凹陷底面（法线 -Z，朝下）
     m.addQuad( i0, i1, b1, b0 ); // 凹陷前侧
     m.addQuad( i1, i2, b2, b1 ); // 凹陷右侧
     m.addQuad( i2, i3, b3, b2 ); // 凹陷后侧

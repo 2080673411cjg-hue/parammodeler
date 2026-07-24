@@ -24,7 +24,13 @@ namespace ParamModelerConfig
   QString pointnetBaseDir();   // e.g.  E:/pointnet
   QString datasetsBaseDir();   // e.g.  E:/pointnet/datasets_aug
 
-  // ---- derived paths (built from the three base paths above) ----
+  // ---- model version selectors (persisted in QgsSettings) ----
+
+  QString classifyModelName();          // e.g.  pointnext_cls_v2
+  QString regressionModelPrefix();      // e.g.  pointnext_reg_
+  QString regressionModelSuffix();      // e.g.  _rot
+
+  // ---- derived paths (built from the base paths + model selectors) ----
 
   QString classifyScript( PointNetBackend backend );
   QString classifyLogDir( PointNetBackend backend );

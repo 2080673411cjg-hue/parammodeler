@@ -14,6 +14,7 @@
 #include <QFile>
 #include <QMatrix4x4>
 #include <QMessageBox>
+#include <QSet>
 #include <QTextStream>
 #include <QVector3D>
 #include <QtMath>
@@ -294,6 +295,392 @@ bool ExportPointCloud::exportDLInputTXT( const QString &fileName,
   out.setRealNumberNotation( QTextStream::FixedNotation );
   out.setRealNumberPrecision( 8 );
   for ( const QVector3D &p : points )
+    out << p.x() << " " << p.y() << " " << p.z() << "\n";
+
+  file.close();
+  return true;
+}
+
+bool ExportPointCloud::exportLabeledTXT( const QString &fileName,
+                                         const QString &primitiveType,
+                                         ParamModelerDock *dock,
+                                         int pointCount,
+                                         DLPointCloudInfo *info )
+{
+  // ── Build mesh and classify triangles (same logic as sampleCurrentPrimitive) ──
+  MeshData mesh = BuildMesh::build( primitiveType, dock );
+  if ( mesh.isEmpty() )
+  {
+    QMessageBox::warning( nullptr, "Warning",
+                          QString( "Primitive \"%1\" cannot generate a valid mesh." ).arg( primitiveType ) );
+    return false;
+  }
+
+  int triCount = mesh.indices.size() / 3;
+  if ( triCount == 0 )
+  {
+    QMessageBox::warning( nullptr, "Warning", "Mesh has no triangles to sample." );
+    return false;
+  }
+
+  QVector<int> horzTris;  // roof  (normal.z > 0.7)
+  QVector<int> sideTris;  // wall  (everything else, skip bottom faces)
+  for ( int i = 0; i < triCount; i++ )
+  {
+    QVector3D A = mesh.vertices[mesh.indices[i * 3]];
+    QVector3D B = mesh.vertices[mesh.indices[i * 3 + 1]];
+    QVector3D C = mesh.vertices[mesh.indices[i * 3 + 2]];
+    QVector3D n = QVector3D::crossProduct( B - A, C - A ).normalized();
+    if ( n.z() > 0.7f )
+      horzTris << i;
+    else if ( n.z() < -0.7f )
+      continue;  // skip bottom faces
+    else
+      sideTris << i;
+  }
+
+  // ── Distribute point budget between roof and wall ──
+  int sideCount = 0;
+  int horzCount = 0;
+  if ( sideTris.isEmpty() )
+    horzCount = pointCount;
+  else if ( horzTris.isEmpty() )
+    sideCount = pointCount;
+  else
+  {
+    sideCount = qMax( int( pointCount * 0.40 ), pointCount / 4 );
+    horzCount = pointCount - sideCount;
+  }
+
+  // ── Sample roof and wall SEPARATELY to preserve labels ──
+  QVector<QVector3D> roofPts = sampleGroup( mesh, horzTris, horzCount );
+  QVector<QVector3D> wallPts = sampleGroup( mesh, sideTris, sideCount );
+
+  // ── Apply pose ──
+  double tx = dock->poseTranslateX();
+  double ty = dock->poseTranslateY();
+  double tz = dock->poseTranslateZ();
+  double rx = dock->poseRotateX();
+  double ry = dock->poseRotateY();
+  double rz = dock->poseRotateZ();
+  bool hasPose = ( tx != 0 || ty != 0 || tz != 0 || rx != 0 || ry != 0 || rz != 0 );
+  if ( hasPose )
+  {
+    for ( QVector3D &p : roofPts )
+      p = applyPose( p, tx, ty, tz, rx, ry, rz );
+    for ( QVector3D &p : wallPts )
+      p = applyPose( p, tx, ty, tz, rx, ry, rz );
+  }
+
+  // ── Compute DL info from combined set (before normalization) ──
+  QVector<QVector3D> allPts;
+  allPts << roofPts << wallPts;
+  if ( info )
+    *info = computeDLPointCloudInfo( allPts );
+
+  // ── Normalize using shared center & scale ──
+  {
+    QVector3D center( 0, 0, 0 );
+    for ( const QVector3D &p : allPts )
+      center += p;
+    center /= float( allPts.size() );
+
+    float maxRadius = 0.0f;
+    for ( const QVector3D &p : allPts )
+      maxRadius = qMax( maxRadius, ( p - center ).length() );
+    if ( maxRadius <= 1e-8f )
+      maxRadius = 1.0f;
+
+    for ( QVector3D &p : roofPts )
+      p = ( p - center ) / maxRadius;
+    for ( QVector3D &p : wallPts )
+      p = ( p - center ) / maxRadius;
+  }
+
+  if ( roofPts.isEmpty() && wallPts.isEmpty() )
+  {
+    QMessageBox::warning( nullptr, "Warning", "Sampling produced no points." );
+    return false;
+  }
+
+  // NOTE: do NOT overwrite *info here — it already holds the original
+  // (pre-normalization) center/scale from line 379.
+  QVector<QVector3D> combined;
+  combined << roofPts << wallPts;
+
+  // ── Write:  x  y  z  label  (label: 0=wall, 1=roof) ──
+  QFile file( fileName );
+  if ( !file.open( QIODevice::WriteOnly | QIODevice::Text ) )
+  {
+    QMessageBox::critical( nullptr, "Error", "Cannot write labeled TXT file." );
+    return false;
+  }
+
+  QTextStream out( &file );
+  out.setRealNumberNotation( QTextStream::FixedNotation );
+  out.setRealNumberPrecision( 8 );
+  for ( const QVector3D &p : roofPts )
+    out << p.x() << " " << p.y() << " " << p.z() << " 1\n";  // 1 = roof
+  for ( const QVector3D &p : wallPts )
+    out << p.x() << " " << p.y() << " " << p.z() << " 0\n";  // 0 = wall
+
+  file.close();
+  return true;
+}
+
+// ====================================================================
+// 侧面遮挡辅助函数
+// ====================================================================
+
+static bool isBoxLike( const QString &primType )
+{
+  static const QSet<QString> s = {
+    "Cuboid", "GabledRoof", "PyramidRoof", "TruncatedPyramidRoof",
+    "HalfCylinderRoof", "AsymmetricGableHouse", "TwoGableHouses",
+    "LHouse", "IndentedCuboid"
+  };
+  return s.contains( primType );
+}
+
+static bool isCylinderLike( const QString &primType )
+{
+  static const QSet<QString> s = {
+    "Cylinder", "CylinderDome", "ConeCylinder", "FourStageRoundTower"
+  };
+  return s.contains( primType );
+}
+
+// Face index (CCW): 0=x_min, 1=y_min, 2=x_max, 3=y_max
+// Adjacent pairs: (0,1), (1,2), (2,3), (3,0)
+static QVector<int> classifyBoxWallFaces( const QVector<QVector3D> &wallPts, double rzDeg )
+{
+  const double rzRad = qDegreesToRadians( rzDeg );
+  const double cosR = std::cos( rzRad ), sinR = std::sin( rzRad );
+  const int n = wallPts.size();
+  QVector<int> labels( n );
+  if ( n < 8 ) return labels;
+
+  // Un-rotate to local building frame
+  QVector<double> xLoc( n ), yLoc( n );
+  for ( int i = 0; i < n; i++ )
+  {
+    xLoc[i] =  wallPts[i].x() * cosR + wallPts[i].y() * sinR;
+    yLoc[i] = -wallPts[i].x() * sinR + wallPts[i].y() * cosR;
+  }
+
+  // Estimate 4 face-plane positions from outer-quartile means
+  QVector<double> xSorted = xLoc, ySorted = yLoc;
+  std::sort( xSorted.begin(), xSorted.end() );
+  std::sort( ySorted.begin(), ySorted.end() );
+  const int k = qMax( n / 4, 4 );
+  double xMinP = 0, xMaxP = 0, yMinP = 0, yMaxP = 0;
+  for ( int i = 0; i < k; i++ )
+  {
+    xMinP += xSorted[i];        xMaxP += xSorted[n - 1 - i];
+    yMinP += ySorted[i];        yMaxP += ySorted[n - 1 - i];
+  }
+  xMinP /= k;  xMaxP /= k;  yMinP /= k;  yMaxP /= k;
+
+  // Assign each point to nearest face plane
+  for ( int i = 0; i < n; i++ )
+  {
+    double d[] = { std::abs( xLoc[i] - xMinP ),  // 0: x_min
+                   std::abs( yLoc[i] - yMinP ),  // 1: y_min
+                   std::abs( xLoc[i] - xMaxP ),  // 2: x_max
+                   std::abs( yLoc[i] - yMaxP ) };// 3: y_max
+    double dMin = std::min( { d[0], d[1], d[2], d[3] } );
+    if ( dMin == d[0] )      labels[i] = 0;
+    else if ( dMin == d[1] ) labels[i] = 1;
+    else if ( dMin == d[2] ) labels[i] = 2;
+    else                     labels[i] = 3;
+  }
+  return labels;
+}
+
+static QVector<QVector3D> applyBoxOcclusion( const QVector<QVector3D> &wallPts,
+                                              double rzDeg, double singleFaceProb )
+{
+  if ( wallPts.size() < 16 )
+    return wallPts;
+
+  QVector<int> faceLabels = classifyBoxWallFaces( wallPts, rzDeg );
+
+  // Select 1 or 2 adjacent faces (CCW: 0,1,2,3)
+  QSet<int> keepFaces;
+  if ( static_cast<double>( qrand() ) / RAND_MAX < singleFaceProb )
+    keepFaces.insert( qrand() % 4 );
+  else
+  {
+    int start = qrand() % 4;
+    keepFaces.insert( start );
+    keepFaces.insert( ( start + 1 ) % 4 );
+  }
+
+  QVector<QVector3D> kept;
+  kept.reserve( wallPts.size() / 2 );
+  for ( int i = 0; i < wallPts.size(); i++ )
+    if ( keepFaces.contains( faceLabels[i] ) )
+      kept << wallPts[i];
+  return kept.isEmpty() ? wallPts : kept;
+}
+
+static QVector<QVector3D> applyCylinderOcclusion( const QVector<QVector3D> &wallPts )
+{
+  if ( wallPts.size() < 16 )
+    return wallPts;
+
+  // Random 150°–210° continuous arc
+  const double keepDeg = 150.0 + static_cast<double>( qrand() ) / RAND_MAX * 60.0;
+  const double keepRatio = keepDeg / 360.0;
+  const double halfSpan = keepRatio * M_PI;
+
+  QVector<double> angles( wallPts.size() );
+  double cx = 0, cy = 0;
+  for ( const QVector3D &p : wallPts ) { cx += p.x(); cy += p.y(); }
+  cx /= wallPts.size();  cy /= wallPts.size();
+  for ( int i = 0; i < wallPts.size(); i++ )
+    angles[i] = std::atan2( wallPts[i].y() - cy, wallPts[i].x() - cx );
+
+  const double start = static_cast<double>( qrand() ) / RAND_MAX * 2.0 * M_PI;
+  const double mid = start + halfSpan;
+
+  QVector<QVector3D> kept;
+  kept.reserve( wallPts.size() / 2 );
+  for ( int i = 0; i < wallPts.size(); i++ )
+  {
+    double diff = angles[i] - mid;
+    diff = std::atan2( std::sin( diff ), std::cos( diff ) );  // wrap to [-pi,pi]
+    if ( std::abs( diff ) <= halfSpan )
+      kept << wallPts[i];
+  }
+  return kept.isEmpty() ? wallPts : kept;
+}
+
+// ====================================================================
+// 遮挡导出：在采样阶段直接模拟摄影测量缺失，输出纯 xyz
+// ====================================================================
+
+bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
+                                           const QString &primitiveType,
+                                           ParamModelerDock *dock,
+                                           int pointCount,
+                                           DLPointCloudInfo *info )
+{
+  MeshData mesh = BuildMesh::build( primitiveType, dock );
+  if ( mesh.isEmpty() )
+  {
+    QMessageBox::warning( nullptr, "Warning",
+                          QString( "Primitive \"%1\" cannot generate a valid mesh." ).arg( primitiveType ) );
+    return false;
+  }
+
+  int triCount = mesh.indices.size() / 3;
+  if ( triCount == 0 )
+  {
+    QMessageBox::warning( nullptr, "Warning", "Mesh has no triangles to sample." );
+    return false;
+  }
+
+  QVector<int> horzTris, sideTris;
+  for ( int i = 0; i < triCount; i++ )
+  {
+    QVector3D A = mesh.vertices[mesh.indices[i * 3]];
+    QVector3D B = mesh.vertices[mesh.indices[i * 3 + 1]];
+    QVector3D C = mesh.vertices[mesh.indices[i * 3 + 2]];
+    QVector3D n = QVector3D::crossProduct( B - A, C - A ).normalized();
+    if ( n.z() > 0.7f )
+      horzTris << i;
+    else if ( n.z() < -0.7f )
+      continue;
+    else
+      sideTris << i;
+  }
+
+  int sideCount = 0, horzCount = 0;
+  if ( sideTris.isEmpty() )       horzCount = pointCount;
+  else if ( horzTris.isEmpty() )  sideCount = pointCount;
+  else
+  {
+    sideCount = qMax( int( pointCount * 0.40 ), pointCount / 4 );
+    horzCount = pointCount - sideCount;
+  }
+
+  QVector<QVector3D> roofPts = sampleGroup( mesh, horzTris, horzCount );
+  QVector<QVector3D> wallPts = sampleGroup( mesh, sideTris, sideCount );
+
+  // ── Apply pose ──
+  double tx = dock->poseTranslateX(), ty = dock->poseTranslateY(), tz = dock->poseTranslateZ();
+  double rx = dock->poseRotateX(), ry = dock->poseRotateY(), rz = dock->poseRotateZ();
+  bool hasPose = ( tx != 0 || ty != 0 || tz != 0 || rx != 0 || ry != 0 || rz != 0 );
+  if ( hasPose )
+  {
+    for ( QVector3D &p : roofPts ) p = applyPose( p, tx, ty, tz, rx, ry, rz );
+    for ( QVector3D &p : wallPts ) p = applyPose( p, tx, ty, tz, rx, ry, rz );
+  }
+
+  // ── ★ 在导出时直接应用遮挡 ──
+  if ( isBoxLike( primitiveType ) )
+    wallPts = applyBoxOcclusion( wallPts, rz, 0.3 );
+  else if ( isCylinderLike( primitiveType ) )
+    wallPts = applyCylinderOcclusion( wallPts );
+
+  QVector<QVector3D> allPts;
+  allPts << roofPts << wallPts;
+  if ( info )
+    *info = computeDLPointCloudInfo( allPts );
+
+  // ── Normalize ──
+  {
+    QVector3D center( 0, 0, 0 );
+    for ( const QVector3D &p : allPts ) center += p;
+    center /= float( allPts.size() );
+    float maxRadius = 0.0f;
+    for ( const QVector3D &p : allPts ) maxRadius = qMax( maxRadius, ( p - center ).length() );
+    if ( maxRadius <= 1e-8f ) maxRadius = 1.0f;
+    for ( QVector3D &p : roofPts ) p = ( p - center ) / maxRadius;
+    for ( QVector3D &p : wallPts ) p = ( p - center ) / maxRadius;
+  }
+
+  QVector<QVector3D> combined;
+  combined << roofPts << wallPts;
+  // NOTE: do NOT overwrite *info here — it already holds the original
+  // (pre-normalization) center/scale from line 631.  Overwriting with the
+  // normalized values would break the denormalisation chain in
+  // loadPointCloudToQGIS3D, making the point cloud appear tiny next to
+  // the metre-scale model.
+
+  // ── Safety: Z-based bottom removal (catch any bottom triangles that escaped n.z filter) ──
+  {
+    float zMin = combined[0].z(), zMax = combined[0].z();
+    for ( const QVector3D &p : combined ) { zMin = qMin( zMin, p.z() ); zMax = qMax( zMax, p.z() ); }
+    float zHeight = zMax - zMin;
+    if ( zHeight > 1e-6f )
+    {
+      float zThr = zMin + zHeight * 0.015f;  // remove bottom 1.5% of height
+      combined.erase( std::remove_if( combined.begin(), combined.end(),
+                       [zThr]( const QVector3D &p ) { return p.z() < zThr; } ),
+                      combined.end() );
+    }
+  }
+
+  if ( combined.isEmpty() )
+  {
+    QMessageBox::warning( nullptr, "Warning", "Occlusion removed all points." );
+    return false;
+  }
+
+  // ── Write plain xyz (occlusion is baked in, no labels needed) ──
+  QFile file( fileName );
+  if ( !file.open( QIODevice::WriteOnly | QIODevice::Text ) )
+  {
+    QMessageBox::critical( nullptr, "Error", "Cannot write occluded TXT file." );
+    return false;
+  }
+
+  QTextStream out( &file );
+  out.setRealNumberNotation( QTextStream::FixedNotation );
+  out.setRealNumberPrecision( 8 );
+  for ( const QVector3D &p : combined )
     out << p.x() << " " << p.y() << " " << p.z() << "\n";
 
   file.close();
