@@ -185,7 +185,7 @@ private:
 		bool            m_isUpdating = false; 
 			QString         m_lastGpkgPath;             // 上一次临时 GPKG 文件路径，用于清理
   bool m_realtimeModelLoaded = false;
-  QCheckBox *mGhostModeCheckBox = nullptr;
+  QCheckBox *mWireframeModeCheckBox = nullptr;
 };
 
 #endif // PARAMMODELER_DOCK_H

@@ -57,6 +57,7 @@
 #include <Qt3DRender/QBuffer>
 #include <Qt3DRender/QDepthTest>
 #include <Qt3DRender/QNoDepthMask>
+#include <Qt3DRender/QLineWidth>
 #include <Qt3DRender/QEffect>
 #include <Qt3DRender/QGeometry>
 #include <Qt3DRender/QGeometryRenderer>
@@ -95,12 +96,13 @@ struct RealtimePreviewState
   QPointer<Qt3DCore::QEntity> root;
   RealtimePreviewPart body;
   RealtimePreviewPart roof;
+  RealtimePreviewPart wireframe;   // 线框模式：只显示边线
   QgsVector3D frozenOrigin;           // origin snapshot at entity creation
   bool         frozenOriginValid = false;
 };
 
 QHash<Qgs3DMapScene *, RealtimePreviewState> sRealtimePreviewMeshes;
-bool sGhostMode = false;
+bool sWireframeMode = false;
 const QString REALTIME_ANCHOR_LAYER_NAME = QStringLiteral( "ParamModeler_3D_Anchor" );
 
 QString meshPointKey( const QVector3D &p )
@@ -324,6 +326,37 @@ void appendRealtimeTriangle( QVector<float> &values,
   appendVertex( v2 );
 }
 
+// ────────────────────────────────────────────────────────────
+//  线框边提取：三角形面片摊平为线段顶点（不去重，零哈希开销）
+// ────────────────────────────────────────────────────────────
+static QVector<float> extractWireframeEdges( const MeshData &mesh,
+                                              const QMatrix4x4 &poseMat )
+{
+  QVector<float> lineVerts;
+  const int triCount = mesh.indices.size() / 3;
+  if ( triCount == 0 )
+    return lineVerts;
+
+  lineVerts.reserve( triCount * 6 * 3 );  // 3 条边 × 6 floats per edge
+
+  for ( int i = 0; i < triCount; ++i )
+  {
+    QVector3D v0 = poseMat.map( mesh.vertices[mesh.indices[i * 3]] );
+    QVector3D v1 = poseMat.map( mesh.vertices[mesh.indices[i * 3 + 1]] );
+    QVector3D v2 = poseMat.map( mesh.vertices[mesh.indices[i * 3 + 2]] );
+
+    auto pushEdge = [&]( const QVector3D &a, const QVector3D &b ) {
+      lineVerts << a.x() << a.y() << a.z()
+                << b.x() << b.y() << b.z();
+    };
+    pushEdge( v0, v1 );
+    pushEdge( v1, v2 );
+    pushEdge( v2, v0 );
+  }
+
+  return lineVerts;
+}
+
 void updateRealtimePart( RealtimePreviewPart &part,
                          Qt3DCore::QEntity *root,
                          const QVector<float> &values,
@@ -395,7 +428,8 @@ void updateRealtimePart( RealtimePreviewPart &part,
     part.blendingSetup = true;
   }
 
-  // Ghost mode 深度状态初始化（一次性）：创建 QDepthTest + QNoDepthMask，挂 depthTest 到所有 render pass
+  // 深度状态初始化（一次性）：创建 QDepthTest + QNoDepthMask，挂 depthTest 到所有 render pass
+  // （wireframe 模式下 body/roof 被隐藏，此代码不生效，保留以备未来可能的透明模式复用）
   if ( !part.depthStateSetup && part.material )
   {
     Qt3DRender::QEffect *effect = part.material->effect();
@@ -416,13 +450,13 @@ void updateRealtimePart( RealtimePreviewPart &part,
     }
   }
 
-  // 每帧动态切换深度状态：Ghost ON → Always + 禁止写深度；Ghost OFF → Less + 正常写深度
+  // 每帧动态切换深度状态：wireframe ON → Always + 禁止写深度；OFF → Less + 正常写深度
   if ( part.depthStateSetup && part.depthTest && part.material )
   {
     Qt3DRender::QEffect *effect = part.material->effect();
     if ( effect )
     {
-      const bool ghost = sGhostMode;
+      const bool ghost = sWireframeMode;
 
       part.depthTest->setDepthFunction(
         ghost
@@ -455,7 +489,7 @@ void updateRealtimePart( RealtimePreviewPart &part,
     }
   }
 
-  // 每次调用都更新材质颜色（ghost mode 切换时需要）
+  // 每次调用都更新材质颜色
   if ( part.material )
   {
     part.material->setAmbient( color.darker( 135 ) );
@@ -876,18 +910,111 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
     }
   }
 
-  const int bodyAlpha  = sGhostMode ? 20 : 255;
-  const int roofAlpha  = sGhostMode ? 25 : 255;
+  // ── 实体三角形：始终不透明 ──
+  const int alpha = 255;
   updateRealtimePart( state.body,
                       state.root,
                       bodyValues,
-                      QColor( 198, 192, 178, bodyAlpha ),
+                      QColor( 198, 192, 178, alpha ),
                       QStringLiteral( "ParamModeler_Qt3D_RealtimePreview_Body" ) );
   updateRealtimePart( state.roof,
                       state.root,
                       roofValues,
-                      QColor( 154, 50, 46, roofAlpha ),
+                      QColor( 154, 50, 46, alpha ),
                       QStringLiteral( "ParamModeler_Qt3D_RealtimePreview_Roof" ) );
+
+  // ── 线框实体（一次性创建）──
+  {
+    QVector<float> wireVerts = extractWireframeEdges( mesh, mat );
+    const int wireVertCount = wireVerts.size() / 3;
+
+    if ( !state.wireframe.entity )
+    {
+      state.wireframe.entity = new Qt3DCore::QEntity( state.root );
+      state.wireframe.entity->setObjectName(
+        QStringLiteral( "ParamModeler_Qt3D_RealtimePreview_Wireframe" ) );
+
+      Qt3DRender::QGeometry *wireGeom = new Qt3DRender::QGeometry( state.wireframe.entity );
+      state.wireframe.buffer = new Qt3DRender::QBuffer( wireGeom );
+
+      // 位置属性 (stride = 3 floats)
+      state.wireframe.positionAttribute = new Qt3DRender::QAttribute( wireGeom );
+      state.wireframe.positionAttribute->setName( Qt3DRender::QAttribute::defaultPositionAttributeName() );
+      state.wireframe.positionAttribute->setVertexBaseType( Qt3DRender::QAttribute::Float );
+      state.wireframe.positionAttribute->setVertexSize( 3 );
+      state.wireframe.positionAttribute->setAttributeType( Qt3DRender::QAttribute::VertexAttribute );
+      state.wireframe.positionAttribute->setBuffer( state.wireframe.buffer );
+      state.wireframe.positionAttribute->setByteOffset( 0 );
+      state.wireframe.positionAttribute->setByteStride( 3 * sizeof( float ) );
+      wireGeom->addAttribute( state.wireframe.positionAttribute );
+
+      // 法线属性 — QPhongMaterial 必须有法线，否则 shader 输出全黑
+      // 全部填充 (0,1,0) 让线段获得正面 diffuse 光照
+      Qt3DRender::QBuffer *wireNormalBuf = new Qt3DRender::QBuffer( wireGeom );
+      state.wireframe.normalAttribute = new Qt3DRender::QAttribute( wireGeom );
+      state.wireframe.normalAttribute->setName( Qt3DRender::QAttribute::defaultNormalAttributeName() );
+      state.wireframe.normalAttribute->setVertexBaseType( Qt3DRender::QAttribute::Float );
+      state.wireframe.normalAttribute->setVertexSize( 3 );
+      state.wireframe.normalAttribute->setAttributeType( Qt3DRender::QAttribute::VertexAttribute );
+      state.wireframe.normalAttribute->setBuffer( wireNormalBuf );
+      state.wireframe.normalAttribute->setByteOffset( 0 );
+      state.wireframe.normalAttribute->setByteStride( 3 * sizeof( float ) );
+      wireGeom->addAttribute( state.wireframe.normalAttribute );
+
+      // 明确告诉 Qt3D 用 position attribute 计算包围盒
+      // 否则默认包围体过小，模型变大/旋转时会被视锥体裁剪掉
+      wireGeom->setBoundingVolumePositionAttribute( state.wireframe.positionAttribute );
+
+      state.wireframe.renderer = new Qt3DRender::QGeometryRenderer( state.wireframe.entity );
+      state.wireframe.renderer->setGeometry( wireGeom );
+      state.wireframe.renderer->setPrimitiveType( Qt3DRender::QGeometryRenderer::Lines );
+      state.wireframe.entity->addComponent( state.wireframe.renderer );
+
+      state.wireframe.material = new Qt3DExtras::QPhongMaterial( state.wireframe.entity );
+      state.wireframe.entity->addComponent( state.wireframe.material );
+    }
+
+    // ── 每帧更新线框顶点数据 ──
+    state.wireframe.buffer->setData(
+      QByteArray( reinterpret_cast<const char *>( wireVerts.constData() ),
+                  wireVerts.size() * static_cast<int>( sizeof( float ) ) ) );
+    state.wireframe.positionAttribute->setCount( wireVertCount );
+    state.wireframe.renderer->setVertexCount( wireVertCount );
+
+    // 每帧填充法线 buffer：统一指向上方 (0,1,0)，配合 Phong 光照
+    {
+      QByteArray normalBytes( wireVertCount * 3 * static_cast<int>( sizeof( float ) ), '\0' );
+      float *norms = reinterpret_cast<float *>( normalBytes.data() );
+      for ( int i = 0; i < wireVertCount; ++i )
+      {
+        norms[i * 3 + 0] = 0.0f;
+        norms[i * 3 + 1] = 1.0f;   // 法线 = (0,1,0)，正面迎光
+        norms[i * 3 + 2] = 0.0f;
+      }
+      // 正常 buffer 通过 normalAttribute 的 buffer() 获取
+      Qt3DRender::QBuffer *nBuf = qobject_cast<Qt3DRender::QBuffer *>(
+        state.wireframe.normalAttribute->buffer() );
+      if ( nBuf )
+        nBuf->setData( normalBytes );
+      state.wireframe.normalAttribute->setCount( wireVertCount );
+    }
+
+    // 线框材质：亮黄色
+    if ( state.wireframe.material )
+    {
+      QColor wireColor( 255, 220, 0 );   // 亮黄色
+      state.wireframe.material->setAmbient( QColor( 180, 155, 0 ) );
+      state.wireframe.material->setDiffuse( wireColor );
+      state.wireframe.material->setSpecular( QColor( 30, 30, 30 ) );
+      state.wireframe.material->setShininess( 0.0f );
+    }
+  }
+
+  // ── 切换 visibility ──
+  state.body.entity->setEnabled( !sWireframeMode && bodyValues.size() > 0 );
+  state.roof.entity->setEnabled( !sWireframeMode && roofValues.size() > 0 );
+  state.wireframe.entity->setEnabled( sWireframeMode && state.wireframe.entity );
+
   sRealtimePreviewMeshes.insert( scene, state );
 
   if ( newPreviewRoot )
@@ -1087,12 +1214,12 @@ void ParamModelerScene3D::removeLayersByNamePrefix( const QString &prefix, const
   }, excludeId );
 }
 
-void ParamModelerScene3D::setGhostMode( bool on )
+void ParamModelerScene3D::setWireframeMode( bool on )
 {
-  sGhostMode = on;
+  sWireframeMode = on;
 }
 
-bool ParamModelerScene3D::isGhostMode()
+bool ParamModelerScene3D::isWireframeMode()
 {
-  return sGhostMode;
+  return sWireframeMode;
 }
