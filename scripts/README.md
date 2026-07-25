@@ -17,17 +17,17 @@ datasets/  ─────────────────→  datasets_aug/
 ## 第 1 步：Windows — QGIS 插件生成数据集
 
 在 QGIS 中打开 ParamModeler 面板 → 点击 **"Export DL Dataset (All Classes)"**
-→ 选择输出目录 → 每类建议 200+ 样本 → 等待完成
+→ 选择输出目录 → 当前标准: 500 样本/类（train 400 + val 50 + test 50） → 等待完成
 
 输出:
 ```
 E:/pointnet/datasets/
-  train/{Cuboid, Cylinder, ...}/sample_00001.txt ...
-  val/{...}/
-  test/{...}/
+  train/{Cuboid, Cylinder, ...}/sample_00001.txt ... sample_00400.txt
+  val/{...}/（每类 50）
+  test/{...}/（每类 50）
   metadata/
     class_names.txt
-    sample_params.json       <-- 每条 params 含 rx/ry/rz
+    sample_params.json       <-- 每条 params 含形状参数 + rz（不含 rx/ry/tx/ty/tz）
 ```
 
 验证:
@@ -61,6 +61,8 @@ python augment_dataset.py \
 ```
 
 增强内容包括：底部点丢弃、侧面遮挡（模拟拍照盲区）、随机挖洞、高斯噪声、离群点。
+
+> **注意**：增强是在原始 500 样本/类基础上进一步增加变体，不是替换。如果原始数据已足够多样，可跳过此步直接训练。
 
 ---
 
@@ -110,19 +112,24 @@ python main.py --mode test \
 
 ---
 
-## 第 5 步：Ubuntu — 参数回归训练（含旋转标签）
+## 第 5 步：Ubuntu — 参数回归训练
+
+当前主力模型为 `_aux`（纯形状参数，不含 pose）。
 
 ```bash
 # 先快速验证（可选）
 bash quick_sanity_check.sh
 
-# 全量训练 13 类
-bash train_reg_with_rot.sh
+# 全量训练 13 类（_aux 版本 — 当前主力）
+bash train_reg_aux.sh
+
+# 如果需要含旋转标签版本（实验性，形状参数精度更低）：
+# bash train_reg_with_rot.sh
 ```
 
 每类输出:
 ```
-logs/pointnext_reg_cuboid_rot/
+logs/pointnext_reg_cuboid_aux/
   best_model.pth
   regression_config.json
   regression_report_test.csv
@@ -130,18 +137,26 @@ logs/pointnext_reg_cuboid_rot/
   train_history.csv
 ```
 
+### 模型版本说明
+
+| 版本 | 后缀 | 回归目标 | 状态 |
+|------|------|---------|------|
+| `_aux` | 当前主力 | 纯形状参数（length, width, height, radius, bulge, wallRatio...） | ✅ 使用中 |
+| `_rot` | 已弃用 | 形状参数 + rz | ❌ 形状参数精度明显更差，不建议使用 |
+
+> `_rot` 版本虽然能预测旋转角，但形状参数精度下降严重（数据量翻倍但每类独立训练，导致每个模型看到有效样本更少）。当前策略是只用 `_aux` 做形状回归，旋转通过人工微调。
+
 ---
 
 ## 第 6 步：Ubuntu — 批量测试
 
 ```bash
-# 回归模型批量测试（使用 test 集）
+# 回归模型批量测试（使用 test 集，_aux 版本）
 DATA_ROOT=/home/xubo/pointnet/datasets_aug \
 SPLIT=test \
   bash test_all_reg.sh
 
-# 注意: test_all_reg.sh 用的 log_dir 是旧的无 rotation 路径
-# 如果要对新的 *_rot 模型测试，修改变量或直接运行:
+# 手动逐类测试：
 for cls in Cuboid Cylinder LHouse ConeCylinder GabledRoof PyramidRoof \
            TruncatedPyramidRoof HalfCylinderRoof CylinderDome IndentedCuboid \
            AsymmetricGableHouse FourStageRoundTower TwoGableHouses; do
@@ -150,7 +165,7 @@ for cls in Cuboid Cylinder LHouse ConeCylinder GabledRoof PyramidRoof \
     --metadata /home/xubo/pointnet/datasets_aug/metadata/sample_params.json \
     --split test \
     --class_name "$cls" \
-    --log_dir "logs/pointnext_reg_${cls,,}_rot" \
+    --log_dir "logs/pointnext_reg_${cls,,}_aux" \
     --num_points 2048 --batch_size 32
 done
 ```
@@ -164,7 +179,7 @@ done
 scp -r xubo@<ubuntu-ip>:/home/xubo/pointnet/pointnext_simple/logs/pointnext_cls_v2 \
     E:/pointnet/pointnext_simple/logs/
 
-scp -r xubo@<ubuntu-ip>:/home/xubo/pointnet/pointnext_simple/logs/pointnext_reg_*_rot \
+scp -r xubo@<ubuntu-ip>:/home/xubo/pointnet/pointnext_simple/logs/pointnext_reg_*_aux \
     E:/pointnet/pointnext_simple/logs/
 ```
 
@@ -172,9 +187,11 @@ scp -r xubo@<ubuntu-ip>:/home/xubo/pointnet/pointnext_simple/logs/pointnext_reg_
 
 ## 第 8 步：更新 C++ 插件推理路径
 
-修改 `parammodeler_pointnet.cpp` 中 `regressionConfig()`:
-- `logDir` 指向新的 `*_rot` 目录（或把 best_model.pth 覆盖到旧目录）
-- `modelName` 可加版本标识
+通过 QGIS 插件设置对话框修改（**推荐**，无需改源码）：
+- 插件面板 → PointNet 路径设置
+- 回归模型后缀：`_aux`（或新训练的版本如 `_v3`）
+
+或直接改 QgsSettings 注册表 / 配置文件。详细配置项见 `parammodeler_config.cpp`。
 
 ---
 
@@ -187,17 +204,23 @@ scp -r xubo@<ubuntu-ip>:/home/xubo/pointnet/pointnext_simple/logs/pointnext_reg_
 | `main.py --mode test` | Ubuntu | 分类测试 |
 | `main_reg.py --mode train` | Ubuntu | 回归训练（每类单独） |
 | `main_reg.py --mode test` | Ubuntu | 回归测试 |
-| `train_reg_with_rot.sh` | Ubuntu | 13 类回归一键训练+测试 |
+| `train_reg_aux.sh` | Ubuntu | 13 类回归一键训练（`_aux`，当前主力） |
+| `train_reg_with_rot.sh` | Ubuntu | 13 类回归训练（`_rot`，已弃用） |
 | `test_all_reg.sh` | Ubuntu | 13 类回归批量测试 |
 | `quick_sanity_check.sh` | Ubuntu | 1 类 5 epoch 快速验证 |
 
 ## 附录 B：关键参数一览
 
-| 参数 | 分类 | 回归 |
+| 参数 | 分类 | 回归 (`_aux`) |
 |------|------|------|
 | `--num_points` | 1024 | 2048 |
 | `--epochs` | 100 | 100 |
 | `--batch_size` | 32 | 32 |
-| `--targets` | — | `length width height rx ry rz` (各基元不同) |
-| `--random_rotate` | — | **不传**（旋转已 bake 进数据） |
+| `--targets` | — | 纯形状参数（length, width, height, radius, bulge, wallRatio...，各基元不同） |
+| `--random_rotate` | — | **不传**（`_aux` 不预测旋转） |
 | `--aux_features` | — | `bbox_x bbox_y bbox_z scale` |
+| 数据集规模 | 500/类 | 500/类（train 400 + val 50 + test 50） |
+
+### 未来模型升级参考
+
+当前 PointNeXt 对局部几何参数精度不足，建议下一版升级到 Swin3D 或 PTv3。详见主项目 `dl-pipeline-log.md` 第九章。

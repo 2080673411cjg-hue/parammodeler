@@ -1,8 +1,10 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-07-12  
-> 当前模型: PointNeXt `_aux`（纯形状参数，不含 rz）  
-> 分类模型: `pointnext_cls_v2`
+> 最后更新: 2026-07-25  
+> 当前模型: PointNeXt `_aux`（纯形状参数，不含 pose）  
+> 分类模型: `pointnext_cls_v2`  
+> 数据集: **500 样本/类**（train 400 + val 50 + test 50），13 类共 6500 样本  
+> 后端: PointNeXt（PointNet / PointNet++ 保留但不再使用）
 
 ---
 
@@ -113,19 +115,19 @@ p_normalized = (p - center) / maxRadius
 ```
 E:/pointnet/datasets_aug/
 ├── train/
-│   ├── Cuboid/sample_00001.txt ... sample_00040.txt
+│   ├── Cuboid/sample_00001.txt ... sample_00400.txt
 │   ├── Cylinder/...
 │   └── ...（13 类）
 ├── val/
-│   └── ...（同上结构）
+│   └── ...（每类 50 样本）
 ├── test/
-│   └── ...（同上结构）
+│   └── ...（每类 50 样本）
 └── metadata/
     ├── class_names.txt
     └── sample_params.json
 ```
 
-训练集 : 验证集 : 测试集 = **8 : 1 : 1**
+训练集 : 验证集 : 测试集 = **8 : 1 : 1**（每类 500 样本：400 + 50 + 50）
 
 ---
 
@@ -338,21 +340,45 @@ setPoseTranslate(tx, ty, tz)
 
 ## 七、当前模型质量速查
 
+> **数据规模**: 500 样本/类（400 train + 50 val + 50 test），13 类共 6500 样本  
+> **回归模型**: PointNeXt `_aux`（纯形状参数，不含 rz / pose）
+
 ### 分类 (pointnext_cls_v2)
 
-总体 F1: **79.9%**（85 样本/类，需要提升）
+总体 F1: **79.9%**（50 样本/类测试集，需重新训练验证）
 
 🔴 主混淆：Cuboid↔Cylinder(9)、Cuboid↔IndentedCuboid(10)、GabledRoof→TwoGableHouses(8)
 
-### 回归 (_aux)
+### 回归 (_aux) — 500 样本/类
 
-| 可用 (R²>0.9) | 部分可用 | 需要重新训练 |
-|---------------|----------|-------------|
-| Cylinder (radius 0.96, height 0.89) | GabledRoof (length 0.90) | CylinderDome (bulge -0.08) |
-| HalfCylinderRoof (length 0.97) | ConeCylinder (totalHeight 0.90) | FourStageRoundTower (middleBulge -0.85) |
-| LHouse (mainLength 0.94) | Cuboid (length 0.84) | TwoGableHouses (wallRatio 0.06) |
-| PyramidRoof (length 0.94) | TruncatedPyramid (bottomLength 0.78) | IndentedCuboid (innerWidth 0.21) |
-| | AsymmetricGableHouse (ridgeLength 0.52) | |
+| 可用 (R²>0.9) | 部分可用 (R² 0.5-0.9) | 🔴 需要突破 (R²<0.5) |
+|---------------|---------------------|---------------------|
+| Cylinder | GabledRoof | **CylinderDome** (bulge -0.08) |
+| HalfCylinderRoof | ConeCylinder | **FourStageRoundTower** (middleBulge -0.85) |
+| LHouse | Cuboid | **TwoGableHouses** (wallRatio 0.06) |
+| PyramidRoof | TruncatedPyramidRoof | **IndentedCuboid** (innerWidth 0.21) |
+| | | **AsymmetricGableHouse** (ridgeLength 0.52) |
+
+### 🔴 问题诊断
+
+R² 差的参数有共同特征——**依赖局部几何细节的非线性形态参数**：
+
+| 参数 | R² | 几何含义 | 为什么难学 |
+|------|-----|---------|-----------|
+| bulge | -0.08 | 穹顶曲面弯曲程度 | 全局点云对曲率变化不敏感 |
+| middleBulge | -0.85 | 塔身中段鼓出量 | 局部形变被全局池化淹没 |
+| wallRatio | 0.06 | 墙体/屋顶高度比 | 需要精确感知屋顶-墙体分割线 |
+| innerWidth | 0.21 | 凹陷宽度 | 凹陷区域的点占比太小 |
+| ridgeLength | 0.52 | 屋脊纵向位置 | 不对称性由少量点决定 |
+
+**根因分析**:
+1. PointNeXt 的 set abstraction（最远点采样+球查询）局部感受野固定，对细粒度形变不敏感
+2. 全局 max-pooling 丢弃了空间分布信息——bulge/middleBulge 本质上需要感知"曲面上点的分布密度变化"
+3. L2 loss 对多模态参数空间（如 wallRatio）不够鲁棒
+
+### 后续模型升级方向
+
+见 [第九章](#九模型升级路线图)。
 
 ---
 
@@ -385,3 +411,92 @@ python main_reg.py --mode train \
 ```
 
 然后更新 `pointnextDirs` 指向 `_v3` 目录。
+
+---
+
+## 九、模型升级路线图
+
+> 当前 PointNeXt 对局部几何参数（bulge、wallRatio、middleBulge 等）估计质量不理想，  
+> 500 样本/类的数据量足够，瓶颈主要在模型架构。
+
+### 候选新模型（2024-2025 SOTA）
+
+| 候选 | 论文/年份 | 核心优势 | 与本任务匹配度 | 迁移难度 |
+|------|----------|---------|:---:|:---:|
+| **Swin3D** | Microsoft, CVPR 2024+ | cRSE 感知局部几何差异；预训练可用；在 Scan-to-BIM 中碾压 PointNeXt | ⭐⭐⭐⭐⭐ | 中 |
+| **Point Transformer V3** | Wu et al., 2024 | 推理极快；序列化点云；NoKSR backbone | ⭐⭐⭐⭐ | 中 |
+| **Li & Shan (2025)** | ISPRS 2025 | 与你完全一样的任务（基元分类+参数回归）；合成数据训练；100K 建筑 | ⭐⭐⭐⭐⭐ | 低 |
+| **Equivariant Diffusion** | TPAMI 2025 | 联合位姿+形状；SO(3)等变；适合非线性多模态参数 | ⭐⭐⭐ | 高 |
+| **ULIP-2 + PointBERT** | Salesforce, CVPR 2024 | 多模态预训练（文本+图像+点云）；少样本迁移强 | ⭐⭐⭐ | 中 |
+
+### 推荐升级路径（按优先级）
+
+#### 🥇 方案一：Swin3D 替换 PointNeXt backbone（推荐首选）
+
+```
+迁移量: ~200-300 行 Python（main_reg.py 模型定义部分）
+预期收益: bulge/middleBulge/wallRatio 类参数 R² 从 <0.2 → 0.6+
+风险: 低（Swin3D 开源 MIT License，有预训练权重）
+代价: 推理速度比 PointNeXt 慢 ~30-50%（但仍可 CPU 推理）
+```
+
+关键改动点：
+1. 替换 `model.py` 中的 backbone：`PointNeXt` → `Swin3D`（`github.com/microsoft/Swin3D`）
+2. 保留现有的 aux_features 机制（bbox_x/y/z, scale）
+3. 回归头：Swin3D 全局特征 → concat(aux) → MLP → 参数输出
+4. 可选：加载 Structured3D 预训练权重加速收敛
+
+```bash
+# 新训练命令（结构不变，只换 backbone）
+python main_reg.py --mode train \
+  --data_root ... --metadata ... \
+  --class_name CylinderDome \
+  --targets radius totalHeight cylinderRatio bulge \
+  --log_dir logs/swin3d_reg_cylinderdome_v1 \
+  --num_points 2048 --epochs 100 --batch_size 16 \
+  --aux_features bbox_x bbox_y bbox_z scale
+```
+
+#### 🥈 方案二：PointNeXt + Attention Pooling（最小改动）
+
+```
+迁移量: ~50 行 Python
+预期收益: 部分改善 bulge 类参数（R² 提升 0.1-0.2）
+风险: 极低
+```
+
+改动：将 backbone 最后的 max-pooling 替换为 cross-attention pooling 或 GeM pooling，让模型学习关注对参数敏感的空间区域。
+
+#### 🥉 方案三：参考 Li & Shan (2025) 的联合 Transformer
+
+```
+迁移量: ~500 行 Python（需要重新设计训练流程）
+预期收益: 分类+回归联合优化，消除分类误差→回归误差的传导
+风险: 中（需要改动训练和推理流程）
+```
+
+合并分类和回归到一个模型，共享 backbone，两个 head 分别输出类别 logits 和参数值。
+
+### 数据增强补充
+
+无论选哪个模型，以下增强策略都建议加入：
+
+| 增强 | 当前状态 | 建议 |
+|------|---------|------|
+| 随机旋转 | `_rot` 实验用过，已弃用 | 改为训练时在线随机绕 Z 旋转 |
+| Jitter | 已用（σ=0.003） | 扩大到 0.005-0.01 |
+| 随机裁切 | 未用 | 模拟遮挡，裁掉 10-30% 点 |
+| Mixup / CutMix | 未用 | 点云 mixup 可提升泛化 |
+| 法向量 | 未用 | 加入 normal 通道帮助感知曲面 |
+
+### 评估基准
+
+换模型后，重点关注以下参数的改善：
+
+| 参数 | 当前 R² | 目标 R² | 对应基元 |
+|------|---------|---------|---------|
+| bulge | -0.08 | >0.6 | CylinderDome |
+| middleBulge | -0.85 | >0.5 | FourStageRoundTower |
+| wallRatio | 0.06 | >0.7 | TwoGableHouses |
+| innerWidth | 0.21 | >0.6 | IndentedCuboid |
+| ridgeLength | 0.52 | >0.8 | AsymmetricGableHouse |
