@@ -13,7 +13,6 @@ set (parammodeler_SRCS
   parammodeler_randomizer.cpp
   exportpointcloud.cpp
   buildmesh.cpp
-  previewglwidget.cpp
   parammodeler_pcdloader.cpp
   parammodeler_pointnet.cpp
   parammodeler_config.cpp

@@ -66,6 +66,14 @@ PointNetBackendConfig backendConfig( PointNetBackend backend )
       ParamModelerConfig::classifyLogDir( backend )
     };
   }
+  if ( backend == PointNetBackend::PCT )
+  {
+    return {
+      QStringLiteral( "PCT" ),
+      ParamModelerConfig::classifyScript( backend ),
+      ParamModelerConfig::classifyLogDir( backend )
+    };
+  }
 
   return {
     QStringLiteral( "PointNet++" ),
@@ -87,8 +95,11 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
   if ( backend == PointNetBackend::PointNet )
     return { QStringLiteral( "PointNet" ), prim, QString(), QString() };
 
-  const bool usePointNeXt = backend == PointNetBackend::PointNeXt;
-  const QString modelName = usePointNeXt ? QStringLiteral( "PointNeXt" ) : QStringLiteral( "PointNet++" );
+  const bool isPCT = ( backend == PointNetBackend::PCT );
+  const bool usePointNeXt = ( backend == PointNetBackend::PointNeXt || isPCT );
+  const QString modelName = isPCT ? QStringLiteral( "PCT" )
+                           : usePointNeXt ? QStringLiteral( "PointNeXt" )
+                           : QStringLiteral( "PointNet++" );
   const QString script = ParamModelerConfig::regressionScript( backend );
   const QString base   = ParamModelerConfig::regressionLogBase( backend );
 
@@ -113,10 +124,23 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
   if ( !stemNames.contains( prim ) )
     return { modelName, prim, script, QString() };
 
-  const QString prefix = usePointNeXt
+  // PCT per-class variant selection: neighbor wins 10/13 classes,
+  // basic wins on CylinderDome, HalfCylinderRoof, LHouse
+  static const QMap<QString, QString> pctBestSuffix = {
+    { QStringLiteral( "CylinderDome" ),       QStringLiteral( "_v2" ) },
+    { QStringLiteral( "HalfCylinderRoof" ),   QStringLiteral( "_v2" ) },
+    { QStringLiteral( "LHouse" ),             QStringLiteral( "_v2" ) }
+  };
+  // Default variant from config; per-class overrides below for the 3 classes where basic wins
+
+  const QString prefix = isPCT
+    ? QStringLiteral( "pct_reg_" )
+    : usePointNeXt
     ? ParamModelerConfig::regressionModelPrefix()
     : QStringLiteral( "reg_" );
-  const QString suffix = usePointNeXt
+  const QString suffix = isPCT
+    ? pctBestSuffix.value( prim, ParamModelerConfig::pctRegressionSuffix() )
+    : usePointNeXt
     ? ParamModelerConfig::regressionModelSuffix()
     : QStringLiteral( "_aux" );
   const QString dirName = prefix + stemNames.value( prim ) + suffix;
@@ -300,7 +324,7 @@ bool runPythonProcess( const QString &scriptPath,
 
 PointNetPredictResult PointNetRunner::predict ( const QString &inputTxt, int numPoints, int topK )
 {
-  return predict( inputTxt, PointNetBackend::PointNeXt, numPoints, topK );
+  return predict( inputTxt, PointNetBackend::PCT, numPoints, topK );
 }
 
 PointNetPredictResult PointNetRunner::predict( const QString &inputTxt,
@@ -384,7 +408,7 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
                                                         const QString &primitiveType,
                                                         int numPoints )
 {
-  return predictParams( inputTxt, PointNetBackend::PointNeXt, primitiveType, numPoints );
+  return predictParams( inputTxt, PointNetBackend::PCT, primitiveType, numPoints );
 }
 
 PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
@@ -524,10 +548,10 @@ void PointNetRunner::applyToUI( ParamModelerDock *dock,
     set( "height",    dock->ui->spinBoxCHeight,    dock->ui->sliderCHeight );
     set( "radius",    dock->ui->spinBoxCylRadius,  dock->ui->sliderCylRadius );
     set( "cylHeight", dock->ui->spinBoxCylHeight,  dock->ui->sliderCylHeight );
-    set( "lMainL",    dock->ui->spinBoxLMainLength,  dock->ui->sliderLMainLength );
-    set( "lMainW",    dock->ui->spinBoxLMainWidth,  dock->ui->sliderLMainWidth );
-    set( "lWingL",    dock->ui->spinBoxLWingLength,  dock->ui->sliderLWingLength );
-    set( "lWingW",    dock->ui->spinBoxLWingWidth,  dock->ui->sliderLWingWidth );
+    set( "lTotalL",   dock->ui->spinBoxLTotalLength, dock->ui->sliderLTotalLength );
+    set( "lWingR",    dock->ui->spinBoxLWingRatio,  dock->ui->sliderLWingRatio );
+    set( "lTotalW",   dock->ui->spinBoxLTotalWidth,  dock->ui->sliderLTotalWidth );
+    set( "lWingWR",   dock->ui->spinBoxLWingWidthRatio, dock->ui->sliderLWingWidthRatio );
     set( "lHeight",   dock->ui->spinBoxLHeight,     dock->ui->sliderLHeight );
     set( "ccRadius",      dock->ui->spinBoxConeCylRadius,    dock->ui->sliderConeCylRadius );
     setTotalAndCylinderRatio( "ccCylHeight", "ccConeHeight", dock->ui->spinBoxConeCylCylHeight, dock->ui->sliderConeCylCylHeight, dock->ui->spinBoxConeCylConeHeight, dock->ui->sliderConeCylConeHeight );

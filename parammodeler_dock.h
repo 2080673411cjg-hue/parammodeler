@@ -33,7 +33,6 @@ class QCheckBox;
 
 class QgisInterface;
 class QgsVectorLayer; 
-class PreviewGLWidget;
 class QMenu;                    // ← 新增这一行（推荐显式包含）
 
 namespace Ui {
@@ -70,10 +69,10 @@ public:
   double cuboidHeight() const;
   double cylinderRadius() const;
   double cylinderHeight() const;
-  double LMainLength() const;
-  double LMainWidth() const;
-  double LWingLength() const;
-  double LWingWidth() const;
+  double LTotalLength() const;
+  double LTotalWidth() const;
+  double LWingRatio() const;
+  double LWingWidthRatio() const;
   double LHeight() const;
   double coneCylRadius() const;
   double coneCylCylHeight() const;
@@ -176,7 +175,6 @@ private:
   bool      m_hasMetadata = false;
 
   // ===== 预览 =====
-  PreviewGLWidget *m_previewWidget = nullptr;
   QTimer          *m_previewTimer  = nullptr;
   bool             m_previewUpdatePending = false;
   bool             m_previewUpdateInProgress = false;

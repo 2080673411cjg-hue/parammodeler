@@ -198,11 +198,11 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
     }
     else if ( type == "LHouse" )
     {
-      p["A_length"] = dock->LMainLength();
-      p["A_width"] = dock->LMainWidth();
-      p["B_length"] = dock->LWingLength();
-      p["B_width"] = dock->LWingWidth();
-      p["height"] = dock->LHeight();
+      p["totalLength"]    = dock->LTotalLength();
+      p["wingRatio"]      = dock->LWingRatio();
+      p["totalWidth"]     = dock->LTotalWidth();
+      p["wingWidthRatio"] = dock->LWingWidthRatio();
+      p["height"]         = dock->LHeight();
     }
     else if ( type == "ConeCylinder" )
     {

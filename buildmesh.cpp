@@ -65,7 +65,7 @@ MeshData BuildMesh::buildCuboid( ParamModelerDock *dock )
     QVector3D v0(0,0,0), v1(W,0,0), v2(W,D,0), v3(0,D,0);
     QVector3D v4(0,0,H), v5(W,0,H), v6(W,D,H), v7(0,D,H);
 
-    m.addQuad( v0, v1, v2, v3 ); // 底面（CCW从下方看）
+    m.addQuad( v0, v3, v2, v1 ); //底面（CCW从下方看）
     m.addQuad( v4, v5, v6, v7 ); // 顶面
     m.addQuad( v0, v1, v5, v4 ); // 前面
     m.addQuad( v1, v2, v6, v5 ); // 右面
@@ -110,14 +110,17 @@ MeshData BuildMesh::buildCylinder( ParamModelerDock *dock )
 MeshData BuildMesh::buildLHouse( ParamModelerDock *dock )
 {
     MeshData m;
-    double Aw = dock->LMainLength();
-    double Ad = dock->LMainWidth();
-    double Bw = dock->LWingLength();
-    double Bd = dock->LWingWidth();
-    double H  = dock->LHeight();
+    double T   = dock->LTotalLength();
+    double Rw  = dock->LWingRatio();
+    double Aw  = T * ( 1.0 - Rw );
+    double Bw  = T * Rw;
+    double Ad  = dock->LTotalWidth();
+    double Bdr = dock->LWingWidthRatio();
+    double Bd  = Ad * Bdr;
+    double H   = dock->LHeight();
 
-    DEBUG_LOG( QString("[LHouse] Aw=%1 Ad=%2 Bw=%3 Bd=%4 H=%5\n")
-        .arg(Aw).arg(Ad).arg(Bw).arg(Bd).arg(H).toStdWString().c_str() );
+    DEBUG_LOG( QString("[LHouse] T=%1 Rw=%2 Aw=%3 Ad=%4 Bw=%5 Bdr=%6 Bd=%7 H=%8\n")
+        .arg(T).arg(Rw).arg(Aw).arg(Ad).arg(Bw).arg(Bdr).arg(Bd).arg(H).toStdWString().c_str() );
     if ( Aw<=0||Ad<=0||Bw<=0||Bd<=0||H<=0 ) return m;
 
     // L形拆成两个凸多边形，各自三角化，凹角不填充
@@ -197,7 +200,7 @@ MeshData BuildMesh::buildConeCylinder( ParamModelerDock *dock )
     for ( int i = 0; i < seg; i++ )
     {
         int n = (i+1)%seg;
-        m.addTriangle( bc, bot[i], bot[n] );         // 底面
+        m.addTriangle( bc, bot[n], bot[i] );         // 底面（法线 -Z）
         m.addTriangle( bot[i], bot[n], mid[n] );     // 圆柱侧面
         m.addTriangle( bot[i], mid[n], mid[i] );
         m.addTriangle( mid[i], mid[n], apex );       // 圆锥侧面
@@ -384,7 +387,7 @@ MeshData BuildMesh::buildCylinderHemisphere( ParamModelerDock *dock )
     QVector3D bc(0,0,0);
     for ( int i=0; i<seg; i++ ) {
         int n=(i+1)%seg;
-        m.addTriangle(bc, botRing[i], botRing[n]);
+        m.addTriangle(bc, botRing[n], botRing[i]);
     }
     // 圆柱侧面
     for ( int i=0; i<seg; i++ ) {
@@ -446,9 +449,9 @@ MeshData BuildMesh::buildIndentedCuboid( ParamModelerDock *dock )
     m.addQuad( v5, v6, i2, i1 ); // 右部顶面
     m.addQuad( v6, v7, i3, i2 ); // 后部顶面
     m.addQuad( v7, v4, i0, i3 ); // 左部顶面
-    // 凹陷内部
-    m.addQuad( b0, b3, b2, b1 ); // 凹陷底面（法线 -Z，朝下）
-    m.addQuad( i0, i1, b1, b0 ); // 凹陷前侧
+    // 凹陷内部（法线均指向凹陷内部空间）
+    m.addQuad( b0, b1, b2, b3 ); // 凹陷底面（法线 +Z，俯视可见）
+    m.addQuad( i0, b0, b1, i1 ); // 凹陷前侧（法线 -Y，朝内）
     m.addQuad( i1, i2, b2, b1 ); // 凹陷右侧
     m.addQuad( i2, i3, b3, b2 ); // 凹陷后侧
     m.addQuad( i3, i0, b0, b3 ); // 凹陷左侧
@@ -564,7 +567,7 @@ MeshData BuildMesh::buildFourStageRoundTower( ParamModelerDock *dock )
     QVector3D bc(0,0,0);
     for ( int i=0; i<seg; i++ ) {
         int n=(i+1)%seg;
-        m.addTriangle(bc, botRing[i], botRing[n]);
+        m.addTriangle(bc, botRing[n], botRing[i]);
     }
 
     // 圆柱段

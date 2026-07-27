@@ -159,7 +159,6 @@ parammodeler/
 ├── parammodeler_dock.cpp / .h / .ui   # 插件主 UI 和调度中心
 ├── buildmesh.cpp / .h                 # 13 类建筑基元的网格生成
 ├── meshdata.h                         # 网格数据结构，保存顶点和三角面索引
-├── previewglwidget.cpp / .h           # 本地 OpenGL 预览窗口
 ├── parammodeler_scene3d.cpp / .h      # QGIS 3D 图层加载与 Qt3D 实时预览
 ├── parammodeler_pcdloader.cpp / .h    # 外部点云读取
 ├── parammodeler_pcdtypes.h            # 点云数据结构

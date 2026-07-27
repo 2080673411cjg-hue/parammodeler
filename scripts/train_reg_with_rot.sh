@@ -55,7 +55,7 @@ run_reg () {
 # ========== 13 类逐个训练（每个 target 加了 rx ry rz） ==========
 run_reg Cuboid               logs/pointnext_reg_cuboid_rot               length width height rx ry rz
 run_reg Cylinder             logs/pointnext_reg_cylinder_rot             radius height rx ry rz
-run_reg LHouse               logs/pointnext_reg_lhouse_rot               mainLength mainWidth wingLength wingWidth height rx ry rz
+run_reg LHouse               logs/pointnext_reg_lhouse_rot               totalLength wingRatio totalWidth wingWidthRatio height rx ry rz
 run_reg ConeCylinder         logs/pointnext_reg_conecylinder_rot         radius totalHeight cylinderRatio rx ry rz
 run_reg GabledRoof           logs/pointnext_reg_gabledroof_rot           length width totalHeight wallRatio rx ry rz
 run_reg PyramidRoof          logs/pointnext_reg_pyramidroof_rot          length width totalHeight wallRatio rx ry rz

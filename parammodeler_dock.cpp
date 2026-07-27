@@ -17,7 +17,6 @@
 
 #include "parammodeler_dock.h"
 #include "ui_parammodeler_dock.h"
-#include "previewglwidget.h"
 #include "buildmesh.h"
 #include "parammodeler_export.h"
 #include "exportpointcloud.h"
@@ -184,10 +183,10 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderCHeight, ui->spinBoxCHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderCylRadius, ui->spinBoxCylRadius, 100.0, 50.0 );
   bindSliderSpin( ui->sliderCylHeight, ui->spinBoxCylHeight, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderLMainLength, ui->spinBoxLMainLength, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderLMainWidth, ui->spinBoxLMainWidth, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderLWingLength, ui->spinBoxLWingLength, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderLWingWidth, ui->spinBoxLWingWidth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderLTotalLength, ui->spinBoxLTotalLength, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderLTotalWidth, ui->spinBoxLTotalWidth, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderLWingRatio, ui->spinBoxLWingRatio, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderLWingWidthRatio, ui->spinBoxLWingWidthRatio, 100.0, 50.0 );
   bindSliderSpin( ui->sliderLHeight, ui->spinBoxLHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderConeCylRadius, ui->spinBoxConeCylRadius, 100.0, 50.0 );
   bindSliderSpin( ui->sliderConeCylCylHeight, ui->spinBoxConeCylCylHeight, 100.0, 50.0 );
@@ -260,10 +259,10 @@ void ParamModelerDock::initUiControls()
   ui->labelLength->setText( tr( "Length:" ) );
   ui->labelCylRadius->setText( tr( "Radius:" ) );
   ui->labelCylHeight->setText( tr( "Height:" ) );
-  ui->labelLMainLength->setText( tr( "Main length:" ) );
-  ui->labelLMainWidth->setText( tr( "Main width:" ) );
-  ui->labelLWingLength->setText( tr( "Wing length:" ) );
-  ui->labelLWingWidth->setText( tr( "Wing width:" ) );
+  ui->labelLTotalLength->setText( tr( "Total length:" ) );
+  ui->labelLTotalWidth->setText( tr( "Total width:" ) );
+  ui->labelLWingRatio->setText( tr( "Wing length ratio:" ) );
+  ui->labelLWingWidthRatio->setText( tr( "Wing width ratio:" ) );
   ui->labelLHeight->setText( tr( "Height:" ) );
   ui->labelConeCylRadius->setText( tr( "Radius:" ) );
   ui->labelConeCylCylHeight->setText( tr( "Total height:" ) );
@@ -353,10 +352,10 @@ void ParamModelerDock::initConnections()
   connect( ui->sliderCHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCylRadius, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCylHeight, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderLMainLength, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderLMainWidth, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderLWingLength, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderLWingWidth, &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderLTotalLength, &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderLTotalWidth, &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderLWingRatio, &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderLWingWidthRatio, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderLHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderConeCylRadius, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderConeCylCylHeight, &QSlider::valueChanged, this, schedulePreview );
@@ -422,28 +421,6 @@ void ParamModelerDock::initConnections()
 
 void ParamModelerDock::initPreview()
 {
-  m_previewWidget = ui->previewWidget;
-  if ( m_previewWidget )
-  {
-    QWidget *previewParent = m_previewWidget->parentWidget();
-    QVBoxLayout *previewLayout = previewParent ? qobject_cast<QVBoxLayout *>( previewParent->layout() ) : nullptr;
-    if ( previewLayout )
-    {
-      QPushButton *togglePreviewButton = new QPushButton( tr( "Show local preview" ), previewParent );
-      togglePreviewButton->setCheckable( true );
-      togglePreviewButton->setChecked( false );
-      const int previewIndex = previewLayout->indexOf( m_previewWidget );
-      previewLayout->insertWidget( previewIndex >= 0 ? previewIndex : previewLayout->count(), togglePreviewButton );
-      m_previewWidget->setVisible( false );
-      connect( togglePreviewButton, &QPushButton::toggled, this, [this, togglePreviewButton]( bool checked ) {
-        if ( m_previewWidget )
-          m_previewWidget->setVisible( checked );
-        togglePreviewButton->setText( checked ? tr( "Hide local preview" ) : tr( "Show local preview" ) );
-        if ( checked )
-          onUpdatePreview();
-      } );
-    }
-  }
   ui->checkBoxAutoSync->setChecked( false );
   ui->checkBoxAutoSync->setVisible( false );
 
@@ -585,6 +562,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   auto *modelLayout = new QHBoxLayout();
   auto *modelLabel = new QLabel( tr( "Model:" ), &dialog );
   auto *comboModel = new QComboBox( &dialog );
+  comboModel->addItem( QStringLiteral( "PCT" ) );
   comboModel->addItem( QStringLiteral( "PointNeXt" ) );
   comboModel->addItem( QStringLiteral( "PointNet++" ) );
   comboModel->addItem( QStringLiteral( "PointNet" ) );
@@ -698,6 +676,8 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       return PointNetBackend::PointNet;
     if ( modelName == QStringLiteral( "PointNeXt" ) )
       return PointNetBackend::PointNeXt;
+    if ( modelName == QStringLiteral( "PCT" ) )
+      return PointNetBackend::PCT;
     return PointNetBackend::PointNet2;
   };
 
@@ -1318,9 +1298,6 @@ void ParamModelerDock::onUpdatePreview()
 
   QString prim = ui->comboPrimitive->currentText();
   MeshData mesh = BuildMesh::build( prim, this );
-  if ( m_previewWidget && m_previewWidget->isVisible() )
-    m_previewWidget->setMesh( mesh );
-
 
   if ( m_realtimeModelLoaded )
   {

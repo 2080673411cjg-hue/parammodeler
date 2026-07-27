@@ -67,7 +67,7 @@ QString datasetsBaseDir()
 QString classifyModelName()
 {
   return setting( QStringLiteral( "parammodeler/classifyModelName" ),
-                  QStringLiteral( "pointnext_cls_v2" ) );
+                  QStringLiteral( "pct_cls_v2" ) );
 }
 
 QString regressionModelPrefix()
@@ -83,6 +83,16 @@ QString regressionModelSuffix()
 }
 
 // ------------------------------------------------------------------
+// PCT model variant (separate from PointNeXt legacy settings)
+// ------------------------------------------------------------------
+
+QString pctRegressionSuffix()
+{
+  return setting( QStringLiteral( "parammodeler/pctRegressionSuffix" ),
+                  QStringLiteral( "_v2_neighbor" ) );
+}
+
+// ------------------------------------------------------------------
 // derived classify paths
 // ------------------------------------------------------------------
 
@@ -93,6 +103,7 @@ QString classifyScript( PointNetBackend backend )
   {
     case PointNetBackend::PointNet:  return base + QStringLiteral( "pointnet_simple/main.py" );
     case PointNetBackend::PointNeXt: return base + QStringLiteral( "pointnext_simple/main.py" );
+    case PointNetBackend::PCT:       return base + QStringLiteral( "pct_simple/main.py" );
     default:                         return base + QStringLiteral( "pointnet2_simple/main.py" );
   }
 }
@@ -104,6 +115,7 @@ QString classifyLogDir( PointNetBackend backend )
   {
     case PointNetBackend::PointNet:  return base + QStringLiteral( "pointnet_simple/logs/pointnet_aug_roof_guard_v1" );
     case PointNetBackend::PointNeXt: return base + QStringLiteral( "pointnext_simple/logs/" ) + classifyModelName();
+    case PointNetBackend::PCT:       return base + QStringLiteral( "pct_simple/logs/pct_cls_v2" );
     default:                         return base + QStringLiteral( "pointnet2_simple/logs/pointnet2_cls_auxdata_250" );
   }
 }
@@ -117,6 +129,8 @@ QString regressionScript( PointNetBackend backend )
   const QString base = pointnetBaseDir();
   if ( backend == PointNetBackend::PointNeXt )
     return base + QStringLiteral( "pointnext_simple/main_reg.py" );
+  if ( backend == PointNetBackend::PCT )
+    return base + QStringLiteral( "pct_simple/main_reg.py" );
   return base + QStringLiteral( "pointnet2_simple/main_reg.py" );
 }
 
@@ -125,6 +139,8 @@ QString regressionLogBase( PointNetBackend backend )
   const QString base = pointnetBaseDir();
   if ( backend == PointNetBackend::PointNeXt )
     return base + QStringLiteral( "pointnext_simple/logs/" );
+  if ( backend == PointNetBackend::PCT )
+    return base + QStringLiteral( "pct_simple/logs/" );
   return base + QStringLiteral( "pointnet2_simple/logs/" );
 }
 
@@ -163,6 +179,7 @@ void showSettingsDialog( QWidget *parent )
   const QString curClsModel = classifyModelName();
   const QString curRegPrefix = regressionModelPrefix();
   const QString curRegSuffix = regressionModelSuffix();
+  const QString curPctSuffix = pctRegressionSuffix();
 
   // --- line edits ---
   auto *edtPython   = new QLineEdit( curPython, &dlg );
@@ -171,6 +188,7 @@ void showSettingsDialog( QWidget *parent )
   auto *edtClsModel = new QLineEdit( curClsModel, &dlg );
   auto *edtRegPrefix = new QLineEdit( curRegPrefix, &dlg );
   auto *edtRegSuffix = new QLineEdit( curRegSuffix, &dlg );
+  auto *edtPctSuffix = new QLineEdit( curPctSuffix, &dlg );
 
   auto makeBrowse = [&]( QLineEdit *edt, bool dirOnly ) {
     auto *btn = new QPushButton( QStringLiteral( "浏览..." ), &dlg );
@@ -210,10 +228,21 @@ void showSettingsDialog( QWidget *parent )
     form->addRow( QStringLiteral( "分类模型名:" ), edtClsModel );
   }
   {
+    form->addRow( QStringLiteral( "PCT 回归默认后缀:" ), edtPctSuffix );
+    auto *pctHint = new QLabel(
+      QStringLiteral( "  默认 _v2_neighbor (10/13 类最优)。CylinderDome/HalfCylinder/LHouse 自动用 _v2。" ), &dlg );
+    pctHint->setStyleSheet( QStringLiteral( "color: #888; font-size: 11px;" ) );
+    form->addRow( QString(), pctHint );
+  }
+  {
     auto *hb = new QHBoxLayout;
     hb->addWidget( edtRegPrefix );
     hb->addWidget( edtRegSuffix );
-    form->addRow( QStringLiteral( "回归模型 (前缀 + 后缀):" ), hb );
+    form->addRow( QStringLiteral( "PointNeXt 回归 (前缀+后缀):" ), hb );
+    auto *pnxHint = new QLabel(
+      QStringLiteral( "  仅 PointNeXt 后端使用，PCT 忽略此项。" ), &dlg );
+    pnxHint->setStyleSheet( QStringLiteral( "color: #888; font-size: 11px;" ) );
+    form->addRow( QString(), pnxHint );
   }
 
   auto *lblHint = new QLabel(
@@ -225,7 +254,8 @@ void showSettingsDialog( QWidget *parent )
     edtPython->setText(    QStringLiteral( "E:/mambaforge/envs/pointnet_train/python.exe" ) );
     edtBase->setText(      QStringLiteral( "E:/pointnet" ) );
     edtDataset->setText(   QStringLiteral( "E:/pointnet/datasets_aug" ) );
-    edtClsModel->setText(  QStringLiteral( "pointnext_cls_v2" ) );
+    edtClsModel->setText(  QStringLiteral( "pct_cls_v2" ) );
+    edtPctSuffix->setText( QStringLiteral( "_v2_neighbor" ) );
     edtRegPrefix->setText( QStringLiteral( "pointnext_reg_" ) );
     edtRegSuffix->setText( QStringLiteral( "_aux" ) );
   } );
@@ -245,6 +275,7 @@ void showSettingsDialog( QWidget *parent )
     s.setValue( QStringLiteral( "parammodeler/classifyModelName" ),    edtClsModel->text() );
     s.setValue( QStringLiteral( "parammodeler/regressionModelPrefix" ), edtRegPrefix->text() );
     s.setValue( QStringLiteral( "parammodeler/regressionModelSuffix" ), edtRegSuffix->text() );
+    s.setValue( QStringLiteral( "parammodeler/pctRegressionSuffix" ),   edtPctSuffix->text() );
     dlg.accept();
   } );
   QObject::connect( btnCancel, &QPushButton::clicked, &dlg, &QDialog::reject );

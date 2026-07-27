@@ -49,22 +49,24 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
   }
   else if ( prim == "LHouse" )
   {
-    const double mainLength = rnd( 10.0, 22.0 );
-    const double mainWidth = rnd( 6.0, 14.0 );
-    double wingLength = mainLength * 0.55;
-    double wingWidth = mainWidth * 0.45;
+    const double totalLength    = rnd( 15.0, 41.0 );
+    const double wingRatio      = rnd( 0.25, 0.65 );
+    const double totalWidth     = rnd( 6.0, 14.0 );
+    double wingWidthRatio       = rnd( 0.35, 0.60 );
+    const double mainLength     = totalLength * ( 1.0 - wingRatio );
+    const double wingLength     = totalLength * wingRatio;
     for ( int attempt = 0; attempt < 20; ++attempt )
     {
-      wingLength = rnd( mainLength * 0.50, mainLength * 0.85 );
-      wingWidth = rnd( mainWidth * 0.35, mainWidth * 0.60 );
-      const double missingRatio = wingLength * ( mainWidth - wingWidth ) / ( ( mainLength + wingLength ) * mainWidth );
+      wingWidthRatio = rnd( 0.35, 0.60 );
+      const double wingWidth = totalWidth * wingWidthRatio;
+      const double missingRatio = wingLength * ( totalWidth - wingWidth ) / ( ( mainLength + wingLength ) * totalWidth );
       if ( missingRatio >= 0.16 )
         break;
     }
-    set( dock->ui->spinBoxLMainLength, mainLength );
-    set( dock->ui->spinBoxLMainWidth, mainWidth );
-    set( dock->ui->spinBoxLWingLength, wingLength );
-    set( dock->ui->spinBoxLWingWidth, wingWidth );
+    set( dock->ui->spinBoxLTotalLength, totalLength );
+    set( dock->ui->spinBoxLWingRatio, wingRatio );
+    set( dock->ui->spinBoxLTotalWidth, totalWidth );
+    set( dock->ui->spinBoxLWingWidthRatio, wingWidthRatio );
     set( dock->ui->spinBoxLHeight, rnd( 2.5, 7.0 ) );
   }
   else if ( prim == "ConeCylinder" )

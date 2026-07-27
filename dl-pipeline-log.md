@@ -1,10 +1,11 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-07-25  
-> 当前模型: PointNeXt `_aux`（纯形状参数，不含 pose）  
-> 分类模型: `pointnext_cls_v2`  
+> 最后更新: 2026-07-27  
+> 当前模型: **PCT**（Point Cloud Transformer）— Li & Shan 2025 风格 offset-attention  
+> 分类模型: `pct_cls_v2` — 98.92% F1，8/13 类满分  
+> 回归模型: `pct_reg_*_v2` (basic) + `pct_reg_*_v2_neighbor` (neighbor)，混合部署  
 > 数据集: **500 样本/类**（train 400 + val 50 + test 50），13 类共 6500 样本  
-> 后端: PointNeXt（PointNet / PointNet++ 保留但不再使用）
+> 后端: PCT（PointNeXt 保留但不再使用）
 
 ---
 
@@ -137,55 +138,67 @@ E:/pointnet/datasets_aug/
 
 | 项 | 路径 |
 |----|------|
-| PointNeXt 代码 | `E:/pointnet/pointnext_simple/` |
-| 分类入口 | `main.py` → `PointNet2Classifier` |
-| 回归入口 | `main_reg.py` → `PointNeXtRegressor` |
+| **PCT 代码** | `E:/pointnet/pct_simple/` |
+| 分类入口 | `main.py` → `PCTClassifier` |
+| 回归入口 | `main_reg.py` → `PCTRegressor` / `PCTNeighborRegressor` |
 | 数据集根目录 | `--data_root E:/pointnet/datasets_aug` |
 | 元数据 | `--metadata E:/pointnet/datasets_aug/metadata/sample_params.json` |
+| PointNeXt 代码 (legacy) | `E:/pointnet/pointnext_simple/` |
 
-### 分类训练
+### PCT 分类训练
 
 ```bash
+cd /home/xubo/pointnet/pct_simple
+source /home/xubo/pointnet_envs/pointnet_gpu/bin/activate
 python main.py --mode train \
-  --data_root E:/pointnet/datasets_aug \
-  --log_dir logs/pointnext_cls_v2 \
-  --num_points 1024 --epochs 80 --batch_size 8
+  --data_root /home/xubo/pointnet/datasets_aug \
+  --log_dir logs/pct_cls_v2 \
+  --num_points 1024 --epochs 80 --batch_size 32 --lr 5e-4 --train_jitter_sigma 0.005
 ```
 
-输出到 `logs/pointnext_cls_v2/`：
-- `best_model.pth`
+输出到 `logs/pct_cls_v2/`：
+- `best_model.pth`（~1.48M 参数）
 - `classes.txt`（13 类名）
 - `classification_report_test.csv`
 - `confusion_matrix_test.csv`
 
-### 回归训练（每个基元独立训练）
+### PCT 回归训练（2 变体 × 13 类 = 26 个模型）
 
 ```bash
+# basic 变体 — 全局 offset-attention
 python main_reg.py --mode train \
-  --data_root E:/pointnet/datasets_aug \
-  --metadata E:/pointnet/datasets_aug/metadata/sample_params.json \
-  --class_name Cuboid \
-  --targets length width height \
-  --log_dir logs/pointnext_reg_cuboid_aux \
-  --num_points 2048 --epochs 100 --batch_size 16 \
-  --aux_features bbox_x bbox_y bbox_z scale
+  --data_root /home/xubo/pointnet/datasets_aug \
+  --metadata /home/xubo/pointnet/datasets_aug/metadata/sample_params.json \
+  --class_name Cuboid --targets length width height \
+  --log_dir logs/pct_reg_cuboid_v2 \
+  --num_points 2048 --epochs 100 --batch_size 16 --lr 1e-3 \
+  --aux_features bbox_x bbox_y bbox_z scale \
+  --pct_variant basic --pct_d_model 256 --pct_heads 4 --pct_blocks 4
+
+# neighbor 变体 — offset-attention + kNN 局部增强
+python main_reg.py --mode train \
+  ... \
+  --log_dir logs/pct_reg_cuboid_v2_neighbor \
+  --pct_variant neighbor --pct_d_model 256 --pct_heads 4 --pct_blocks 4
 ```
 
-**关键参数说明：**
+**PCT 特有超参：**
 
 | 参数 | 含义 |
 |------|------|
-| `--targets` | 回归目标参数名（必须和 sample_params.json 中 params 的 key 一致） |
-| `--aux_features` | 辅助特征（来自 metadata 的 pointCloudInfo 字段） |
-| `--random_rotate` | 训练时随机旋转增强（`_rot` 实验用，`_aux` 不用） |
-| `--train_jitter_sigma` | 训练时加噪标准差，默认 0.003 |
-| `--smooth_l1_beta` | SmoothL1 loss 的 beta 参数，默认 1.0 |
+| `--pct_variant` | `basic`（全局 attention）或 `neighbor`（+kNN 局部图） |
+| `--pct_d_model` | 特征维度，默认 256 |
+| `--pct_heads` | 多头注意力头数，默认 4 |
+| `--pct_blocks` | offset-attention 层数，默认 4 |
+| `--pct_dropout` | Dropout，默认 0.1 |
+
+**通用参数：**（与 PointNeXt 训练相同，见之前文档）
 
 ### 回归输出文件
 
 ```
-logs/pointnext_reg_{primitive}_aux/
-├── best_model.pth              # 模型权重
+logs/pct_reg_{primitive}_v2{_neighbor}/
+├── best_model.pth              # 模型权重（~1.5M 参数，PointNeXt 的 1/3）
 ├── regression_config.json      # 训练配置 + target/aux 的 mean/std
 ├── train_history.csv           # epoch, train_loss, val_mae_mean, val_rmse_mean
 ├── regression_metrics_test.csv # target, mae, rmse, mape_percent, r2
@@ -202,11 +215,12 @@ logs/pointnext_reg_{primitive}_aux/
 
 | 实验 | 目录 | 说明 |
 |------|------|------|
-| 分类 v2 | `pointnext_cls_v2` | 当前使用的分类模型，79.9% F1 (85/类) |
-| 分类 aug_250 | `pointnext_cls_aug_250` | 旧实验，数据增强版（**不用**） |
-| 分类 coordfix | `pointnext_cls_coordfix_v1` | 旧实验（**不用**） |
-| 回归 aux ×13 | `pointnext_reg_*_aux` | **当前使用**，纯形状参数 |
-| 回归 rot ×13 | `pointnext_reg_*_rot` | 含 rz 预测，数据量大但形状参数更差（**不用**） |
+| **PCT 分类 v2** | `pct_cls_v2` | **当前使用**，98.92% F1 |
+| **PCT 回归 basic v2 ×13** | `pct_reg_*_v2` | basic 变体，3 类最优 |
+| **PCT 回归 neighbor v2 ×13** | `pct_reg_*_v2_neighbor` | neighbor 变体，10 类最优 |
+| PointNeXt 分类 v2 | `pointnext_cls_v2` | 旧实验，79.9% F1（**不用**） |
+| PointNeXt 回归 aux ×13 | `pointnext_reg_*_aux` | 旧实验（**不用**） |
+| PointNeXt 回归 rot ×13 | `pointnext_reg_*_rot` | 旧实验（**不用**） |
 
 ---
 
@@ -229,9 +243,9 @@ onPointNetClassify() - dock.cpp:2503
     ↓
 PointNetRunner::predict(inputTxt, 2048, topK=3)
     ↓
-backendConfig(PointNeXt)
-    → script: pointnext_simple/main.py
-    → logDir: pointnext_simple/logs/pointnext_cls_v2
+backendConfig(PCT)
+    → script: pct_simple/main.py
+    → logDir: pct_simple/logs/pct_cls_v2
     ↓
 QProcess: python main.py --mode predict --input X --log_dir Y
          --num_points 2048 --topk 3 --cpu
@@ -248,9 +262,9 @@ onInverseParams() - dock.cpp:2552
     ↓
 PointNetRunner::predictParams(inputTxt, primitiveType, 2048)
     ↓
-regressionConfig(PointNeXt, primitiveType)
-    → script: pointnext_simple/main_reg.py
-    → logDir: pointnext_simple/logs/pointnext_reg_{primitive}_aux
+regressionConfig(PCT, primitiveType)
+    → script: pct_simple/main_reg.py
+    → logDir: pct_simple/logs/pct_reg_{primitive}_v2{_neighbor}  (per-class variant)
     ↓
 QProcess: python main_reg.py --mode predict
          --input X --log_dir Y --num_points 2048 --cpu
@@ -313,10 +327,11 @@ setPoseTranslate(tx, ty, tz)
 ### 派生路径（自动计算）
 
 ```
-分类脚本: {pointnetBase}/pointnext_simple/main.py
-回归脚本: {pointnetBase}/pointnext_simple/main_reg.py
-分类日志: {pointnetBase}/pointnext_simple/logs/pointnext_cls_v2
-回归日志: {pointnetBase}/pointnext_simple/logs/pointnext_reg_{primitive}_aux
+分类脚本: {pointnetBase}/pct_simple/main.py
+回归脚本: {pointnetBase}/pct_simple/main_reg.py
+分类日志: {pointnetBase}/pct_simple/logs/pct_cls_v2
+回归日志: {pointnetBase}/pct_simple/logs/pct_reg_{primitive}_v2{_neighbor}
+         (CylinderDome/HalfCylinderRoof/LHouse → _v2, 其余 10 类 → _v2_neighbor)
 元数据:   {datasetsBase}/metadata/sample_params.json
 数据根:   {datasetsBase}
 ```
@@ -341,42 +356,98 @@ setPoseTranslate(tx, ty, tz)
 ## 七、当前模型质量速查
 
 > **数据规模**: 500 样本/类（400 train + 50 val + 50 test），13 类共 6500 样本  
-> **回归模型**: PointNeXt `_aux`（纯形状参数，不含 rz / pose）
+> **模型**: PCT (Point Cloud Transformer)，~1.48M 参数（分类）/ ~1.5M 参数（回归）  
+> **变体部署策略**: 10 类用 neighbor，3 类用 basic
 
-### 分类 (pointnext_cls_v2)
+### 分类 (pct_cls_v2) — 🟢 基本毕业
 
-总体 F1: **79.9%**（50 样本/类测试集，需重新训练验证）
+| 指标 | PointNeXt `cls_v2` | **PCT `cls_v2`** | 提升 |
+|------|:---:|:---:|:---:|
+| Overall F1（macro avg） | 79.9% | **98.92%** | **+19%** |
+| 满分（100%）类 | ~4/13 | **8/13** | 翻倍 |
+| 总错误数（/650） | ~130 | **4** | 97% 减少 |
 
-🔴 主混淆：Cuboid↔Cylinder(9)、Cuboid↔IndentedCuboid(10)、GabledRoof→TwoGableHouses(8)
+**逐类 F1：**
 
-### 回归 (_aux) — 500 样本/类
+| 类 | PointNeXt | PCT |
+|----|:---:|:---:|
+| Cuboid | ~70% | **100%** ✅ |
+| Cylinder | ~80% | **100%** ✅ |
+| CylinderDome | ~80% | **100%** ✅ |
+| FourStageRoundTower | ~85% | **100%** ✅ |
+| HalfCylinderRoof | ~90% | **100%** ✅ |
+| IndentedCuboid | ~70% | **100%** ✅ |
+| LHouse | ~80% | **100%** ✅ |
+| PyramidRoof | ~80% | **100%** ✅ |
+| TruncatedPyramidRoof | ~75% | **100%** ✅ |
+| AsymmetricGableHouse | ~78% | 97.96% |
+| ConeCylinder | ~80% | 98.04% |
+| TwoGableHouses | ~70% | 95.05% |
+| GabledRoof | ~65% | 94.95% |
 
-| 可用 (R²>0.9) | 部分可用 (R² 0.5-0.9) | 🔴 需要突破 (R²<0.5) |
-|---------------|---------------------|---------------------|
-| Cylinder | GabledRoof | **CylinderDome** (bulge -0.08) |
-| HalfCylinderRoof | ConeCylinder | **FourStageRoundTower** (middleBulge -0.85) |
-| LHouse | Cuboid | **TwoGableHouses** (wallRatio 0.06) |
-| PyramidRoof | TruncatedPyramidRoof | **IndentedCuboid** (innerWidth 0.21) |
-| | | **AsymmetricGableHouse** (ridgeLength 0.52) |
+**残留混淆（仅 4/650 错误）：**
+- AsymmetricGableHouse：1→GabledRoof、1→TwoGableHouses
+- GabledRoof：1→ConeCylinder、2→TwoGableHouses
+- TwoGableHouses：1→ConeCylinder、1→GabledRoof
+
+PointNeXt 时代的主混淆（Cuboid↔Cylinder↔IndentedCuboid）**全部消除**。
+
+### 回归 — PCT 2 变体混合部署
+
+**变体选择：neighbor 10/13 胜出**
+
+| 类 | 参数数 | basic avg R² | neighbor avg R² | 部署变体 |
+|----|:---:|:---:|:---:|:---:|
+| Cylinder | 2 | 0.985 | **0.989** | neighbor |
+| ConeCylinder | 3 | 0.743 | **0.953** | neighbor |
+| HalfCylinderRoof | 4 | **0.844** | 0.729 | **basic** |
+| Cuboid | 3 | 0.697 | **0.778** | neighbor |
+| GabledRoof | 4 | 0.718 | **0.739** | neighbor |
+| PyramidRoof | 4 | 0.334 | **0.625** | neighbor |
+| CylinderDome | 4 | **0.584** | 0.520 | **basic** |
+| AsymmetricGableHouse | 6 | 0.328 | **0.468** | neighbor |
+| LHouse | 5 | **0.414** | 0.389 | **basic** |
+| TruncatedPyramidRoof | 6 | 0.323 | **0.415** | neighbor |
+| FourStageRoundTower | 6 | 0.014 | **0.414** | neighbor |
+| IndentedCuboid | 8 | 0.172 | **0.316** | neighbor |
+| TwoGableHouses | 7 | 0.014 | **0.090** | neighbor |
+
+**分档：**
+
+| 可用 (avg R²>0.6) | 部分可用 (0.3-0.6) | 🔴 困难 (<0.3) |
+|---|---|---|
+| Cylinder (0.989) | PyramidRoof (0.625) | **IndentedCuboid** (0.316) |
+| ConeCylinder (0.953) | CylinderDome (0.584) | **TwoGableHouses** (0.090) |
+| HalfCylinderRoof (0.844) | AsymmetricGableHouse (0.468) | |
+| Cuboid (0.778) | TruncatedPyramid (0.415) | |
+| GabledRoof (0.739) | FourStageRoundTower (0.414) | |
+| | LHouse (0.414) | |
+
+### 🔴 历史灾难参数 — PCT vs PointNeXt
+
+| 参数 | PointNeXt R² | PCT 最优 | Δ | 评估 |
+|---|---|---|---|---|
+| bulge (CylinderDome) | -0.08 | -0.004 (basic) | ≈持平 | ❌ 依然困难 — 2048 点不足以捕捉曲率变化 |
+| middleBulge (FourStage) | -0.85 | **-0.363** (neighbor) | **+0.49** | ✅ 大幅改善但仍负 — 数据量不足 |
+| wallRatio (TwoGable) | 0.06 | -0.271 (basic) | -0.33 | ❌ 恶化 — 需排查过拟合 |
+| innerWidth (IndentedCuboid) | 0.21 | 0.050 (neighbor) | -0.16 | ⚠️ 略降 — neighbor 勉强正 |
+| ridgeLength (AsymmetricGable) | 0.52 | **0.608** (neighbor) | **+0.09** | ✅ 小幅改善 |
 
 ### 🔴 问题诊断
 
-R² 差的参数有共同特征——**依赖局部几何细节的非线性形态参数**：
+**TwoGableHouses 和 IndentedCuboid 过拟合**：
 
-| 参数 | R² | 几何含义 | 为什么难学 |
-|------|-----|---------|-----------|
-| bulge | -0.08 | 穹顶曲面弯曲程度 | 全局点云对曲率变化不敏感 |
-| middleBulge | -0.85 | 塔身中段鼓出量 | 局部形变被全局池化淹没 |
-| wallRatio | 0.06 | 墙体/屋顶高度比 | 需要精确感知屋顶-墙体分割线 |
-| innerWidth | 0.21 | 凹陷宽度 | 凹陷区域的点占比太小 |
-| ridgeLength | 0.52 | 屋脊纵向位置 | 不对称性由少量点决定 |
+| 类 | train loss | val loss | test loss | 诊断 |
+|----|:---:|:---:|:---:|---|
+| TwoGableHouses (neighbor) | 0.125 | 2.046 | 2.446 | 严重过拟合 |
+| IndentedCuboid (neighbor) | 0.149 | 1.604 | 1.995 | 严重过拟合 |
+| FourStageRoundTower (neighbor) | 0.130 | 0.236 | 0.293 | 正常 |
 
-**根因分析**:
-1. PointNeXt 的 set abstraction（最远点采样+球查询）局部感受野固定，对细粒度形变不敏感
-2. 全局 max-pooling 丢弃了空间分布信息——bulge/middleBulge 本质上需要感知"曲面上点的分布密度变化"
-3. L2 loss 对多模态参数空间（如 wallRatio）不够鲁棒
+根因：500 样本不足以支撑 7-8 个参数的回归。PCT 参数仅 1.5M，本身泛化能力有限。
 
-### 后续模型升级方向
+**bulge 参数（CylinderDome）** R² 三个模型（PointNeXt、PCT basic、PCT neighbor）都在 0 附近 —— 不是架构问题，而是 2048 个 XYZ 坐标点缺乏曲率信息。需要法向量通道。
+
+### 后续改进方向
 
 见 [第九章](#九模型升级路线图)。
 
@@ -388,115 +459,105 @@ R² 差的参数有共同特征——**依赖局部几何细节的非线性形�
 
 1. **插件端**：`parammodeler_dock.cpp` — 添加 UI 控件 + `randomizeCurrentPrimitiveParams()` 加随机化逻辑 + `pointNetParamsToUiParams()` 加映射
 2. **数据生成**：重新跑 `onExportDLDatasetClicked()` 生成新数据
-3. **训练**：复制 reg config 跑新的 `main_reg.py --class_name NewPrimitive`
-4. **部署**：`parammodeler_pointnet.cpp:92` — `pointnextDirs` 加新条目，`parammodeler_config.cpp` — 如有新脚本路径需更新
+3. **训练**：复制 reg config 跑新的 PCT `main_reg.py --class_name NewPrimitive`（推荐 neighbor 变体）
+4. **部署**：`parammodeler_pointnet.cpp:92` — `stemNames` 加新条目 + `pctBestSuffix` 可选添加变体偏好，`parammodeler_config.cpp` — 如有新脚本路径需更新
 
-### 场景 2：更换模型版本
+### 场景 2：更换模型版本 / 变体
 
-只需改 `parammodeler_pointnet.cpp`:
-- 分类：修改 `classifyLogDir()` 返回新目录
-- 回归：修改 `pointnextDirs` 映射表
+通过设置对话框（或直接改代码）：
+- 分类：修改设置对话框「分类模型名」（如 `pct_cls_v3`）
+- 回归默认变体：修改设置对话框「PCT 回归默认后缀」（如 `_v3_neighbor` → 全部类默认用 v3 neighbor）
+- 每类变体覆盖：修改 `parammodeler_pointnet.cpp:129` — `pctBestSuffix` 映射表控制例外类（当前 CylinderDome/HalfCylinder/LHouse 用 basic）
+- 设置对话框路径：`设置 → PointNet 路径设置`
 
-### 场景 3：重新训练（等有训练机器后）
+**注意**：改对话框设置后需重启插件生效。
 
-建议用 `_rot` 实验的数据量 + `_aux` 实验的 target（不加 rz）：
+### 场景 3：重新训练
+
+PCT 重新训练命令参考 `scripts/train_pct_reg.sh` 和 `scripts/train_pct_cls.sh`：
+
 ```bash
+# 回归 — neighbor 变体（推荐，10/13 类最优）
 python main_reg.py --mode train \
   --data_root ... --metadata ... \
-  --class_name Cuboid \
-  --targets length width height \    # 不加 rz
-  --log_dir logs/pointnext_reg_cuboid_v3 \
-  --num_points 2048 --epochs 150 \
-  --aux_features bbox_x bbox_y bbox_z scale
+  --class_name Cuboid --targets length width height \
+  --log_dir logs/pct_reg_cuboid_v3_neighbor \
+  --num_points 2048 --epochs 100 --batch_size 16 --lr 1e-3 \
+  --aux_features bbox_x bbox_y bbox_z scale \
+  --pct_variant neighbor --pct_d_model 256 --pct_heads 4 --pct_blocks 4
+
+# 对于 CylinderDome / HalfCylinder / LHouse，用 basic 变体
+# --pct_variant basic
 ```
 
-然后更新 `pointnextDirs` 指向 `_v3` 目录。
+然后更新 `pctBestSuffix` map 指向新版本目录。
 
 ---
 
+
 ## 九、模型升级路线图
 
-> 当前 PointNeXt 对局部几何参数（bulge、wallRatio、middleBulge 等）估计质量不理想，  
-> 500 样本/类的数据量足够，瓶颈主要在模型架构。
+> ✅ **PCT (Li & Shan 2025) 已完成** — 分类 98.92% F1，回归 6/13 类 avg R^2>0.6  
+> 🔴 剩余困难：bulge（曲率不敏感）、TwoGable/IndentedCuboid（过拟合）  
+> 下一步优先级：数据端增强 > 法向量通道 > 架构升级
 
-### 候选新模型（2024-2025 SOTA）
+### 已完成
 
-| 候选 | 论文/年份 | 核心优势 | 与本任务匹配度 | 迁移难度 |
-|------|----------|---------|:---:|:---:|
-| **Swin3D** | Microsoft, CVPR 2024+ | cRSE 感知局部几何差异；预训练可用；在 Scan-to-BIM 中碾压 PointNeXt | ⭐⭐⭐⭐⭐ | 中 |
-| **Point Transformer V3** | Wu et al., 2024 | 推理极快；序列化点云；NoKSR backbone | ⭐⭐⭐⭐ | 中 |
-| **Li & Shan (2025)** | ISPRS 2025 | 与你完全一样的任务（基元分类+参数回归）；合成数据训练；100K 建筑 | ⭐⭐⭐⭐⭐ | 低 |
-| **Equivariant Diffusion** | TPAMI 2025 | 联合位姿+形状；SO(3)等变；适合非线性多模态参数 | ⭐⭐⭐ | 高 |
-| **ULIP-2 + PointBERT** | Salesforce, CVPR 2024 | 多模态预训练（文本+图像+点云）；少样本迁移强 | ⭐⭐⭐ | 中 |
+| 方案 | 状态 | 结果 |
+|------|:---:|------|
+| **PCT (Li & Shan 2025)** | ✅ 完成 | 分类 98.92%、回归 avg R^2 大幅改善（详见第七章） |
+| basic + neighbor 双变体对比 | ✅ 完成 | neighbor 10/13 胜出，basic 3/13 胜出 |
 
-### 推荐升级路径（按优先级）
+### 下一步优先级
 
-#### 🥇 方案一：Swin3D 替换 PointNeXt backbone（推荐首选）
+#### 🥇 优先级 1：数据端 — 法向量 + 增强 + 扩量（立即可做，无需重训模型架构）
 
-```
-迁移量: ~200-300 行 Python（main_reg.py 模型定义部分）
-预期收益: bulge/middleBulge/wallRatio 类参数 R² 从 <0.2 → 0.6+
-风险: 低（Swin3D 开源 MIT License，有预训练权重）
-代价: 推理速度比 PointNeXt 慢 ~30-50%（但仍可 CPU 推理）
-```
-
-关键改动点：
-1. 替换 `model.py` 中的 backbone：`PointNeXt` → `Swin3D`（`github.com/microsoft/Swin3D`）
-2. 保留现有的 aux_features 机制（bbox_x/y/z, scale）
-3. 回归头：Swin3D 全局特征 → concat(aux) → MLP → 参数输出
-4. 可选：加载 Structured3D 预训练权重加速收敛
-
-```bash
-# 新训练命令（结构不变，只换 backbone）
-python main_reg.py --mode train \
-  --data_root ... --metadata ... \
-  --class_name CylinderDome \
-  --targets radius totalHeight cylinderRatio bulge \
-  --log_dir logs/swin3d_reg_cylinderdome_v1 \
-  --num_points 2048 --epochs 100 --batch_size 16 \
-  --aux_features bbox_x bbox_y bbox_z scale
-```
-
-#### 🥈 方案二：PointNeXt + Attention Pooling（最小改动）
+**1a. 加入法向量通道**（解决 bulge R^2≈0 问题）：
 
 ```
-迁移量: ~50 行 Python
-预期收益: 部分改善 bulge 类参数（R² 提升 0.1-0.2）
-风险: 极低
+当前: 每点 (x, y, z)  3 通道
+改进: 每点 (x, y, z, nx, ny, nz)  6 通道
+
+额外信息量: 法向量直接编码曲面弯曲程度 ->
+             bulge/middleBulge 类参数的回归信号增强数倍
 ```
 
-改动：将 backbone 最后的 max-pooling 替换为 cross-attention pooling 或 GeM pooling，让模型学习关注对参数敏感的空间区域。
+改动量：`exportpointcloud.cpp:92` — `sampleCurrentPrimitive()` 同时输出法向量 + PCT `main_reg.py` 增加通道数。
 
-#### 🥉 方案三：参考 Li & Shan (2025) 的联合 Transformer
-
-```
-迁移量: ~500 行 Python（需要重新设计训练流程）
-预期收益: 分类+回归联合优化，消除分类误差→回归误差的传导
-风险: 中（需要改动训练和推理流程）
-```
-
-合并分类和回归到一个模型，共享 backbone，两个 head 分别输出类别 logits 和参数值。
-
-### 数据增强补充
-
-无论选哪个模型，以下增强策略都建议加入：
+**1b. 数据增强（减少 TwoGable/IndentedCuboid 过拟合）：**
 
 | 增强 | 当前状态 | 建议 |
 |------|---------|------|
-| 随机旋转 | `_rot` 实验用过，已弃用 | 改为训练时在线随机绕 Z 旋转 |
-| Jitter | 已用（σ=0.003） | 扩大到 0.005-0.01 |
-| 随机裁切 | 未用 | 模拟遮挡，裁掉 10-30% 点 |
-| Mixup / CutMix | 未用 | 点云 mixup 可提升泛化 |
-| 法向量 | 未用 | 加入 normal 通道帮助感知曲面 |
+| 随机裁切 | 未用 | 模拟遮挡，裁掉 10-30% 点 -> 强制模型用局部线索推理 |
+| Mixup / CutMix | 未用 | 点云 mixup 可提升泛化，特别适合多参数空间 |
+| Jitter | 已用 sigma=0.003 | 扩大到 0.005-0.01 |
 
-### 评估基准
+**1c. 扩量**：TwoGableHouses 和 IndentedCuboid 从 500->1000+ 样本/类（train loss 0.125 vs val loss 2.046 是教科书过拟合）。
 
-换模型后，重点关注以下参数的改善：
+#### 🥈 优先级 2：架构升级（如果数据端不解决问题）
 
-| 参数 | 当前 R² | 目标 R² | 对应基元 |
-|------|---------|---------|---------|
-| bulge | -0.08 | >0.6 | CylinderDome |
-| middleBulge | -0.85 | >0.5 | FourStageRoundTower |
-| wallRatio | 0.06 | >0.7 | TwoGableHouses |
-| innerWidth | 0.21 | >0.6 | IndentedCuboid |
-| ridgeLength | 0.52 | >0.8 | AsymmetricGableHouse |
+| 候选 | 核心优势 | 匹配度 | 迁移难度 |
+|------|---------|:---:|:---:|
+| **Swin3D** (Microsoft, CVPR 2024) | cRSE 感知局部几何差异；预训练可用 | (5/5) | 中 |
+| **Point Transformer V3** (Wu et al., 2024) | 推理极快；NoKSR backbone | (4/5) | 中 |
+| **Equivariant Diffusion** (TPAMI 2025) | SO(3)等变；联合位姿+形状 | (3/5) | 高 |
+
+**推荐首选 Swin3D**：
+- 迁移量 ~200-300 行（替换 PCT 的 backbone）
+- 保留 PCT 的 aux_features 和双变体机制
+- 预训练权重可从 Structured3D 加载
+- 代价：推理速度比 PCT 慢 30-50%
+
+#### 🥉 优先级 3：分类+回归联合训练
+
+合并到一个模型共享 backbone，两个 head 分别输出类别和参数。消除分类误差->回归误差的传导（当前 TwoGableHouses 分类 95% 还有 5% 分错，错分后回归结果无意义）。
+
+### 评估基准（更新）
+
+| 参数 | PointNeXt R^2 | PCT R^2 | 目标 R^2 | 备注 |
+|------|:---:|:---:|:---:|---|
+| bulge | -0.08 | -0.004 | >0.6 | 需法向量 |
+| middleBulge | -0.85 | -0.363 | >0.5 | 已改善 0.49，需数据增强 |
+| wallRatio | 0.06 | -0.271 | >0.7 | PCT 反而更差，过拟合 |
+| innerWidth | 0.21 | 0.050 | >0.6 | 过拟合，需扩量 |
+| ridgeLength | 0.52 | 0.608 | >0.8 | 小幅改善 |

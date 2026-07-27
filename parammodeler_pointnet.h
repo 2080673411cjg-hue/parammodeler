@@ -30,7 +30,8 @@ enum class PointNetBackend
 {
   PointNet,
   PointNet2,
-  PointNeXt
+  PointNeXt,
+  PCT
 };
 
 class ParamModelerDock;

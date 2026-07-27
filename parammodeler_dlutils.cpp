@@ -79,10 +79,10 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
   }
   else if ( prim == QStringLiteral( "LHouse" ) )
   {
-    put( QStringLiteral( "mainLength" ), QStringLiteral( "lMainL" ) );
-    put( QStringLiteral( "mainWidth" ), QStringLiteral( "lMainW" ) );
-    put( QStringLiteral( "wingLength" ), QStringLiteral( "lWingL" ) );
-    put( QStringLiteral( "wingWidth" ), QStringLiteral( "lWingW" ) );
+    put( QStringLiteral( "totalLength" ), QStringLiteral( "lTotalL" ) );
+    put( QStringLiteral( "wingRatio" ), QStringLiteral( "lWingR" ) );
+    put( QStringLiteral( "totalWidth" ), QStringLiteral( "lTotalW" ) );
+    put( QStringLiteral( "wingWidthRatio" ), QStringLiteral( "lWingWR" ) );
     put( QStringLiteral( "height" ), QStringLiteral( "lHeight" ) );
   }
   else if ( prim == QStringLiteral( "ConeCylinder" ) )
@@ -182,10 +182,10 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
   }
   else if ( prim == "LHouse" )
   {
-    params["mainLength"] = dock->LMainLength();
-    params["mainWidth"] = dock->LMainWidth();
-    params["wingLength"] = dock->LWingLength();
-    params["wingWidth"] = dock->LWingWidth();
+    params["totalLength"]    = dock->LTotalLength();
+    params["wingRatio"]      = dock->LWingRatio();
+    params["totalWidth"]     = dock->LTotalWidth();
+    params["wingWidthRatio"] = dock->LWingWidthRatio();
     params["height"] = dock->LHeight();
   }
   else if ( prim == "ConeCylinder" )

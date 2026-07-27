@@ -26,9 +26,10 @@ namespace ParamModelerConfig
 
   // ---- model version selectors (persisted in QgsSettings) ----
 
-  QString classifyModelName();          // e.g.  pointnext_cls_v2
-  QString regressionModelPrefix();      // e.g.  pointnext_reg_
-  QString regressionModelSuffix();      // e.g.  _rot
+  QString classifyModelName();          // e.g.  pct_cls_v2
+  QString regressionModelPrefix();      // e.g.  pointnext_reg_  (PointNeXt legacy)
+  QString regressionModelSuffix();      // e.g.  _aux             (PointNeXt legacy)
+  QString pctRegressionSuffix();        // e.g.  _v2_neighbor     (PCT default variant)
 
   // ---- derived paths (built from the base paths + model selectors) ----
 

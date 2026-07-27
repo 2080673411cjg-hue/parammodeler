@@ -648,23 +648,23 @@
               <widget class="QWidget" name="pageLHouse">
                <layout class="QFormLayout" name="formLHouse">
                 <item row="0" column="0">
-                 <widget class="QLabel" name="labelLMainLength">
+                 <widget class="QLabel" name="labelLTotalLength">
                   <property name="text">
-                   <string>Main length:</string>
+                   <string>Total length:</string>
                   </property>
                  </widget>
                 </item>
                 <item row="0" column="1">
-                 <layout class="QHBoxLayout" name="layoutALength">
+                 <layout class="QHBoxLayout" name="layoutTotalLength">
                   <item>
-                   <widget class="QSlider" name="sliderLMainLength">
+                   <widget class="QSlider" name="sliderLTotalLength">
                     <property name="orientation">
                      <enum>Qt::Horizontal</enum>
                     </property>
                    </widget>
                   </item>
                   <item>
-                   <widget class="QDoubleSpinBox" name="spinBoxLMainLength">
+                   <widget class="QDoubleSpinBox" name="spinBoxLTotalLength">
                     <property name="singleStep">
                      <double>0.100000000000000</double>
                     </property>
@@ -673,65 +673,79 @@
                  </layout>
                 </item>
                 <item row="1" column="0">
-                 <widget class="QLabel" name="labelLMainWidth">
+                 <widget class="QLabel" name="labelLTotalWidth">
                   <property name="text">
-                   <string>Main width:</string>
+                   <string>Total width:</string>
                   </property>
                  </widget>
                 </item>
                 <item row="1" column="1">
-                 <layout class="QHBoxLayout" name="layoutAWidth">
+                 <layout class="QHBoxLayout" name="layoutTotalWidth">
                   <item>
-                   <widget class="QSlider" name="sliderLMainWidth">
+                   <widget class="QSlider" name="sliderLTotalWidth">
                     <property name="orientation">
                      <enum>Qt::Horizontal</enum>
                     </property>
                    </widget>
                   </item>
                   <item>
-                   <widget class="QDoubleSpinBox" name="spinBoxLMainWidth"/>
+                   <widget class="QDoubleSpinBox" name="spinBoxLTotalWidth"/>
                   </item>
                  </layout>
                 </item>
                 <item row="2" column="0">
-                 <widget class="QLabel" name="labelLWingLength">
+                 <widget class="QLabel" name="labelLWingRatio">
                   <property name="text">
-                   <string>Wing length:</string>
+                   <string>Wing length ratio:</string>
                   </property>
                  </widget>
                 </item>
                 <item row="2" column="1">
-                 <layout class="QHBoxLayout" name="layoutBLength">
+                 <layout class="QHBoxLayout" name="layoutWingRatio">
                   <item>
-                   <widget class="QSlider" name="sliderLWingLength">
+                   <widget class="QSlider" name="sliderLWingRatio">
                     <property name="orientation">
                      <enum>Qt::Horizontal</enum>
                     </property>
                    </widget>
                   </item>
                   <item>
-                   <widget class="QDoubleSpinBox" name="spinBoxLWingLength"/>
+                   <widget class="QDoubleSpinBox" name="spinBoxLWingRatio">
+                    <property name="minimum">
+                     <double>0.000000000000000</double>
+                    </property>
+                    <property name="maximum">
+                     <double>1.000000000000000</double>
+                    </property>
+                   </widget>
                   </item>
                  </layout>
                 </item>
                 <item row="3" column="0">
-                 <widget class="QLabel" name="labelLWingWidth">
+                 <widget class="QLabel" name="labelLWingWidthRatio">
                   <property name="text">
-                   <string>Wing width:</string>
+                   <string>Wing width ratio:</string>
                   </property>
                  </widget>
                 </item>
                 <item row="3" column="1">
-                 <layout class="QHBoxLayout" name="layoutBWidth">
+                 <layout class="QHBoxLayout" name="layoutWingWidthRatio">
                   <item>
-                   <widget class="QSlider" name="sliderLWingWidth">
+                   <widget class="QSlider" name="sliderLWingWidthRatio">
                     <property name="orientation">
                      <enum>Qt::Horizontal</enum>
                     </property>
                    </widget>
                   </item>
                   <item>
-                   <widget class="QDoubleSpinBox" name="spinBoxLWingWidth"/>
+                   <widget class="QDoubleSpinBox" name="spinBoxLWingWidthRatio">
+                    <property name="minimum">
+                     <double>0.000000000000000</double>
+                    </property>
+                    <property name="maximum">
+                     <double>1.000000000000000</double>
+                    </property>
+                   </widget>
                   </item>
                  </layout>
                 </item>
@@ -2351,16 +2365,6 @@
          </widget>
         </item>
         <item>
-         <widget class="PreviewGLWidget" name="previewWidget">
-          <property name="minimumSize">
-           <size>
-            <width>0</width>
-            <height>280</height>
-           </size>
-          </property>
-         </widget>
-        </item>
-        <item>
          <widget class="QCheckBox" name="checkBoxAutoSync">
           <property name="toolTip">
            <string>Automatically sync model updates to QGIS 3D scene</string>
@@ -2377,13 +2381,7 @@
    </layout>
   </widget>
  </widget>
- <customwidgets>
-  <customwidget>
-   <class>PreviewGLWidget</class>
-   <extends>QOpenGLWidget</extends>
-   <header>previewglwidget.h</header>
-  </customwidget>
- </customwidgets>
+
  <resources/>
  <connections/>
 </ui>

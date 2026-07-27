@@ -42,10 +42,10 @@ double ParamModelerDock::cylinderHeight() const { return ui->spinBoxCylHeight->v
 
 // ===== LHouse =====
 
-double ParamModelerDock::LMainLength() const { return ui->spinBoxLMainLength->value(); }
-double ParamModelerDock::LMainWidth() const { return ui->spinBoxLMainWidth->value(); }
-double ParamModelerDock::LWingLength() const { return ui->spinBoxLWingLength->value(); }
-double ParamModelerDock::LWingWidth() const { return ui->spinBoxLWingWidth->value(); }
+double ParamModelerDock::LTotalLength() const { return ui->spinBoxLTotalLength->value(); }
+double ParamModelerDock::LTotalWidth() const { return ui->spinBoxLTotalWidth->value(); }
+double ParamModelerDock::LWingRatio() const { return ui->spinBoxLWingRatio->value(); }
+double ParamModelerDock::LWingWidthRatio() const { return ui->spinBoxLWingWidthRatio->value(); }
 double ParamModelerDock::LHeight() const { return ui->spinBoxLHeight->value(); }
 
 // ===== ConeCylinder =====

@@ -42,6 +42,7 @@
 #include <Qgs3DMapCanvas.h>
 #include <qgs3dmapscene.h>
 #include <qgs3dmapsettings.h>
+#include <qgscameracontroller.h>
 #include <qgs3dtypes.h>
 #include <qgsphongmaterialsettings.h>
 #include <qgsvectorfilewriter.h>
@@ -57,6 +58,7 @@
 #include <Qt3DRender/QBuffer>
 #include <Qt3DRender/QDepthTest>
 #include <Qt3DRender/QNoDepthMask>
+#include <Qt3DRender/QCullFace>
 #include <Qt3DRender/QLineWidth>
 #include <Qt3DRender/QEffect>
 #include <Qt3DRender/QGeometry>
@@ -89,6 +91,7 @@ struct RealtimePreviewPart
 
   bool blendingSetup = false;
   bool depthStateSetup = false;
+  bool cullingSetup = false;
 };
 
 struct RealtimePreviewState
@@ -97,8 +100,7 @@ struct RealtimePreviewState
   RealtimePreviewPart body;
   RealtimePreviewPart roof;
   RealtimePreviewPart wireframe;   // 线框模式：只显示边线
-  QgsVector3D frozenOrigin;           // origin snapshot at entity creation
-  bool         frozenOriginValid = false;
+  QPointer<Qgs3DMapSettings> mapSettings;  // for origin tracking
 };
 
 QHash<Qgs3DMapScene *, RealtimePreviewState> sRealtimePreviewMeshes;
@@ -393,6 +395,25 @@ void updateRealtimePart( RealtimePreviewPart &part,
     part.normalAttribute->setByteStride( 6 * sizeof( float ) );
     geometry->addAttribute( part.normalAttribute );
 
+    // Dummy giant bounding volume — prevents Qt3D frustum culling
+    // from ever discarding the entity, regardless of camera position.
+    {
+      Qt3DRender::QBuffer *bboxBuf = new Qt3DRender::QBuffer( geometry );
+      static const float giantBox[6] = { -1e7f, -1e7f, -1e7f, 1e7f, 1e7f, 1e7f };
+      bboxBuf->setData( QByteArray::fromRawData(
+        reinterpret_cast<const char *>( giantBox ), static_cast<int>( sizeof( giantBox ) ) ) );
+      Qt3DRender::QAttribute *bboxAttr = new Qt3DRender::QAttribute( geometry );
+      bboxAttr->setVertexBaseType( Qt3DRender::QAttribute::Float );
+      bboxAttr->setVertexSize( 3 );
+      bboxAttr->setAttributeType( Qt3DRender::QAttribute::VertexAttribute );
+      bboxAttr->setBuffer( bboxBuf );
+      bboxAttr->setByteOffset( 0 );
+      bboxAttr->setByteStride( 3 * sizeof( float ) );
+      bboxAttr->setCount( 2 );
+      geometry->addAttribute( bboxAttr );
+      geometry->setBoundingVolumePositionAttribute( bboxAttr );
+    }
+
     part.renderer = new Qt3DRender::QGeometryRenderer( part.entity );
     part.renderer->setGeometry( geometry );
     part.renderer->setPrimitiveType( Qt3DRender::QGeometryRenderer::Triangles );
@@ -428,6 +449,26 @@ void updateRealtimePart( RealtimePreviewPart &part,
     part.blendingSetup = true;
   }
 
+  // Disable back-face culling for this entity (one-shot).
+  // Qt3D defaults to QCullFace::Back; NoCulling ensures every triangle
+  // is visible from any camera angle, which is important for building
+  // models with internal faces (indentations, open bottoms, etc.).
+  if ( !part.cullingSetup && part.material )
+  {
+    Qt3DRender::QEffect *effect = part.material->effect();
+    if ( effect )
+    {
+      Qt3DRender::QCullFace *noCull = new Qt3DRender::QCullFace();
+      noCull->setMode( Qt3DRender::QCullFace::NoCulling );
+      for ( Qt3DRender::QTechnique *tech : effect->techniques() )
+      {
+        for ( Qt3DRender::QRenderPass *pass : tech->renderPasses() )
+          pass->addRenderState( noCull );
+      }
+    }
+    part.cullingSetup = true;
+  }
+
   // 深度状态初始化（一次性）：创建 QDepthTest + QNoDepthMask，挂 depthTest 到所有 render pass
   // （wireframe 模式下 body/roof 被隐藏，此代码不生效，保留以备未来可能的透明模式复用）
   if ( !part.depthStateSetup && part.material )
@@ -456,10 +497,8 @@ void updateRealtimePart( RealtimePreviewPart &part,
     Qt3DRender::QEffect *effect = part.material->effect();
     if ( effect )
     {
-      const bool ghost = sWireframeMode;
-
       part.depthTest->setDepthFunction(
-        ghost
+        sWireframeMode
           ? Qt3DRender::QDepthTest::Always
           : Qt3DRender::QDepthTest::Less
       );
@@ -474,7 +513,7 @@ void updateRealtimePart( RealtimePreviewPart &part,
           const QVector<Qt3DRender::QRenderState *> states = pass->renderStates();
           const bool hasNoDepthMask = states.contains( part.noDepthMask );
 
-          if ( ghost )
+          if ( sWireframeMode )
           {
             if ( !hasNoDepthMask )
               pass->addRenderState( part.noDepthMask );
@@ -503,9 +542,25 @@ void updateRealtimePart( RealtimePreviewPart &part,
   part.normalAttribute->setCount( vertexCount );
   part.renderer->setVertexCount( vertexCount );
   part.entity->setEnabled( vertexCount > 0 );
+
+  // Qt3D caches the bounding volume from the first buffer upload and never
+  // recomputes it when QBuffer::setData() replaces vertex data later.
+  // Toggling the geometry off / on forces the renderer to re-evaluate it,
+  // triggering a fresh bounding-volume calculation so the entity does not
+  // get incorrectly frustum-culled after parameter changes.
+  if ( part.positionAttribute )
+  {
+    Qt3DRender::QGeometry *geom = qobject_cast<Qt3DRender::QGeometry *>( part.positionAttribute->parent() );
+    if ( geom )
+    {
+      part.renderer->setGeometry( nullptr );
+      part.renderer->setGeometry( geom );
+    }
+  }
 }
 
-void ensureRealtimeAnchorLayer( QgisInterface *iface, const QgsRectangle &extent )
+void ensureRealtimeAnchorLayer( QgisInterface *iface, const QgsRectangle &extent,
+                                 double minZ = 0.0, double maxZ = 0.0 )
 {
   if ( extent.isNull() )
     return;
@@ -519,12 +574,23 @@ void ensureRealtimeAnchorLayer( QgisInterface *iface, const QgsRectangle &extent
     return;
   }
 
-  QgsFeature f0;
-  f0.setGeometry( QgsGeometry( new QgsPoint( extent.xMinimum(), extent.yMinimum(), 0.0 ) ) );
-  QgsFeature f1;
-  f1.setGeometry( QgsGeometry( new QgsPoint( extent.xMaximum(), extent.yMaximum(), 0.0 ) ) );
+  // Create 4 corner points at minZ and maxZ so the 3D scene's
+  // near/far plane computation covers the model's full vertical extent
   QgsFeatureList anchorFeatures;
-  anchorFeatures << f0 << f1;
+  auto addAnchor = [&]( double x, double y, double z ) {
+    QgsFeature f;
+    f.setGeometry( QgsGeometry( new QgsPoint( x, y, z ) ) );
+    anchorFeatures << f;
+  };
+  addAnchor( extent.xMinimum(), extent.yMinimum(), minZ );
+  addAnchor( extent.xMaximum(), extent.yMinimum(), minZ );
+  addAnchor( extent.xMaximum(), extent.yMaximum(), minZ );
+  addAnchor( extent.xMinimum(), extent.yMaximum(), minZ );
+  addAnchor( extent.xMinimum(), extent.yMinimum(), maxZ );
+  addAnchor( extent.xMaximum(), extent.yMinimum(), maxZ );
+  addAnchor( extent.xMaximum(), extent.yMaximum(), maxZ );
+  addAnchor( extent.xMinimum(), extent.yMaximum(), maxZ );
+
   anchorLayer->dataProvider()->addFeatures( anchorFeatures );
   anchorLayer->updateExtents();
   anchorLayer->setOpacity( 0.0 );
@@ -798,23 +864,24 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
   roofValues.reserve( mesh.indices.size() * 6 );
 
   bool hasExtent = false;
-  double xmin = 0.0;
-  double ymin = 0.0;
-  double xmax = 0.0;
-  double ymax = 0.0;
+  double xmin = 0.0, ymin = 0.0, zmin = 0.0;
+  double xmax = 0.0, ymax = 0.0, zmax = 0.0;
   auto addToExtent = [&]( const QVector3D &v )
   {
     if ( !hasExtent )
     {
       xmin = xmax = v.x();
       ymin = ymax = v.y();
+      zmin = zmax = v.z();
       hasExtent = true;
       return;
     }
     xmin = std::min( xmin, static_cast<double>( v.x() ) );
     ymin = std::min( ymin, static_cast<double>( v.y() ) );
+    zmin = std::min( zmin, static_cast<double>( v.z() ) );
     xmax = std::max( xmax, static_cast<double>( v.x() ) );
     ymax = std::max( ymax, static_cast<double>( v.y() ) );
+    zmax = std::max( zmax, static_cast<double>( v.z() ) );
   };
 
   const int triCount = mesh.indices.size() / 3;
@@ -854,6 +921,9 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
   previewExtent = padded3DViewExtent( previewExtent );
 
   Qgs3DMapCanvas *canvas = ensureRealtimePreviewCanvas( iface, previewExtent );
+  // Refresh anchor layer with full 3D extent so QGIS's near/far plane
+  // computation (updateCameraNearFarPlanes) covers the model's height
+  ensureRealtimeAnchorLayer( iface, previewExtent, zmin, zmax );
   if ( !canvas || !canvas->scene() )
   {
     if ( errorMessage )
@@ -875,22 +945,64 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
   }
 
   // Align Qt3D entity coordinates with QGIS layer coordinates.
-  // QGIS 3D layers are rendered relative to the map origin, but raw Qt3D entities
-  // are not.  Offset the root entity by -origin so the model and point-cloud layers
-  // share the same coordinate frame.
+  // QGIS 3D layers are rendered relative to the map origin, but raw Qt3D
+  // entities are not.  Offset the root entity by -origin so the model and
+  // point-cloud layers share the same coordinate frame.
+  //
+  // IMPORTANT: use the CURRENT origin (not a frozen snapshot).  QGIS shifts
+  // its floating origin as the camera moves; if we keep a stale offset the
+  // entity ends up in the wrong coordinate frame, causing the model to
+  // disappear during zoom / rotation.
   {
     Qgs3DMapSettings *mapSettings = canvas->mapSettings();
     if ( mapSettings )
     {
-      // Freeze the map origin at entity creation so the model stays put
-      // even when the QGIS floating origin shifts (camera movement, terrain
-      // toggle, etc.).
-      if ( !state.frozenOriginValid )
+      // Wire up origin tracking so the entity follows QGIS coordinate shifts
+      if ( newPreviewRoot )
       {
-        state.frozenOrigin = mapSettings->origin();
-        state.frozenOriginValid = true;
+        state.mapSettings = mapSettings;
+        QObject::connect( mapSettings, &Qgs3DMapSettings::originChanged,
+                          scene, [scene]()
+        {
+          RealtimePreviewState st = sRealtimePreviewMeshes.value( scene );
+          if ( !st.root || !st.mapSettings )
+            return;
+          const QgsVector3D newOrigin = st.mapSettings->origin();
+          for ( Qt3DCore::QComponent *comp : st.root->components() )
+          {
+            Qt3DCore::QTransform *t = qobject_cast<Qt3DCore::QTransform *>( comp );
+            if ( t )
+            {
+              t->setTranslation( QVector3D(
+                -static_cast<float>( newOrigin.x() ),
+                -static_cast<float>( newOrigin.y() ),
+                -static_cast<float>( newOrigin.z() ) ) );
+              break;
+            }
+          }
+        } );
+
+        // QGIS's updateCameraNearFarPlanes() computes near/far from map-layer
+        // scene entities.  Our custom Qt3D entity is not a map-layer entity,
+        // so the model's vertical extent is invisible to the depth-range
+        // calculation.  Force absurdly wide near/far after every camera update
+        // so the model never gets clipped by the projection frustum.
+        Qt3DRender::QCamera *camera = canvas->scene()->cameraController()->camera();
+        if ( camera )
+        {
+          auto forceNearFar = [camera]()
+          {
+            camera->setNearPlane( 0.001f );
+            camera->setFarPlane( 1e9f );
+          };
+          forceNearFar();
+          QObject::connect( canvas->scene()->cameraController(),
+                            &QgsCameraController::cameraChanged,
+                            camera, forceNearFar, Qt::QueuedConnection );
+        }
       }
-      const QgsVector3D origin = state.frozenOrigin;
+
+      const QgsVector3D origin = mapSettings->origin();
       Qt3DCore::QTransform *rootTransform = nullptr;
       for ( Qt3DCore::QComponent *comp : state.root->components() )
       {
@@ -961,9 +1073,23 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
       state.wireframe.normalAttribute->setByteStride( 3 * sizeof( float ) );
       wireGeom->addAttribute( state.wireframe.normalAttribute );
 
-      // 明确告诉 Qt3D 用 position attribute 计算包围盒
-      // 否则默认包围体过小，模型变大/旋转时会被视锥体裁剪掉
-      wireGeom->setBoundingVolumePositionAttribute( state.wireframe.positionAttribute );
+      // Dummy giant bounding volume — prevents Qt3D frustum culling
+      {
+        Qt3DRender::QBuffer *wBboxBuf = new Qt3DRender::QBuffer( wireGeom );
+        static const float giantBox[6] = { -1e7f, -1e7f, -1e7f, 1e7f, 1e7f, 1e7f };
+        wBboxBuf->setData( QByteArray::fromRawData(
+          reinterpret_cast<const char *>( giantBox ), static_cast<int>( sizeof( giantBox ) ) ) );
+        Qt3DRender::QAttribute *wBboxAttr = new Qt3DRender::QAttribute( wireGeom );
+        wBboxAttr->setVertexBaseType( Qt3DRender::QAttribute::Float );
+        wBboxAttr->setVertexSize( 3 );
+        wBboxAttr->setAttributeType( Qt3DRender::QAttribute::VertexAttribute );
+        wBboxAttr->setBuffer( wBboxBuf );
+        wBboxAttr->setByteOffset( 0 );
+        wBboxAttr->setByteStride( 3 * sizeof( float ) );
+        wBboxAttr->setCount( 2 );
+        wireGeom->addAttribute( wBboxAttr );
+        wireGeom->setBoundingVolumePositionAttribute( wBboxAttr );
+      }
 
       state.wireframe.renderer = new Qt3DRender::QGeometryRenderer( state.wireframe.entity );
       state.wireframe.renderer->setGeometry( wireGeom );
@@ -980,6 +1106,17 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
                   wireVerts.size() * static_cast<int>( sizeof( float ) ) ) );
     state.wireframe.positionAttribute->setCount( wireVertCount );
     state.wireframe.renderer->setVertexCount( wireVertCount );
+
+    // Force bounding-volume recalculation (same reason as body/roof)
+    if ( state.wireframe.positionAttribute )
+    {
+      Qt3DRender::QGeometry *wGeom = qobject_cast<Qt3DRender::QGeometry *>( state.wireframe.positionAttribute->parent() );
+      if ( wGeom )
+      {
+        state.wireframe.renderer->setGeometry( nullptr );
+        state.wireframe.renderer->setGeometry( wGeom );
+      }
+    }
 
     // 每帧填充法线 buffer：统一指向上方 (0,1,0)，配合 Phong 光照
     {
