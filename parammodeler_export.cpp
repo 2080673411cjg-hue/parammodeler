@@ -308,6 +308,13 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
       p["angle"]      = dock->tgAngle();
       p["ridgeRatio"] = dock->tgRidgeRatio();
     }
+    else if ( type == "TriPrismPyramid" )
+    {
+      p["leg"]          = dock->triPrismPyramidLeg();
+      p["baseSide"]     = dock->triPrismPyramidBase();
+      p["totalHeight"]  = dock->triPrismPyramidHeight();
+      p["pyramidRatio"] = dock->triPrismPyramidRatio();
+    }
 
     return p;
 }

@@ -465,6 +465,7 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
        << QStringLiteral( "--bbox_y" ) << QString::number( bboxSize.y(), 'g', 12 )
        << QStringLiteral( "--bbox_z" ) << QString::number( bboxSize.z(), 'g', 12 )
        << QStringLiteral( "--scale" ) << QString::number( scale, 'g', 12 )
+       << QStringLiteral( "--canonical_align" )
        << QStringLiteral( "--cpu" );
 
   QString stdoutText;
@@ -487,6 +488,10 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
   const QJsonObject paramsObj = obj.value( QStringLiteral( "params" ) ).toObject();
   for ( auto it = paramsObj.constBegin(); it != paramsObj.constEnd(); ++it )
     result.params.insert( it.key(), it.value().toDouble() );
+
+  // 提取顶层的 poseRotateZ (canonical alignment 输出)
+  if ( obj.contains( QStringLiteral( "poseRotateZ" ) ) )
+    result.params.insert( QStringLiteral( "poseRotateZ" ), obj.value( QStringLiteral( "poseRotateZ" ) ).toDouble() );
 
   if ( result.params.isEmpty() )
     result.errorMessage = QStringLiteral( "%1 regression returned no parameters." ).arg( config.modelName );

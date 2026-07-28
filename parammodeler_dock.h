@@ -127,6 +127,10 @@ public:
   double tgRoofHeight() const;
   double tgAngle() const;
   double tgRidgeRatio() const;
+  double triPrismPyramidLeg() const;
+  double triPrismPyramidBase() const;
+  double triPrismPyramidHeight() const;
+  double triPrismPyramidRatio() const;
 
 private slots:
   void onPrimitiveChanged(const QString &prim); // 基元切换槽函数

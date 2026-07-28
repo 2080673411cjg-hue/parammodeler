@@ -246,6 +246,11 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderTGAngle, ui->spinBoxTGAngle, 10.0, 180.0, 135.0 );
   bindSliderSpin( ui->sliderTGRidgeRatio, ui->spinBoxTGRidgeRatio, 100.0, 0.8, 0.2 );
 
+  bindSliderSpin( ui->sliderTPPLeg, ui->spinBoxTPPLeg, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTPPBase, ui->spinBoxTPPBase, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTPPHeight, ui->spinBoxTPPHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderTPPRatio, ui->spinBoxTPPRatio, 100.0, 0.90, 0.20 );
+
   bindSliderSpin( ui->sliderROmega, ui->spinBoxROmega, 10.0, 180.0, -180.0 );
   bindSliderSpin( ui->sliderRPhi, ui->spinBoxRPhi, 10.0, 180.0, -180.0 );
   bindSliderSpin( ui->sliderRKappa, ui->spinBoxRKappa, 10.0, 180.0, -180.0 );
@@ -316,6 +321,11 @@ void ParamModelerDock::initUiControls()
   ui->labelTGRoofHeight->setText( tr( "Wall ratio:" ) );
   ui->labelTGAngle->setText( tr( "Angle:" ) );
   ui->labelTGRidgeRatio->setText( tr( "Ridge ratio:" ) );
+
+  ui->labelTPPLeg->setText( tr( "Leg length:" ) );
+  ui->labelTPPBase->setText( tr( "Base length:" ) );
+  ui->labelTPPHeight->setText( tr( "Total height:" ) );
+  ui->labelTPPRatio->setText( tr( "Pyramid ratio:" ) );
 }
 
 void ParamModelerDock::initConnections()
@@ -409,6 +419,11 @@ void ParamModelerDock::initConnections()
   connect( ui->sliderTGAngle, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTGRidgeRatio, &QSlider::valueChanged, this, schedulePreview );
 
+  connect( ui->sliderTPPLeg, &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderTPPBase, &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderTPPHeight, &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderTPPRatio, &QSlider::valueChanged, this, schedulePreview );
+
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, &ParamModelerDock::onPrimitiveChanged );
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, [this]( const QString & ) { onUpdatePreview(); } );
   connect( ui->btnRandomParams, &QPushButton::clicked, this, &ParamModelerDock::onRandomizeCurrentPrimitive );
@@ -491,6 +506,7 @@ void ParamModelerDock::onPrimitiveChanged( const QString &prim )
     { "AsymmetricGableHouse", &Ui::ParamModelerDock::pageAsymmetricGableHouse },
     { "FourStageRoundTower", &Ui::ParamModelerDock::pageFourStageRoundTower },
     { "TwoGableHouses", &Ui::ParamModelerDock::pageTwoGableHouses },
+    { "TriPrismPyramid", &Ui::ParamModelerDock::pageTriPrismPyramid },
   };
 
   auto it = pageMap.find( prim );

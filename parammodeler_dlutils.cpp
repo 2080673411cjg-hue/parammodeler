@@ -162,6 +162,8 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
 
   // 水平朝向（所有基元通用）
   put( QStringLiteral( "rz" ), QStringLiteral( "poseRotateZ" ) );
+  // 几何对齐模块直接输出 poseRotateZ，透传
+  put( QStringLiteral( "poseRotateZ" ), QStringLiteral( "poseRotateZ" ) );
 
   return uiParams;
 }

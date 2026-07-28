@@ -222,6 +222,11 @@
                <string>TwoGableHouses</string>
               </property>
              </item>
+             <item>
+              <property name="text">
+               <string>TriPrismPyramid</string>
+              </property>
+             </item>
             </widget>
            </item>
            <item row="1" column="1">
@@ -2159,6 +2164,122 @@
                     </property>
                     <property name="value">
                      <double>0.500000000000000</double>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+               </layout>
+              </widget>
+              <widget class="QWidget" name="pageTriPrismPyramid">
+               <layout class="QFormLayout" name="formLayout_12">
+                <item row="0" column="0">
+                 <widget class="QLabel" name="labelTPPLeg">
+                  <property name="text">
+                   <string>Leg length:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <layout class="QHBoxLayout" name="layoutTPPLeg">
+                  <item>
+                   <widget class="QSlider" name="sliderTPPLeg">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QDoubleSpinBox" name="spinBoxTPPLeg">
+                    <property name="singleStep">
+                     <double>0.100000000000000</double>
+                    </property>
+                    <property name="value">
+                     <double>8.000000000000000</double>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QLabel" name="labelTPPBase">
+                  <property name="text">
+                   <string>Base length:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="1">
+                 <layout class="QHBoxLayout" name="layoutTPPBase">
+                  <item>
+                   <widget class="QSlider" name="sliderTPPBase">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QDoubleSpinBox" name="spinBoxTPPBase">
+                    <property name="singleStep">
+                     <double>0.100000000000000</double>
+                    </property>
+                    <property name="value">
+                     <double>6.000000000000000</double>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item row="2" column="0">
+                 <widget class="QLabel" name="labelTPPHeight">
+                  <property name="text">
+                   <string>Total height:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="1">
+                 <layout class="QHBoxLayout" name="layoutTPPHeight">
+                  <item>
+                   <widget class="QSlider" name="sliderTPPHeight">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QDoubleSpinBox" name="spinBoxTPPHeight">
+                    <property name="singleStep">
+                     <double>0.100000000000000</double>
+                    </property>
+                    <property name="value">
+                     <double>8.000000000000000</double>
+                    </property>
+                   </widget>
+                  </item>
+                 </layout>
+                </item>
+                <item row="3" column="0">
+                 <widget class="QLabel" name="labelTPPRatio">
+                  <property name="text">
+                   <string>Pyramid ratio:</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="3" column="1">
+                 <layout class="QHBoxLayout" name="layoutTPPRatio">
+                  <item>
+                   <widget class="QSlider" name="sliderTPPRatio">
+                    <property name="orientation">
+                     <enum>Qt::Horizontal</enum>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QDoubleSpinBox" name="spinBoxTPPRatio">
+                    <property name="singleStep">
+                     <double>0.100000000000000</double>
+                    </property>
+                    <property name="value">
+                     <double>0.400000000000000</double>
                     </property>
                    </widget>
                   </item>

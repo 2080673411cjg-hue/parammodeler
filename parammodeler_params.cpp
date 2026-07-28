@@ -210,3 +210,14 @@ double ParamModelerDock::tgRoofHeight() const
 }
 double ParamModelerDock::tgAngle() const { return ui->spinBoxTGAngle->value(); }
 double ParamModelerDock::tgRidgeRatio() const { return ui->spinBoxTGRidgeRatio->value(); }
+
+// ===== TriPrismPyramid =====
+
+double ParamModelerDock::triPrismPyramidLeg() const { return ui->spinBoxTPPLeg->value(); }
+double ParamModelerDock::triPrismPyramidBase() const { return ui->spinBoxTPPBase->value(); }
+double ParamModelerDock::triPrismPyramidHeight() const { return ui->spinBoxTPPHeight->value(); }
+
+double ParamModelerDock::triPrismPyramidRatio() const
+{
+    return std::max( 0.05, std::min( 0.95, ui->spinBoxTPPRatio->value() ) );
+}

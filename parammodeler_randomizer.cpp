@@ -159,6 +159,17 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
     set( dock->ui->spinBoxTGAngle, rnd( 135.0, 165.0, 1.0 ) );
     set( dock->ui->spinBoxTGRidgeRatio, rnd( 0.3, 0.7, 0.01 ) );
   }
+  else if ( prim == "TriPrismPyramid" )
+  {
+    // 先随机底边和腰长，确保等腰三角形存在（腰 > 底边/2）
+    const double baseSide = rnd( 4.0, 14.0 );
+    const double minLeg = baseSide / 2.0 + 0.5;
+    const double leg = rnd( minLeg, minLeg + 12.0 );
+    set( dock->ui->spinBoxTPPBase, baseSide );
+    set( dock->ui->spinBoxTPPLeg, leg );
+    set( dock->ui->spinBoxTPPHeight, rnd( 4.5, 14.0 ) );
+    set( dock->ui->spinBoxTPPRatio, rnd( 0.25, 0.70, 0.01 ) );
+  }
 
   // --- 训练数据生成：随机水平朝向 ---
   if ( randomizePose )
