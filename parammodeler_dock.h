@@ -30,6 +30,7 @@
 #include <QVector3D>
 
 class QCheckBox;
+class QPushButton;
 
 class QgisInterface;
 class QgsVectorLayer; 
@@ -188,6 +189,12 @@ private:
 			QString         m_lastGpkgPath;             // 上一次临时 GPKG 文件路径，用于清理
   bool m_realtimeModelLoaded = false;
   QCheckBox *mWireframeModeCheckBox = nullptr;
+
+  // ===== DL预测值锚点（微调复位用） =====
+  QMap<QString, double> m_dlAnchorParams;
+  bool m_hasDlAnchor = false;
+  QPushButton *m_resetAnchorBtn = nullptr;
+  void resetToDlAnchor();
 };
 
 #endif // PARAMMODELER_DOCK_H

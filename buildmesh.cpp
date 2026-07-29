@@ -23,6 +23,42 @@
 #define DEBUG_LOG(msg) OutputDebugStringW(msg)
 
 // ============================================================
+// 统一后处理：所有建筑 mesh 以底面几何中心为原点
+// 圆形建筑（Cylinder/Dome/Tower 等）底面中心已在 (0,0,0)，不受影响
+// 矩形建筑（Cuboid/GabledRoof 等）从"左下角原点"统一平移到"底面中心原点"
+// 效果：旋转绕模型自身中心、tx/ty 语义 = 建筑底面中心的世界坐标
+// ============================================================
+static void centerMeshOnBaseFace( MeshData &m )
+{
+    if ( m.vertices.isEmpty() )
+        return;
+
+    float minX = 1e9f, maxX = -1e9f;
+    float minY = 1e9f, maxY = -1e9f;
+    for ( const QVector3D &v : m.vertices )
+    {
+        if ( v.x() < minX ) minX = v.x();
+        if ( v.x() > maxX ) maxX = v.x();
+        if ( v.y() < minY ) minY = v.y();
+        if ( v.y() > maxY ) maxY = v.y();
+    }
+
+    const float cx = ( minX + maxX ) * 0.5f;
+    const float cy = ( minY + maxY ) * 0.5f;
+
+    // 已经居中的（圆形建筑）跳过，避免无意义的遍历
+    if ( std::abs( cx ) < 0.001f && std::abs( cy ) < 0.001f )
+        return;
+
+    for ( QVector3D &v : m.vertices )
+    {
+        v.setX( v.x() - cx );
+        v.setY( v.y() - cy );
+        // Z 保持不动，底面仍然在 Z=0
+    }
+}
+
+// ============================================================
 // 统一入口
 // ============================================================
 MeshData BuildMesh::build( const QString &primitiveType, ParamModelerDock *dock )
@@ -43,6 +79,10 @@ MeshData BuildMesh::build( const QString &primitiveType, ParamModelerDock *dock 
     else if ( primitiveType == "FourStageRoundTower" )   m = buildFourStageRoundTower( dock );
     else if ( primitiveType == "TwoGableHouses" )        m = buildTwoGableHouses( dock );
     else if ( primitiveType == "TriPrismPyramid" )     m = buildTriPrismPyramid( dock );
+
+    // 统一居中：矩形建筑从"左下角原点"修正为"底面中心原点"
+    // 圆形建筑底面中心已在 (0,0,0)，centerMeshOnBaseFace 检测后自动跳过
+    centerMeshOnBaseFace( m );
 
     DEBUG_LOG( QString( "[BuildMesh] %1 → 顶点=%2, 三角面=%3\n" )
       .arg( primitiveType )

@@ -47,6 +47,8 @@
 #include <QInputDialog>
 #include <QDialog>
 #include <QObject>
+#include <QEvent>
+#include <QWheelEvent>
 #include <QMenu>
 #include <QAction>
 #include <QApplication>
@@ -110,6 +112,84 @@
 #include <windows.h>
 #define DEBUG_LOG( msg ) OutputDebugStringW( msg )
 
+// ============================================================
+// 微调辅助：Ctrl+滚轮 = 10x 精调（步长缩小为 1/10）
+// 安装到所有 QDoubleSpinBox，在微调时提供更细粒度的控制
+// ============================================================
+class FineTuneFilter : public QObject
+{
+public:
+    explicit FineTuneFilter( QDoubleSpinBox *spin )
+        : QObject( spin ), m_spin( spin ) {}
+
+protected:
+    bool eventFilter( QObject * /*obj*/, QEvent *event ) override
+    {
+        if ( event->type() == QEvent::Wheel )
+        {
+            QWheelEvent *we = static_cast<QWheelEvent *>( event );
+            if ( we->modifiers() & Qt::ControlModifier )
+            {
+                // 10x 精调
+                const double fineStep = m_spin->singleStep() * 0.1;
+                const int delta = we->angleDelta().y();
+                if ( delta > 0 )
+                    m_spin->setValue( m_spin->value() + fineStep );
+                else if ( delta < 0 )
+                    m_spin->setValue( m_spin->value() - fineStep );
+                return true;  // 事件已处理，不再传递
+            }
+        }
+        return false;
+    }
+
+private:
+    QDoubleSpinBox *m_spin;
+};
+
+// ============================================================
+// 自动对齐：计算 mesh 包围盒中心 → 设置 pose 使模型中心对齐点云中心
+// 坐标系居中后，mesh X/Y 中心 ≈ (0,0)，Z 中心 = 建筑半高
+// ============================================================
+static void alignModelToPointCloud( const MeshData &mesh, const QVector3D &pcCenter,
+                                     ParamModelerDock *dock, const QString &context )
+{
+    if ( mesh.vertices.isEmpty() )
+    {
+        DEBUG_LOG( QString( "[Align] %1 mesh empty, skipped\n" ).arg( context ).toStdWString().c_str() );
+        return;
+    }
+
+    QVector3D vMin( std::numeric_limits<float>::max(),
+                    std::numeric_limits<float>::max(),
+                    std::numeric_limits<float>::max() );
+    QVector3D vMax( std::numeric_limits<float>::lowest(),
+                    std::numeric_limits<float>::lowest(),
+                    std::numeric_limits<float>::lowest() );
+    for ( const QVector3D &v : mesh.vertices )
+    {
+        if ( v.x() < vMin.x() ) vMin.setX( v.x() );
+        if ( v.y() < vMin.y() ) vMin.setY( v.y() );
+        if ( v.z() < vMin.z() ) vMin.setZ( v.z() );
+        if ( v.x() > vMax.x() ) vMax.setX( v.x() );
+        if ( v.y() > vMax.y() ) vMax.setY( v.y() );
+        if ( v.z() > vMax.z() ) vMax.setZ( v.z() );
+    }
+    const QVector3D mc = ( vMin + vMax ) * 0.5f;
+
+    const double tx = static_cast<double>( pcCenter.x() ) - static_cast<double>( mc.x() );
+    const double ty = static_cast<double>( pcCenter.y() ) - static_cast<double>( mc.y() );
+    const double tz = static_cast<double>( pcCenter.z() ) - static_cast<double>( mc.z() );
+    dock->setPoseTranslate( tx, ty, tz );
+
+    DEBUG_LOG( QString( "[Align] %1 pcCenter=(%2,%3,%4) modelCenter=(%5,%6,%7) → tx=%8 ty=%9 tz=%10\n" )
+                 .arg( context )
+                 .arg( pcCenter.x(), 0, 'f', 2 ).arg( pcCenter.y(), 0, 'f', 2 ).arg( pcCenter.z(), 0, 'f', 2 )
+                 .arg( mc.x(), 0, 'f', 2 ).arg( mc.y(), 0, 'f', 2 ).arg( mc.z(), 0, 'f', 2 )
+                 .arg( tx, 0, 'f', 2 ).arg( ty, 0, 'f', 2 ).arg( tz, 0, 'f', 2 )
+                 .toStdWString().c_str() );
+}
+
 static void bindSliderSpin( QSlider *slider, QDoubleSpinBox *spin, double multiplier, double maxVal = 100.0, double minVal = 0.0 )
 {
   if ( !slider || !spin )
@@ -117,6 +197,9 @@ static void bindSliderSpin( QSlider *slider, QDoubleSpinBox *spin, double multip
 
   spin->setRange( minVal, maxVal );
   spin->setSingleStep( 1.0 / multiplier );
+
+  // Ctrl+滚轮精调（10x 精度）
+  spin->installEventFilter( new FineTuneFilter( spin ) );
 
   slider->setRange( static_cast<int>( minVal * multiplier ), static_cast<int>( maxVal * multiplier ) );
   QObject::connect( slider, &QSlider::valueChanged, spin, [spin, multiplier]( int v ) {
@@ -175,6 +258,86 @@ ParamModelerDock::~ParamModelerDock()
 }
 
 // ======================= init helpers =======================
+
+// ============================================================
+// 参数分组：在复杂基元（4+ 参数）的 QFormLayout 中插入加粗分隔标题
+// 不改动 .ui 文件、不移动现有 widget，仅在指定行插入 QLabel 标题行
+// ============================================================
+static void insertSectionHeader( QFormLayout *form, int row, const QString &title )
+{
+    if ( !form || row < 0 || row > form->rowCount() )
+        return;
+    auto *label = new QLabel( title );
+    label->setStyleSheet( QStringLiteral(
+        "font-weight: bold; color: #555;"
+        "padding-top: 6px; margin-bottom: 1px;"
+    ) );
+    form->insertRow( row, label );  // QLabel 跨两列，作为分组标题
+}
+
+static void applyParameterGroups( Ui::ParamModelerDock *ui )
+{
+    auto fmt = [&]( QWidget *page ) -> QFormLayout * {
+        return page ? qobject_cast<QFormLayout *>( page->layout() ) : nullptr;
+    };
+
+    // 插入顺序：从底部到顶部（避免索引偏移）
+
+    // GabledRoof (4 rows): L,W → Roof(2)
+    if ( QFormLayout *f = fmt( ui->pageGabledRoof ) )
+        insertSectionHeader( f, 2, ParamModelerDock::tr( "Roof" ) );
+
+    // PyramidRoof (4 rows): L,W → Roof(2)
+    if ( QFormLayout *f = fmt( ui->pagePyramidRoof ) )
+        insertSectionHeader( f, 2, ParamModelerDock::tr( "Roof" ) );
+
+    // CylinderDome (4 rows): R,H,ratio → Dome(3)
+    if ( QFormLayout *f = fmt( ui->pageCylinderHemisphere ) )
+        insertSectionHeader( f, 3, ParamModelerDock::tr( "Dome" ) );
+
+    // TriPrismPyramid (4 rows): leg,base → Height(2)
+    if ( QFormLayout *f = fmt( ui->pageTriPrismPyramid ) )
+        insertSectionHeader( f, 2, ParamModelerDock::tr( "Height" ) );
+
+    // LHouse (5 rows): L,W,H → Wing(2)
+    if ( QFormLayout *f = fmt( ui->pageLHouse ) )
+        insertSectionHeader( f, 2, ParamModelerDock::tr( "Wing" ) );
+
+    // TruncatedPyramidRoof (6 rows): BottomL,BottomW → TopL,TopW(2) → Height(4)
+    if ( QFormLayout *f = fmt( ui->pageTPRoof ) )
+    {
+        insertSectionHeader( f, 4, ParamModelerDock::tr( "Height" ) );
+        insertSectionHeader( f, 2, ParamModelerDock::tr( "Top" ) );
+    }
+
+    // AsymmetricGableHouse (6 rows): L,W → Roof(2) → Ridge(4)
+    if ( QFormLayout *f = fmt( ui->pageAsymmetricGableHouse ) )
+    {
+        insertSectionHeader( f, 4, ParamModelerDock::tr( "Ridge" ) );
+        insertSectionHeader( f, 2, ParamModelerDock::tr( "Roof" ) );
+    }
+
+    // FourStageRoundTower (6 rows): BaseR,BaseH → Middle(2) → Top(5)
+    if ( QFormLayout *f = fmt( ui->pageFourStageRoundTower ) )
+    {
+        insertSectionHeader( f, 5, ParamModelerDock::tr( "Top" ) );
+        insertSectionHeader( f, 2, ParamModelerDock::tr( "Middle" ) );
+    }
+
+    // TwoGableHouses (7 rows): L1,L2,W → Roof(3) → Orientation(5)
+    if ( QFormLayout *f = fmt( ui->pageTwoGableHouses ) )
+    {
+        insertSectionHeader( f, 5, ParamModelerDock::tr( "Orientation" ) );
+        insertSectionHeader( f, 3, ParamModelerDock::tr( "Roof" ) );
+    }
+
+    // IndentedCuboid (8 rows): OuterL,OuterW,OuterH → Inner(3) → Offset(6)
+    if ( QFormLayout *f = fmt( ui->pageIndentedCuboid ) )
+    {
+        insertSectionHeader( f, 6, ParamModelerDock::tr( "Offset" ) );
+        insertSectionHeader( f, 3, ParamModelerDock::tr( "Inner" ) );
+    }
+}
 
 void ParamModelerDock::initUiControls()
 {
@@ -326,6 +489,9 @@ void ParamModelerDock::initUiControls()
   ui->labelTPPBase->setText( tr( "Base length:" ) );
   ui->labelTPPHeight->setText( tr( "Total height:" ) );
   ui->labelTPPRatio->setText( tr( "Pyramid ratio:" ) );
+
+  // ---- 参数分组标题：在复杂基元（4+ 参数）的 QFormLayout 中插入加粗分隔线 ----
+  applyParameterGroups();
 }
 
 void ParamModelerDock::initConnections()
@@ -470,6 +636,18 @@ void ParamModelerDock::initPointNet()
     if ( m_realtimeModelLoaded )
       onUpdatePreview();
   } );
+
+  // DL预测值复位按钮：一键将所有参数恢复到深度学习推理结果
+  m_resetAnchorBtn = new QPushButton( tr( "↺ Reset to DL prediction" ), this );
+  m_resetAnchorBtn->setToolTip( tr( "Restore all shape parameters to the last deep-learning inference result." ) );
+  m_resetAnchorBtn->setEnabled( false );  // 初始禁用，等推理成功后再启用
+  m_resetAnchorBtn->setStyleSheet(
+      "QPushButton { color: #1a73e8; border: 1px solid #1a73e8; border-radius: 3px; padding: 3px 8px; }"
+      "QPushButton:hover { background: #e8f0fe; }"
+      "QPushButton:disabled { color: #999; border-color: #ccc; }"
+  );
+  ui->formLayoutPrimitive->addRow( tr( "DL anchor:" ), m_resetAnchorBtn );
+  connect( m_resetAnchorBtn, &QPushButton::clicked, this, &ParamModelerDock::resetToDlAnchor );
 }
 
 void ParamModelerDock::onPrimitiveChanged( const QString &prim )
@@ -533,6 +711,12 @@ void ParamModelerDock::onPrimitiveChanged( const QString &prim )
     ui->spinBoxRPhi->setValue( 0 );
     ui->spinBoxRKappa->setValue( 0 );
   }
+
+  // 切换基元后 DL 锚点失效（锚点参数与基元类型绑定），禁用复位按钮
+  m_hasDlAnchor = false;
+  m_dlAnchorParams.clear();
+  if ( m_resetAnchorBtn )
+    m_resetAnchorBtn->setEnabled( false );
 
   m_currentPrimitive = prim;
 
@@ -768,6 +952,13 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     }
 
     PointNetRunner::applyToUI( this, params );
+
+    // 保存 DL 预测值作为微调锚点（对话框流程也需要）
+    m_dlAnchorParams = params;
+    m_hasDlAnchor = true;
+    if ( m_resetAnchorBtn )
+      m_resetAnchorBtn->setEnabled( true );
+
     parametersApplied = true;
     table->setRowCount( params.size() );
     int row = 0;
@@ -797,55 +988,15 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
         double pcScale = 1.0;
         if ( metadataPointCloudInfoForInput( m_inputDataPath, nullptr, &pcCenter, &pcScale ) )
         {
-          // 缓存元数据，供 onLoadToQGIS3D / onUpdatePreview 反归一化模型
           m_metadataCenter = pcCenter;
           m_metadataScale  = pcScale;
           m_hasMetadata    = true;
-
-          const QString prim = ui->comboPrimitive->currentText();
-          MeshData previewMesh = BuildMesh::build( prim, this );
-          if ( !previewMesh.isEmpty() )
-          {
-            // Compute model bbox center from vertices (normalized space)
-            QVector3D modelMin( std::numeric_limits<float>::max(),
-                                std::numeric_limits<float>::max(),
-                                std::numeric_limits<float>::max() );
-            QVector3D modelMax( std::numeric_limits<float>::lowest(),
-                                std::numeric_limits<float>::lowest(),
-                                std::numeric_limits<float>::lowest() );
-            for ( const QVector3D &v : previewMesh.vertices )
-            {
-              if ( v.x() < modelMin.x() ) modelMin.setX( v.x() );
-              if ( v.y() < modelMin.y() ) modelMin.setY( v.y() );
-              if ( v.z() < modelMin.z() ) modelMin.setZ( v.z() );
-              if ( v.x() > modelMax.x() ) modelMax.setX( v.x() );
-              if ( v.y() > modelMax.y() ) modelMax.setY( v.y() );
-              if ( v.z() > modelMax.z() ) modelMax.setZ( v.z() );
-            }
-            const QVector3D modelCenter = ( modelMin + modelMax ) * 0.5f;
-
-            // Both model vertices and point cloud are in meter/projected-meter space.
-            // Translation = pcCenter - modelCenter  (no scale factor needed)
-            const double tx = static_cast<double>( pcCenter.x() ) - static_cast<double>( modelCenter.x() );
-            const double ty = static_cast<double>( pcCenter.y() ) - static_cast<double>( modelCenter.y() );
-            const double tz = static_cast<double>( pcCenter.z() ) - static_cast<double>( modelCenter.z() );
-            setPoseTranslate( tx, ty, tz );
-
-            DEBUG_LOG( QString( "[Align] pcCenter=(%1,%2,%3) modelCenter=(%4,%5,%6) → tx=%7 ty=%8 tz=%9\n" )
-                         .arg( pcCenter.x(), 0, 'f', 2 ).arg( pcCenter.y(), 0, 'f', 2 ).arg( pcCenter.z(), 0, 'f', 2 )
-                         .arg( modelCenter.x(), 0, 'f', 2 ).arg( modelCenter.y(), 0, 'f', 2 ).arg( modelCenter.z(), 0, 'f', 2 )
-                         .arg( tx, 0, 'f', 2 ).arg( ty, 0, 'f', 2 ).arg( tz, 0, 'f', 2 )
-                         .toStdWString().c_str() );
-          }
-          else
-          {
-            DEBUG_LOG( L"[Align] mesh build failed, skipping auto-alignment\n" );
-          }
+          alignModelToPointCloud( BuildMesh::build( ui->comboPrimitive->currentText(), this ),
+                                  pcCenter, this, QStringLiteral( "dialog" ) );
         }
         else
         {
-          DEBUG_LOG( QString( "[Align] no metadata for %1, skipping auto-alignment\n" )
-                       .arg( m_inputDataPath ).toStdWString().c_str() );
+          DEBUG_LOG( QString( "[Align] no metadata for %1, skipping\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
         }
 
         onLoadToQGIS3D( true );
@@ -1449,6 +1600,12 @@ void ParamModelerDock::onInverseParams()
     DEBUG_LOG( QString( "[PointNet] parameter regression done, returned %1 parameters\n" ).arg( params.size() ).toStdWString().c_str() );
     PointNetRunner::applyToUI( this, params );
 
+    // 保存 DL 预测值作为微调锚点，供 resetToDlAnchor() 一键复位
+    m_dlAnchorParams = params;
+    m_hasDlAnchor = true;
+    if ( m_resetAnchorBtn )
+      m_resetAnchorBtn->setEnabled( true );
+
     ui->tableInverseParams->setRowCount( params.size() );
     int row = 0;
     for ( auto it = params.cbegin(); it != params.cend(); ++it, ++row )
@@ -1463,55 +1620,24 @@ void ParamModelerDock::onInverseParams()
 
   // --- Auto-align model translation to point cloud center ---
   if ( m_hasMetadata )
-  {
-    const QString prim = ui->comboPrimitive->currentText();
-    MeshData previewMesh = BuildMesh::build( prim, this );
-    if ( !previewMesh.isEmpty() )
-    {
-      QVector3D modelMin( std::numeric_limits<float>::max(),
-                          std::numeric_limits<float>::max(),
-                          std::numeric_limits<float>::max() );
-      QVector3D modelMax( std::numeric_limits<float>::lowest(),
-                          std::numeric_limits<float>::lowest(),
-                          std::numeric_limits<float>::lowest() );
-      for ( const QVector3D &v : previewMesh.vertices )
-      {
-        if ( v.x() < modelMin.x() ) modelMin.setX( v.x() );
-        if ( v.y() < modelMin.y() ) modelMin.setY( v.y() );
-        if ( v.z() < modelMin.z() ) modelMin.setZ( v.z() );
-        if ( v.x() > modelMax.x() ) modelMax.setX( v.x() );
-        if ( v.y() > modelMax.y() ) modelMax.setY( v.y() );
-        if ( v.z() > modelMax.z() ) modelMax.setZ( v.z() );
-      }
-      const QVector3D modelCenter = ( modelMin + modelMax ) * 0.5f;
-
-      const double tx = static_cast<double>( m_metadataCenter.x() ) - static_cast<double>( modelCenter.x() );
-      const double ty = static_cast<double>( m_metadataCenter.y() ) - static_cast<double>( modelCenter.y() );
-      const double tz = static_cast<double>( m_metadataCenter.z() ) - static_cast<double>( modelCenter.z() );
-      setPoseTranslate( tx, ty, tz );
-
-      DEBUG_LOG( QString( "[Align] pcCenter=(%1,%2,%3) modelCenter=(%4,%5,%6) → tx=%7 ty=%8 tz=%9\n" )
-                   .arg( m_metadataCenter.x(), 0, 'f', 2 )
-                   .arg( m_metadataCenter.y(), 0, 'f', 2 )
-                   .arg( m_metadataCenter.z(), 0, 'f', 2 )
-                   .arg( modelCenter.x(), 0, 'f', 2 )
-                   .arg( modelCenter.y(), 0, 'f', 2 )
-                   .arg( modelCenter.z(), 0, 'f', 2 )
-                   .arg( tx, 0, 'f', 2 )
-                   .arg( ty, 0, 'f', 2 )
-                   .arg( tz, 0, 'f', 2 )
-                   .toStdWString().c_str() );
-    }
-    else
-    {
-      DEBUG_LOG( L"[Align] regression mesh build failed, skipping auto-alignment\n" );
-    }
-  }
+    alignModelToPointCloud( BuildMesh::build( ui->comboPrimitive->currentText(), this ),
+                            m_metadataCenter, this, QStringLiteral( "onInverseParams" ) );
   else
-  {
-    DEBUG_LOG( QString( "[Align] no metadata for %1, skipping auto-alignment\n" )
-                 .arg( m_inputDataPath ).toStdWString().c_str() );
-  }
+    DEBUG_LOG( QString( "[Align] no metadata for %1, skipping\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
 
   onUpdatePreview();
+}
+
+// ============================================================
+// 一键复位：将所有参数恢复到 DL 推理的预测值
+// ============================================================
+void ParamModelerDock::resetToDlAnchor()
+{
+  if ( !m_hasDlAnchor || m_dlAnchorParams.isEmpty() )
+    return;
+
+  PointNetRunner::applyToUI( this, m_dlAnchorParams );
+  schedulePreviewUpdate();
+
+  DEBUG_LOG( L"[DL Anchor] parameters reset to DL prediction\n" );
 }
