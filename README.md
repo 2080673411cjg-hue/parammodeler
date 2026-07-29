@@ -12,14 +12,14 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 
 ## 主要功能
 
-- 支持 13 类建筑基元的参数化建模。
+- 支持 14 类建筑基元的参数化建模。
 - 支持本地 OpenGL 快速预览。
 - 支持将当前模型加载到 QGIS 3D 场景。
 - 支持 Qt3D 实时预览实体，用于参数拖动时快速更新拟合模型。
 - 支持外部点云导入，包括 `.ply`、`.txt`、`.xyz`、`.pts`、`.las`、`.laz`。
-- 支持 PointNet、PointNet++、PointNeXt 三类后端进行点云分类（当前主力：PointNeXt）
+- 支持 PointNet、PointNet++、PointNeXt、PCT 四类后端进行点云分类（当前主力：PCT，98.92% F1）
 - 支持调用外部 Python 参数回归模型，并将结果回填到插件 UI
-- 支持随机参数生成和批量深度学习数据集导出（500 样本/类，13 类共 6500）
+- 支持随机参数生成和批量深度学习数据集导出（500 样本/类，14 类共 7000）
 - 支持 OBJ、STL、JSON、PLY、深度学习 TXT 点云等格式导出。
 
 ## 支持的建筑基元
@@ -39,8 +39,10 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 | `AsymmetricGableHouse` | 非对称人字形房屋 | `length`, `width`, `totalHeight`, `wallRatio`, `ridgeLength`, `ridgeRatio` |
 | `FourStageRoundTower` | 四段式圆塔 | `baseRadius`, `baseHeight`, `middleHeight`, `middleTopRadius`, `middleBulge`, `coneHeight` |
 | `TwoGableHouses` | 双人字形房屋 | `length1`, `length2`, `width`, `totalHeight`, `wallRatio`, `angle`, `ridgeRatio` |
+| `TriPrismPyramid` | 三棱柱 + 三棱锥 | `leg`, `baseSide`, `totalHeight`, `pyramidRatio` |
 
 `CylinderDome` 是当前正式类型名，代码中仍兼容旧名 `CylinderHemisphere`。
+v2.2.0 起所有建筑 mesh 以底面中心为原点，旋转绕自身中心。
 
 ## 工作流
 
@@ -63,7 +65,7 @@ x y z
 
 导出时会进行中心化和按最大半径归一化，同时记录 `pointCloudInfo`，包括包围盒、中心、尺度等信息，用于后续参数估计时恢复尺度。
 
-当前标准数据集规模为 **500 样本/类**（train 400 + val 50 + test 50），13 类共 6500 样本。
+当前标准数据集规模为 **500 样本/类**（train 400 + val 50 + test 50），14 类共 7000 样本。
 
 ### 3. 点云分类
 
@@ -72,6 +74,7 @@ x y z
 - PointNet
 - PointNet++
 - PointNeXt
+- PCT (Point Cloud Transformer) — 当前主力
 
 分类流程大致为：
 
@@ -157,15 +160,18 @@ x y z
 parammodeler/
 ├── parammodeler.cpp / .h              # QGIS 插件入口，注册菜单、工具栏和 Dock 面板
 ├── parammodeler_dock.cpp / .h / .ui   # 插件主 UI 和调度中心
-├── buildmesh.cpp / .h                 # 13 类建筑基元的网格生成
-├── meshdata.h                         # 网格数据结构，保存顶点和三角面索引
+├── buildmesh.cpp / .h                 # 14 类建筑基元网格生成（双接口 + 底面中心化）
+├── meshdata.h                         # 网格数据结构 + 所有 Params 结构体
+├── parammodeler_params.cpp            # 参数访问器（spinbox → 派生参数）
 ├── parammodeler_scene3d.cpp / .h      # QGIS 3D 图层加载与 Qt3D 实时预览
 ├── parammodeler_pcdloader.cpp / .h    # 外部点云读取
 ├── parammodeler_pcdtypes.h            # 点云数据结构
 ├── parammodeler_pointnet.cpp / .h     # 外部深度学习模型调用
-
-├── exportjson.cpp / .h                # JSON 参数导出
-├── exportobj.cpp / .h                 # OBJ 网格导出
+├── parammodeler_dlutils.cpp / .h      # DL 参数映射 + 元数据 + JSON 辅助
+├── parammodeler_datasetgen.cpp / .h   # 数据集批量生成
+├── parammodeler_randomizer.cpp / .h   # 参数随机化
+├── parammodeler_config.cpp / .h       # 路径配置管理
+├── parammodeler_export.cpp / .h       # 统一导出（OBJ/JSON/PLY/STL/GPKG）
 ├── exportpointcloud.cpp / .h          # PLY 和深度学习 TXT 点云导出
 ├── CMakeLists.txt                     # 插件构建配置
 └── parammodeler.qrc                   # Qt 资源文件
@@ -227,34 +233,40 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 ```text
 参数化基元定义
 -> 随机参数生成
--> 网格表面采样点云
--> 点云增强
--> PointNeXt / PointNet++ 分类
--> PointNeXt / PointNet++ 参数估计
--> 插件回填参数
+-> BuildMesh + centerMeshOnBaseFace（底面中心原点）
+-> 网格表面采样点云 + 归一化
+-> PCT 分类（98.92% F1）
+-> PCT 回归（neighbor + basic 混合部署）
+-> pointNetParamsToUiParams 映射 + applyToUI 回填
+-> alignModelToPointCloud 自动对齐
 -> QGIS 3D 叠加点云与模型
--> 人工微调
+-> 人工微调（Ctrl+滚轮精调 + DL 锚点复位）
 -> 导出参数化成果
 ```
 
-传统几何反演模块仍保留，但更适合作为 baseline、fallback 或对照实验，不建议作为当前主线。
+传统几何反演模块已移除，深度学习路线为唯一主线。
 
 ## 当前已知问题
 
-- `parammodeler_dock.cpp` 职责较重，后续建议拆出数据集导出、估计弹窗、参数映射和配置管理模块。
-- Python 环境、模型脚本、日志目录和 metadata 路径已配置化（`parammodeler_config.h`），可通过设置对话框修改，不需要手动改源码。
-- 🔴 **参数估计精度不足**：当前 PointNeXt `_aux` 模型对局部几何参数（`bulge` R²=-0.08、`middleBulge` R²=-0.85、`wallRatio` R²=0.06、`innerWidth` R²=0.21）几乎学不到。根因是 PointNeXt 的 set abstraction + max-pooling 对细粒度曲面形变不敏感。详见 `dl-pipeline-log.md` 第九章模型升级路线图。
-- 点云与模型的初始配准仍是微调体验的关键，需要确保归一化、尺度恢复、包围盒、坐标系和 QGIS 3D 位姿一致。
-- 位姿参数（rx/ry/rz/tx/ty/tz）尚未进入回归训练，当前仅自动对齐平移（auto-align）。
+- 🔴 **参数估计精度不足**：PCT 回归对局部几何参数（`bulge` R²=-0.004、`middleBulge` R²=-0.363、`wallRatio` R²=-0.271、`innerWidth` R²=0.050）仍然困难。TwoGableHouses 和 IndentedCuboid 存在严重过拟合（500样本不够支撑7-8参数回归）。详见 `dl-pipeline-log.md`。
+- 位姿参数（rx/ry/rz/tx/ty/tz）尚未进入回归训练，当前仅 auto-align 平移。
+- `parammodeler_dock.cpp` 职责仍偏重，但已拆分出 7 个辅助模块（params/dlutils/randomizer/datasetgen/config/export/scene3d）。
+
+## 已解决（v2.2.0 → v2.3.0）
+
+- ✅ 坐标系不统一 → `centerMeshOnBaseFace()` 统一底面中心原点
+- ✅ 微调无锚点 → DL 预测值存储 + "↺ Reset to DL prediction" 一键复位
+- ✅ 参数 UI 扁平 → 8 类复杂基元加分组标题
+- ✅ Ctrl+滚轮精调 → `FineTuneFilter` 事件过滤器
+- ✅ auto-align 代码重复 → `alignModelToPointCloud()` 共用函数
 
 ## 后续建议
 
-1. 🔴 **升级模型架构**：从 PointNeXt 迁移到 Swin3D 或 PTv3，重点解决局部几何参数的回归精度问题。详见 `dl-pipeline-log.md` 第九章。
-2. 增加训练数据增强：在线随机旋转、随机裁切、法向量通道。
-3. 拆分 `ParamModelerDock`，降低主 UI 文件复杂度。
+1. 🔴 **数据端增强**：法向量通道 + 数据扩量（TwoGable/IndentedCuboid 各 1000+）+ 随机裁切。详见 `dl-pipeline-log.md` 第九章。
+2. 加入位姿参数回归（先 rz，再 rx/ry/tx/ty/tz）。
+3. 每种基元加小示意图帮助理解参数含义。
 4. 稳定 QGIS 3D 中点云和模型的一键加载、透明显示和实时微调体验。
-5. 加入位姿参数回归（先 rz，再 rx/ry/tx/ty/tz）。
-6. 整理论文或项目报告中的实验章节，包括数据集生成、增强策略、分类结果、参数回归结果和误差分析。
+5. 整理论文或项目报告中的实验章节。
 
 ## 项目定位
 

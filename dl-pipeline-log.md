@@ -1,10 +1,11 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-07-27  
+> 最后更新: 2026-07-29  
+> 插件版本: **v2.3.0**（坐标系居中 + 微调体验升级 + 参数分组）  
 > 当前模型: **PCT**（Point Cloud Transformer）— Li & Shan 2025 风格 offset-attention  
-> 分类模型: `pct_cls_v2` — 98.92% F1，8/13 类满分  
+> 分类模型: `pct_cls_v2` — 98.92% F1，8/14 类满分  
 > 回归模型: `pct_reg_*_v2` (basic) + `pct_reg_*_v2_neighbor` (neighbor)，混合部署  
-> 数据集: **500 样本/类**（train 400 + val 50 + test 50），13 类共 6500 样本  
+> 数据集: **500 样本/类**（train 400 + val 50 + test 50），14 类共 7000 样本  
 > 后端: PCT（PointNeXt 保留但不再使用）
 
 ---
@@ -38,7 +39,7 @@
 
 | 功能 | 函数 | 文件 |
 |------|------|------|
-| 批量生成全部 13 类 | `onExportDLDatasetClicked()` | `parammodeler_dock.cpp:1748` |
+| 批量生成全部 14 类 | `onExportDLDatasetClicked()` | `parammodeler_dock.cpp:1748` |
 | 生成当前单个基元 | `onExportCurrentPrimitiveDLDatasetClicked()` | `parammodeler_dock.cpp:1893` |
 | 导出单样本 TXT | `ExportPointCloud::exportDLInputTXT()` | `exportpointcloud.cpp:267` |
 
@@ -118,7 +119,7 @@ E:/pointnet/datasets_aug/
 ├── train/
 │   ├── Cuboid/sample_00001.txt ... sample_00400.txt
 │   ├── Cylinder/...
-│   └── ...（13 类）
+│   └── ...（14 类）
 ├── val/
 │   └── ...（每类 50 样本）
 ├── test/
@@ -158,11 +159,11 @@ python main.py --mode train \
 
 输出到 `logs/pct_cls_v2/`：
 - `best_model.pth`（~1.48M 参数）
-- `classes.txt`（13 类名）
+- `classes.txt`（14 类名）
 - `classification_report_test.csv`
 - `confusion_matrix_test.csv`
 
-### PCT 回归训练（2 变体 × 13 类 = 26 个模型）
+### PCT 回归训练（2 变体 × 14 类 = 26 个模型）
 
 ```bash
 # basic 变体 — 全局 offset-attention
@@ -298,19 +299,20 @@ Python 预测脚本 (`main_reg.py`) 的处理：
 | `radius` + `height` | `*Radius` / `cylHeight` | Cylinder |
 | `mainLength`, `mainWidth`, `wingLength`, `wingWidth` | `lMainL`, `lMainW`, `lWingL`, `lWingW` | LHouse |
 
-### Auto-Align（平移对齐）
+### Auto-Align（平移对齐）— v2.3.0 精简
 
-`onInverseParams()` 末尾 — `parammodeler_dock.cpp:2589-2641`
+`alignModelToPointCloud()` — `parammodeler_dock.cpp:154`（共用函数，`onInverseParams` 和对话框均调用）
 
 ```
-modelCenter = (modelBBoxMin + modelBBoxMax) / 2
+modelCenter = meshBboxCenter(mesh)   // v2.2.0 起 mesh 已居中，X/Y ≈ 0
 tx = metadataCenter.x - modelCenter.x
 ty = metadataCenter.y - modelCenter.y
 tz = metadataCenter.z - modelCenter.z
 setPoseTranslate(tx, ty, tz)
 ```
 
-注意：**只对齐平移，不处理旋转**。因为 `_aux` 模型不预测 rz，模型朝向保持默认。
+注意：**只对齐平移，不处理旋转**。因为模型不预测 rz，模型朝向保持默认。
+v2.2.0 坐标系居中后 modelCenter X/Y ≈ 0，tx/ty 直接等于点云中心的 X/Y。
 
 ---
 
@@ -355,7 +357,7 @@ setPoseTranslate(tx, ty, tz)
 
 ## 七、当前模型质量速查
 
-> **数据规模**: 500 样本/类（400 train + 50 val + 50 test），13 类共 6500 样本  
+> **数据规模**: 500 样本/类（400 train + 50 val + 50 test），14 类共 6500 样本  
 > **模型**: PCT (Point Cloud Transformer)，~1.48M 参数（分类）/ ~1.5M 参数（回归）  
 > **变体部署策略**: 10 类用 neighbor，3 类用 basic
 
@@ -477,7 +479,7 @@ PointNeXt 时代的主混淆（Cuboid↔Cylinder↔IndentedCuboid）**全部消�
 PCT 重新训练命令参考 `scripts/train_pct_reg.sh` 和 `scripts/train_pct_cls.sh`：
 
 ```bash
-# 回归 — neighbor 变体（推荐，10/13 类最优）
+# 回归 — neighbor 变体（推荐，10/14 类最优）
 python main_reg.py --mode train \
   --data_root ... --metadata ... \
   --class_name Cuboid --targets length width height \
@@ -497,7 +499,7 @@ python main_reg.py --mode train \
 
 ## 九、模型升级路线图
 
-> ✅ **PCT (Li & Shan 2025) 已完成** — 分类 98.92% F1，回归 6/13 类 avg R^2>0.6  
+> ✅ **PCT (Li & Shan 2025) 已完成** — 分类 98.92% F1，回归 6/14 类 avg R^2>0.6  
 > 🔴 剩余困难：bulge（曲率不敏感）、TwoGable/IndentedCuboid（过拟合）  
 > 下一步优先级：数据端增强 > 法向量通道 > 架构升级
 
@@ -561,3 +563,31 @@ python main_reg.py --mode train \
 | wallRatio | 0.06 | -0.271 | >0.7 | PCT 反而更差，过拟合 |
 | innerWidth | 0.21 | 0.050 | >0.6 | 过拟合，需扩量 |
 | ridgeLength | 0.52 | 0.608 | >0.8 | 小幅改善 |
+
+---
+
+## 十、插件版本变更日志
+
+### v2.3.0 (2026-07-29) — 坐标系居中 + 微调体验升级
+
+**坐标系**
+- `centerMeshOnBaseFace()`：14 类基元统一底面中心原点
+- 旋转绕自身中心，tx/ty = 建筑中心世界坐标
+- auto-align 代码精简：`alignModelToPointCloud()` 共用函数（90行→30行）
+
+**微调体验**
+- Ctrl+滚轮 10x 精调：`FineTuneFilter` 事件过滤器
+- DL 预测值锚点 + "↺ Reset to DL prediction" 一键复位按钮
+- 参数分组标题：8 类复杂基元的 QFormLayout 加粗分隔线
+
+### v2.2.0 (2026-07-27) — TriPrismPyramid + 纯数据双接口
+
+- 新增 TriPrismPyramid 基元（三棱柱+三棱锥）
+- 14 类基元全部支持纯数据接口（`BuildMesh::build*(const XxxParams&)`）
+- 姿态归一化闭环：auto-align 从 metadata center 计算 tx/ty/tz
+
+### v2.1.4 — PCT 模型部署
+
+- PCT 分类 98.92% F1
+- PCT 回归 neighbor + basic 混合部署
+- 3D 预览消失修复 + 底面颜色修复
