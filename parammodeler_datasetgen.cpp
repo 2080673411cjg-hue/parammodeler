@@ -107,7 +107,7 @@ static QString existingCountsSummary( const QMap<QString, QMap<QString, int>> &c
 }
 
 /// Generate samples for a single split, returning new metadata records.
-static QJsonArray generateSplitSamples( const QString &prim,
+QJsonArray generateSplitSamples( const QString &prim,
                                         const QString &classDir,
                                         const QString &split,
                                         int startIdx,

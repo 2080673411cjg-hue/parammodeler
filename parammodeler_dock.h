@@ -30,7 +30,9 @@
 #include <QVector3D>
 
 class QCheckBox;
+class QProgressDialog;
 class QPushButton;
+class QJsonArray;
 
 class QgisInterface;
 class QgsVectorLayer; 
@@ -49,6 +51,11 @@ class ParamModelerDock : public QDockWidget
 
   friend void generateFullDataset( ParamModelerDock *dock );
   friend void generateSinglePrimitiveDataset( ParamModelerDock *dock );
+  friend QJsonArray generateSplitSamples( const QString &prim, const QString &classDir,
+                                          const QString &split, int startIdx, int count,
+                                          const QString &rootPath, int pointCount,
+                                          ParamModelerDock *dock, QProgressDialog &progress,
+                                          int &generated, int &failed );
   friend void randomizePrimitiveParams( ParamModelerDock *dock, bool refreshPreview, bool randomizePose );
 
 public:
