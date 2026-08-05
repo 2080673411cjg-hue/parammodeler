@@ -590,9 +590,11 @@ python main_reg.py --mode train \
 - `generateSinglePrimitiveDataset`：可选「替换」（删旧+重建+合并 metadata）或「追加」（保留旧数据，续号添加）
 - 回归只覆盖 13 类：TriPrismPyramid 无需回归（仅分类），`parammodeler_pointnet.cpp` stemNames map 中不含
 
-**TwoGableHouses 扩量 + 增强**
+**TwoGableHouses 扩量 + 增强 + 遮挡修复**
 - 单类追加 500 → 1000 样本（train 800 + val 100 + test 100）
-- 增强孔洞（15% prob）+ 高斯噪声（σ=0.01）+ 离群点（1%）
+- 增强：仅归一化+采样，不加孔洞/噪声（保留顶面完整性）
+- 从 `isBoxLike` 移除：6 面 L/V 形墙被 4 面 box 遮挡假设破坏，导出点云严重失真
+- ⚠️ LHouse 和 IndentedCuboid 也在 `isBoxLike` 中，可能有类似遮挡问题，待后续验证
 - 重新训练 `pct_reg_twogable_v2_neighbor`（100 epoch，neighbor 变体）
 - 修复 `QJsonArray::append` 嵌套 bug（val/test metadata 被吞）
 
