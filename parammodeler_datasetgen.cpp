@@ -495,21 +495,28 @@ void generateSinglePrimitiveDataset( ParamModelerDock *dock )
   int generated = 0;
   int failed = 0;
 
-  // Collect new records for metadata merging
+  // Collect new records for metadata merging.
+  // Helper: append each element individually — QJsonArray::append(QJsonArray)
+  // would nest the whole array as a single QJsonValue instead of flattening.
+  auto appendRecords = []( QJsonArray &dest, const QJsonArray &src ) {
+    for ( const QJsonValue &v : src )
+      dest.append( v );
+  };
+
   QJsonArray newRecords = generateSplitSamples(
     prim, classDir, QStringLiteral( "train" ), startTrain,
     samplesPerClass * 8 / 10, rootPath, pointCount, dock, progress, generated, failed );
   if ( !progress.wasCanceled() )
   {
     const int valCount = samplesPerClass * 9 / 10 - samplesPerClass * 8 / 10;
-    newRecords.append( generateSplitSamples(
+    appendRecords( newRecords, generateSplitSamples(
       prim, classDir, QStringLiteral( "val" ), startVal,
       valCount, rootPath, pointCount, dock, progress, generated, failed ) );
   }
   if ( !progress.wasCanceled() )
   {
     const int testCount = samplesPerClass - ( samplesPerClass * 8 / 10 ) - ( samplesPerClass * 9 / 10 - samplesPerClass * 8 / 10 );
-    newRecords.append( generateSplitSamples(
+    appendRecords( newRecords, generateSplitSamples(
       prim, classDir, QStringLiteral( "test" ), startTest,
       testCount, rootPath, pointCount, dock, progress, generated, failed ) );
   }
