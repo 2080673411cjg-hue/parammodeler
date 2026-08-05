@@ -5,7 +5,7 @@
 > 当前模型: **PCT**（Point Cloud Transformer）— Li & Shan 2025 风格 offset-attention  
 > 分类模型: `pct_cls_v2` — 98.92% F1，8/14 类满分  
 > 回归模型: 13 类（TriPrismPyramid 无需回归），`pct_reg_*_v2` (basic) + `pct_reg_*_v2_neighbor` (neighbor)，混合部署  
-> 数据集: **500 样本/类**（train 400 + val 50 + test 50），14 类共 7000 样本  
+> 数据集: **500 样本/类**（train 400 + val 50 + test 50），TwoGableHouses **1000 样本**（已增强孔洞+噪声+离群点），14 类共 7500 样本  
 > 后端: PCT（PointNeXt 保留但不再使用）
 
 ---
@@ -589,6 +589,12 @@ python main_reg.py --mode train \
 - `generateFullDataset`：检测已有 `sample_params.json` → 显示各类现有数量 → 可选「追加」（只补差额，文件续号，metadata 合并）或「覆盖」（全删重建）
 - `generateSinglePrimitiveDataset`：可选「替换」（删旧+重建+合并 metadata）或「追加」（保留旧数据，续号添加）
 - 回归只覆盖 13 类：TriPrismPyramid 无需回归（仅分类），`parammodeler_pointnet.cpp` stemNames map 中不含
+
+**TwoGableHouses 扩量 + 增强**
+- 单类追加 500 → 1000 样本（train 800 + val 100 + test 100）
+- 增强孔洞（15% prob）+ 高斯噪声（σ=0.01）+ 离群点（1%）
+- 重新训练 `pct_reg_twogable_v2_neighbor`（100 epoch，neighbor 变体）
+- 修复 `QJsonArray::append` 嵌套 bug（val/test metadata 被吞）
 
 ### v2.3.0 (2026-07-29) — 坐标系居中 + 微调体验升级
 
