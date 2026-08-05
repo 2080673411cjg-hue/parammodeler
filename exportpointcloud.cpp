@@ -436,7 +436,7 @@ static bool isBoxLike( const QString &primType )
 {
   static const QSet<QString> s = {
     "Cuboid", "GabledRoof", "PyramidRoof", "TruncatedPyramidRoof",
-    "HalfCylinderRoof", "AsymmetricGableHouse", "TwoGableHouses",
+    "HalfCylinderRoof", "AsymmetricGableHouse",
     "LHouse", "IndentedCuboid"
   };
   return s.contains( primType );
