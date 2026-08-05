@@ -1,10 +1,10 @@
 # Deep Learning Pipeline 完整日志
 
 > 最后更新: 2026-08-05  
-> 插件版本: **v2.3.1**（模型路径统一 v2 + PCT 超参修复）  
+> 插件版本: **v2.3.1**（模型路径统一 v2 + PCT 超参修复 + 数据集追加模式）  
 > 当前模型: **PCT**（Point Cloud Transformer）— Li & Shan 2025 风格 offset-attention  
 > 分类模型: `pct_cls_v2` — 98.92% F1，8/14 类满分  
-> 回归模型: `pct_reg_*_v2` (basic) + `pct_reg_*_v2_neighbor` (neighbor)，混合部署  
+> 回归模型: 13 类（TriPrismPyramid 无需回归），`pct_reg_*_v2` (basic) + `pct_reg_*_v2_neighbor` (neighbor)，混合部署  
 > 数据集: **500 样本/类**（train 400 + val 50 + test 50），14 类共 7000 样本  
 > 后端: PCT（PointNeXt 保留但不再使用）
 
@@ -568,7 +568,7 @@ python main_reg.py --mode train \
 
 ## 十、插件版本变更日志
 
-### v2.3.1 (2026-08-05) — 模型路径统一 v2 + PCT 超参修复
+### v2.3.1 (2026-08-05) — 模型路径统一 v2 + PCT 超参修复 + 数据集追加模式
 
 **模型路径**
 - `regressionModelSuffix()` 默认值从 `_aux` 改为 `_v2`（4 处：config 默认值、设置对话框复位、.h 注释、pointnet.cpp 回退）
@@ -579,6 +579,16 @@ python main_reg.py --mode train \
 - `--pct_heads` 默认值 8 → 4
 - `--pct_blocks` 默认值 6 → 4
 - 修复原因：checkpoint 用 256/4/4 训练，argparse 默认值被误改为 384/8/6，导致 `load_state_dict` 尺寸不匹配
+
+**训练脚本修复（train_pct_cls.sh / train_pct_reg.sh / train_pct_all.sh）**
+- PCT_D_MODEL/HEDS/BLOCKS 恢复为 256/4/4
+- LOG_DIR 统一使用 v2 命名：`pct_cls_v2`、`pct_reg_*_v2`、`pct_reg_*_v2_neighbor`
+- 三个脚本均添加 `export PYTHONUNBUFFERED=1`
+
+**数据集生成：追加模式 + 单类替换**
+- `generateFullDataset`：检测已有 `sample_params.json` → 显示各类现有数量 → 可选「追加」（只补差额，文件续号，metadata 合并）或「覆盖」（全删重建）
+- `generateSinglePrimitiveDataset`：可选「替换」（删旧+重建+合并 metadata）或「追加」（保留旧数据，续号添加）
+- 回归只覆盖 13 类：TriPrismPyramid 无需回归（仅分类），`parammodeler_pointnet.cpp` stemNames map 中不含
 
 ### v2.3.0 (2026-07-29) — 坐标系居中 + 微调体验升级
 
