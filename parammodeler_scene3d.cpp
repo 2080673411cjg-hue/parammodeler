@@ -1177,7 +1177,7 @@ void ParamModelerScene3D::clearRealtimePreviewMesh( QgisInterface *iface )
       delete state.root;
   }
 
-  removeLayerByName( REALTIME_ANCHOR_LAYER_NAME );
+  removeLayerByName( REALTIME_ANCHOR_LAYER_NAME );//111
 }
 
 QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
@@ -1261,10 +1261,7 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
     return nullptr;
   }
 
-  removeLayersByNamePrefix( QStringLiteral( "External point cloud - " ) );
-  removeLayerByName( layerName );
-  QgsProject::instance()->addMapLayer( vl );
-
+  // ── 计算 extent（在旧图层被删除前完成） ──
   QgsRectangle viewExtent = padded3DViewExtent( vl->extent() );
 
   if ( iface->mapCanvas() )
@@ -1287,6 +1284,7 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
     }
   }
 
+  // ── 先从 3D 设置中移除旧图层（避免 removeMapLayer 后访问悬空指针） ──
   QList<Qgs3DMapCanvas *> canvases3D = iface->mapCanvases3D();
   for ( Qgs3DMapCanvas *canvas3D : canvases3D )
   {
@@ -1295,9 +1293,6 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
     Qgs3DMapSettings *settings = canvas3D->mapSettings();
     if ( !settings )
       continue;
-
-    if ( !viewExtent.isNull() )
-      settings->setExtent( viewExtent );
 
     QList<QgsMapLayer *> curLayers = settings->layers();
     curLayers.erase(
@@ -1309,9 +1304,18 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
     if ( !curLayers.contains( vl ) )
       curLayers.append( vl );
     settings->setLayers( curLayers );
+
     if ( !viewExtent.isNull() )
+    {
+      settings->setExtent( viewExtent );
       canvas3D->setViewFrom2DExtent( viewExtent );
+    }
   }
+
+  // ── 最后从 project 移除旧图层并添加新图层 ──
+  removeLayersByNamePrefix( QStringLiteral( "External point cloud - " ) );
+  removeLayerByName( layerName );
+  QgsProject::instance()->addMapLayer( vl );
 
   vl->triggerRepaint();
 
