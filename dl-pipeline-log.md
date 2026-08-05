@@ -1,7 +1,7 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-07-29  
-> 插件版本: **v2.3.0**（坐标系居中 + 微调体验升级 + 参数分组）  
+> 最后更新: 2026-08-05  
+> 插件版本: **v2.3.1**（模型路径统一 v2 + PCT 超参修复）  
 > 当前模型: **PCT**（Point Cloud Transformer）— Li & Shan 2025 风格 offset-attention  
 > 分类模型: `pct_cls_v2` — 98.92% F1，8/14 类满分  
 > 回归模型: `pct_reg_*_v2` (basic) + `pct_reg_*_v2_neighbor` (neighbor)，混合部署  
@@ -567,6 +567,18 @@ python main_reg.py --mode train \
 ---
 
 ## 十、插件版本变更日志
+
+### v2.3.1 (2026-08-05) — 模型路径统一 v2 + PCT 超参修复
+
+**模型路径**
+- `regressionModelSuffix()` 默认值从 `_aux` 改为 `_v2`（4 处：config 默认值、设置对话框复位、.h 注释、pointnet.cpp 回退）
+- 策略不变：分类 `pct_cls_v2`，回归默认 `_v2_neighbor`（10 类）+ `_v2`（CylinderDome / HalfCylinderRoof / LHouse）
+
+**PCT 超参修复（main.py / main_reg.py）**
+- `--pct_d_model` 默认值 384 → 256
+- `--pct_heads` 默认值 8 → 4
+- `--pct_blocks` 默认值 6 → 4
+- 修复原因：checkpoint 用 256/4/4 训练，argparse 默认值被误改为 384/8/6，导致 `load_state_dict` 尺寸不匹配
 
 ### v2.3.0 (2026-07-29) — 坐标系居中 + 微调体验升级
 

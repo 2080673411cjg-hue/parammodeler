@@ -142,7 +142,7 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
     ? pctBestSuffix.value( prim, ParamModelerConfig::pctRegressionSuffix() )
     : usePointNeXt
     ? ParamModelerConfig::regressionModelSuffix()
-    : QStringLiteral( "_aux" );
+    : QStringLiteral( "_v2" );
   const QString dirName = prefix + stemNames.value( prim ) + suffix;
 
   return { modelName, prim, script, base + dirName };

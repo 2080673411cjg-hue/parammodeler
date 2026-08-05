@@ -79,7 +79,7 @@ QString regressionModelPrefix()
 QString regressionModelSuffix()
 {
   return setting( QStringLiteral( "parammodeler/regressionModelSuffix" ),
-                  QStringLiteral( "_aux" ) );
+                  QStringLiteral( "_v2" ) );
 }
 
 // ------------------------------------------------------------------
@@ -257,7 +257,7 @@ void showSettingsDialog( QWidget *parent )
     edtClsModel->setText(  QStringLiteral( "pct_cls_v2" ) );
     edtPctSuffix->setText( QStringLiteral( "_v2_neighbor" ) );
     edtRegPrefix->setText( QStringLiteral( "pointnext_reg_" ) );
-    edtRegSuffix->setText( QStringLiteral( "_aux" ) );
+    edtRegSuffix->setText( QStringLiteral( "_v2" ) );
   } );
 
   auto *btnBox = new QHBoxLayout;
