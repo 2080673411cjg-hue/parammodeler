@@ -505,12 +505,13 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
 void PointNetRunner::applyToUI( ParamModelerDock *dock,
                                  const QMap<QString, double> &params )
 {
-    auto set = [&]( const QString &key, QDoubleSpinBox *spin, QSlider *slider ) {
+    // Slider 由 bindSliderSpin 双向绑定自动同步，无需手动设置
+    // （否则 multiplier≠100 的参数如 tgAngle 会被错误覆盖）
+    auto set = [&]( const QString &key, QDoubleSpinBox *spin, QSlider * /*slider*/ ) {
         if ( params.contains( key ) )
         {
             double v = params[key];
             if ( spin ) spin->setValue( v );
-            if ( slider ) slider->setValue( static_cast<int>( v * 100 ) );
         }
     };
 
@@ -526,9 +527,7 @@ void PointNetRunner::applyToUI( ParamModelerDock *dock,
         const double totalH = std::max( 0.0, wallH + roofH );
         const double wallRatio = totalH > 1e-6 ? std::max( 0.2, std::min( 0.9, wallH / totalH ) ) : 0.7;
         if ( totalSpin ) totalSpin->setValue( totalH );
-        if ( totalSlider ) totalSlider->setValue( static_cast<int>( totalH * 100 ) );
         if ( ratioSpin ) ratioSpin->setValue( wallRatio );
-        if ( ratioSlider ) ratioSlider->setValue( static_cast<int>( wallRatio * 100 ) );
     };
 
     auto setTotalAndCylinderRatio = [&]( const QString &cylKey, const QString &upperKey,
@@ -543,9 +542,7 @@ void PointNetRunner::applyToUI( ParamModelerDock *dock,
         const double totalH = std::max( 0.0, cylH + upperH );
         const double cylRatio = totalH > 1e-6 ? std::max( 0.2, std::min( 0.9, cylH / totalH ) ) : 0.7;
         if ( totalSpin ) totalSpin->setValue( totalH );
-        if ( totalSlider ) totalSlider->setValue( static_cast<int>( totalH * 100 ) );
         if ( ratioSpin ) ratioSpin->setValue( cylRatio );
-        if ( ratioSlider ) ratioSlider->setValue( static_cast<int>( cylRatio * 100 ) );
     };
 
     set( "length",     dock->ui->spinBoxCLength,     dock->ui->sliderCLength );
@@ -588,14 +585,12 @@ void PointNetRunner::applyToUI( ParamModelerDock *dock,
         const double movable = std::max( 0.0, dock->ui->spinBoxICLength->value() - dock->ui->spinBoxICInnerLength->value() );
         const double ratio = movable > 1e-6 ? std::max( 0.0, std::min( 1.0, params["icOffsetX"] / movable ) ) : 0.0;
         dock->ui->spinBoxICOffsetX->setValue( ratio );
-        dock->ui->sliderICOffsetX->setValue( static_cast<int>( ratio * 100 ) );
     }
     if ( params.contains( "icOffsetY" ) )
     {
         const double movable = std::max( 0.0, dock->ui->spinBoxICWidth->value() - dock->ui->spinBoxICInnerWidth->value() );
         const double ratio = movable > 1e-6 ? std::max( 0.0, std::min( 1.0, params["icOffsetY"] / movable ) ) : 0.0;
         dock->ui->spinBoxICOffsetY->setValue( ratio );
-        dock->ui->sliderICOffsetY->setValue( static_cast<int>( ratio * 100 ) );
     }
     set( "aghLength",       dock->ui->spinBoxAGHLength,       dock->ui->sliderAGHLength );
     set( "aghWidth",       dock->ui->spinBoxAGHWidth,       dock->ui->sliderAGHWidth );

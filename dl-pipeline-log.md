@@ -1,11 +1,11 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-08-05  
-> 插件版本: **v2.3.1**（模型路径统一 v2 + PCT 超参修复 + 数据集追加模式）  
+> 最后更新: 2026-08-06  
+> 插件版本: **v2.3.2**（TwoGable 回归增强 + 角度映射修复 + 3D 场景清除）  
 > 当前模型: **PCT**（Point Cloud Transformer）— Li & Shan 2025 风格 offset-attention  
 > 分类模型: `pct_cls_v2` — 98.92% F1，8/14 类满分  
 > 回归模型: 13 类（TriPrismPyramid 无需回归），`pct_reg_*_v2` (basic) + `pct_reg_*_v2_neighbor` (neighbor)，混合部署  
-> 数据集: **500 样本/类**（train 400 + val 50 + test 50），TwoGableHouses **1000 样本**（已增强孔洞+噪声+离群点），14 类共 7500 样本  
+> 数据集: **500 样本/类**（train 400 + val 50 + test 50），TwoGableHouses **1000 样本**（仅扩充数据量，无额外增强），14 类共 7500 样本  
 > 后端: PCT（PointNeXt 保留但不再使用）
 
 ---
@@ -419,11 +419,11 @@ PointNeXt 时代的主混淆（Cuboid↔Cylinder↔IndentedCuboid）**全部消�
 | 可用 (avg R²>0.6) | 部分可用 (0.3-0.6) | 🔴 困难 (<0.3) |
 |---|---|---|
 | Cylinder (0.989) | PyramidRoof (0.625) | **IndentedCuboid** (0.316) |
-| ConeCylinder (0.953) | CylinderDome (0.584) | **TwoGableHouses** (0.090) |
+| ConeCylinder (0.953) | CylinderDome (0.584) | |
 | HalfCylinderRoof (0.844) | AsymmetricGableHouse (0.468) | |
 | Cuboid (0.778) | TruncatedPyramid (0.415) | |
 | GabledRoof (0.739) | FourStageRoundTower (0.414) | |
-| | LHouse (0.414) | |
+| **TwoGableHouses (0.811)** | LHouse (0.414) | |
 
 ### 🔴 历史灾难参数 — PCT vs PointNeXt
 
@@ -437,15 +437,15 @@ PointNeXt 时代的主混淆（Cuboid↔Cylinder↔IndentedCuboid）**全部消�
 
 ### 🔴 问题诊断
 
-**TwoGableHouses 和 IndentedCuboid 过拟合**：
+**IndentedCuboid 过拟合**：
 
 | 类 | train loss | val loss | test loss | 诊断 |
 |----|:---:|:---:|:---:|---|
-| TwoGableHouses (neighbor) | 0.125 | 2.046 | 2.446 | 严重过拟合 |
+| TwoGableHouses (neighbor) | — | — | — | ✅ **已解决**：扩量至 1000 样本，R² 0.090→0.811 |
 | IndentedCuboid (neighbor) | 0.149 | 1.604 | 1.995 | 严重过拟合 |
 | FourStageRoundTower (neighbor) | 0.130 | 0.236 | 0.293 | 正常 |
 
-根因：500 样本不足以支撑 7-8 个参数的回归。PCT 参数仅 1.5M，本身泛化能力有限。
+根因：500 样本不足以支撑 7-8 个参数的回归。TwoGable 扩量 1000 后已解决，IndentedCuboid 待扩量。
 
 **bulge 参数（CylinderDome）** R² 三个模型（PointNeXt、PCT basic、PCT neighbor）都在 0 附近 —— 不是架构问题，而是 2048 个 XYZ 坐标点缺乏曲率信息。需要法向量通道。
 
@@ -621,3 +621,24 @@ python main_reg.py --mode train \
 - PCT 分类 98.92% F1
 - PCT 回归 neighbor + basic 混合部署
 - 3D 预览消失修复 + 底面颜色修复
+
+### v2.3.2 (2026-08-06) — TwoGable 回归增强 + 角度映射修复 + 3D 场景清除
+
+**TwoGableHouses 回归模型重新训练**
+- 仅扩充数据量至 1000 样本（train 800 + val 100 + test 100），无额外增强（不删侧面、不加孔洞/噪声）
+- 仅重新训练参数回归（分类模型不变）
+- 结果：`pct_reg_twogable_v2_neighbor` MAE 3.15→1.70（-46%），R² 0.41→0.81，从「困难」升入「可用」档
+- 数据量翻倍有效解决了 500 样本→7 参数回归的过拟合问题
+- 其他 12 类回归模型不变（两次训练间仅有随机波动）
+
+**角度映射 Bug 修复**
+- **根因**：`applyToUI()` 硬编码 `slider->setValue(v * 100)`，但 `spinBoxTGAngle` 的 slider 通过 `bindSliderSpin` 用了 multiplier=10（因为角度范围 135-180°）
+- **Bug 链路**：预测角度 139.40 → slider 获值 13940 → clamp 到上限 1800 → 双向绑定回写 `1800/10=180.0` 覆盖 spinBox
+- **修复**：`parammodeler_pointnet.cpp` — `applyToUI()` 中移除所有手动 `slider->setValue()` 调用。`bindSliderSpin` 的双向绑定会在 spinBox 值变更时自动用正确 multiplier 同步 slider
+- 影响范围：`set` lambda + `setTotalAndWallRatio` lambda + `setTotalAndCylinderRatio` lambda + IC offset 两处
+
+**3D 场景清除功能**
+- `menuLoad3D` 菜单新增 "Clear 3D scene" 选项（`actClear3D`）
+- 实现 `ParamModelerScene3D::clearAll3DEntities()`：清除 Qt3D 实时预览实体 + legacy 模型图层
+- dock 端直接通过 `m_pointCloudLayer` 指针清除点云：先清 3D Map Settings layers，再从 QgsProject 删除，确保 3D 场景正确刷新
+- dock.h 新增 `QgsMapLayer *m_pointCloudLayer` 缓存已加载的点云图层指针

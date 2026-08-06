@@ -1180,6 +1180,17 @@ void ParamModelerScene3D::clearRealtimePreviewMesh( QgisInterface *iface )
   removeLayerByName( REALTIME_ANCHOR_LAYER_NAME );
 }
 
+void ParamModelerScene3D::clearAll3DEntities( QgisInterface *iface )
+{
+  // 清除 Qt3D 实时预览实体 + anchor 图层
+  clearRealtimePreviewMesh( iface );
+
+  // 清除 legacy 模型图层
+  removeLayerByName( QStringLiteral( "ParamModeler_Model" ) );
+  removeLayerByName( QStringLiteral( "ParamModeler_Model_Roof" ) );
+  removeLayerByName( QStringLiteral( "ParamModeler_Model_Edges" ) );
+}
+
 QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
                                                           const QString &filePath,
                                                           const QString &layerName,

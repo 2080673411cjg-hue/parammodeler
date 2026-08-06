@@ -35,7 +35,8 @@ class QPushButton;
 class QJsonArray;
 
 class QgisInterface;
-class QgsVectorLayer; 
+class QgsMapLayer;
+class QgsVectorLayer;
 class QMenu;                    // ← 新增这一行（推荐显式包含）
 
 namespace Ui {
@@ -192,6 +193,7 @@ private:
   bool             m_previewUpdateInProgress = false;
 		
   QgsVectorLayer *m_modelLayer = nullptr;//新增一个成员变量，缓存图层指针
+  QgsMapLayer    *m_pointCloudLayer = nullptr;    // 缓存外部点云图层，用于清除
 		bool            m_isUpdating = false; 
 			QString         m_lastGpkgPath;             // 上一次临时 GPKG 文件路径，用于清理
   bool m_realtimeModelLoaded = false;

@@ -72,6 +72,8 @@
        </property>
        <addaction name="actTo3D"/>
        <addaction name="actLoadPC"/>
+       <addaction name="separator"/>
+       <addaction name="actClear3D"/>
       </widget>
       <action name="actOBJ">
        <property name="text">
@@ -121,6 +123,11 @@
       <action name="actLoadPC">
        <property name="text">
          <string>Load external point cloud to QGIS 3D scene</string>
+       </property>
+      </action>
+      <action name="actClear3D">
+       <property name="text">
+         <string>Clear 3D scene</string>
        </property>
       </action>
       <addaction name="menuExport"/>
@@ -1315,7 +1322,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelCylHemiRadius">
                   <property name="text">
-                   <string>Outer length:</string>
+                   <string>Radius:</string>
                   </property>
                  </widget>
                 </item>
@@ -1340,7 +1347,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelCylHemiHeight">
                   <property name="text">
-                   <string>Outer height:</string>
+                   <string>Total height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1365,7 +1372,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelCylHemiDomeHeight">
                   <property name="text">
-                   <string>Inner length:</string>
+                   <string>Cylinder ratio:</string>
                   </property>
                  </widget>
                 </item>
@@ -1390,7 +1397,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelCylHemiBulge">
                   <property name="text">
-                   <string>Inner width:</string>
+                   <string>Bulge:</string>
                   </property>
                  </widget>
                 </item>
@@ -1425,7 +1432,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelICLength">
                   <property name="text">
-                   <string>Inner length:</string>
+                   <string>Outer length:</string>
                   </property>
                  </widget>
                 </item>
@@ -1450,7 +1457,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelICWidth">
                   <property name="text">
-                   <string>Inner width:</string>
+                   <string>Outer width:</string>
                   </property>
                  </widget>
                 </item>
@@ -1475,7 +1482,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelICHeight">
                   <property name="text">
-                   <string>Inner height:</string>
+                   <string>Outer height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1500,7 +1507,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelICInnerLength">
                   <property name="text">
-                   <string>Offset X ratio:</string>
+                   <string>Inner length:</string>
                   </property>
                  </widget>
                 </item>
@@ -1525,7 +1532,7 @@
                 <item row="4" column="0">
                  <widget class="QLabel" name="labelICInnerWidth">
                   <property name="text">
-                   <string>Inner height:</string>
+                   <string>Inner width:</string>
                   </property>
                  </widget>
                 </item>
@@ -1550,7 +1557,7 @@
                 <item row="5" column="0">
                  <widget class="QLabel" name="labelICInnerHeight">
                   <property name="text">
-                   <string>Offset Y ratio:</string>
+                   <string>Inner height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1807,7 +1814,7 @@
                 <item row="0" column="0">
                  <widget class="QLabel" name="labelFTBaseRadius">
                   <property name="text">
-                   <string>Radius:</string>
+                   <string>Base radius:</string>
                   </property>
                  </widget>
                 </item>
@@ -1832,7 +1839,7 @@
                 <item row="1" column="0">
                  <widget class="QLabel" name="labelFTBaseHeight">
                   <property name="text">
-                   <string>Total height:</string>
+                   <string>Base height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1857,7 +1864,7 @@
                 <item row="2" column="0">
                  <widget class="QLabel" name="labelFTMiddleHeight">
                   <property name="text">
-                   <string>Cylinder ratio:</string>
+                   <string>Middle height:</string>
                   </property>
                  </widget>
                 </item>
@@ -1882,7 +1889,7 @@
                 <item row="3" column="0">
                  <widget class="QLabel" name="labelFTMiddleTopRadius">
                   <property name="text">
-                   <string>Dome height:</string>
+                   <string>Middle top radius:</string>
                   </property>
                  </widget>
                 </item>
@@ -1907,7 +1914,7 @@
                 <item row="4" column="0">
                  <widget class="QLabel" name="labelFTMiddleBulge">
                   <property name="text">
-                   <string>Bulge:</string>
+                   <string>Middle bulge:</string>
                   </property>
                  </widget>
                 </item>

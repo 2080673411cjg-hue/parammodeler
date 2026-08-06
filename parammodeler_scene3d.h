@@ -47,6 +47,8 @@ public:
 
   static void clearRealtimePreviewMesh( QgisInterface *iface );
 
+  static void clearAll3DEntities( QgisInterface *iface );
+
   static QgsMapLayer *loadExternalPointCloud( QgisInterface *iface,
                                               const QString &filePath,
                                               const QString &layerName,

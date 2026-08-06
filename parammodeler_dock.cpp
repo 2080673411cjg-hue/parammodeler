@@ -65,6 +65,7 @@
 #include <QProgressBar>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QPainter>
 #include <QHeaderView>
 #include <QAbstractItemView>
 #include <QAbstractSpinBox>
@@ -111,6 +112,59 @@
 #include "parammodeler_config.h"
 #include <windows.h>
 #define DEBUG_LOG( msg ) OutputDebugStringW( msg )
+
+// ============================================================
+// 分组分隔线：绘制 "———— Roof ————" 风格的虚线分隔标题
+// 左右虚线延伸到边缘，文字居中，背后有背景色"断线"留白
+// ============================================================
+class SectionDivider : public QWidget
+{
+public:
+    explicit SectionDivider( const QString &text, QWidget *parent = nullptr )
+        : QWidget( parent ), m_text( text )
+    {
+        setFixedHeight( 22 );
+        setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
+    }
+
+protected:
+    void paintEvent( QPaintEvent * ) override
+    {
+        QPainter p( this );
+        p.setRenderHint( QPainter::Antialiasing, true );
+
+        QFont f = font();
+        f.setBold( true );
+        f.setPixelSize( 11 );
+        p.setFont( f );
+        QFontMetrics fm( f );
+
+        const int textW = fm.horizontalAdvance( m_text );
+        const int pad   = 12;                                // 文字两侧留白
+        const int gapW  = textW + pad * 2;                   // 断线总宽度
+        const int y     = height() / 2;
+
+        // 虚线（全宽），文字区域会被背景覆盖形成"断线"效果
+        QPen linePen( QColor( 0xaa, 0xaa, 0xaa ), 1, Qt::DashLine );
+        p.setPen( linePen );
+        p.drawLine( 0, y, width(), y );
+
+        // 用背景色擦除文字背后的线段
+        QColor bg = palette().window().color();
+        p.setPen( Qt::NoPen );
+        p.setBrush( bg );
+        const double left = ( width() - gapW ) / 2.0;
+        p.drawRect( QRectF( left, y - fm.height() / 2.0, gapW, fm.height() ) );
+
+        // 文字
+        p.setPen( QColor( 0x88, 0x88, 0x88 ) );
+        p.setBrush( Qt::NoBrush );
+        p.drawText( QRectF( 0, 0, width(), height() ), Qt::AlignCenter, m_text );
+    }
+
+private:
+    QString m_text;
+};
 
 // ============================================================
 // 微调辅助：Ctrl+滚轮 = 10x 精调（步长缩小为 1/10）
@@ -260,19 +314,17 @@ ParamModelerDock::~ParamModelerDock()
 // ======================= init helpers =======================
 
 // ============================================================
-// 参数分组：在复杂基元（4+ 参数）的 QFormLayout 中插入加粗分隔标题
-// 不改动 .ui 文件、不移动现有 widget，仅在指定行插入 QLabel 标题行
+// 参数分组：在复杂基元（4+ 参数）的 QFormLayout 中插入 "———— Title ————" 分隔线
+// 使用自定义 SectionDivider widget，绘制全宽虚线 + 居中加粗文字
+// QFormLayout::insertRow(widget) 使用 SpanningRole 占满两列，
+// 但 SectionDivider 固定高度 22px，不影响其他行的双列宽度计算
 // ============================================================
 static void insertSectionHeader( QFormLayout *form, int row, const QString &title )
 {
     if ( !form || row < 0 || row > form->rowCount() )
         return;
-    auto *label = new QLabel( title );
-    label->setStyleSheet( QStringLiteral(
-        "font-weight: bold; color: #555;"
-        "padding-top: 6px; margin-bottom: 1px;"
-    ) );
-    form->insertRow( row, label );  // QLabel 跨两列，作为分组标题
+    auto *divider = new SectionDivider( title );
+    form->insertRow( row, divider );
 }
 
 static void applyParameterGroups( Ui::ParamModelerDock *ui )
@@ -283,59 +335,74 @@ static void applyParameterGroups( Ui::ParamModelerDock *ui )
 
     // 插入顺序：从底部到顶部（避免索引偏移）
 
-    // GabledRoof (4 rows): L,W → Roof(2)
+    // GabledRoof (4 rows): Body(L,W) → Roof(Total height, Wall ratio)
     if ( QFormLayout *f = fmt( ui->pageGabledRoof ) )
-        insertSectionHeader( f, 2, ParamModelerDock::tr( "Roof" ) );
+    {
+        insertSectionHeader( f, 2, ParamModelerDock::tr( "Roof / Height" ) );
+        insertSectionHeader( f, 0, ParamModelerDock::tr( "Body" ) );
+    }
 
-    // PyramidRoof (4 rows): L,W → Roof(2)
+    // PyramidRoof (4 rows): Body(L,W) → Roof(Total height, Wall ratio)
     if ( QFormLayout *f = fmt( ui->pagePyramidRoof ) )
-        insertSectionHeader( f, 2, ParamModelerDock::tr( "Roof" ) );
+    {
+        insertSectionHeader( f, 2, ParamModelerDock::tr( "Roof / Height" ) );
+        insertSectionHeader( f, 0, ParamModelerDock::tr( "Body" ) );
+    }
 
-    // CylinderDome (4 rows): R,H,ratio → Dome(3)
+    // CylinderDome (4 rows): Cylinder(R, Total H, Cyl ratio) → Dome(Bulge)
     if ( QFormLayout *f = fmt( ui->pageCylinderHemisphere ) )
+    {
         insertSectionHeader( f, 3, ParamModelerDock::tr( "Dome" ) );
+        insertSectionHeader( f, 0, ParamModelerDock::tr( "Cylinder" ) );
+    }
 
-    // TriPrismPyramid (4 rows): leg,base → Height(2)
+    // TriPrismPyramid (4 rows): Prism(Leg, Base) → Pyramid(Total H, Pyramid ratio)
     if ( QFormLayout *f = fmt( ui->pageTriPrismPyramid ) )
-        insertSectionHeader( f, 2, ParamModelerDock::tr( "Height" ) );
+    {
+        insertSectionHeader( f, 2, ParamModelerDock::tr( "Pyramid" ) );
+        insertSectionHeader( f, 0, ParamModelerDock::tr( "Prism" ) );
+    }
 
-    // LHouse (5 rows): L,W,H → Wing(2)
-    if ( QFormLayout *f = fmt( ui->pageLHouse ) )
-        insertSectionHeader( f, 2, ParamModelerDock::tr( "Wing" ) );
+    // LHouse (5 rows)：不插分组标题，因为 Height 横跨 Body/Wing 两组语义
 
-    // TruncatedPyramidRoof (6 rows): BottomL,BottomW → TopL,TopW(2) → Height(4)
+    // TruncatedPyramidRoof (6 rows): BottomL,BottomW → TopL,TopW → Height
     if ( QFormLayout *f = fmt( ui->pageTPRoof ) )
     {
         insertSectionHeader( f, 4, ParamModelerDock::tr( "Height" ) );
         insertSectionHeader( f, 2, ParamModelerDock::tr( "Top" ) );
+        insertSectionHeader( f, 0, ParamModelerDock::tr( "Bottom" ) );
     }
 
-    // AsymmetricGableHouse (6 rows): L,W → Roof(2) → Ridge(4)
+    // AsymmetricGableHouse (6 rows): Body(L,W) → Roof(Total H, Wall ratio) → Ridge
     if ( QFormLayout *f = fmt( ui->pageAsymmetricGableHouse ) )
     {
         insertSectionHeader( f, 4, ParamModelerDock::tr( "Ridge" ) );
         insertSectionHeader( f, 2, ParamModelerDock::tr( "Roof" ) );
+        insertSectionHeader( f, 0, ParamModelerDock::tr( "Body" ) );
     }
 
-    // FourStageRoundTower (6 rows): BaseR,BaseH → Middle(2) → Top(5)
+    // FourStageRoundTower (6 rows): Base(R,H) → Middle → Top
     if ( QFormLayout *f = fmt( ui->pageFourStageRoundTower ) )
     {
         insertSectionHeader( f, 5, ParamModelerDock::tr( "Top" ) );
         insertSectionHeader( f, 2, ParamModelerDock::tr( "Middle" ) );
+        insertSectionHeader( f, 0, ParamModelerDock::tr( "Base" ) );
     }
 
-    // TwoGableHouses (7 rows): L1,L2,W → Roof(3) → Orientation(5)
+    // TwoGableHouses (7 rows): Body(L1,L2,W) → Roof → Orientation
     if ( QFormLayout *f = fmt( ui->pageTwoGableHouses ) )
     {
         insertSectionHeader( f, 5, ParamModelerDock::tr( "Orientation" ) );
         insertSectionHeader( f, 3, ParamModelerDock::tr( "Roof" ) );
+        insertSectionHeader( f, 0, ParamModelerDock::tr( "Body" ) );
     }
 
-    // IndentedCuboid (8 rows): OuterL,OuterW,OuterH → Inner(3) → Offset(6)
+    // IndentedCuboid (8 rows): Outer(L,W,H) → Inner → Offset
     if ( QFormLayout *f = fmt( ui->pageIndentedCuboid ) )
     {
         insertSectionHeader( f, 6, ParamModelerDock::tr( "Offset" ) );
         insertSectionHeader( f, 3, ParamModelerDock::tr( "Inner" ) );
+        insertSectionHeader( f, 0, ParamModelerDock::tr( "Outer" ) );
     }
 }
 
@@ -348,8 +415,8 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderCylHeight, ui->spinBoxCylHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderLTotalLength, ui->spinBoxLTotalLength, 100.0, 50.0 );
   bindSliderSpin( ui->sliderLTotalWidth, ui->spinBoxLTotalWidth, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderLWingRatio, ui->spinBoxLWingRatio, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderLWingWidthRatio, ui->spinBoxLWingWidthRatio, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderLWingRatio, ui->spinBoxLWingRatio, 100.0, 0.9, 0.2 );
+  bindSliderSpin( ui->sliderLWingWidthRatio, ui->spinBoxLWingWidthRatio, 100.0, 0.9, 0.2 );
   bindSliderSpin( ui->sliderLHeight, ui->spinBoxLHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderConeCylRadius, ui->spinBoxConeCylRadius, 100.0, 50.0 );
   bindSliderSpin( ui->sliderConeCylCylHeight, ui->spinBoxConeCylCylHeight, 100.0, 50.0 );
@@ -491,7 +558,7 @@ void ParamModelerDock::initUiControls()
   ui->labelTPPRatio->setText( tr( "Pyramid ratio:" ) );
 
   // ---- 参数分组标题：在复杂基元（4+ 参数）的 QFormLayout 中插入加粗分隔线 ----
-  applyParameterGroups();
+  applyParameterGroups( ui );
 }
 
 void ParamModelerDock::initConnections()
@@ -512,6 +579,44 @@ void ParamModelerDock::initConnections()
   connect( ui->actMesh, &QAction::triggered, this, &ParamModelerDock::onExportMeshClicked );
   connect( ui->actTo3D, &QAction::triggered, this, [this]() { onLoadToQGIS3D( true ); } );
   connect( ui->actLoadPC, &QAction::triggered, this, &ParamModelerDock::onLoadExternalPointCloud );
+  connect( ui->actClear3D, &QAction::triggered, this, [this]() {
+    // 1. 先清理 3D 场景的 settings layers（在删除 QgsProject 之前做）
+    const QList<Qgs3DMapCanvas *> canvases = mIface->mapCanvases3D();
+    for ( Qgs3DMapCanvas *canvas : canvases )
+    {
+      if ( !canvas ) continue;
+      Qgs3DMapSettings *s = canvas->mapSettings();
+      if ( !s ) continue;
+      QList<QgsMapLayer *> layers = s->layers();
+      // 移除所有插件相关的图层
+      layers.erase(
+        std::remove_if( layers.begin(), layers.end(),
+                        []( QgsMapLayer *l ) {
+                          if ( !l ) return true;
+                          const QString name = l->name();
+                          return name == QStringLiteral( "ParamModeler_Model" )
+                              || name == QStringLiteral( "ParamModeler_Model_Roof" )
+                              || name == QStringLiteral( "ParamModeler_Model_Edges" )
+                              || name == QStringLiteral( "ParamModeler_3D_Anchor" )
+                              || name.startsWith( QStringLiteral( "External point cloud - " ) );
+                        } ),
+        layers.end() );
+      s->setLayers( layers );
+    }
+
+    // 2. 清除 Qt3D 预览实体 + 从 QgsProject 移除图层
+    ParamModelerScene3D::clearAll3DEntities( mIface );
+
+    // 3. 确保点云图层彻底删除
+    if ( m_pointCloudLayer )
+    {
+      QgsProject::instance()->removeMapLayer( m_pointCloudLayer->id() );
+      m_pointCloudLayer = nullptr;
+    }
+
+    m_realtimeModelLoaded = false;
+    m_modelLayer = nullptr;
+  } );
 
   auto schedulePreview = [this]( int ) { schedulePreviewUpdate(); };
   auto schedulePreviewD = [this]( double ) { schedulePreviewUpdate(); };
@@ -1425,6 +1530,8 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
       QMessageBox::warning( this, tr( "Load failed" ), errorMessage );
     return false;
   }
+
+  m_pointCloudLayer = loadedLayer;
 
   if ( showMessage )
     QMessageBox::information( this, tr( "Load succeeded" ), tr( "Point cloud loaded successfully.\nLayer: %1\n\nYou can view and adjust it in the 3D scene." ).arg( layerName ) );
