@@ -1,6 +1,6 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-08-06  
+> 最后更新: 2026-08-30  
 > 插件版本: **v2.3.2**（TwoGable 回归增强 + 角度映射修复 + 3D 场景清除）  
 > 当前模型: **PCT**（Point Cloud Transformer）— Li & Shan 2025 风格 offset-attention  
 > 分类模型: `pct_cls_v2` — 98.92% F1，8/14 类满分  
@@ -313,6 +313,22 @@ setPoseTranslate(tx, ty, tz)
 
 注意：**只对齐平移，不处理旋转**。因为模型不预测 rz，模型朝向保持默认。
 v2.2.0 坐标系居中后 modelCenter X/Y ≈ 0，tx/ty 直接等于点云中心的 X/Y。
+
+### 点云显示反归一化（尺度还原）— 解决"点云很小 / 缩不上去"
+
+**问题现象**：加载点云到 QGIS 3D 后点云极小；放大到一定程度就上不去了。
+
+**根因**：DL 导出把点云归一化成单位球（`normalizeForDL`：中心化 + 最大半径归一化），坐标变成直径约 1~2 的无量纲尺度，而模型 mesh 是米级（十几米）。早期显示路径直接把归一化坐标渲染，没还原尺度 → 点云显得极小。
+"缩不上去"是连带效应：3D 视图 extent 从点云 bbox 推（`padded3DViewExtent` / `setExtent` / `setViewFrom2DExtent`），云越小 extent 越小、相机近裁剪面越近，缩放空间被卡死。
+
+**解决（反归一化链路，两个 commit）**：
+
+| commit | 内容 |
+|--------|------|
+| `441b726` (2026-07-01) | 引入反归一化：`pointCloudLooksNormalizedForDisplay()` 判断是否归一化（bbox 最大边 ≤3.5 或最大半径 ≤1.5）→ `metadataPointCloudInfoForInput()` 取原始 center/scale（JSON `pointCloudInfo.center/scale` → PLY `denorm_center/denorm_scale` 注释 → 兜底自算）→ `restored = p*scale + center` 还原后写临时文件再显示 |
+| `7d30106` (2026-07-24, v2.1.2) | 补坏元数据兜底：`metadataLooksBuggy`（scale<2 且 center≈0）检测旧导出的坏记录；坏时改用当前模型 mesh 估算 center/scale（mesh bbox 中心 + 尺寸×0.8） |
+
+关键函数：`loadPointCloudToQGIS3D`（dock.cpp:1438）、`metadataPointCloudInfoForInput`（dlutils.cpp:500）、`pointCloudLooksNormalizedForDisplay`（dlutils.cpp:398）、`denormInfoFromPlyComment`（dlutils.cpp:420）。
 
 ---
 
