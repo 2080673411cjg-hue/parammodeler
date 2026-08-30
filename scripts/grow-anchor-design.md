@@ -1,7 +1,7 @@
 # 参数生长锚点设计讨论（中心 vs 左下角）
 
-> 状态：**讨论中，未定案**
-> 日期：2026-08-24
+> 状态：**已定案（2026-08-30，方案 B 直做；尚未实施）**
+> 日期：2026-08-24 起讨论，2026-08-30 定案
 > 归属：ParamModeler 插件微调体验优化
 
 ---
@@ -44,8 +44,10 @@
 ## 4. 适用类划分（若做 B）
 
 - **圆形类保持中心**（无角）：Cylinder / ConeCylinder / CylinderDome / FourStageRoundTower
-- **适合角锚的矩形类（约 7 个）**：Cuboid / GabledRoof / PyramidRoof / TruncatedPyramidRoof / IndentedCuboid / AsymmetricGableHouse / HalfCylinderRoof
-- **不适合（角是空的 / 非矩形）**：TwoGableHouses（双 gable 夹角）/ LHouse（L 形缺角）/ TriPrismPyramid（三角底面）
+- **适合角锚的矩形类（8 个）**：Cuboid / GabledRoof / PyramidRoof / TruncatedPyramidRoof / IndentedCuboid / AsymmetricGableHouse / HalfCylinderRoof / LHouse
+  - LHouse 左下角 (0,0) 是**实角**：主体 [0,Aw]×[0,Ad]，翼部 [Aw,Aw+Bw]×[0,Bd]，缺口在**右上** [Aw,Aw+Bw]×[Bd,Ad]，不影响左下角锚点（已核实 buildmesh.cpp buildLHouse）。
+- **待定**：TwoGableHouses（双 gable 夹角，底面是非矩形凹多边形，中心 or 左下角未拍板）
+- **排除**：TriPrismPyramid（不参与分类 / 参数估计）
 
 ## 5. 落地改动点（方案 B，已探明）
 
@@ -57,9 +59,7 @@
 
 > 注意：auto-align 改动会同时影响两条路径 —— DL 回归后的自动对齐（`onInverseParams`）和手动加载点云的路径，动手前需一起过一遍。
 
-## 6. 待决策项（下次讨论起点）
+## 6. 决策（2026-08-30 已定）
 
-> **推理点云是合成（干净）还是真实扫描（噪声/遮挡）？**
->
-> - 合成为主 → 方案 B 直接落地（auto-align 用包围盒 min 角对齐）
-> - 真实扫描为主 → 加"锚点可切换"开关（中心/左下角），默认中心
+> 推理点云**基本是合成（干净）数据** → 方案 B 直接落地，**不加可切换开关**。
+> 最终划分见第 4 节；TwoGableHouses 锚点待定。
