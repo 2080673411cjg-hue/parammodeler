@@ -489,6 +489,12 @@ QString metadataRelativePathForPointCloud( const QString &filePath )
   if ( rel.isEmpty() && datasetIdx >= 0 )
     rel = normalized.mid( datasetIdx + datasetMarker.size() );
 
+  // 原始导出目录 datasets/（未增强）同样需要反归一化，否则加载后点云停留在归一化尺度、显示为极小的一团
+  const QString rawMarker = QStringLiteral( "/datasets/" );
+  const int rawIdx = lower.indexOf( rawMarker );
+  if ( rel.isEmpty() && rawIdx >= 0 )
+    rel = normalized.mid( rawIdx + rawMarker.size() );
+
   if ( rel.isEmpty() || rel.startsWith( QStringLiteral( "metadata/" ), Qt::CaseInsensitive ) )
     return QString();
 
