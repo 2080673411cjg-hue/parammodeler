@@ -124,14 +124,10 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
   if ( !stemNames.contains( prim ) )
     return { modelName, prim, script, QString() };
 
-  // PCT per-class variant selection: neighbor wins 10/13 classes,
-  // basic wins on CylinderDome, HalfCylinderRoof, LHouse
-  static const QMap<QString, QString> pctBestSuffix = {
-    { QStringLiteral( "CylinderDome" ),       QStringLiteral( "_v2" ) },
-    { QStringLiteral( "HalfCylinderRoof" ),   QStringLiteral( "_v2" ) },
-    { QStringLiteral( "LHouse" ),             QStringLiteral( "_v2" ) }
-  };
-  // Default variant from config; per-class overrides below for the 3 classes where basic wins
+  // PCT variant: v3_normals (basic + PCA normals) is the single production
+  // variant for all 13 classes (2026-09).  No per-class override needed; the
+  // suffix comes from config.  Re-add a pctBestSuffix map here if a future run
+  // favours a different variant per class.
 
   const QString prefix = isPCT
     ? QStringLiteral( "pct_reg_" )
@@ -139,7 +135,7 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
     ? ParamModelerConfig::regressionModelPrefix()
     : QStringLiteral( "reg_" );
   const QString suffix = isPCT
-    ? pctBestSuffix.value( prim, ParamModelerConfig::pctRegressionSuffix() )
+    ? ParamModelerConfig::pctRegressionSuffix()
     : usePointNeXt
     ? ParamModelerConfig::regressionModelSuffix()
     : QStringLiteral( "_v2" );

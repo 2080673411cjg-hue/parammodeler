@@ -29,7 +29,7 @@ namespace ParamModelerConfig
   QString classifyModelName();          // e.g.  pct_cls_v2
   QString regressionModelPrefix();      // e.g.  pointnext_reg_  (PointNeXt legacy)
   QString regressionModelSuffix();      // e.g.  _v2              (PointNeXt legacy)
-  QString pctRegressionSuffix();        // e.g.  _v2_neighbor     (PCT default variant)
+  QString pctRegressionSuffix();        // e.g.  _v3_normals      (PCT default variant)
 
   // ---- derived paths (built from the base paths + model selectors) ----
 

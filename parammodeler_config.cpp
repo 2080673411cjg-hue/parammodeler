@@ -89,7 +89,7 @@ QString regressionModelSuffix()
 QString pctRegressionSuffix()
 {
   return setting( QStringLiteral( "parammodeler/pctRegressionSuffix" ),
-                  QStringLiteral( "_v2_neighbor" ) );
+                  QStringLiteral( "_v3_normals" ) );
 }
 
 // ------------------------------------------------------------------
@@ -230,7 +230,7 @@ void showSettingsDialog( QWidget *parent )
   {
     form->addRow( QStringLiteral( "PCT 回归默认后缀:" ), edtPctSuffix );
     auto *pctHint = new QLabel(
-      QStringLiteral( "  默认 _v2_neighbor (10/13 类最优)。CylinderDome/HalfCylinder/LHouse 自动用 _v2。" ), &dlg );
+      QStringLiteral( "  默认 _v3_normals (basic + PCA 法向量，13 类统一)。" ), &dlg );
     pctHint->setStyleSheet( QStringLiteral( "color: #888; font-size: 11px;" ) );
     form->addRow( QString(), pctHint );
   }
@@ -255,7 +255,7 @@ void showSettingsDialog( QWidget *parent )
     edtBase->setText(      QStringLiteral( "E:/pointnet" ) );
     edtDataset->setText(   QStringLiteral( "E:/pointnet/datasets_aug" ) );
     edtClsModel->setText(  QStringLiteral( "pct_cls_v2" ) );
-    edtPctSuffix->setText( QStringLiteral( "_v2_neighbor" ) );
+    edtPctSuffix->setText( QStringLiteral( "_v3_normals" ) );
     edtRegPrefix->setText( QStringLiteral( "pointnext_reg_" ) );
     edtRegSuffix->setText( QStringLiteral( "_v2" ) );
   } );

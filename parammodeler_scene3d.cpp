@@ -1272,6 +1272,27 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
     return nullptr;
   }
 
+  // 在从 QgsProject 删除旧 layer 之前，先从所有 3D 画布移除旧的外部点云 layer。
+  // 否则删除后 Qgs3DMapSettings::layers() 里会残留悬空指针，第二次加载时
+  // 遍历 `l->name()` 会访问已释放内存导致崩溃（0xC0000005）。
+  const QList<Qgs3DMapCanvas *> canvasesBeforeRemove = iface->mapCanvases3D();
+  for ( Qgs3DMapCanvas *canvas3D : canvasesBeforeRemove )
+  {
+    if ( !canvas3D )
+      continue;
+    Qgs3DMapSettings *settings = canvas3D->mapSettings();
+    if ( !settings )
+      continue;
+    QList<QgsMapLayer *> layers = settings->layers();
+    layers.erase(
+      std::remove_if( layers.begin(), layers.end(),
+                      [&]( QgsMapLayer *l ) {
+                        return l && l->name().startsWith( QStringLiteral( "External point cloud - " ) );
+                      } ),
+      layers.end() );
+    settings->setLayers( layers );
+  }
+
   removeLayersByNamePrefix( QStringLiteral( "External point cloud - " ) );
   removeLayerByName( layerName );
   QgsProject::instance()->addMapLayer( vl );
@@ -1311,12 +1332,7 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
       settings->setExtent( viewExtent );
 
     QList<QgsMapLayer *> curLayers = settings->layers();
-    curLayers.erase(
-      std::remove_if( curLayers.begin(), curLayers.end(),
-                      [&]( QgsMapLayer *l ) {
-                        return l && l->name() == layerName && l->id() != vl->id();
-                      } ),
-      curLayers.end() );
+    // 旧 layer 已在上面从 settings 移除，这里只需追加新 layer，避免再遍历已删除指针。
     if ( !curLayers.contains( vl ) )
       curLayers.append( vl );
     settings->setLayers( curLayers );
