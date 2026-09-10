@@ -42,7 +42,16 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 | `TriPrismPyramid` | 三棱柱 + 三棱锥 | `leg`, `baseSide`, `totalHeight`, `pyramidRatio` |
 
 `CylinderDome` 是当前正式类型名，代码中仍兼容旧名 `CylinderHemisphere`。
-v2.2.0 起所有建筑 mesh 以底面中心为原点，旋转绕自身中心。
+
+**锚点（原点）按类划分**（v2.3.5 起，方案 B；判定集中在 `BuildMesh::usesCornerAnchor()`）：
+
+| 锚点 | 类 | 行为 |
+|---|---|---|
+| **底面左下角** | Cuboid / GabledRoof / PyramidRoof / TruncatedPyramidRoof / HalfCylinderRoof / IndentedCuboid / AsymmetricGableHouse / LHouse / TwoGableHouses | 构建时原点即 (0,0,0)，不再居中；长/宽沿 +X/+Y **单边生长**，旋转绕左下角 |
+| 底面中心 | Cylinder / ConeCylinder / CylinderDome / FourStageRoundTower / TriPrismPyramid | 走 `centerMeshOnBaseFace()` 平移到 bbox 中心；旋转绕中心 |
+
+锚点 / 生长原点 / 旋转轴**三者绑定，不能拆**（曾试"生长用左下角、旋转留中心"，自洽性破裂）。
+详见 `scripts/grow-anchor-design.md`。
 
 ## 工作流
 
@@ -160,7 +169,7 @@ x y z
 parammodeler/
 ├── parammodeler.cpp / .h              # QGIS 插件入口，注册菜单、工具栏和 Dock 面板
 ├── parammodeler_dock.cpp / .h / .ui   # 插件主 UI 和调度中心
-├── buildmesh.cpp / .h                 # 14 类建筑基元网格生成（双接口 + 底面中心化）
+├── buildmesh.cpp / .h                 # 14 类建筑基元网格生成（双接口 + 锚点判定 usesCornerAnchor）
 ├── meshdata.h                         # 网格数据结构 + 所有 Params 结构体
 ├── parammodeler_params.cpp            # 参数访问器（spinbox → 派生参数）
 ├── parammodeler_scene3d.cpp / .h      # QGIS 3D 图层加载与 Qt3D 实时预览
@@ -233,12 +242,12 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 ```text
 参数化基元定义
 -> 随机参数生成
--> BuildMesh + centerMeshOnBaseFace（底面中心原点）
+-> BuildMesh（锚点见下：长方体类左下角 / 圆形类底面中心）
 -> 网格表面采样点云 + 归一化
 -> PCT 分类（98.92% F1）
--> PCT 回归（neighbor + basic 混合部署）
+-> PCT 回归（v3_normals：basic + PCA 法向量）
 -> pointNetParamsToUiParams 映射 + applyToUI 回填
--> alignModelToPointCloud 自动对齐
+-> alignModelToPointCloud 自动对齐（同锚点语义的 bbox 极值对齐）
 -> QGIS 3D 叠加点云与模型
 -> 人工微调（Ctrl+滚轮精调 + DL 锚点复位）
 -> 导出参数化成果
@@ -249,16 +258,34 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 ## 当前已知问题
 
 - 🔴 **参数估计精度不足**：PCT 回归对局部几何参数（`bulge` R²=-0.004、`middleBulge` R²=-0.363、`wallRatio` R²=-0.271、`innerWidth` R²=0.050）仍然困难。TwoGableHouses 和 IndentedCuboid 存在严重过拟合（500样本不够支撑7-8参数回归）。详见 `dl-pipeline-log.md`。
-- 位姿参数（rx/ry/rz/tx/ty/tz）尚未进入回归训练，当前仅 auto-align 平移。
+- 位姿参数（rx/ry/rz/tx/ty/tz）尚未进入回归训练，auto-align 只做平移对齐（v2.3.4 起改用点云 **bbox 中心** 而非采样质心，见下）。**旋转仍未处理**：DL 不预测 rz，模型朝向始终是默认值。
 - `parammodeler_dock.cpp` 职责仍偏重，但已拆分出 7 个辅助模块（params/dlutils/randomizer/datasetgen/config/export/scene3d）。
 
 ## 已解决（v2.2.0 → v2.3.0）
 
-- ✅ 坐标系不统一 → `centerMeshOnBaseFace()` 统一底面中心原点
+- ✅ 坐标系不统一 → `centerMeshOnBaseFace()` 统一底面中心原点（**v2.3.5 起改为按类划分，见下**）
 - ✅ 微调无锚点 → DL 预测值存储 + "↺ Reset to DL prediction" 一键复位
 - ✅ 参数 UI 扁平 → 8 类复杂基元加分组标题
 - ✅ Ctrl+滚轮精调 → `FineTuneFilter` 事件过滤器
 - ✅ auto-align 代码重复 → `alignModelToPointCloud()` 共用函数
+
+## 已解决（v2.3.5）
+
+- ✅ **调参时模型往两边长、把已对齐的部分推开** → 锚点改为按类划分（方案 B 落地）：
+  锚点 / 生长原点 / 旋转轴三者绑定，**长方体类（含 LHouse / TwoGableHouses）左下角锚定**，
+  长/宽沿 +X/+Y 单边生长、旋转绕左下角；**圆形类保持底面中心**。
+  判定集中在 `BuildMesh::usesCornerAnchor()`，`parammodeler_scene3d.cpp` 无需改动。
+- ✅ 高度误差的表现改善：中心锚定下高度预测偏了会**上下各分一半**（既浮起又扎进地里），
+  角锚定后误差只往一侧堆。
+- ⚠️ 未消除：**旋转（rz）仍未处理**。切到角锚定后对齐目标变成"点云 bbox 左下角"，
+  而点云若带 rz，其 bbox 左下角不是模型左下角的对应点（bbox 中心对中心在对称底面上是旋转不变的，
+  bbox 角对则不是）——所以**带 rz 的点云在 X/Y 上可能反而更明显**，需等位姿估计落地。
+
+## 已解决（v2.3.4）
+
+- ✅ **模型/点云对齐偏移** → 对齐目标从"采样点**质心**"改为"点云 **bbox 中心**"。质心被 60%/40% 的屋顶/墙采样比例顶高（平屋顶类 z≈0.8h），而 mesh 侧用的是 bbox 中心（z=0.5h），直接相减会把模型整体抬高 0.3h；非对称底面（LHouse/TwoGable）X/Y 同样偏。
+- ✅ **显示路径与对齐路径各算各的** → `pointCloudMetadataLooksBuggy()` 判据共用；对齐优先取"场景中实际显示点云"的 bbox 中心（`m_displayCloudBBoxCenter`），坏 metadata 走 mesh 估算时两条路径也用同一几何。
+- ✅ 坏 metadata（center≈0/scale≈1）不再拿去对齐 → 不再把模型对到世界原点。
 
 ## 后续建议
 

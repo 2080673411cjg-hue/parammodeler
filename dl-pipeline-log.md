@@ -1,10 +1,11 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-08-30  
-> 插件版本: **v2.3.2**（TwoGable 回归增强 + 角度映射修复 + 3D 场景清除）  
+> 最后更新: 2026-09-10  
+> 插件版本: **v2.3.5**（对齐修复 bbox 极值 + 生长锚点落地：长方体类左下角；含 v2.3.3 回归切换 v3_normals）  
 > 当前模型: **PCT**（Point Cloud Transformer）— Li & Shan 2025 风格 offset-attention  
-> 分类模型: `pct_cls_v2` — 98.92% F1，8/14 类满分  
-> 回归模型: 13 类（TriPrismPyramid 无需回归），`pct_reg_*_v2` (basic) + `pct_reg_*_v2_neighbor` (neighbor)，混合部署  
+> 分类模型: `pct_cls_v2` — 98.92% F1（保持 v2；`pct_cls_v3` 99.23% 仅噪音级提升，且分类与法向量无关）  
+> 回归模型: 13 类（TriPrismPyramid 无需回归），**`pct_reg_*_v3_normals` (basic + PCA 法向量)，已接入生产**  
+> 法向量实验: 阶段 0/1/2 全部完成，bulge 转正、middleBulge 大幅改善但仍≈0（详见第七章）  
 > 数据集: **500 样本/类**（train 400 + val 50 + test 50），TwoGableHouses **1000 样本**（仅扩充数据量，无额外增强），14 类共 7500 样本  
 > 后端: PCT（PointNeXt 保留但不再使用）
 
@@ -299,20 +300,39 @@ Python 预测脚本 (`main_reg.py`) 的处理：
 | `radius` + `height` | `*Radius` / `cylHeight` | Cylinder |
 | `mainLength`, `mainWidth`, `wingLength`, `wingWidth` | `lMainL`, `lMainW`, `lWingL`, `lWingW` | LHouse |
 
-### Auto-Align（平移对齐）— v2.3.0 精简
+### Auto-Align（平移对齐）— v2.3.4 改 bbox 极值 / v2.3.5 按锚点类型取角或中心
 
-`alignModelToPointCloud()` — `parammodeler_dock.cpp:154`（共用函数，`onInverseParams` 和对话框均调用）
+`alignModelToPointCloud()` — `parammodeler_dock.cpp`（共用函数，`onInverseParams` 和对话框均调用）
 
 ```
-modelCenter = meshBboxCenter(mesh)   // v2.2.0 起 mesh 已居中，X/Y ≈ 0
-tx = metadataCenter.x - modelCenter.x
-ty = metadataCenter.y - modelCenter.y
-tz = metadataCenter.z - modelCenter.z
-setPoseTranslate(tx, ty, tz)
+corner = BuildMesh::usesCornerAnchor(primitiveType)
+modelRef = corner ? meshBBoxMin            : meshBBoxCenter   // 角锚定 → 左下角(0,0,0)；圆类 → 中心
+pcRef    = corner ? pcBBoxMin              : pcBBoxCenter     // 两侧必须同一语义
+setPoseTranslate( pcRef - modelRef )
 ```
+
+⚠️ **对齐目标绝不能用 `pointCloudInfo.center`**：那是采样点**质心**，采样比例是屋顶 60% / 墙 40%
+（`exportpointcloud.cpp`，三处一致），底面又被剔除。实测（`sample_params.json` 7502 条）
+"质心 − bbox 中心"的 Z 偏差逐类统计：Cylinder **+3.19 m**、HalfCylinderRoof +3.17、
+IndentedCuboid +2.84、TruncatedPyramidRoof +2.58、LHouse +1.83、ConeCylinder **−1.60** ……
+XY 偏差 0.4–1.7 m。**必须用 bbox 极值**（所有类 `bboxMin.z ≈ 0`，故 bbox 中心 z 严格等于 h/2）。
+
+`pointCloudAlignTarget()` 的优先级（`parammodeler_dock.cpp`）：
+
+1. `m_displayCloudBBoxMin/Center` —— **场景中实际显示的点云**的 bbox 极值（`loadPointCloudToQGIS3D` 里
+   对着"真正写进显示用的那些点"累积 min/max 得到）。仅当显示的文件 == 当前 `m_inputDataPath` 时才用。
+   显示什么就对到什么，彻底消除"点云画在 A、模型对到 B"。
+2. `m_metadataBBoxMin/Center`（点云没显示时的退化备选，来自 metadata 的 `bboxMin` / `bboxMin+bboxSize/2`）。
+
+坏 metadata（`pointCloudMetadataLooksBuggy()`：scale<2 且 center≈0，即从归一化坐标存下来的旧记录）
+判据由显示路径和对齐路径**共用**，且坏记录不参与对齐（否则模型被对到世界原点）。
+`metadataPointCloudInfoForInput()` 增加了 `bboxSize` 出参（JSON 里本来就有，只是没读）。
 
 注意：**只对齐平移，不处理旋转**。因为模型不预测 rz，模型朝向保持默认。
-v2.2.0 坐标系居中后 modelCenter X/Y ≈ 0，tx/ty 直接等于点云中心的 X/Y。
+旋转待做时有一个必须注意的点：rz 非 0 后，模型自己的 AABB 中心会随旋转漂移（非对称底面尤其明显），
+参考点必须在**应用 rx/ry/rz 之后**的 mesh 上算；现在 rz 恒为 0，这个坑还没暴露。
+另：角锚定下 bbox 角对 bbox 角不是旋转不变的（中心对中心在对称底面上是），
+所以带 rz 的点云切换后 X/Y 残余可能更明显，要等位姿估计解决。
 
 ### 点云显示反归一化（尺度还原）— 解决"点云很小 / 缩不上去"
 
@@ -450,6 +470,35 @@ PointNeXt 时代的主混淆（Cuboid↔Cylinder↔IndentedCuboid）**全部消�
 | wallRatio (TwoGable) | 0.06 | -0.271 (basic) | -0.33 | ❌ 恶化 — 需排查过拟合 |
 | innerWidth (IndentedCuboid) | 0.21 | 0.050 (neighbor) | -0.16 | ⚠️ 略降 — neighbor 勉强正 |
 | ridgeLength (AsymmetricGable) | 0.52 | **0.608** (neighbor) | **+0.09** | ✅ 小幅改善 |
+
+### ✅ 法向量通道实验（阶段 2 全量 13 类，2026-09-10 完成）
+
+根因：bulge/middleBulge 曲率参数学不动（R²≈0），2048 个纯 XYZ 点缺曲率信息。解法：**PCA 估计法向量**（kNN 局部平面拟合，不用 mesh 真值）作为额外点通道（3→6 通道），训练/推理用同一 `estimate_normals`。全程结论：
+
+- 阶段 0（小集 A/B）：basic+normals 胜出（bulge +0.265，middleBulge +0.073）
+- 阶段 1（neighbor A/B）：neighbor+normals 对 middleBulge 负迁移，判死路
+- **阶段 2（全量 13 类，basic+normals，`pct_reg_*_v3_normals/`）** ← 最终结果
+
+**整体 mean R²（test，13 类平均）**：
+
+| 变体 | mean R² | 说明 |
+|---|---:|---|
+| v2 (basic，当前生产) | 0.468 | — |
+| v2_neighbor | 0.655 | kNN 图 6 通道边特征 |
+| **v3_normals (basic + 法向量)** | **0.658** | ✅ 新候选 |
+
+**核心曲率参数**：
+
+| 参数 | v2 (basic) | v2_neighbor | **v3_normals** | 判定 |
+|---|---:|---:|---:|---|
+| **bulge** (CylinderDome) | -0.686 | -0.226 | **+0.599** | ✅ 彻底转正（MAPE 36.8%→22.5%） |
+| **middleBulge** (FourStage) | -0.851 | -0.236 | **-0.057** | ⚠️ 大幅改善但仍≈0（MAPE 46.4%→26.0%） |
+
+**连带大赢**：FourStage baseHeight/middleHeight 0.313/0.312→0.762/0.813；PyramidRoof width −0.192→+0.460、wallRatio −0.104→+0.831；TwoGable width −0.531→+0.850、angle −0.358→+0.487、ridgeRatio −0.201→+0.600；IndentedCuboid outerHeight 0.588→0.964；ConeCylinder cylinderRatio 0.271→0.802。
+
+**回归项（诚实记录）**：cylinder height 0.981→0.957（仍>0.95）；halfcylinder width 0.930→0.843、radius 0.936→0.821；**truncatedpyramid bottomWidth 0.425→−0.479（崩塌）**。
+
+**结论/建议**：v3_normals 整体≈v2_neighbor，但**唯一解掉 bulge**，且 basic 无 kNN 图、推理更快更简、PCA 法向量在合成+真实扫描两场景都成立。**建议 basic+normals 作为单一生产变体**；追求每类最优可做 per-class 混合（v3 用于 cylinderdome/fourstage/halfcylinder/lhouse/pyramidroof/conecylinder/indentedcuboid，neighbor 用于 asymgable/cuboid/cylinder/gabledroof/truncatedpyramid/twogable）。分类 `pct_cls_v3` F1 0.9923 vs `pct_cls_v2` 0.9892（边际提升）。
 
 ### 🔴 问题诊断
 
@@ -658,3 +707,75 @@ python main_reg.py --mode train \
 - 实现 `ParamModelerScene3D::clearAll3DEntities()`：清除 Qt3D 实时预览实体 + legacy 模型图层
 - dock 端直接通过 `m_pointCloudLayer` 指针清除点云：先清 3D Map Settings layers，再从 QgsProject 删除，确保 3D 场景正确刷新
 - dock.h 新增 `QgsMapLayer *m_pointCloudLayer` 缓存已加载的点云图层指针
+
+### v2.3.3 (2026-09-10) — 回归模型切换 v3_normals（法向量）+ 点云连续加载崩溃修复
+
+**回归模型接入 v3_normals（basic + PCA 法向量）**
+- 阶段 0/1/2 法向量实验全部完成：bulge（CylinderDome）R² -0.686→+0.599 彻底转正；middleBulge（FourStage）-0.851→-0.057 大幅改善但仍≈0
+- 整体 mean R²（test，13 类）：v2 (basic) 0.468 → v2_neighbor 0.655 → **v3_normals 0.658**
+- 13 类统一 `pct_reg_*_v3_normals`，删掉 `pctBestSuffix` 例外表（原来 CylinderDome/HalfCylinder/LHouse 指 `_v2`）
+- 分类保持 `pct_cls_v2`（法向量只加给回归，分类与法向量无关；v2→v3 仅噪音级提升）
+- 关键机制：`main_reg.py` predict 从 checkpoint 自动读 `use_normals`，推理时用 PCA 从 XYZ 现算法向量，插件推理命令零改动
+
+**点云连续加载崩溃修复**
+- 症状：加载一个点云到 3D 后再加载另一个 → 0xC0000005 读取 0xFFFFFFFFFFFFFFFF
+- 根因：`loadExternalPointCloud` 先删旧 layer 再遍历 3D settings，残留悬空指针
+- 修复：删除旧 layer 前先清 3D settings，删除后只追加新 layer
+
+### v2.3.4 (2026-09-10) — 对齐修复：对齐目标改为点云 bbox 中心
+
+用户反馈"模型和点云对齐不太好"（上下浮 + 水平错 + 调参往两边长）。定位到两个独立根因并修复前两个，
+第三个（旋转）与方案 B（左下角锚点）留待后续。
+
+**根因 1：对齐目标用错了统计量（可量化，必然发生）**
+- 点云侧 `pointCloudInfo.center` 是**采样点质心**（`exportpointcloud.cpp` 的 `computeDLPointCloudInfo`），
+  采样比例屋顶 60% / 墙 40% 且底面被剔除 → 平屋顶类质心 z ≈ 0.8h
+- 模型侧 `alignModelToPointCloud` 用的是 mesh **bbox 中心** z = 0.5h
+- 两者相减 → 模型整体抬高 **0.3h**（h=6m 即 1.8m）；非对称底面 X/Y 同样错位
+- 修复：新增 `bboxSize` 出参（JSON 里本来就有），对齐统一用 `bboxMin + bboxSize/2`
+
+**根因 2：显示路径和对齐路径各算各的**
+- `metadataPointCloudInfoForInput` 三条返回路径的 `center` 语义不同：JSON/PLY → 质心；都没命中 → 归一化后点云的 bbox 中心 ≈ (0,0,0)
+- 显示路径在坏记录时改用模型 mesh 估算 center/scale，对齐路径却直接用 ≈0 → 点云画在 A、模型对到 B
+- 修复：抽 `pointCloudMetadataLooksBuggy()` 共用判据；坏记录不参与对齐；
+  `loadPointCloudToQGIS3D` 对着**真正显示的点集**累积 bbox → `m_displayCloudBBoxCenter`，
+  `pointCloudAlignTarget()` 优先用它（且只在显示文件==当前输入文件时）；
+  对话框流程改为**先显示点云再对齐**，对齐后 `onUpdatePreview()` 推位姿
+
+**未做（下一步）**
+- 旋转：DL 不预测 rz、align 也不估位姿，点云带 rz 时朝向仍是歪的
+- 方案 B（左下角锚定）：调参对称生长导致已对齐部分被推开（见 `scripts/grow-anchor-design.md`）
+
+**改动文件**：`parammodeler_dlutils.{h,cpp}`（bboxSize 出参）、`parammodeler_dock.{h,cpp}`（对齐目标解析、显示 bbox 累积、对话框顺序）、`README.md`
+
+### v2.3.5 (2026-09-10) — 生长锚点落地（方案 B）：长方体类左下角锚定
+
+用户反馈"高度啥的对齐的也一般"。中心锚定下预测高度偏了会**上下各分一半**（既浮起又扎进地里），
+角锚定后误差只往一侧堆 —— 这是方案 B 的对齐侧收益（真正的尺寸误差仍需回归精度解决）。
+
+**锚点判定集中到一处**：`BuildMesh::usesCornerAnchor()`（`buildmesh.cpp/h`）
+
+| 锚点 | 类 |
+|---|---|
+| 左下角（原点即 (0,0,0)，跳过居中） | Cuboid / GabledRoof / PyramidRoof / TruncatedPyramidRoof / HalfCylinderRoof / IndentedCuboid / AsymmetricGableHouse / LHouse / TwoGableHouses |
+| 底面中心（`centerMeshOnBaseFace`） | Cylinder / ConeCylinder / CylinderDome(Hemisphere) / FourStageRoundTower / TriPrismPyramid |
+
+**逐类核实**（跳过居中的前提）：9 个角锚定类的构建代码都以 (0,0,0) 为原点、footprint 全在 +X/+Y 象限、
+左下角是真实直角 —— LHouse 缺口在右上 (`buildLHouse`)、HalfCylinderRoof 弧在竖向底部仍是完整矩形、
+IndentedCuboid 外底是完整矩形、**TwoGableHouses 从 A(0,0) 起沿 +X/+Y 展开**（`buildTwoGableHouses`：
+`dir=(cos(turnRad), sin(turnRad))`，turnRad∈[0°,45°] 故两分量均 ≥0，minX/minY 都在 A）。
+→ 上次悬着的 TwoGableHouses 锚点据此定案：**用左下角**（凹角在两屋交接的 B/C 处，不在锚点）。
+
+**对齐侧**：`alignModelToPointCloud(mesh, pcRef, primitiveType, ...)` 按类型取 bbox 左下角或中心；
+`pointCloudAlignTarget()` 同步（`m_metadataBBoxMin` / `m_displayCloudBBoxMin` 新增）。
+`parammodeler_scene3d.cpp` **不用改** —— 变换是 `T·Rx·Ry·Rz`（先绕自身原点转再平移），
+两种锚点都兼容，只是角锚定下旋转轴变成左下角（已确认是期望行为）。
+
+**连带影响（已核对，无破坏）**：导出/采样走同一个 `BuildMesh::build`，所以新导出的合成点云
+原点也变成左下角。训练无影响 —— 点云喂网络前按自身质心+最大半径归一化，平移无关；
+`bboxSize`/`scale` 也是平移无关量；老数据集（居中坐标系）的 metadata 与显示/对齐自洽读取，照常可用。
+
+**未做**：旋转（rz）。且注意角锚定下"bbox 角对 bbox 角"**不是旋转不变的**（中心对中心在对称底面上是），
+所以带 rz 的点云在切换后 X/Y 残余可能更明显 —— 位姿估计要紧接着做。
+
+**改动文件**：`buildmesh.{h,cpp}`（usesCornerAnchor + 跳过居中）、`parammodeler_dock.{h,cpp}`（对齐参考点按类）、`README.md`
