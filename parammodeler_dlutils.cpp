@@ -505,6 +505,7 @@ QString metadataRelativePathForPointCloud( const QString &filePath )
 
 bool metadataPointCloudInfoForInput( const QString &filePath,
                                      QVector3D *bboxMin,
+                                     QVector3D *bboxSize,
                                      QVector3D *center,
                                      double *scale )
 {
@@ -530,6 +531,8 @@ bool metadataPointCloudInfoForInput( const QString &filePath,
           bool ok = true;
           if ( bboxMin )
             ok = vectorFromJsonArray( info.value( QStringLiteral( "bboxMin" ) ), *bboxMin ) && ok;
+          if ( bboxSize )
+            ok = vectorFromJsonArray( info.value( QStringLiteral( "bboxSize" ) ), *bboxSize ) && ok;
           if ( center )
             ok = vectorFromJsonArray( info.value( QStringLiteral( "center" ) ), *center ) && ok;
           if ( scale )
@@ -548,12 +551,15 @@ bool metadataPointCloudInfoForInput( const QString &filePath,
   double plyScale = 1.0;
   if ( denormInfoFromPlyComment( filePath, plyCenter, plyScale ) )
   {
-    if ( bboxMin )
+    if ( bboxMin || bboxSize )
     {
       const PointCloud pc = PointCloudLoader::load( filePath );
       if ( pc.points.isEmpty() )
         return false;
-      *bboxMin = pc.bboxMin * static_cast<float>( plyScale ) + plyCenter;
+      if ( bboxMin )
+        *bboxMin = pc.bboxMin * static_cast<float>( plyScale ) + plyCenter;
+      if ( bboxSize )
+        *bboxSize = ( pc.bboxMax - pc.bboxMin ) * static_cast<float>( plyScale );
     }
     if ( center )
       *center = plyCenter;
@@ -576,6 +582,8 @@ bool metadataPointCloudInfoForInput( const QString &filePath,
 
       if ( bboxMin )
         *bboxMin = pc.bboxMin;
+      if ( bboxSize )
+        *bboxSize = pc.bboxMax - pc.bboxMin;
       if ( center )
         *center = pcCenter;
       if ( scale )

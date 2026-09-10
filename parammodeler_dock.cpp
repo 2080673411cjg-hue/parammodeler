@@ -202,10 +202,27 @@ private:
 };
 
 // ============================================================
-// 自动对齐：计算 mesh 包围盒中心 → 设置 pose 使模型中心对齐点云中心
-// 坐标系居中后，mesh X/Y 中心 ≈ (0,0)，Z 中心 = 建筑半高
+// metadata 记录明显是"从归一化坐标存下来的坏记录"：center ≈ 0 且 scale ≈ 1。
+// 显示路径和对齐路径必须用同一判据，否则会出现"点云画在 A、模型对到 B"。
 // ============================================================
-static void alignModelToPointCloud( const MeshData &mesh, const QVector3D &pcCenter,
+static bool pointCloudMetadataLooksBuggy( const QVector3D &center, double scale )
+{
+  return scale < 2.0 && center.lengthSquared() < 0.01;
+}
+
+// ============================================================
+// 自动对齐：模型参考点 ↔ 点云参考点
+//
+// 参考点按锚点类型二选一（锚点 / 生长原点 / 旋转轴三者绑定）：
+//   左下角锚定（长方体类，BuildMesh::usesCornerAnchor）→ 两边都取 bbox **左下角**
+//   底面中心锚定（圆形类 / TriPrismPyramid）          → 两边都取 bbox **中心**
+//
+// 绝不能用 pointCloudInfo.center（那是采样点质心）：采样分布屋顶 60% / 墙 40%
+// （exportpointcloud.cpp），质心 z 与 bbox 中心 z 能差 1–3 m（实测），
+// 非对称底面 X/Y 也偏。必须用 bbox 极值，两侧同一语义才能对上。
+// ============================================================
+static void alignModelToPointCloud( const MeshData &mesh, const QVector3D &pcRef,
+                                     const QString &primitiveType,
                                      ParamModelerDock *dock, const QString &context )
 {
     if ( mesh.vertices.isEmpty() )
@@ -229,19 +246,82 @@ static void alignModelToPointCloud( const MeshData &mesh, const QVector3D &pcCen
         if ( v.y() > vMax.y() ) vMax.setY( v.y() );
         if ( v.z() > vMax.z() ) vMax.setZ( v.z() );
     }
-    const QVector3D mc = ( vMin + vMax ) * 0.5f;
+    const bool corner = BuildMesh::usesCornerAnchor( primitiveType );
+    // 模型侧参考点：角锚定 → bbox 左下角（即构建原点 (0,0,0)）；中心锚定 → bbox 中心
+    const QVector3D mRef = corner ? vMin : ( vMin + vMax ) * 0.5f;
 
-    const double tx = static_cast<double>( pcCenter.x() ) - static_cast<double>( mc.x() );
-    const double ty = static_cast<double>( pcCenter.y() ) - static_cast<double>( mc.y() );
-    const double tz = static_cast<double>( pcCenter.z() ) - static_cast<double>( mc.z() );
+    const double tx = static_cast<double>( pcRef.x() ) - static_cast<double>( mRef.x() );
+    const double ty = static_cast<double>( pcRef.y() ) - static_cast<double>( mRef.y() );
+    const double tz = static_cast<double>( pcRef.z() ) - static_cast<double>( mRef.z() );
     dock->setPoseTranslate( tx, ty, tz );
 
-    DEBUG_LOG( QString( "[Align] %1 pcCenter=(%2,%3,%4) modelCenter=(%5,%6,%7) → tx=%8 ty=%9 tz=%10\n" )
+    DEBUG_LOG( QString( "[Align] %1 anchor=%2 pcRef=(%3,%4,%5) modelRef=(%6,%7,%8) → tx=%9 ty=%10 tz=%11\n" )
                  .arg( context )
-                 .arg( pcCenter.x(), 0, 'f', 2 ).arg( pcCenter.y(), 0, 'f', 2 ).arg( pcCenter.z(), 0, 'f', 2 )
-                 .arg( mc.x(), 0, 'f', 2 ).arg( mc.y(), 0, 'f', 2 ).arg( mc.z(), 0, 'f', 2 )
+                 .arg( corner ? QStringLiteral( "corner" ) : QStringLiteral( "center" ) )
+                 .arg( pcRef.x(), 0, 'f', 2 ).arg( pcRef.y(), 0, 'f', 2 ).arg( pcRef.z(), 0, 'f', 2 )
+                 .arg( mRef.x(), 0, 'f', 2 ).arg( mRef.y(), 0, 'f', 2 ).arg( mRef.z(), 0, 'f', 2 )
                  .arg( tx, 0, 'f', 2 ).arg( ty, 0, 'f', 2 ).arg( tz, 0, 'f', 2 )
                  .toStdWString().c_str() );
+}
+
+// ============================================================
+// 缓存输入文件的 metadata：
+//   center / scale → 反归一化（p*scale + center）
+//   bbox 极值      → 模型对齐（角锚定用 bboxMin，圆类用 bbox 中心；
+//                    不能拿 center 去对齐，见 alignModelToPointCloud）
+// ============================================================
+void ParamModelerDock::cacheInputMetadata( const QString &filePath )
+{
+  QVector3D metadataBBoxMin, metadataBBoxSize;
+  m_hasMetadata = metadataPointCloudInfoForInput( filePath, &metadataBBoxMin, &metadataBBoxSize,
+                                                 &m_metadataCenter, &m_metadataScale );
+  // 坏记录（从归一化坐标存下来的 center≈0 / scale≈1）不能拿去对齐，否则模型被对到世界原点
+  m_hasMetadataBBox = m_hasMetadata &&
+                      !pointCloudMetadataLooksBuggy( m_metadataCenter, m_metadataScale );
+  if ( m_hasMetadataBBox )
+  {
+    m_metadataBBoxMin    = metadataBBoxMin;
+    m_metadataBBoxCenter = metadataBBoxMin + metadataBBoxSize * 0.5f;
+  }
+
+  if ( m_hasMetadata )
+  {
+    DEBUG_LOG( QString( "[Meta] cached center=(%1,%2,%3) scale=%4 alignBBoxCenter=(%5,%6,%7)\n" )
+                 .arg( m_metadataCenter.x(), 0, 'f', 2 )
+                 .arg( m_metadataCenter.y(), 0, 'f', 2 )
+                 .arg( m_metadataCenter.z(), 0, 'f', 2 )
+                 .arg( m_metadataScale, 0, 'f', 2 )
+                 .arg( m_metadataBBoxCenter.x(), 0, 'f', 2 )
+                 .arg( m_metadataBBoxCenter.y(), 0, 'f', 2 )
+                 .arg( m_metadataBBoxCenter.z(), 0, 'f', 2 )
+                 .toStdWString().c_str() );
+  }
+}
+
+// ============================================================
+// 对齐目标解析：优先"场景里实际显示的点云"的包围盒中心（ground truth），
+// 没有时退回 metadata 记录的 bbox 中心。
+// 这样显示路径和对齐路径用的是同一个几何，不会再出现"点云画在 A、模型对到 B"。
+// ============================================================
+bool ParamModelerDock::pointCloudAlignTarget( QVector3D &out ) const
+{
+  // 参考点语义必须和模型侧一致（见 alignModelToPointCloud）
+  const bool corner = BuildMesh::usesCornerAnchor( ui->comboPrimitive->currentText() );
+
+  // 场景里显示的正好就是当前输入文件 → 用实测的显示 bbox（最可靠）
+  if ( m_hasDisplayCloudBBox && !m_inputDataPath.isEmpty() &&
+       QFileInfo( m_displayCloudSourcePath ).absoluteFilePath().compare(
+         QFileInfo( m_inputDataPath ).absoluteFilePath(), Qt::CaseInsensitive ) == 0 )
+  {
+    out = corner ? m_displayCloudBBoxMin : m_displayCloudBBoxCenter;
+    return true;
+  }
+  if ( m_hasMetadataBBox )
+  {
+    out = corner ? m_metadataBBoxMin : m_metadataBBoxCenter;
+    return true;
+  }
+  return false;
 }
 
 static void bindSliderSpin( QSlider *slider, QDoubleSpinBox *spin, double multiplier, double maxVal = 100.0, double minVal = 0.0 )
@@ -972,6 +1052,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       return;
 
     m_inputDataPath = filePath;
+    cacheInputMetadata( filePath );   // 对话框流程也要缓存，否则对齐没有退化备选
     updateInputInfo();
   } );
 
@@ -1088,25 +1169,23 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       );
       if ( answer == QMessageBox::Yes )
       {
-        // --- Auto-align model translation to point cloud center ---
-        QVector3D pcCenter;
-        double pcScale = 1.0;
-        if ( metadataPointCloudInfoForInput( m_inputDataPath, nullptr, &pcCenter, &pcScale ) )
-        {
-          m_metadataCenter = pcCenter;
-          m_metadataScale  = pcScale;
-          m_hasMetadata    = true;
-          alignModelToPointCloud( BuildMesh::build( ui->comboPrimitive->currentText(), this ),
-                                  pcCenter, this, QStringLiteral( "dialog" ) );
-        }
-        else
-        {
-          DEBUG_LOG( QString( "[Align] no metadata for %1, skipping\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
-        }
-
         onLoadToQGIS3D( true );
         if ( !loadPointCloudToQGIS3D( m_inputDataPath, false ) )
           QMessageBox::warning( &dialog, tr( "Point cloud load failed" ), tr( "The model was loaded, but the point cloud was not loaded into QGIS 3D." ) );
+
+        // --- Auto-align：必须在点云显示**之后**做，对齐目标 = 实际显示点云的 bbox 极值 ---
+        QVector3D alignTarget;
+        if ( pointCloudAlignTarget( alignTarget ) )
+        {
+          alignModelToPointCloud( BuildMesh::build( ui->comboPrimitive->currentText(), this ),
+                                  alignTarget, ui->comboPrimitive->currentText(),
+                                  this, QStringLiteral( "dialog" ) );
+          onUpdatePreview();  // 把新位姿推给 Qt3D 实时实体（模型图层已加载）
+        }
+        else
+        {
+          DEBUG_LOG( QString( "[Align] no point cloud bbox for %1, skipping\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
+        }
       }
     }
     dialog.accept();
@@ -1450,11 +1529,32 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
   QTemporaryFile denormalizedFile( QDir::tempPath() + QStringLiteral( "/parammodeler_displaypc_XXXXXX.txt" ) );
   QVector3D metadataCenter;
   double metadataScale = 1.0;
-  const bool hasMetadata = metadataPointCloudInfoForInput( filePath, nullptr, &metadataCenter, &metadataScale );
+  const bool hasMetadata = metadataPointCloudInfoForInput( filePath, nullptr, nullptr, &metadataCenter, &metadataScale );
 
   // Detect buggy metadata (center ≈ 0, scale ≈ 1  →  was saved from
   // normalised coords by the old exportOccludedTXT / exportLabeledTXT).
-  const bool metadataLooksBuggy = ( metadataScale < 2.0 && metadataCenter.lengthSquared() < 0.01 );
+  const bool metadataLooksBuggy = pointCloudMetadataLooksBuggy( metadataCenter, metadataScale );
+
+  // 累积"最终显示的点集"的包围盒 —— 模型对齐的目标就是它的 bbox 中心。
+  // 显示什么就对到什么，两条路径共用同一几何，不再各算各的。
+  QVector3D displayMin, displayMax;
+  bool hasDisplayBBox = false;
+  auto accumulateDisplayPoint = [&]( const QVector3D &p )
+  {
+    if ( !hasDisplayBBox )
+    {
+      displayMin = p;
+      displayMax = p;
+      hasDisplayBBox = true;
+      return;
+    }
+    if ( p.x() < displayMin.x() ) displayMin.setX( p.x() );
+    if ( p.y() < displayMin.y() ) displayMin.setY( p.y() );
+    if ( p.z() < displayMin.z() ) displayMin.setZ( p.z() );
+    if ( p.x() > displayMax.x() ) displayMax.setX( p.x() );
+    if ( p.y() > displayMax.y() ) displayMax.setY( p.y() );
+    if ( p.z() > displayMax.z() ) displayMax.setZ( p.z() );
+  };
 
   if ( hasMetadata )
   {
@@ -1506,6 +1606,7 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
           QVector3D restored = p * static_cast<float>( denormScale ) + denormCenter;
           if ( restored.z() < 0.0f )
             restored.setZ( 0.0f );
+          accumulateDisplayPoint( restored );
           out << restored.x() << ' ' << restored.y() << ' ' << restored.z() << '\n';
         }
         out.flush();
@@ -1517,7 +1618,38 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
     else if ( !normalizedCloud.points.isEmpty() )
     {
       DEBUG_LOG( QString( "[PointCloud] metadata matched, input appears already in display scale: %1\n" ).arg( filePath ).toStdWString().c_str() );
+      for ( const QVector3D &p : normalizedCloud.points )
+        accumulateDisplayPoint( p );
     }
+  }
+
+  // 到这里还没量到 bbox（无 metadata / 坏记录且没走还原分支）→ 显示的就是文件本身，直接读它
+  if ( !hasDisplayBBox )
+  {
+    const PointCloud asIs = PointCloudLoader::load( displayPath );
+    for ( const QVector3D &p : asIs.points )
+      accumulateDisplayPoint( p );
+  }
+
+  if ( hasDisplayBBox )
+  {
+    m_displayCloudBBoxMin    = displayMin;
+    m_displayCloudBBoxCenter = ( displayMin + displayMax ) * 0.5f;
+    m_hasDisplayCloudBBox    = true;
+    m_displayCloudSourcePath = filePath;
+    DEBUG_LOG( QString( "[PointCloud] displayed bbox min=(%1,%2,%3) center=(%4,%5,%6) → align target\n" )
+                 .arg( m_displayCloudBBoxMin.x(), 0, 'f', 2 )
+                 .arg( m_displayCloudBBoxMin.y(), 0, 'f', 2 )
+                 .arg( m_displayCloudBBoxMin.z(), 0, 'f', 2 )
+                 .arg( m_displayCloudBBoxCenter.x(), 0, 'f', 2 )
+                 .arg( m_displayCloudBBoxCenter.y(), 0, 'f', 2 )
+                 .arg( m_displayCloudBBoxCenter.z(), 0, 'f', 2 )
+                 .toStdWString().c_str() );
+  }
+  else
+  {
+    m_hasDisplayCloudBBox = false;
+    m_displayCloudSourcePath.clear();
   }
 
   QString errorMessage;
@@ -1610,17 +1742,8 @@ void ParamModelerDock::onLoadInputData()
   m_inputDataPath = filePath;
   QFileInfo fi( filePath );
 
-  // 缓存元数据（center/scale），用于后续模型反归一化
-  m_hasMetadata = metadataPointCloudInfoForInput( filePath, nullptr, &m_metadataCenter, &m_metadataScale );
-  if ( m_hasMetadata )
-  {
-    DEBUG_LOG( QString( "[Meta] cached center=(%1,%2,%3) scale=%4\n" )
-                 .arg( m_metadataCenter.x(), 0, 'f', 2 )
-                 .arg( m_metadataCenter.y(), 0, 'f', 2 )
-                 .arg( m_metadataCenter.z(), 0, 'f', 2 )
-                 .arg( m_metadataScale, 0, 'f', 2 )
-                 .toStdWString().c_str() );
-  }
+  // 缓存元数据：center（质心）用于反归一化，bbox 中心用于模型对齐 —— 两者语义不同，别混用
+  cacheInputMetadata( filePath );
 
   DEBUG_LOG( QString( "[Tab2] load input data: %1\n" ).arg( filePath ).toStdWString().c_str() );
 
@@ -1725,12 +1848,14 @@ void ParamModelerDock::onInverseParams()
   ui->progressInversion->setValue( 100 );
   ui->progressInversion->setVisible( false );
 
-  // --- Auto-align model translation to point cloud center ---
-  if ( m_hasMetadata )
+  // --- Auto-align：模型参考点 ↔ 点云参考点（bbox 极值，不是质心，见 alignModelToPointCloud） ---
+  QVector3D alignTarget;
+  if ( pointCloudAlignTarget( alignTarget ) )
     alignModelToPointCloud( BuildMesh::build( ui->comboPrimitive->currentText(), this ),
-                            m_metadataCenter, this, QStringLiteral( "onInverseParams" ) );
+                            alignTarget, ui->comboPrimitive->currentText(),
+                            this, QStringLiteral( "onInverseParams" ) );
   else
-    DEBUG_LOG( QString( "[Align] no metadata for %1, skipping\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
+    DEBUG_LOG( QString( "[Align] no point cloud bbox for %1, skipping\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
 
   onUpdatePreview();
 }

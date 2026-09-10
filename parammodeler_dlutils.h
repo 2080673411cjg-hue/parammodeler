@@ -53,8 +53,13 @@ bool denormInfoFromPlyComment( const QString &filePath,
 
 QString metadataRelativePathForPointCloud( const QString &filePath );
 
+// center 是采样点**质心**（反归一化 p*scale+center 用它还原原始坐标）；
+// bboxMin/bboxSize 是原始坐标下的包围盒。两者语义不同，不可互换：
+// 只有 bbox 中心（bboxMin + bboxSize/2）才能和 mesh bbox 中心比较 —— 模型对齐用它，
+// 不能用质心（质心被 60/40 的屋顶/墙采样比例顶高，见 alignModelToPointCloud）。
 bool metadataPointCloudInfoForInput( const QString &filePath,
                                      QVector3D *bboxMin,
+                                     QVector3D *bboxSize,
                                      QVector3D *center,
                                      double *scale );
 

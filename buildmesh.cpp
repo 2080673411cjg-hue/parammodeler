@@ -23,10 +23,12 @@
 #define DEBUG_LOG(msg) OutputDebugStringW(msg)
 
 // ============================================================
-// 统一后处理：所有建筑 mesh 以底面几何中心为原点
-// 圆形建筑（Cylinder/Dome/Tower 等）底面中心已在 (0,0,0)，不受影响
-// 矩形建筑（Cuboid/GabledRoof 等）从"左下角原点"统一平移到"底面中心原点"
-// 效果：旋转绕模型自身中心、tx/ty 语义 = 建筑底面中心的世界坐标
+// 底面中心居中后处理：**只对非左下角锚定的类生效**
+// 圆形建筑（Cylinder/Dome/Tower 等）底面中心已在 (0,0,0)，检测后自动跳过
+// TriPrismPyramid（三角形底面）也从这里居中
+// 长方体类是左下角锚定（锚点/生长原点/旋转轴三者绑定 = 左下角），
+// 由 BuildMesh::build 白名单跳过本函数，保持构建时的 (0,0,0) 原点
+// 详见 scripts/grow-anchor-design.md（方案 B）
 // ============================================================
 static void centerMeshOnBaseFace( MeshData &m )
 {
@@ -59,6 +61,26 @@ static void centerMeshOnBaseFace( MeshData &m )
 }
 
 // ============================================================
+// 锚点判定：锚点 / 生长原点 / 旋转轴三者绑定，不能拆
+// 左下角锚定的都是"构建时原点就在底面左下角"的类（buildCuboid v0(0,0,0) 等），
+// 已逐类核实：footprint 全在 +X/+Y 象限，左下角是真实直角
+// （LHouse 缺口在右上；HalfCylinderRoof 的弧在竖向、底部仍是完整矩形；
+//   IndentedCuboid 外底是完整矩形；TwoGableHouses 从 A(0,0) 起沿 +X/+Y 展开）。
+// ============================================================
+bool BuildMesh::usesCornerAnchor( const QString &primitiveType )
+{
+    return primitiveType == "Cuboid"
+        || primitiveType == "GabledRoof"
+        || primitiveType == "PyramidRoof"
+        || primitiveType == "TruncatedPyramidRoof"
+        || primitiveType == "HalfCylinderRoof"
+        || primitiveType == "IndentedCuboid"
+        || primitiveType == "AsymmetricGableHouse"
+        || primitiveType == "LHouse"
+        || primitiveType == "TwoGableHouses";
+}
+
+// ============================================================
 // 统一入口
 // ============================================================
 MeshData BuildMesh::build( const QString &primitiveType, ParamModelerDock *dock )
@@ -80,9 +102,12 @@ MeshData BuildMesh::build( const QString &primitiveType, ParamModelerDock *dock 
     else if ( primitiveType == "TwoGableHouses" )        m = buildTwoGableHouses( dock );
     else if ( primitiveType == "TriPrismPyramid" )     m = buildTriPrismPyramid( dock );
 
-    // 统一居中：矩形建筑从"左下角原点"修正为"底面中心原点"
-    // 圆形建筑底面中心已在 (0,0,0)，centerMeshOnBaseFace 检测后自动跳过
-    centerMeshOnBaseFace( m );
+    // 锚点保持构建时的原点：
+    //   左下角锚定类（长方体类含 LHouse / TwoGableHouses）→ 原点就是左下角 (0,0,0)，不居中
+    //   其余（圆形类已天然居中 / TriPrismPyramid）→ 平移到 bbox 中心
+    // 方案 B，详见 scripts/grow-anchor-design.md
+    if ( !usesCornerAnchor( primitiveType ) )
+        centerMeshOnBaseFace( m );
 
     DEBUG_LOG( QString( "[BuildMesh] %1 → 顶点=%2, 三角面=%3\n" )
       .arg( primitiveType )

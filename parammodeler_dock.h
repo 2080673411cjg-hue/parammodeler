@@ -174,6 +174,13 @@ private:
   void randomizeCurrentPrimitiveParams( bool refreshPreview, bool randomizePose = false );
   bool loadPointCloudToQGIS3D( const QString &filePath, bool showMessage );
 
+  // 缓存输入文件的 metadata（center 质心用于反归一化，bbox 中心用于对齐）
+  void cacheInputMetadata( const QString &filePath );
+
+  // 取模型对齐的目标点（点云 bbox 中心）。优先用"实际显示的点云"的 bbox 中心，
+  // 没有时退回 metadata 记录的 bbox 中心。返回 false = 无可用目标，调用方应跳过对齐。
+  bool pointCloudAlignTarget( QVector3D &out ) const;
+
   Ui::ParamModelerDock *ui;
   QgisInterface *mIface;
 		QString m_currentPrimitive;                  // 记录当前基元名
@@ -182,10 +189,21 @@ private:
   // ===== Tab2：输入数据 =====
   QString m_inputDataPath;
 
-  // ===== 元数据缓存（用于模型反归一化对齐） =====
-  QVector3D m_metadataCenter;
+  // ===== 元数据缓存（用于模型反归一化 / 对齐） =====
+  // 注意：center 是采样点**质心**，只能用于反归一化 p*scale+center；
+  // 模型对齐必须用 bbox 的极值（质心被 60/40 屋顶/墙采样比例顶高，见 alignModelToPointCloud）。
+  QVector3D m_metadataCenter;                  // 质心（反归一化用）
+  QVector3D m_metadataBBoxCenter;              // bbox 中心（圆类对齐用）
+  QVector3D m_metadataBBoxMin;                 // bbox 左下角（角锚定类对齐用）
   double    m_metadataScale = 1.0;
   bool      m_hasMetadata = false;
+  bool      m_hasMetadataBBox = false;
+
+  // ===== 场景中实际显示的点云 bbox（对齐首选，仅当它就是当前输入文件时用） =====
+  QVector3D m_displayCloudBBoxCenter;          // bbox 中心（圆类用）
+  QVector3D m_displayCloudBBoxMin;             // bbox 左下角（角锚定类用）
+  bool      m_hasDisplayCloudBBox = false;
+  QString   m_displayCloudSourcePath;          // 显示在场景里的那个点云文件
 
   // ===== 预览 =====
   QTimer          *m_previewTimer  = nullptr;
