@@ -507,8 +507,14 @@ bool metadataPointCloudInfoForInput( const QString &filePath,
                                      QVector3D *bboxMin,
                                      QVector3D *bboxSize,
                                      QVector3D *center,
-                                     double *scale )
+                                     double *scale,
+                                     double *rz )
 {
+  // 只有 JSON metadata 记了 rz；PLY / 兜底路径取不到 → 保持 NaN。
+  // 调用方以 NaN 作为"该记录没有 rz"的判据，所以必须先置位。
+  if ( rz )
+    *rz = qQNaN();
+
   const QString rel = metadataRelativePathForPointCloud( filePath );
   if ( !rel.isEmpty() )
   {
@@ -539,6 +545,14 @@ bool metadataPointCloudInfoForInput( const QString &filePath,
           {
             *scale = info.value( QStringLiteral( "scale" ) ).toDouble( 1.0 );
             ok = *scale > 1e-9 && ok;
+          }
+          if ( rz )
+          {
+            // params.rz：导出时 applyPose 用的那个角（度）。缺失 → 保持 NaN，不算记录无效
+            const QJsonValue rzValue = obj.value( QStringLiteral( "params" ) )
+                                          .toObject().value( QStringLiteral( "rz" ) );
+            if ( rzValue.isDouble() )
+              *rz = rzValue.toDouble();
           }
           if ( ok )
             return true;

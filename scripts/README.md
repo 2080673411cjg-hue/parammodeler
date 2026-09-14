@@ -144,7 +144,24 @@ logs/pointnext_reg_cuboid_aux/
 | `_aux` | 当前主力 | 纯形状参数（length, width, height, radius, bulge, wallRatio...） | ✅ 使用中 |
 | `_rot` | 已弃用 | 形状参数 + rz | ❌ 形状参数精度明显更差，不建议使用 |
 
-> `_rot` 版本虽然能预测旋转角，但形状参数精度下降严重（数据量翻倍但每类独立训练，导致每个模型看到有效样本更少）。当前策略是只用 `_aux` 做形状回归，旋转通过人工微调。
+> `_rot` 版本虽然能预测旋转角，但形状参数精度下降严重。**根因不是数据量**：rz 这个标签在
+> 当前数据形态下是**不可辨识**的，加数据也修不好。
+>
+> - **圆柱类**（Cylinder / ConeCylinder / CylinderDome / FourStageRoundTower）：底面是圆，
+>   绕自身轴旋转点云**完全不变** → rz 根本没有定义，标签就是纯噪声。模型学不到，
+>   那一维的梯度还会污染共享 backbone。
+> - **矩形/多边形底面类**（Cuboid / GabledRoof / PyramidRoof / TruncatedPyramidRoof /
+>   IndentedCuboid / LHouse / HalfCylinderRoof / TwoGableHouses / AsymmetricGableHouse）：
+>   底面是矩形 → rz 只确定到 **mod 180°**；底面接近正方形时（PyramidRoof /
+>   TruncatedPyramidRoof）只确定到 **mod 90°**。目标本身多值，MSE 把它拉向"平均"。
+>
+> 注意**归一化不背这个锅**：`normalizeForDL`（`exportpointcloud.cpp`）是质心平移 +
+> 单一标量 maxRadius 各向同性缩放，两者都与旋转可交换 → 归一化后 rz 在 TXT 里完整保留。
+> 真正会碾平朝向的是**逐轴**归一化（分别除以 bboxSize.x/y/z），当前没有做。
+>
+> 所以当前策略是：回归只用形状参数，**朝向不从模型来** —— 直接回填 metadata 里的
+> 导出真值 `params.rz`（见 `dl-pipeline-log.md` 的 rz 回填一节）。要让模型预测 rz，
+> 必须先做对称性改造（canonical pose / 把 rz 折叠到 [0°, 90°) 再回归），否则重蹈 `_rot` 覆辙。
 
 ---
 

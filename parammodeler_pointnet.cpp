@@ -124,10 +124,11 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
   if ( !stemNames.contains( prim ) )
     return { modelName, prim, script, QString() };
 
-  // PCT variant: v3_normals (basic + PCA normals) is the single production
-  // variant for all 13 classes (2026-09).  No per-class override needed; the
-  // suffix comes from config.  Re-add a pctBestSuffix map here if a future run
-  // favours a different variant per class.
+  // PCT variant: v4_normals (basic + PCA normals, retrained on the fixed
+  // datasets_aug) is the single production variant for all 13 classes
+  // (2026-09).  No per-class override needed; the suffix comes from config.
+  // Re-add a pctBestSuffix map here if a future run favours a different
+  // variant per class.
 
   const QString prefix = isPCT
     ? QStringLiteral( "pct_reg_" )
@@ -461,7 +462,13 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
        << QStringLiteral( "--bbox_y" ) << QString::number( bboxSize.y(), 'g', 12 )
        << QStringLiteral( "--bbox_z" ) << QString::number( bboxSize.z(), 'g', 12 )
        << QStringLiteral( "--scale" ) << QString::number( scale, 'g', 12 )
-       << QStringLiteral( "--canonical_align" )
+       // 注意：这里刻意不传 --canonical_align。
+       // main_reg.py 会把点云旋到 canonical 姿态再推理，但训练侧从未做同样处理
+       // （--random_rotate 默认 False），且 aux 特征用的仍是旋转前的 metadata
+       // bboxSize —— 属训练/推理输入语义不一致。
+       // 8 类 A/B 实测（ab_canonical_align.py，n=2900 配对）：净效果为零
+       // （Δ=+0.0013, t=+0.86），6 类无差别 / 2 类略差 / 0 类显著变好，
+       // 且多数类有一半以上样本对齐根本没触发。故移除。
        << QStringLiteral( "--cpu" );
 
   QString stdoutText;

@@ -17,10 +17,11 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 - 支持将当前模型加载到 QGIS 3D 场景。
 - 支持 Qt3D 实时预览实体，用于参数拖动时快速更新拟合模型。
 - 支持外部点云导入，包括 `.ply`、`.txt`、`.xyz`、`.pts`、`.las`、`.laz`。
-- 支持 PointNet、PointNet++、PointNeXt、PCT 四类后端进行点云分类（当前主力：PCT，98.92% F1）
-- 支持调用外部 Python 参数回归模型，并将结果回填到插件 UI
-- 支持随机参数生成和批量深度学习数据集导出（500 样本/类，14 类共 7000）
+- 支持 PointNet、PointNet++、PointNeXt、PCT 四类后端进行点云分类（当前主力：PCT，98.92% F1，v4 分类待重训）
+- 支持调用外部 Python 参数回归模型，并将结果回填到插件 UI（当前默认回归后缀 `_v4_normals`）
+- 支持随机参数生成和批量深度学习数据集导出（500 样本/类，TwoGableHouses 1000 样本，14 类共 7500）
 - 支持 OBJ、STL、JSON、PLY、深度学习 TXT 点云等格式导出。
+- 支持 2D 地图画布点选目标点，将当前模型锚点平移到点云指定位置，便于 QGIS 3D 里人工微调。
 
 ## 支持的建筑基元
 
@@ -74,7 +75,7 @@ x y z
 
 导出时会进行中心化和按最大半径归一化，同时记录 `pointCloudInfo`，包括包围盒、中心、尺度等信息，用于后续参数估计时恢复尺度。
 
-当前标准数据集规模为 **500 样本/类**（train 400 + val 50 + test 50），14 类共 7000 样本。
+当前标准数据集规模为 **500 样本/类**（train 400 + val 50 + test 50），TwoGableHouses 为 **1000 样本**，14 类共 **7500 样本**。
 
 ### 3. 点云分类
 
@@ -245,11 +246,12 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 -> BuildMesh（锚点见下：长方体类左下角 / 圆形类底面中心）
 -> 网格表面采样点云 + 归一化
 -> PCT 分类（98.92% F1）
--> PCT 回归（v3_normals：basic + PCA 法向量）
+-> PCT 回归（v4_normals：basic + PCA 法向量，修复数据集上重训）
 -> pointNetParamsToUiParams 映射 + applyToUI 回填
--> alignModelToPointCloud 自动对齐（同锚点语义的 bbox 极值对齐）
+-> applyMetadataRz 回填朝向（metadata 的导出真值，不是 DL 预测）
+-> alignModelToPointCloud 自动对齐（同锚点语义、旋转后的 bbox 极值对齐）
 -> QGIS 3D 叠加点云与模型
--> 人工微调（Ctrl+滚轮精调 + DL 锚点复位）
+-> 人工微调（Ctrl+滚轮精调 + DL 锚点复位 + 2D 点选目标平移）
 -> 导出参数化成果
 ```
 
@@ -257,9 +259,25 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 
 ## 当前已知问题
 
-- 🔴 **参数估计精度不足**：PCT 回归对局部几何参数（`bulge` R²=-0.004、`middleBulge` R²=-0.363、`wallRatio` R²=-0.271、`innerWidth` R²=0.050）仍然困难。TwoGableHouses 和 IndentedCuboid 存在严重过拟合（500样本不够支撑7-8参数回归）。详见 `dl-pipeline-log.md`。
-- 位姿参数（rx/ry/rz/tx/ty/tz）尚未进入回归训练，auto-align 只做平移对齐（v2.3.4 起改用点云 **bbox 中心** 而非采样质心，见下）。**旋转仍未处理**：DL 不预测 rz，模型朝向始终是默认值。
+- 🔴 **参数估计精度不足**：v4 重训后 9/13 类 avg R²>0.6，但仍有 7 个参数属"输入里没有信号"（`middleBulge`、`wingRatio/wingWidthRatio`、`offsetX/offsetY`、`ridgeRatio`、`middleTopRadius`，corr≈0、预测方差只有真值 1/3）——**扩量和换架构都救不了**，别在这上面花时间。`LHouse` 整体最弱（avg R² 0.207）。`IndentedCuboid` 仍严重过拟合。详见 `dl-pipeline-log.md` 第七章。
+- ⚠️ **分类尚未在新数据上重训**：`pct_cls_v2` 的 98.92% F1 是修复前的 `datasets_aug` 上的结果，`train_pct_cls_v4.sh` 已就绪但未执行。
+- 位姿参数（rx/ry/rz/tx/ty/tz）尚未进入回归训练。auto-align 做平移对齐（v2.3.4 起改用点云 **bbox 极值** 而非采样质心，见下），**朝向 rz 从 v2.3.6 起由 metadata 真值回填**（见下）——但只对"有 metadata 记录的输入"有效，纯推理（无 metadata）时朝向仍是默认值 + 人工微调。
+- **rz 无法通过训练补**：它在当前数据形态下不可辨识（圆柱类无定义、矩形类只确定到 mod 180°），`_rot` 实验已因此弃用，详见 `scripts/README.md`。
+- 自动对齐仍是几何启发式：点云对齐目标优先取"底部截面 footprint + 1% 分位稳健 bbox"，比全点云硬 bbox 稳，但当回归尺寸本身偏了或可见点云缺角时，仍需要 2D 点选目标平移做最后校正。
 - `parammodeler_dock.cpp` 职责仍偏重，但已拆分出 7 个辅助模块（params/dlutils/randomizer/datasetgen/config/export/scene3d）。
+
+## 已解决（v2.3.9）
+
+- ✅ **自动对齐目标更贴近底部 footprint**：加载点云时同时统计硬 bbox、1% 分位稳健 bbox、底部截面 bbox。X/Y 优先用底部截面，Z 保留硬底面 `z_min`；底部点数不足或 footprint 太小时退回全点云稳健 bbox。
+- ✅ **保留 bbox 兜底**：底部截面不是替代旧方案，而是和稳健 bbox 组合使用；点云没有足够底部截面时仍能自动对齐。
+- ✅ **人工点选平移**：新增 `Pick target for model anchor`。点击后在 QGIS 2D 画布显示当前模型锚点红 X，并显示红色 +X / 绿色 +Y 方向线；再点点云目标位置，只更新 `TX/TY`，不改尺寸、高度、旋转。
+- ✅ **锚点可视化语义明确**：红 X 是模型的生长/旋转锚点（局部 `(0,0,0)` 经过当前旋转和平移后的位置），不是旋转后的 AABB 左下角。长方体类含 LHouse / TwoGableHouses 用外包络左下角；圆形类用底面中心。
+- ✅ **调试日志降噪**：移除高频 `[BuildMesh] ...` 输出，保留 `[PointCloudBBox]`、`[PointCloudFootprint]`、`[Align]`、`[ManualAlign]` 这些定位对齐问题真正有用的日志。
+
+## 已解决（v2.3.7）
+
+- ✅ **离群点不再主导自动对齐**：点云显示 bbox 改为 1% 分位稳健统计，避免少量离群点把左下角参考点拉走。
+- ✅ **数据增强坐标系漂移已定位并修复**：`datasets_aug` 早期增强会重新归一化且不映射回导出坐标系，导致显示反归一化和训练尺度都受污染；修复后回归 v4 在干净数据上重训。
 
 ## 已解决（v2.2.0 → v2.3.0）
 
@@ -268,6 +286,18 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 - ✅ 参数 UI 扁平 → 8 类复杂基元加分组标题
 - ✅ Ctrl+滚轮精调 → `FineTuneFilter` 事件过滤器
 - ✅ auto-align 代码重复 → `alignModelToPointCloud()` 共用函数
+
+## 已解决（v2.3.6）
+
+- ✅ **朝向歪（点云带 rz 时模型不转）** → 新增 `applyMetadataRz()`：从输入文件的 metadata
+  记录里读 `params.rz`（导出时 `applyPose` 用的那个角，点云坐标本身就是它转出来的），
+  回填到 `spinBoxRKappa`。**不做训练**——rz 在标签层面不可辨识（见 `scripts/README.md`），
+  只能取真值。该值同时记入 DL 锚点，`↺ Reset` 会恢复完整朝向。
+- ✅ **对齐参考点与点云不同语义** → `alignModelToPointCloud` 改为在**施加 pose 旋转之后**的
+  mesh 上算 bbox。点云侧 bbox 是旋转后点集的极值，模型侧必须同样先转再取极值；
+  旋转绕 mesh 自身原点（= 锚点），rz=0 时 `posMat` 是单位阵，行为与 v2.3.5 完全一致。
+- ⚠️ 仅对**有 metadata 记录的输入**有效（`datasets_aug`）；PLY / 无 `params` 的记录读不到 rz，
+  此时保持当前朝向不变（调试日志会记 `<none>`）。
 
 ## 已解决（v2.3.5）
 
@@ -280,6 +310,8 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 - ⚠️ 未消除：**旋转（rz）仍未处理**。切到角锚定后对齐目标变成"点云 bbox 左下角"，
   而点云若带 rz，其 bbox 左下角不是模型左下角的对应点（bbox 中心对中心在对称底面上是旋转不变的，
   bbox 角对则不是）——所以**带 rz 的点云在 X/Y 上可能反而更明显**，需等位姿估计落地。
+  → **v2.3.6 已解决**：rz 由 metadata 真值回填，且对齐参考点改在旋转后的 mesh 上取，
+  两侧恢复同一语义。
 
 ## 已解决（v2.3.4）
 

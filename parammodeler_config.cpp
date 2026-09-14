@@ -67,7 +67,7 @@ QString datasetsBaseDir()
 QString classifyModelName()
 {
   return setting( QStringLiteral( "parammodeler/classifyModelName" ),
-                  QStringLiteral( "pct_cls_v2" ) );
+                  QStringLiteral( "pct_cls_v4" ) );
 }
 
 QString regressionModelPrefix()
@@ -89,7 +89,7 @@ QString regressionModelSuffix()
 QString pctRegressionSuffix()
 {
   return setting( QStringLiteral( "parammodeler/pctRegressionSuffix" ),
-                  QStringLiteral( "_v3_normals" ) );
+                  QStringLiteral( "_v4_normals" ) );
 }
 
 // ------------------------------------------------------------------
@@ -115,7 +115,7 @@ QString classifyLogDir( PointNetBackend backend )
   {
     case PointNetBackend::PointNet:  return base + QStringLiteral( "pointnet_simple/logs/pointnet_aug_roof_guard_v1" );
     case PointNetBackend::PointNeXt: return base + QStringLiteral( "pointnext_simple/logs/" ) + classifyModelName();
-    case PointNetBackend::PCT:       return base + QStringLiteral( "pct_simple/logs/pct_cls_v2" );
+    case PointNetBackend::PCT:       return base + QStringLiteral( "pct_simple/logs/pct_cls_v4" );
     default:                         return base + QStringLiteral( "pointnet2_simple/logs/pointnet2_cls_auxdata_250" );
   }
 }
@@ -230,7 +230,8 @@ void showSettingsDialog( QWidget *parent )
   {
     form->addRow( QStringLiteral( "PCT 回归默认后缀:" ), edtPctSuffix );
     auto *pctHint = new QLabel(
-      QStringLiteral( "  默认 _v3_normals (basic + PCA 法向量，13 类统一)。" ), &dlg );
+      QStringLiteral( "  默认 _v4_normals (basic + PCA 法向量，13 类统一；"
+                      "v4 用修复离群点/坐标系后的 datasets_aug 重训)。" ), &dlg );
     pctHint->setStyleSheet( QStringLiteral( "color: #888; font-size: 11px;" ) );
     form->addRow( QString(), pctHint );
   }
@@ -254,8 +255,8 @@ void showSettingsDialog( QWidget *parent )
     edtPython->setText(    QStringLiteral( "E:/mambaforge/envs/pointnet_train/python.exe" ) );
     edtBase->setText(      QStringLiteral( "E:/pointnet" ) );
     edtDataset->setText(   QStringLiteral( "E:/pointnet/datasets_aug" ) );
-    edtClsModel->setText(  QStringLiteral( "pct_cls_v2" ) );
-    edtPctSuffix->setText( QStringLiteral( "_v3_normals" ) );
+    edtClsModel->setText(  QStringLiteral( "pct_cls_v4" ) );
+    edtPctSuffix->setText( QStringLiteral( "_v4_normals" ) );
     edtRegPrefix->setText( QStringLiteral( "pointnext_reg_" ) );
     edtRegSuffix->setText( QStringLiteral( "_v2" ) );
   } );

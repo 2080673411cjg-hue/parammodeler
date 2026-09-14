@@ -109,11 +109,6 @@ MeshData BuildMesh::build( const QString &primitiveType, ParamModelerDock *dock 
     if ( !usesCornerAnchor( primitiveType ) )
         centerMeshOnBaseFace( m );
 
-    DEBUG_LOG( QString( "[BuildMesh] %1 → 顶点=%2, 三角面=%3\n" )
-      .arg( primitiveType )
-      .arg( m.vertices.size() )
-      .arg( m.indices.size() / 3 )
-      .toStdWString().c_str() );
     return m;
 }
 

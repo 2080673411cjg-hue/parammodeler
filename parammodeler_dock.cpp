@@ -29,6 +29,8 @@
 #include "parammodeler_scene3d.h"
 
 #include <limits>
+#include <algorithm>
+#include <cmath>
 
 #include <QFileInfo>
 #include <QDir>
@@ -72,9 +74,8 @@
 #include <QRandomGenerator>
 #include <QRegularExpression>
 #include <QStringList>
-#include <algorithm>
-#include <cmath>
 #include <QJsonArray>
+#include <QColor>
 
 
 #include <qgis.h>
@@ -101,6 +102,9 @@
 #include "qgspointcloud3dsymbol.h"
 #include "qgspointcloudlayer3drenderer.h"
 #include "qgsmapcanvas.h"
+#include "qgsmaptoolemitpoint.h"
+#include "qgsmaptool.h"
+#include "qgsrubberband.h"
 #include "qgspointcloudindex.h"
 #include "qgspointcloudblock.h"
 #include "qgspointcloudattribute.h"
@@ -215,12 +219,65 @@ static bool pointCloudMetadataLooksBuggy( const QVector3D &center, double scale 
 //
 // 参考点按锚点类型二选一（锚点 / 生长原点 / 旋转轴三者绑定）：
 //   左下角锚定（长方体类，BuildMesh::usesCornerAnchor）→ 两边都取 bbox **左下角**
-//   底面中心锚定（圆形类 / TriPrismPyramid）          → 两边都取 bbox **中心**
+//   底面中心锚定（圆形类 / TriPrismPyramid）          → XY 取 bbox 中心，Z 取 bbox 底面
 //
 // 绝不能用 pointCloudInfo.center（那是采样点质心）：采样分布屋顶 60% / 墙 40%
 // （exportpointcloud.cpp），质心 z 与 bbox 中心 z 能差 1–3 m（实测），
 // 非对称底面 X/Y 也偏。必须用 bbox 极值，两侧同一语义才能对上。
+//
+// 参考点必须在**施加 pose 旋转之后**的 mesh 上算：点云坐标导出时已被 applyPose 转过 rz，
+// 它的 bbox 是旋转后点集的 bbox；模型侧若拿未旋转的 mesh bbox，两侧就不是同一个语义。
+// 旋转绕 mesh 自身原点（=锚点，见 scene3d 的 T·Rx·Ry·Rz），所以 rz=0 时下面的
+// posMat 是单位阵，结果与 v2.3.5 完全一致。
 // ============================================================
+static QMatrix4x4 modelRotationMatrix( ParamModelerDock *dock )
+{
+    QMatrix4x4 posMat;
+    posMat.setToIdentity();
+    posMat.rotate( static_cast<float>( dock->poseRotateX() ), 1, 0, 0 );
+    posMat.rotate( static_cast<float>( dock->poseRotateY() ), 0, 1, 0 );
+    posMat.rotate( static_cast<float>( dock->poseRotateZ() ), 0, 0, 1 );
+    return posMat;
+}
+
+static QVector3D modelAlignmentReference( const MeshData &mesh, const QString &primitiveType,
+                                          ParamModelerDock *dock )
+{
+    const QMatrix4x4 posMat = modelRotationMatrix( dock );
+
+    QVector3D vMin( std::numeric_limits<float>::max(),
+                    std::numeric_limits<float>::max(),
+                    std::numeric_limits<float>::max() );
+    QVector3D vMax( std::numeric_limits<float>::lowest(),
+                    std::numeric_limits<float>::lowest(),
+                    std::numeric_limits<float>::lowest() );
+    for ( const QVector3D &raw : mesh.vertices )
+    {
+        const QVector3D v = posMat.map( raw );
+        if ( v.x() < vMin.x() ) vMin.setX( v.x() );
+        if ( v.y() < vMin.y() ) vMin.setY( v.y() );
+        if ( v.z() < vMin.z() ) vMin.setZ( v.z() );
+        if ( v.x() > vMax.x() ) vMax.setX( v.x() );
+        if ( v.y() > vMax.y() ) vMax.setY( v.y() );
+        if ( v.z() > vMax.z() ) vMax.setZ( v.z() );
+    }
+
+    const bool corner = BuildMesh::usesCornerAnchor( primitiveType );
+    return corner
+      ? vMin
+      : QVector3D( ( vMin.x() + vMax.x() ) * 0.5f,
+                   ( vMin.y() + vMax.y() ) * 0.5f,
+                   vMin.z() );
+}
+
+static QVector3D modelGrowthAnchor( ParamModelerDock *dock )
+{
+    // BuildMesh keeps the semantic growth/rotation anchor at local origin:
+    // corner-anchored classes use the footprint corner; centered classes are
+    // shifted so the base center is at (0,0,0).
+    return modelRotationMatrix( dock ).map( QVector3D( 0.0f, 0.0f, 0.0f ) );
+}
+
 static void alignModelToPointCloud( const MeshData &mesh, const QVector3D &pcRef,
                                      const QString &primitiveType,
                                      ParamModelerDock *dock, const QString &context )
@@ -231,33 +288,21 @@ static void alignModelToPointCloud( const MeshData &mesh, const QVector3D &pcRef
         return;
     }
 
-    QVector3D vMin( std::numeric_limits<float>::max(),
-                    std::numeric_limits<float>::max(),
-                    std::numeric_limits<float>::max() );
-    QVector3D vMax( std::numeric_limits<float>::lowest(),
-                    std::numeric_limits<float>::lowest(),
-                    std::numeric_limits<float>::lowest() );
-    for ( const QVector3D &v : mesh.vertices )
-    {
-        if ( v.x() < vMin.x() ) vMin.setX( v.x() );
-        if ( v.y() < vMin.y() ) vMin.setY( v.y() );
-        if ( v.z() < vMin.z() ) vMin.setZ( v.z() );
-        if ( v.x() > vMax.x() ) vMax.setX( v.x() );
-        if ( v.y() > vMax.y() ) vMax.setY( v.y() );
-        if ( v.z() > vMax.z() ) vMax.setZ( v.z() );
-    }
     const bool corner = BuildMesh::usesCornerAnchor( primitiveType );
-    // 模型侧参考点：角锚定 → bbox 左下角（即构建原点 (0,0,0)）；中心锚定 → bbox 中心
-    const QVector3D mRef = corner ? vMin : ( vMin + vMax ) * 0.5f;
+    // 模型侧参考点：角锚定 → 旋转后 bbox 左下角；中心锚定 → 旋转后底面中心
+    // （圆形底面各向同性，绕中心转后 XY 的 bbox 中心仍在原点；角锚定类 rz≠0 时
+    //   锚点本身已不再是 bbox 极值，所以必须用旋转后的 bbox —— 见上面的注释）
+    const QVector3D mRef = modelAlignmentReference( mesh, primitiveType, dock );
 
     const double tx = static_cast<double>( pcRef.x() ) - static_cast<double>( mRef.x() );
     const double ty = static_cast<double>( pcRef.y() ) - static_cast<double>( mRef.y() );
     const double tz = static_cast<double>( pcRef.z() ) - static_cast<double>( mRef.z() );
     dock->setPoseTranslate( tx, ty, tz );
 
-    DEBUG_LOG( QString( "[Align] %1 anchor=%2 pcRef=(%3,%4,%5) modelRef=(%6,%7,%8) → tx=%9 ty=%10 tz=%11\n" )
+    DEBUG_LOG( QString( "[Align] %1 anchor=%2 rz=%3 pcRef=(%4,%5,%6) modelRef=(%7,%8,%9) → tx=%10 ty=%11 tz=%12\n" )
                  .arg( context )
                  .arg( corner ? QStringLiteral( "corner" ) : QStringLiteral( "center" ) )
+                 .arg( dock->poseRotateZ(), 0, 'f', 2 )
                  .arg( pcRef.x(), 0, 'f', 2 ).arg( pcRef.y(), 0, 'f', 2 ).arg( pcRef.z(), 0, 'f', 2 )
                  .arg( mRef.x(), 0, 'f', 2 ).arg( mRef.y(), 0, 'f', 2 ).arg( mRef.z(), 0, 'f', 2 )
                  .arg( tx, 0, 'f', 2 ).arg( ty, 0, 'f', 2 ).arg( tz, 0, 'f', 2 )
@@ -267,14 +312,17 @@ static void alignModelToPointCloud( const MeshData &mesh, const QVector3D &pcRef
 // ============================================================
 // 缓存输入文件的 metadata：
 //   center / scale → 反归一化（p*scale + center）
-//   bbox 极值      → 模型对齐（角锚定用 bboxMin，圆类用 bbox 中心；
+//   bbox 极值      → 模型对齐（角锚定用 bboxMin，圆类用 XY 中心 + Z 底面；
 //                    不能拿 center 去对齐，见 alignModelToPointCloud）
+//   rz             → 导出朝向，回填到 pose（见 applyMetadataRz）
 // ============================================================
 void ParamModelerDock::cacheInputMetadata( const QString &filePath )
 {
   QVector3D metadataBBoxMin, metadataBBoxSize;
+  double metadataRz = qQNaN();
   m_hasMetadata = metadataPointCloudInfoForInput( filePath, &metadataBBoxMin, &metadataBBoxSize,
-                                                 &m_metadataCenter, &m_metadataScale );
+                                                 &m_metadataCenter, &m_metadataScale,
+                                                 &metadataRz );
   // 坏记录（从归一化坐标存下来的 center≈0 / scale≈1）不能拿去对齐，否则模型被对到世界原点
   m_hasMetadataBBox = m_hasMetadata &&
                       !pointCloudMetadataLooksBuggy( m_metadataCenter, m_metadataScale );
@@ -283,24 +331,53 @@ void ParamModelerDock::cacheInputMetadata( const QString &filePath )
     m_metadataBBoxMin    = metadataBBoxMin;
     m_metadataBBoxCenter = metadataBBoxMin + metadataBBoxSize * 0.5f;
   }
+  // rz 只有 JSON metadata 有（PLY / 兜底路径给 NaN），且坏记录不算数
+  m_hasMetadataRz = m_hasMetadataBBox && !qIsNaN( metadataRz );
+  if ( m_hasMetadataRz )
+    m_metadataRz = metadataRz;
 
   if ( m_hasMetadata )
   {
-    DEBUG_LOG( QString( "[Meta] cached center=(%1,%2,%3) scale=%4 alignBBoxCenter=(%5,%6,%7)\n" )
+    DEBUG_LOG( QString( "[Meta] center=(%1,%2,%3) scale=%4 metadataMin=(%5,%6,%7) metadataCenter=(%8,%9,%10) rz=%11 usableBBox=%12\n" )
                  .arg( m_metadataCenter.x(), 0, 'f', 2 )
                  .arg( m_metadataCenter.y(), 0, 'f', 2 )
                  .arg( m_metadataCenter.z(), 0, 'f', 2 )
                  .arg( m_metadataScale, 0, 'f', 2 )
+                 .arg( m_metadataBBoxMin.x(), 0, 'f', 2 )
+                 .arg( m_metadataBBoxMin.y(), 0, 'f', 2 )
+                 .arg( m_metadataBBoxMin.z(), 0, 'f', 2 )
                  .arg( m_metadataBBoxCenter.x(), 0, 'f', 2 )
                  .arg( m_metadataBBoxCenter.y(), 0, 'f', 2 )
                  .arg( m_metadataBBoxCenter.z(), 0, 'f', 2 )
+                 .arg( m_hasMetadataRz ? QString::number( m_metadataRz, 'f', 2 )
+                                       : QStringLiteral( "<none>" ) )
+                 .arg( m_hasMetadataBBox ? QStringLiteral( "yes" ) : QStringLiteral( "no" ) )
                  .toStdWString().c_str() );
   }
 }
 
 // ============================================================
-// 对齐目标解析：优先"场景里实际显示的点云"的包围盒中心（ground truth），
-// 没有时退回 metadata 记录的 bbox 中心。
+// 把 metadata 记录的导出朝向回填到 pose。
+//
+// 为什么是 metadata 而不是 DL 预测：rz 在训练标签里是**不可辨识**的，模型学不到
+// （圆柱类绕轴旋转点云不变 → rz 无定义；矩形底面类只确定到 mod 180°，近正方到 mod 90°；
+//  `_rot` 实验已因此弃用，见 scripts/README.md）。metadata 里存的却是导出真值，
+// 点云坐标本身就是 applyPose(..., rz) 转出来的，所以直接回填同一个角最准。
+//
+// 必须早于 alignModelToPointCloud：对齐参考点按旋转后的 mesh 算。
+// ============================================================
+bool ParamModelerDock::applyMetadataRz()
+{
+  if ( !m_hasMetadataRz )
+    return false;
+
+  ui->spinBoxRKappa->setValue( m_metadataRz );
+  return true;
+}
+
+// ============================================================
+// 对齐目标解析：优先"场景里实际显示的点云"的包围盒（ground truth），
+// 没有时退回 metadata 记录的 bbox。
 // 这样显示路径和对齐路径用的是同一个几何，不会再出现"点云画在 A、模型对到 B"。
 // ============================================================
 bool ParamModelerDock::pointCloudAlignTarget( QVector3D &out ) const
@@ -314,11 +391,33 @@ bool ParamModelerDock::pointCloudAlignTarget( QVector3D &out ) const
          QFileInfo( m_inputDataPath ).absoluteFilePath(), Qt::CaseInsensitive ) == 0 )
   {
     out = corner ? m_displayCloudBBoxMin : m_displayCloudBBoxCenter;
+    out.setZ( m_displayCloudBBoxMin.z() );
+    DEBUG_LOG( QString( "[AlignTarget] source=display anchor=%1 pcRef=(%2,%3,%4) displayMin=(%5,%6,%7) displayCenter=(%8,%9,%10)\n" )
+                 .arg( corner ? QStringLiteral( "corner" ) : QStringLiteral( "base-center" ) )
+                 .arg( out.x(), 0, 'f', 2 ).arg( out.y(), 0, 'f', 2 ).arg( out.z(), 0, 'f', 2 )
+                 .arg( m_displayCloudBBoxMin.x(), 0, 'f', 2 )
+                 .arg( m_displayCloudBBoxMin.y(), 0, 'f', 2 )
+                 .arg( m_displayCloudBBoxMin.z(), 0, 'f', 2 )
+                 .arg( m_displayCloudBBoxCenter.x(), 0, 'f', 2 )
+                 .arg( m_displayCloudBBoxCenter.y(), 0, 'f', 2 )
+                 .arg( m_displayCloudBBoxCenter.z(), 0, 'f', 2 )
+                 .toStdWString().c_str() );
     return true;
   }
   if ( m_hasMetadataBBox )
   {
     out = corner ? m_metadataBBoxMin : m_metadataBBoxCenter;
+    out.setZ( m_metadataBBoxMin.z() );
+    DEBUG_LOG( QString( "[AlignTarget] source=metadata anchor=%1 pcRef=(%2,%3,%4) metadataMin=(%5,%6,%7) metadataCenter=(%8,%9,%10)\n" )
+                 .arg( corner ? QStringLiteral( "corner" ) : QStringLiteral( "base-center" ) )
+                 .arg( out.x(), 0, 'f', 2 ).arg( out.y(), 0, 'f', 2 ).arg( out.z(), 0, 'f', 2 )
+                 .arg( m_metadataBBoxMin.x(), 0, 'f', 2 )
+                 .arg( m_metadataBBoxMin.y(), 0, 'f', 2 )
+                 .arg( m_metadataBBoxMin.z(), 0, 'f', 2 )
+                 .arg( m_metadataBBoxCenter.x(), 0, 'f', 2 )
+                 .arg( m_metadataBBoxCenter.y(), 0, 'f', 2 )
+                 .arg( m_metadataBBoxCenter.z(), 0, 'f', 2 )
+                 .toStdWString().c_str() );
     return true;
   }
   return false;
@@ -386,6 +485,29 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
 
 ParamModelerDock::~ParamModelerDock()
 {
+  QgsMapCanvas *canvas = mIface ? mIface->mapCanvas() : nullptr;
+  if ( canvas && m_manualTranslateTool && canvas->mapTool() == m_manualTranslateTool )
+  {
+    if ( m_previousMapTool )
+      canvas->setMapTool( m_previousMapTool );
+    else
+      canvas->unsetMapTool( m_manualTranslateTool );
+  }
+  if ( m_manualTranslateSourceMarker )
+  {
+    delete m_manualTranslateSourceMarker;
+    m_manualTranslateSourceMarker = nullptr;
+  }
+  if ( m_manualTranslateXAxisMarker )
+  {
+    delete m_manualTranslateXAxisMarker;
+    m_manualTranslateXAxisMarker = nullptr;
+  }
+  if ( m_manualTranslateYAxisMarker )
+  {
+    delete m_manualTranslateYAxisMarker;
+    m_manualTranslateYAxisMarker = nullptr;
+  }
   ParamModelerScene3D::clearRealtimePreviewMesh( mIface );
   m_modelLayer = nullptr;
   delete ui;
@@ -833,6 +955,184 @@ void ParamModelerDock::initPointNet()
   );
   ui->formLayoutPrimitive->addRow( tr( "DL anchor:" ), m_resetAnchorBtn );
   connect( m_resetAnchorBtn, &QPushButton::clicked, this, &ParamModelerDock::resetToDlAnchor );
+
+  m_manualTranslateBtn = new QPushButton( tr( "Pick target for model anchor" ), this );
+  m_manualTranslateBtn->setToolTip( tr( "Shows the current model anchor as a red X in the 2D map canvas. Click the point cloud target position to translate the model there. Only TX/TY are changed." ) );
+  ui->formLayoutPrimitive->addRow( tr( "Manual align:" ), m_manualTranslateBtn );
+  connect( m_manualTranslateBtn, &QPushButton::clicked, this, &ParamModelerDock::startManualTranslateByClick );
+}
+
+void ParamModelerDock::startManualTranslateByClick()
+{
+  if ( !mIface || !mIface->mapCanvas() )
+  {
+    QMessageBox::warning( this, tr( "Manual align" ), tr( "QGIS map canvas is unavailable." ) );
+    return;
+  }
+
+  const QString prim = ui->comboPrimitive->currentText();
+  const MeshData mesh = BuildMesh::build( prim, this );
+  if ( mesh.isEmpty() )
+  {
+    QMessageBox::warning( this, tr( "Manual align" ), tr( "Current model has no geometry data." ) );
+    return;
+  }
+
+  const QVector3D localRef = modelGrowthAnchor( this );
+  m_manualTranslateSource = QgsPointXY(
+    static_cast<double>( localRef.x() ) + poseTranslateX(),
+    static_cast<double>( localRef.y() ) + poseTranslateY()
+  );
+  m_manualTranslateHasSource = true;
+
+  const QMatrix4x4 rotMat = modelRotationMatrix( this );
+  QVector3D xDir = rotMat.mapVector( QVector3D( 1.0f, 0.0f, 0.0f ) );
+  QVector3D yDir = rotMat.mapVector( QVector3D( 0.0f, 1.0f, 0.0f ) );
+  QVector3D meshMin = mesh.vertices.first();
+  QVector3D meshMax = mesh.vertices.first();
+  for ( const QVector3D &v : mesh.vertices )
+  {
+    if ( v.x() < meshMin.x() ) meshMin.setX( v.x() );
+    if ( v.y() < meshMin.y() ) meshMin.setY( v.y() );
+    if ( v.z() < meshMin.z() ) meshMin.setZ( v.z() );
+    if ( v.x() > meshMax.x() ) meshMax.setX( v.x() );
+    if ( v.y() > meshMax.y() ) meshMax.setY( v.y() );
+    if ( v.z() > meshMax.z() ) meshMax.setZ( v.z() );
+  }
+  const QVector3D meshSize = meshMax - meshMin;
+  const double guideLength = std::max( 1.0, std::max( static_cast<double>( meshSize.x() ),
+                                                      static_cast<double>( meshSize.y() ) ) * 0.18 );
+  auto normalizeXY = []( const QVector3D &v ) -> QgsPointXY
+  {
+    const double len = std::hypot( static_cast<double>( v.x() ), static_cast<double>( v.y() ) );
+    if ( len < 1e-9 )
+      return QgsPointXY( 1.0, 0.0 );
+    return QgsPointXY( static_cast<double>( v.x() ) / len, static_cast<double>( v.y() ) / len );
+  };
+  const QgsPointXY xUnit = normalizeXY( xDir );
+  const QgsPointXY yUnit = normalizeXY( yDir );
+  const QgsPointXY xEnd( m_manualTranslateSource.x() + xUnit.x() * guideLength,
+                         m_manualTranslateSource.y() + xUnit.y() * guideLength );
+  const QgsPointXY yEnd( m_manualTranslateSource.x() + yUnit.x() * guideLength,
+                         m_manualTranslateSource.y() + yUnit.y() * guideLength );
+
+  QgsMapCanvas *canvas = mIface->mapCanvas();
+  if ( !m_manualTranslateTool )
+  {
+    m_manualTranslateTool = new QgsMapToolEmitPoint( canvas );
+    connect( m_manualTranslateTool, &QgsMapToolEmitPoint::canvasClicked,
+             this, &ParamModelerDock::handleManualTranslateClick );
+  }
+
+  if ( canvas->mapTool() != m_manualTranslateTool )
+    m_previousMapTool = canvas->mapTool();
+
+  if ( m_manualTranslateSourceMarker )
+  {
+    delete m_manualTranslateSourceMarker;
+    m_manualTranslateSourceMarker = nullptr;
+  }
+  if ( m_manualTranslateXAxisMarker )
+  {
+    delete m_manualTranslateXAxisMarker;
+    m_manualTranslateXAxisMarker = nullptr;
+  }
+  if ( m_manualTranslateYAxisMarker )
+  {
+    delete m_manualTranslateYAxisMarker;
+    m_manualTranslateYAxisMarker = nullptr;
+  }
+  m_manualTranslateSourceMarker = new QgsRubberBand( canvas, Qgis::GeometryType::Point );
+  m_manualTranslateSourceMarker->setIcon( QgsRubberBand::ICON_X );
+  m_manualTranslateSourceMarker->setIconSize( 16 );
+  m_manualTranslateSourceMarker->setWidth( 3 );
+  m_manualTranslateSourceMarker->setColor( QColor( 220, 30, 30, 220 ) );
+  m_manualTranslateSourceMarker->addPoint( m_manualTranslateSource );
+  m_manualTranslateXAxisMarker = new QgsRubberBand( canvas, Qgis::GeometryType::Line );
+  m_manualTranslateXAxisMarker->setColor( QColor( 220, 30, 30, 220 ) );
+  m_manualTranslateXAxisMarker->setWidth( 3 );
+  m_manualTranslateXAxisMarker->addPoint( m_manualTranslateSource );
+  m_manualTranslateXAxisMarker->addPoint( xEnd );
+  m_manualTranslateYAxisMarker = new QgsRubberBand( canvas, Qgis::GeometryType::Line );
+  m_manualTranslateYAxisMarker->setColor( QColor( 30, 170, 60, 220 ) );
+  m_manualTranslateYAxisMarker->setWidth( 3 );
+  m_manualTranslateYAxisMarker->addPoint( m_manualTranslateSource );
+  m_manualTranslateYAxisMarker->addPoint( yEnd );
+
+  canvas->setMapTool( m_manualTranslateTool );
+  if ( m_manualTranslateBtn )
+    m_manualTranslateBtn->setText( tr( "Click target point..." ) );
+
+  DEBUG_LOG( QString( "[ManualAlign] started prim=%1 anchor=(%2,%3) localRef=(%4,%5,%6) +X=(%7,%8) +Y=(%9,%10); click target on the 2D map canvas\n" )
+               .arg( prim )
+               .arg( m_manualTranslateSource.x(), 0, 'f', 3 )
+               .arg( m_manualTranslateSource.y(), 0, 'f', 3 )
+               .arg( localRef.x(), 0, 'f', 3 )
+               .arg( localRef.y(), 0, 'f', 3 )
+               .arg( localRef.z(), 0, 'f', 3 )
+               .arg( xUnit.x(), 0, 'f', 3 )
+               .arg( xUnit.y(), 0, 'f', 3 )
+               .arg( yUnit.x(), 0, 'f', 3 )
+               .arg( yUnit.y(), 0, 'f', 3 )
+               .toStdWString().c_str() );
+}
+
+void ParamModelerDock::handleManualTranslateClick( const QgsPointXY &point, Qt::MouseButton button )
+{
+  if ( button != Qt::LeftButton )
+    return;
+
+  if ( !m_manualTranslateHasSource )
+  {
+    DEBUG_LOG( L"[ManualAlign] ignored click without a source anchor\n" );
+    return;
+  }
+
+  const double dx = point.x() - m_manualTranslateSource.x();
+  const double dy = point.y() - m_manualTranslateSource.y();
+  const double oldTx = poseTranslateX();
+  const double oldTy = poseTranslateY();
+  const double oldTz = poseTranslateZ();
+  setPoseTranslate( oldTx + dx, oldTy + dy, oldTz );
+
+  DEBUG_LOG( QString( "[ManualAlign] target=(%1,%2) delta=(%3,%4) tx=%5→%6 ty=%7→%8 tz=%9\n" )
+               .arg( point.x(), 0, 'f', 3 )
+               .arg( point.y(), 0, 'f', 3 )
+               .arg( dx, 0, 'f', 3 )
+               .arg( dy, 0, 'f', 3 )
+               .arg( oldTx, 0, 'f', 3 )
+               .arg( poseTranslateX(), 0, 'f', 3 )
+               .arg( oldTy, 0, 'f', 3 )
+               .arg( poseTranslateY(), 0, 'f', 3 )
+               .arg( oldTz, 0, 'f', 3 )
+               .toStdWString().c_str() );
+
+  m_manualTranslateHasSource = false;
+  if ( m_manualTranslateBtn )
+    m_manualTranslateBtn->setText( tr( "Pick target for model anchor" ) );
+  if ( m_manualTranslateSourceMarker )
+  {
+    delete m_manualTranslateSourceMarker;
+    m_manualTranslateSourceMarker = nullptr;
+  }
+  if ( m_manualTranslateXAxisMarker )
+  {
+    delete m_manualTranslateXAxisMarker;
+    m_manualTranslateXAxisMarker = nullptr;
+  }
+  if ( m_manualTranslateYAxisMarker )
+  {
+    delete m_manualTranslateYAxisMarker;
+    m_manualTranslateYAxisMarker = nullptr;
+  }
+
+  QgsMapCanvas *canvas = mIface ? mIface->mapCanvas() : nullptr;
+  if ( canvas && canvas->mapTool() == m_manualTranslateTool && m_previousMapTool )
+    canvas->setMapTool( m_previousMapTool );
+  else if ( canvas && canvas->mapTool() == m_manualTranslateTool )
+    canvas->unsetMapTool( m_manualTranslateTool );
+
+  onUpdatePreview();
 }
 
 void ParamModelerDock::onPrimitiveChanged( const QString &prim )
@@ -1172,6 +1472,10 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
         onLoadToQGIS3D( true );
         if ( !loadPointCloudToQGIS3D( m_inputDataPath, false ) )
           QMessageBox::warning( &dialog, tr( "Point cloud load failed" ), tr( "The model was loaded, but the point cloud was not loaded into QGIS 3D." ) );
+
+        // --- 朝向：先回填 metadata 里的导出 rz（点云已转过这个角），再对齐 ---
+        if ( !applyMetadataRz() )
+          DEBUG_LOG( QString( "[Align] no metadata rz for %1, keeping current pose rotation\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
 
         // --- Auto-align：必须在点云显示**之后**做，对齐目标 = 实际显示点云的 bbox 极值 ---
         QVector3D alignTarget;
@@ -1514,6 +1818,82 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
 }
 
 
+// ============================================================
+// 稳健包围盒：XY 取分位数，Z 底部取硬 min。
+//
+// 为什么必须这样：点云里的离群点（真实扫描的误匹配点，或 datasets_aug 里
+// add_outliers 撒的点）数量很少但离得远，硬 min/max 会被它们完全主导。
+// 实测（datasets_aug，每朵云约 1% 离群点、撒在归一化空间 [-1.15,1.15]^3）
+// 角锚定点被拉偏 3–7 m —— 模型对齐就落不到建筑的左下角。
+//
+// 为什么 XY 分位数不会削掉建筑本体：建筑在水平轴上的极值是被一整条边/面（长方体）
+// 或平方根聚集的点列（圆柱）逼近的，1% 分位与真实极值几乎重合。
+// 但 Z 不能用 1% 分位：底面通常不采样，墙脚点也可能很稀，分位数会把模型整体垫高。
+// 所以 Z 的 min 保留硬最小值；显示路径已把反归一化后的负 Z clamp 到 0。
+// 点数 <100 时退回硬 min/max（样本太少，分位数没有意义）。
+// ============================================================
+static void hardBBoxFromPoints( const QVector<QVector3D> &pts,
+                                QVector3D &outMin, QVector3D &outMax )
+{
+  outMin = QVector3D();
+  outMax = QVector3D();
+  if ( pts.isEmpty() )
+    return;
+
+  outMin = pts.first();
+  outMax = pts.first();
+  for ( const QVector3D &p : pts )
+  {
+    if ( p.x() < outMin.x() ) outMin.setX( p.x() );
+    if ( p.y() < outMin.y() ) outMin.setY( p.y() );
+    if ( p.z() < outMin.z() ) outMin.setZ( p.z() );
+    if ( p.x() > outMax.x() ) outMax.setX( p.x() );
+    if ( p.y() > outMax.y() ) outMax.setY( p.y() );
+    if ( p.z() > outMax.z() ) outMax.setZ( p.z() );
+  }
+}
+
+static void robustBBoxFromPoints( const QVector<QVector3D> &pts,
+                                  QVector3D &outMin, QVector3D &outMax )
+{
+  outMin = QVector3D();
+  outMax = QVector3D();
+  const int n = pts.size();
+  if ( n == 0 )
+    return;
+
+  int lo = 0;
+  int hi = n - 1;
+  if ( n >= 100 )
+  {
+    lo = static_cast<int>( std::floor( 0.01 * n ) );
+    hi = n - 1 - lo;
+  }
+
+  QVector<float> col;
+  col.resize( n );
+  float mn[3] = { pts[0].x(), pts[0].y(), pts[0].z() };
+  float mx[3] = { pts[0].x(), pts[0].y(), pts[0].z() };
+  for ( int a = 0; a < 3; ++a )
+  {
+    for ( int i = 0; i < n; ++i )
+      col[i] = pts[i][a];
+    std::sort( col.begin(), col.end() );
+    if ( a < 2 )
+    {
+      mn[a] = col[lo];
+      mx[a] = col[hi];
+    }
+    else
+    {
+      mn[a] = col.first();
+      mx[a] = col.last();
+    }
+  }
+  outMin = QVector3D( mn[0], mn[1], mn[2] );
+  outMax = QVector3D( mx[0], mx[1], mx[2] );
+}
+
 bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool showMessage )
 {
   if ( filePath.isEmpty() )
@@ -1535,25 +1915,78 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
   // normalised coords by the old exportOccludedTXT / exportLabeledTXT).
   const bool metadataLooksBuggy = pointCloudMetadataLooksBuggy( metadataCenter, metadataScale );
 
-  // 累积"最终显示的点集"的包围盒 —— 模型对齐的目标就是它的 bbox 中心。
+  // 量"最终显示的点集"的包围盒 —— 模型对齐的目标就是它的极值/中心。
   // 显示什么就对到什么，两条路径共用同一几何，不再各算各的。
+  // 注意用 robustBBoxFromPoints（分位数）而不是硬 min/max：离群点会把
+  // 包围盒极值整个拉走，对齐就落不到建筑上（见该函数注释）。
   QVector3D displayMin, displayMax;
   bool hasDisplayBBox = false;
-  auto accumulateDisplayPoint = [&]( const QVector3D &p )
+  auto setDisplayBBoxFromPoints = [&]( const QVector<QVector3D> &points, const QString &source )
   {
-    if ( !hasDisplayBBox )
-    {
-      displayMin = p;
-      displayMax = p;
-      hasDisplayBBox = true;
+    if ( points.isEmpty() )
       return;
+
+    QVector3D hardMin, hardMax;
+    hardBBoxFromPoints( points, hardMin, hardMax );
+    QVector3D fullRobustMin, fullRobustMax;
+    robustBBoxFromPoints( points, fullRobustMin, fullRobustMax );
+
+    const double fullHeight = static_cast<double>( hardMax.z() - hardMin.z() );
+    const double sliceHeight = std::max( 0.5, fullHeight * 0.12 );
+    const double sliceTop = static_cast<double>( hardMin.z() ) + sliceHeight;
+    QVector<QVector3D> bottomSlice;
+    bottomSlice.reserve( points.size() );
+    for ( const QVector3D &p : points )
+    {
+      if ( static_cast<double>( p.z() ) <= sliceTop )
+        bottomSlice.append( p );
     }
-    if ( p.x() < displayMin.x() ) displayMin.setX( p.x() );
-    if ( p.y() < displayMin.y() ) displayMin.setY( p.y() );
-    if ( p.z() < displayMin.z() ) displayMin.setZ( p.z() );
-    if ( p.x() > displayMax.x() ) displayMax.setX( p.x() );
-    if ( p.y() > displayMax.y() ) displayMax.setY( p.y() );
-    if ( p.z() > displayMax.z() ) displayMax.setZ( p.z() );
+
+    QVector3D sliceMin, sliceMax;
+    const int minSlicePoints = std::max( 50, static_cast<int>( std::ceil( points.size() * 0.05 ) ) );
+    bool useBottomSlice = bottomSlice.size() >= minSlicePoints;
+    QString sliceReason = useBottomSlice ? QStringLiteral( "ok" ) : QStringLiteral( "too-few-points" );
+    if ( useBottomSlice )
+    {
+      robustBBoxFromPoints( bottomSlice, sliceMin, sliceMax );
+      const QVector3D fullRange = fullRobustMax - fullRobustMin;
+      const QVector3D sliceRange = sliceMax - sliceMin;
+      const bool xReasonable = fullRange.x() <= 1e-6f || sliceRange.x() >= fullRange.x() * 0.25f;
+      const bool yReasonable = fullRange.y() <= 1e-6f || sliceRange.y() >= fullRange.y() * 0.25f;
+      useBottomSlice = xReasonable && yReasonable;
+      if ( !useBottomSlice )
+        sliceReason = QStringLiteral( "tiny-footprint" );
+    }
+
+    displayMin = useBottomSlice
+      ? QVector3D( sliceMin.x(), sliceMin.y(), hardMin.z() )
+      : QVector3D( fullRobustMin.x(), fullRobustMin.y(), hardMin.z() );
+    displayMax = useBottomSlice
+      ? QVector3D( sliceMax.x(), sliceMax.y(), fullRobustMax.z() )
+      : fullRobustMax;
+    hasDisplayBBox = true;
+
+    const QVector3D fullRobustShift = fullRobustMin - hardMin;
+    DEBUG_LOG( QString( "[PointCloudBBox] source=%1 n=%2 hardMin=(%3,%4,%5) hardMax=(%6,%7,%8) fullRobustMin=(%9,%10,%11) fullRobustMax=(%12,%13,%14) fullMinShift=(%15,%16,%17)\n" )
+                 .arg( source )
+                 .arg( points.size() )
+                 .arg( hardMin.x(), 0, 'f', 2 ).arg( hardMin.y(), 0, 'f', 2 ).arg( hardMin.z(), 0, 'f', 2 )
+                 .arg( hardMax.x(), 0, 'f', 2 ).arg( hardMax.y(), 0, 'f', 2 ).arg( hardMax.z(), 0, 'f', 2 )
+                 .arg( fullRobustMin.x(), 0, 'f', 2 ).arg( fullRobustMin.y(), 0, 'f', 2 ).arg( fullRobustMin.z(), 0, 'f', 2 )
+                 .arg( fullRobustMax.x(), 0, 'f', 2 ).arg( fullRobustMax.y(), 0, 'f', 2 ).arg( fullRobustMax.z(), 0, 'f', 2 )
+                 .arg( fullRobustShift.x(), 0, 'f', 2 ).arg( fullRobustShift.y(), 0, 'f', 2 ).arg( fullRobustShift.z(), 0, 'f', 2 )
+                 .toStdWString().c_str() );
+    DEBUG_LOG( QString( "[PointCloudFootprint] source=%1 slice=%2 n=%3/%4 z=[%5,%6] alignMin=(%7,%8,%9) alignMax=(%10,%11,%12) reason=%13\n" )
+                 .arg( source )
+                 .arg( useBottomSlice ? QStringLiteral( "bottom" ) : QStringLiteral( "full-coarse" ) )
+                 .arg( bottomSlice.size() )
+                 .arg( points.size() )
+                 .arg( hardMin.z(), 0, 'f', 2 )
+                 .arg( sliceTop, 0, 'f', 2 )
+                 .arg( displayMin.x(), 0, 'f', 2 ).arg( displayMin.y(), 0, 'f', 2 ).arg( displayMin.z(), 0, 'f', 2 )
+                 .arg( displayMax.x(), 0, 'f', 2 ).arg( displayMax.y(), 0, 'f', 2 ).arg( displayMax.z(), 0, 'f', 2 )
+                 .arg( sliceReason )
+                 .toStdWString().c_str() );
   };
 
   if ( hasMetadata )
@@ -1600,15 +2033,22 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
 
       if ( denormalizedFile.open() )
       {
-        QTextStream out( &denormalizedFile );
+        QVector<QVector3D> restoredPoints;
+        restoredPoints.reserve( normalizedCloud.points.size() );
         for ( const QVector3D &p : normalizedCloud.points )
         {
           QVector3D restored = p * static_cast<float>( denormScale ) + denormCenter;
           if ( restored.z() < 0.0f )
             restored.setZ( 0.0f );
-          accumulateDisplayPoint( restored );
-          out << restored.x() << ' ' << restored.y() << ' ' << restored.z() << '\n';
+          restoredPoints.append( restored );
         }
+
+        // 稳健 bbox：离群点不能主导对齐目标（见 robustBBoxFromPoints）
+        setDisplayBBoxFromPoints( restoredPoints, QStringLiteral( "restored" ) );
+
+        QTextStream out( &denormalizedFile );
+        for ( const QVector3D &p : restoredPoints )
+          out << p.x() << ' ' << p.y() << ' ' << p.z() << '\n';
         out.flush();
         denormalizedFile.flush();
         displayPath = denormalizedFile.fileName();
@@ -1618,8 +2058,7 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
     else if ( !normalizedCloud.points.isEmpty() )
     {
       DEBUG_LOG( QString( "[PointCloud] metadata matched, input appears already in display scale: %1\n" ).arg( filePath ).toStdWString().c_str() );
-      for ( const QVector3D &p : normalizedCloud.points )
-        accumulateDisplayPoint( p );
+      setDisplayBBoxFromPoints( normalizedCloud.points, QStringLiteral( "display-scale" ) );
     }
   }
 
@@ -1627,8 +2066,7 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
   if ( !hasDisplayBBox )
   {
     const PointCloud asIs = PointCloudLoader::load( displayPath );
-    for ( const QVector3D &p : asIs.points )
-      accumulateDisplayPoint( p );
+    setDisplayBBoxFromPoints( asIs.points, QStringLiteral( "as-is" ) );
   }
 
   if ( hasDisplayBBox )
@@ -1637,7 +2075,7 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
     m_displayCloudBBoxCenter = ( displayMin + displayMax ) * 0.5f;
     m_hasDisplayCloudBBox    = true;
     m_displayCloudSourcePath = filePath;
-    DEBUG_LOG( QString( "[PointCloud] displayed bbox min=(%1,%2,%3) center=(%4,%5,%6) → align target\n" )
+    DEBUG_LOG( QString( "[PointCloud] align bbox min=(%1,%2,%3) center=(%4,%5,%6) → align target\n" )
                  .arg( m_displayCloudBBoxMin.x(), 0, 'f', 2 )
                  .arg( m_displayCloudBBoxMin.y(), 0, 'f', 2 )
                  .arg( m_displayCloudBBoxMin.z(), 0, 'f', 2 )
@@ -1742,7 +2180,7 @@ void ParamModelerDock::onLoadInputData()
   m_inputDataPath = filePath;
   QFileInfo fi( filePath );
 
-  // 缓存元数据：center（质心）用于反归一化，bbox 中心用于模型对齐 —— 两者语义不同，别混用
+  // 缓存元数据：center（质心）用于反归一化，bbox 极值/底面用于模型对齐 —— 两者语义不同，别混用
   cacheInputMetadata( filePath );
 
   DEBUG_LOG( QString( "[Tab2] load input data: %1\n" ).arg( filePath ).toStdWString().c_str() );
@@ -1847,6 +2285,25 @@ void ParamModelerDock::onInverseParams()
 
   ui->progressInversion->setValue( 100 );
   ui->progressInversion->setVisible( false );
+
+  // --- 朝向：DL 不预测 rz（标签不可辨识，见 applyMetadataRz），回填 metadata 的导出真值 ---
+  // applyToUI 已在上面执行 → metadata 的 rz 覆盖模型可能给出的值；
+  // rz 同时记进 DL 锚点并补一行表格，这样"一键复位"恢复的是完整的自动估计结果（含朝向）。
+  if ( applyMetadataRz() )
+  {
+    if ( m_hasDlAnchor )
+    {
+      m_dlAnchorParams.insert( QStringLiteral( "poseRotateZ" ), m_metadataRz );
+      const int row = ui->tableInverseParams->rowCount();
+      ui->tableInverseParams->setRowCount( row + 1 );
+      ui->tableInverseParams->setItem( row, 0, new QTableWidgetItem( QStringLiteral( "poseRotateZ (metadata)" ) ) );
+      ui->tableInverseParams->setItem( row, 1, new QTableWidgetItem( QString::number( m_metadataRz, 'f', 2 ) ) );
+    }
+  }
+  else
+  {
+    DEBUG_LOG( QString( "[Align] no metadata rz for %1, keeping current pose rotation\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
+  }
 
   // --- Auto-align：模型参考点 ↔ 点云参考点（bbox 极值，不是质心，见 alignModelToPointCloud） ---
   QVector3D alignTarget;

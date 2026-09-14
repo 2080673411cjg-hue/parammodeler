@@ -28,6 +28,7 @@
 #include <QMap>
 #include <QVector>
 #include <QVector3D>
+#include <qgspointxy.h>
 
 class QCheckBox;
 class QProgressDialog;
@@ -36,6 +37,9 @@ class QJsonArray;
 
 class QgisInterface;
 class QgsMapLayer;
+class QgsMapTool;
+class QgsMapToolEmitPoint;
+class QgsRubberBand;
 class QgsVectorLayer;
 class QMenu;                    // ← 新增这一行（推荐显式包含）
 
@@ -160,6 +164,8 @@ private slots:
   void onInverseParams();
   void onOpenPointCloudEstimateDialog();
   void onRandomizeCurrentPrimitive();
+  void startManualTranslateByClick();
+  void handleManualTranslateClick( const QgsPointXY &point, Qt::MouseButton button );
 		
   void onUpdatePreview();//主刷新入口
 
@@ -174,12 +180,19 @@ private:
   void randomizeCurrentPrimitiveParams( bool refreshPreview, bool randomizePose = false );
   bool loadPointCloudToQGIS3D( const QString &filePath, bool showMessage );
 
-  // 缓存输入文件的 metadata（center 质心用于反归一化，bbox 中心用于对齐）
+  // 缓存输入文件的 metadata（center 质心用于反归一化，bbox 极值/底面用于对齐）
   void cacheInputMetadata( const QString &filePath );
 
-  // 取模型对齐的目标点（点云 bbox 中心）。优先用"实际显示的点云"的 bbox 中心，
-  // 没有时退回 metadata 记录的 bbox 中心。返回 false = 无可用目标，调用方应跳过对齐。
+  // 取模型对齐的目标点。角锚定类取点云 bbox 左下角；中心锚定类取 XY 中心 + Z 底面。
+  // 优先用"实际显示的点云"的 bbox，没有时退回 metadata 记录的 bbox。
+  // 返回 false = 无可用目标，调用方应跳过对齐。
   bool pointCloudAlignTarget( QVector3D &out ) const;
+
+  // 把 metadata 里记录的导出朝向 rz 回填到 pose（spinBoxRKappa）。
+  // 点云坐标导出时已经被 applyPose 转过 rz，模型补上同一个角才能对上朝向。
+  // 必须在 alignModelToPointCloud 之前调用（对齐参考点按 pose 旋转后的 mesh 算）。
+  // 返回 false = 该输入没有可用的 rz，pose 保持不变。
+  bool applyMetadataRz();
 
   Ui::ParamModelerDock *ui;
   QgisInterface *mIface;
@@ -193,14 +206,16 @@ private:
   // 注意：center 是采样点**质心**，只能用于反归一化 p*scale+center；
   // 模型对齐必须用 bbox 的极值（质心被 60/40 屋顶/墙采样比例顶高，见 alignModelToPointCloud）。
   QVector3D m_metadataCenter;                  // 质心（反归一化用）
-  QVector3D m_metadataBBoxCenter;              // bbox 中心（圆类对齐用）
+  QVector3D m_metadataBBoxCenter;              // bbox XY 中心（圆类对齐用；Z 对齐时取 m_metadataBBoxMin）
   QVector3D m_metadataBBoxMin;                 // bbox 左下角（角锚定类对齐用）
   double    m_metadataScale = 1.0;
+  double    m_metadataRz = 0.0;                // 导出朝向（度，applyPose 用的那个角）
   bool      m_hasMetadata = false;
   bool      m_hasMetadataBBox = false;
+  bool      m_hasMetadataRz = false;           // 该输入是否带 rz（PLY / 无 params 的记录为 false）
 
   // ===== 场景中实际显示的点云 bbox（对齐首选，仅当它就是当前输入文件时用） =====
-  QVector3D m_displayCloudBBoxCenter;          // bbox 中心（圆类用）
+  QVector3D m_displayCloudBBoxCenter;          // bbox XY 中心（圆类用；Z 对齐时取 m_displayCloudBBoxMin）
   QVector3D m_displayCloudBBoxMin;             // bbox 左下角（角锚定类用）
   bool      m_hasDisplayCloudBBox = false;
   QString   m_displayCloudSourcePath;          // 显示在场景里的那个点云文件
@@ -222,6 +237,16 @@ private:
   bool m_hasDlAnchor = false;
   QPushButton *m_resetAnchorBtn = nullptr;
   void resetToDlAnchor();
+
+  // ===== 手动目标点平移对齐（2D canvas 拾取） =====
+  QPushButton *m_manualTranslateBtn = nullptr;
+  QgsMapToolEmitPoint *m_manualTranslateTool = nullptr;
+  QgsMapTool *m_previousMapTool = nullptr;
+  QgsRubberBand *m_manualTranslateSourceMarker = nullptr;
+  QgsRubberBand *m_manualTranslateXAxisMarker = nullptr;
+  QgsRubberBand *m_manualTranslateYAxisMarker = nullptr;
+  bool m_manualTranslateHasSource = false;
+  QgsPointXY m_manualTranslateSource;
 };
 
 #endif // PARAMMODELER_DOCK_H
