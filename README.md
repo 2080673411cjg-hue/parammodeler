@@ -29,14 +29,14 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 |---|---|---|
 | `Cuboid` | 长方体 | `length`, `width`, `height` |
 | `Cylinder` | 圆柱体 | `radius`, `height` |
-| `LHouse` | L 型房屋 | `mainLength`, `mainWidth`, `wingLength`, `wingWidth`, `height` |
+| `LHouse` | L 型房屋 | `outerLength`, `outerWidth`, `cutoutLengthRatio`, `cutoutWidthRatio`, `height` |
 | `ConeCylinder` | 圆柱 + 圆锥 | `radius`, `totalHeight`, `cylinderRatio` |
 | `GabledRoof` | 人字形屋顶房屋 | `length`, `width`, `totalHeight`, `wallRatio` |
 | `PyramidRoof` | 金字塔屋顶房屋 | `length`, `width`, `totalHeight`, `wallRatio` |
-| `TruncatedPyramidRoof` | 截顶金字塔屋顶 | `bottomLength`, `bottomWidth`, `topLength`, `topWidth`, `totalHeight`, `wallRatio` |
-| `HalfCylinderRoof` | 半圆柱拱顶房屋 | `length`, `width`, `wallHeight`, `roofRadius` |
+| `TruncatedPyramidRoof` | 截顶金字塔屋顶 | `bottomLength`, `bottomWidth`, `topLengthRatio`, `topWidthRatio`, `totalHeight`, `wallRatio` |
+| `HalfCylinderRoof` | 半圆柱拱顶房屋 | `length`, `width`, `wallHeight`（`roofRadius = width/2` 派生） |
 | `CylinderDome` | 圆柱穹顶 | `radius`, `totalHeight`, `cylinderRatio`, `bulge` |
-| `IndentedCuboid` | 凹陷长方体 | `outerLength`, `outerWidth`, `outerHeight`, `innerLength`, `innerWidth`, `innerHeight`, `offsetX`, `offsetY` |
+| `IndentedCuboid` | 凹陷长方体 | `outerLength`, `outerWidth`, `outerHeight`, `innerLengthRatio`, `innerWidthRatio`, `innerHeight`, `innerMinXRatio`, `innerMinYRatio` |
 | `AsymmetricGableHouse` | 非对称人字形房屋 | `length`, `width`, `totalHeight`, `wallRatio`, `ridgeLength`, `ridgeRatio` |
 | `FourStageRoundTower` | 四段式圆塔 | `baseRadius`, `baseHeight`, `middleHeight`, `middleTopRadius`, `middleBulge`, `coneHeight` |
 | `TwoGableHouses` | 双人字形房屋 | `length1`, `length2`, `width`, `totalHeight`, `wallRatio`, `angle`, `ridgeRatio` |
@@ -247,6 +247,7 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 -> 网格表面采样点云 + 归一化
 -> PCT 分类（98.92% F1）
 -> PCT 回归（v4_normals：basic + PCA 法向量，修复数据集上重训）
+-> 参数级数据驱动校正（实验：Cuboid / Cylinder / GabledRoof）
 -> pointNetParamsToUiParams 映射 + applyToUI 回填
 -> applyMetadataRz 回填朝向（metadata 的导出真值，不是 DL 预测）
 -> alignModelToPointCloud 自动对齐（同锚点语义、旋转后的 bbox 极值对齐）
@@ -259,12 +260,29 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 
 ## 当前已知问题
 
-- 🔴 **参数估计精度不足**：v4 重训后 9/13 类 avg R²>0.6，但仍有 7 个参数属"输入里没有信号"（`middleBulge`、`wingRatio/wingWidthRatio`、`offsetX/offsetY`、`ridgeRatio`、`middleTopRadius`，corr≈0、预测方差只有真值 1/3）——**扩量和换架构都救不了**，别在这上面花时间。`LHouse` 整体最弱（avg R² 0.207）。`IndentedCuboid` 仍严重过拟合。详见 `dl-pipeline-log.md` 第七章。
+- 🔴 **参数估计精度不足**：v4 重训后 9/13 类 avg R²>0.6，但仍有 7 个参数属"输入里没有信号"（`middleBulge`、旧 `wingRatio/wingWidthRatio`、旧 `offsetX/offsetY`、`ridgeRatio`、`middleTopRadius`，corr≈0、预测方差只有真值 1/3）。v2.3.10 起先把 LHouse / IndentedCuboid / TruncatedPyramidRoof / HalfCylinderRoof 的训练 target 改成更贴近 footprint 或物理约束的形式，待重训验证。
 - ⚠️ **分类尚未在新数据上重训**：`pct_cls_v2` 的 98.92% F1 是修复前的 `datasets_aug` 上的结果，`train_pct_cls_v4.sh` 已就绪但未执行。
 - 位姿参数（rx/ry/rz/tx/ty/tz）尚未进入回归训练。auto-align 做平移对齐（v2.3.4 起改用点云 **bbox 极值** 而非采样质心，见下），**朝向 rz 从 v2.3.6 起由 metadata 真值回填**（见下）——但只对"有 metadata 记录的输入"有效，纯推理（无 metadata）时朝向仍是默认值 + 人工微调。
 - **rz 无法通过训练补**：它在当前数据形态下不可辨识（圆柱类无定义、矩形类只确定到 mod 180°），`_rot` 实验已因此弃用，详见 `scripts/README.md`。
 - 自动对齐仍是几何启发式：点云对齐目标优先取"底部截面 footprint + 1% 分位稳健 bbox"，比全点云硬 bbox 稳，但当回归尺寸本身偏了或可见点云缺角时，仍需要 2D 点选目标平移做最后校正。
 - `parammodeler_dock.cpp` 职责仍偏重，但已拆分出 7 个辅助模块（params/dlutils/randomizer/datasetgen/config/export/scene3d）。
+
+## 已解决（v2.3.11）
+
+- ✅ **参数级数据驱动校正最小闭环**：新增 `Enable geometry correction` 开关（默认关闭；主面板和分类/参数估计弹窗里同步显示）。开启后在 PCT 回归后、写 UI 前，对 Cuboid / Cylinder / GabledRoof 加一层点云几何强修正。
+- ✅ **Cuboid**：用反归一化后的点云、按 metadata rz 逆旋到 canonical 后，从底部 footprint 修正 `length/width`，从 Z range 修正 `height`。
+- ✅ **Cylinder**：用稳健 XY 中心和半径分位数修正 `radius`，用 Z range 修正 `height`。
+- ✅ **GabledRoof**：用底部 footprint 修正 `length/width`，并尝试从高度剖面估计 `wallRatio`；估不出来时保留 PCT 的墙/屋顶比例。
+- ✅ **实验安全边界**：点云读不到、metadata 缺失或估计失败时直接跳过，不影响原始 PCT 回填；当前不做残差校正模型。
+
+## 已解决（v2.3.10）
+
+- ✅ **回归 target 重参数化**：不推翻 UI / BuildMesh，只改变 dataset metadata 和 DL 回填支持的新标签；旧模型返回旧 key 时仍兼容。
+- ✅ **HalfCylinderRoof 去掉 `radius` target**：半圆屋顶半径固定为 `width/2`，训练只保留 `length width wallHeight`。
+- ✅ **TruncatedPyramidRoof 顶面改比例**：`topLength/topWidth` 改为 `topLengthRatio/topWidthRatio`，用底面尺寸派生顶面绝对尺寸，降低尺度耦合。
+- ✅ **LHouse 改外包络 + 缺口比例**：`outerLength outerWidth cutoutLengthRatio cutoutWidthRatio height`，比旧 `wingRatio/wingWidthRatio` 更直接对应 footprint 缺口。
+- ✅ **IndentedCuboid 改 inner 位置/尺寸比例**：`innerLengthRatio innerWidthRatio innerMinXRatio innerMinYRatio`，保留 `innerHeight` 绝对高度；UI 仍显示 inner 长宽和偏移滑块。
+- ✅ **FourStageRoundTower / TwoGableHouses 暂不调整**：先减少变量，后续看这一轮重训结果再动。
 
 ## 已解决（v2.3.9）
 

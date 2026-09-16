@@ -1,11 +1,11 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-09-14
-> 插件版本: **v2.3.9**（2D 点选目标平移 + 底部截面 footprint 对齐；含 v2.3.8 回归 `v4_normals` 默认 / v2.3.7 稳健 bbox / v2.3.6 rz 回填）
+> 最后更新: 2026-09-16
+> 插件版本: **v2.3.12**（v4-1 四类重参数化模型验证 + 3D 拾取对齐技术检查；含 v2.3.11 参数级数据驱动校正 / v2.3.10 回归 target 重参数化 / v2.3.9 2D 点选目标平移）
 > ⚠️ **待办**：分类重训（`train_pct_cls_v4.sh`）**尚未执行**，下方分类指标仍是旧数据上 `pct_cls_v2` 的结果
 > 当前模型: **PCT**（Point Cloud Transformer）— Li & Shan 2025 风格 offset-attention
 > 分类模型: `pct_cls_v2` — 98.92% F1（旧数据；v4 重训待跑）
-> 回归模型: 13 类（TriPrismPyramid 无需回归），**`pct_reg_*_v4_normals` (basic + PCA 法向量)，已接入生产**（v2.3.8 起为插件默认后缀）
+> 回归模型: 13 类（TriPrismPyramid 无需回归），生产默认仍为 **`pct_reg_*_v4_normals`**；另有 4 类重参数化验证模型 **`pct_reg_{lhouse,truncatedpyramid,halfcylinder,indentedcuboid}_v4-1_normals`**
 > 法向量实验: 阶段 0/1/2 全部完成，bulge 转正（v4 corr=0.578）、middleBulge 仍≈0（详见第七章）
 > 数据集: **500 样本/类**（train 400 + val 50 + test 50），TwoGableHouses **1000 样本**（仅扩充数据量，无额外增强），14 类共 7500 样本；**v4 起用修复后的 `datasets_aug`**（离群点 extent 0.08 + 坐标系不漂移）
 > 后端: PCT（PointNeXt 保留但不再使用）
@@ -307,7 +307,9 @@ Python 预测脚本 (`main_reg.py`) 的处理：
 | `totalHeight` + `wallRatio` | `*WallHeight` + `*RoofHeight` | 所有带屋顶的基元：`totalHeight * wallRatio` / `totalHeight * (1-wallRatio)` |
 | `totalHeight` + `cylinderRatio` | `*CylHeight` + `*UpperHeight` | ConeCylinder / CylinderDome |
 | `radius` + `height` | `*Radius` / `cylHeight` | Cylinder |
-| `mainLength`, `mainWidth`, `wingLength`, `wingWidth` | `lMainL`, `lMainW`, `lWingL`, `lWingW` | LHouse |
+| `outerLength`, `outerWidth`, `cutoutLengthRatio`, `cutoutWidthRatio` | `lTotalL`, `lTotalW`, `lWingR`, `lWingWR=1-cutoutWidthRatio` | LHouse v2.3.10 起 |
+| `topLengthRatio`, `topWidthRatio` | `tpTopLength=bottomLength*ratio`, `tpTopWidth=bottomWidth*ratio` | TruncatedPyramidRoof v2.3.10 起 |
+| `innerLengthRatio`, `innerWidthRatio`, `innerMinXRatio`, `innerMinYRatio` | `icInnerL/W` 和 offset 滑块 | IndentedCuboid v2.3.10 起 |
 
 ### Auto-Align（平移对齐 + 朝向回填）— v2.3.4 bbox 极值 / v2.3.5 按锚点取角或中心 / v2.3.6 旋转后取极值
 
@@ -626,6 +628,65 @@ PointNeXt 时代的主混淆（Cuboid↔Cylinder↔IndentedCuboid）**全部消�
 `args.pct_variant`（CLI 默认值 "neighbor"）；真正建模型走 `load_checkpoint()`，
 从 checkpoint 里的 `pct_variant` 字段读（`main_reg.py:606`）。所以指标是对的，
 只有那行日志文案不可信。v3 脚本同样如此。
+
+### 回归 v4-1_normals — 四类重参数化验证（2026-09-15）
+
+目的：验证 v2.3.10 的 target 重参数化是否比旧 v4 标签更适合回归。只重训 4 类：
+`LHouse / TruncatedPyramidRoof / HalfCylinderRoof / IndentedCuboid`。训练脚本为
+`/home/xubo/pointnet/pct_simple/train_pct_reg_normals_v4_1.sh`，输出后缀
+`_v4-1_normals`；Windows 侧产物已同步到 `E:/pointnet/pct_simple/logs/`。
+
+数据生成：先用修复后的 `augment_dataset.py` 只增强这 4 类，命令口径：
+
+```bash
+python augment_dataset.py --input E:/pointnet/datasets --output E:/pointnet/datasets_aug --classes HalfCylinderRoof TruncatedPyramidRoof LHouse IndentedCuboid --num_points 2048 --outlier_extent 0.08 --no-drop_bottom --overwrite
+```
+
+增强结果：`success=2000, failed=0`；bbox-min frame drift：median=0.0083、p99=0.0194、max=0.0304。
+
+**v4-1 test split 指标摘要：**
+
+| 类 | 结论 |
+|---|---|
+| `HalfCylinderRoof` | 可用。`length` R²=0.938、`width` R²=0.852、`wallHeight` R²=0.681；去掉 `radius` 单独回归是正确方向，`roofRadius=width/2` 派生即可。 |
+| `TruncatedPyramidRoof` | 部分改善。`bottomLength` R²=0.797、`bottomWidth` R²=0.648、`totalHeight` R²=0.925、`wallRatio` R²=0.696；`topLengthRatio/topWidthRatio` 仍一般（0.398/0.453）。 |
+| `LHouse` | 外包络和高度很好，缺口比例仍难。`outerLength` R²=0.925、`height` R²=0.945；`outerWidth` R²=0.517；`cutoutLengthRatio` R²=0.116、`cutoutWidthRatio` R²=-0.273。 |
+| `IndentedCuboid` | 外框/高度很好，内凹位置仍失败。`outerLength` R²=0.785、`outerWidth` R²=0.656、`outerHeight` R²=0.940、`innerHeight` R²=0.929；`innerLengthRatio/innerWidthRatio` ≈0.23；`innerMinXRatio/innerMinYRatio` <0。 |
+
+**逐参数明细（test）：**
+
+| 类 | 参数 | MAE | R² |
+|---|---|---:|---:|
+| HalfCylinderRoof | length | 0.939 | 0.938 |
+| HalfCylinderRoof | width | 0.786 | 0.852 |
+| HalfCylinderRoof | wallHeight | 0.537 | 0.681 |
+| TruncatedPyramidRoof | bottomLength | 1.260 | 0.797 |
+| TruncatedPyramidRoof | bottomWidth | 1.538 | 0.648 |
+| TruncatedPyramidRoof | topLengthRatio | 0.085 | 0.398 |
+| TruncatedPyramidRoof | topWidthRatio | 0.075 | 0.453 |
+| TruncatedPyramidRoof | totalHeight | 0.495 | 0.925 |
+| TruncatedPyramidRoof | wallRatio | 0.033 | 0.696 |
+| LHouse | outerLength | 1.702 | 0.925 |
+| LHouse | outerWidth | 1.087 | 0.517 |
+| LHouse | cutoutLengthRatio | 0.103 | 0.116 |
+| LHouse | cutoutWidthRatio | 0.059 | -0.273 |
+| LHouse | height | 0.256 | 0.945 |
+| IndentedCuboid | outerLength | 1.547 | 0.785 |
+| IndentedCuboid | outerWidth | 1.335 | 0.656 |
+| IndentedCuboid | outerHeight | 0.454 | 0.940 |
+| IndentedCuboid | innerLengthRatio | 0.074 | 0.236 |
+| IndentedCuboid | innerWidthRatio | 0.074 | 0.232 |
+| IndentedCuboid | innerHeight | 0.324 | 0.929 |
+| IndentedCuboid | innerMinXRatio | 0.149 | -0.126 |
+| IndentedCuboid | innerMinYRatio | 0.134 | -0.023 |
+
+**当前判断：**
+
+- v4-1 适合作为后续插件测试的候选后缀，但生产默认是否从 `_v4_normals` 改到 `_v4-1_normals`，需要先在 QGIS 真实叠加效果里看 4 类视觉表现。
+- 对 `HalfCylinderRoof`，参数设计已经比旧 `radius` 单独回归更合理。
+- 对 `LHouse` / `IndentedCuboid`，神经网络对"缺口比例/缺口位置"仍明显不稳；这批参数后续更适合接几何规则化或交互式微调，而不是继续单纯堆 PCT。
+- 训练日志末尾出现 `$'\r'` 是脚本 CRLF 换行问题，发生在训练和 test 全部完成后，不影响模型。Ubuntu 侧可用 `sed -i 's/\r$//' train_pct_reg_normals_v4_1.sh` 修正。
+- 日志 test 段仍可能打印 `(neighbor)`，但 4 个 `regression_config.json` 均为 `"model": "basic"`，实际模型是 basic + normals。
 
 ### 回归历史：PCT 2 变体混合部署（v2/v3，旧数据）
 
@@ -1233,3 +1294,162 @@ rz≈45° 时接近正方形（实例 `Cuboid/sample_00001`：`14.5×6.8` 的真
 
 本轮未跑 MSBuild / cl / cmake 编译验证。改动涉及 QGIS UI 类、QgsMapToolEmitPoint、QgsRubberBand
 以及若干调试日志，下一次正常编译时重点看 `parammodeler_dock.cpp/h` 的新增成员和 include。
+
+---
+
+### v2.3.10 (2026-09-15) — 回归 target 重参数化：先改最病态的 4 类
+
+按"重新训练也可以"的原则，先把回归标签从 UI 友好参数改成更数据友好的参数；UI 和 BuildMesh
+仍保留原来的可编辑语义，`pointNetParamsToUiParams()` 负责把新标签映射回 UI。
+
+#### 为什么用比例
+
+比例参数通常比绝对参数更适合回归，原因不是"比例一定更准"，而是它解决了三件事：
+
+1. **尺度解耦**：`topLength` 同时受建筑大小和屋顶收缩影响；`topLengthRatio` 只表达收缩形态。
+2. **范围有界**：ratio 天然落在 0-1 附近，标准化后比多个大尺度绝对值更稳定。
+3. **几何约束更容易满足**：`topLength = bottomLength * topLengthRatio`、`innerLength = outerLength * innerLengthRatio`，
+   不容易生成"顶面比底面还大"或"内凹超出外包络"这种不合法组合。
+
+#### 改动表
+
+| 类 | 旧 target | 新 target |
+|---|---|---|
+| `HalfCylinderRoof` | `length width wallHeight radius` | `length width wallHeight`，`radius = width/2` 派生 |
+| `TruncatedPyramidRoof` | `bottomLength bottomWidth topLength topWidth totalHeight wallRatio` | `bottomLength bottomWidth topLengthRatio topWidthRatio totalHeight wallRatio` |
+| `LHouse` | `totalLength wingRatio totalWidth wingWidthRatio height` | `outerLength outerWidth cutoutLengthRatio cutoutWidthRatio height` |
+| `IndentedCuboid` | `outerLength outerWidth outerHeight innerLength innerWidth innerHeight offsetX offsetY` | `outerLength outerWidth outerHeight innerLengthRatio innerWidthRatio innerHeight innerMinXRatio innerMinYRatio` |
+
+#### 兼容策略
+
+- 新导出的 metadata 使用新 key。
+- 新训练脚本 target 列表使用新 key。
+- 插件回填同时兼容旧 key 和新 key：旧 v4 模型仍可把旧输出映射到 UI；新模型输出比例 key 时也能正确映射。
+- `FourStageRoundTower` 和 `TwoGableHouses` 暂不调整，避免一次改变太多变量。
+
+#### 改动文件
+
+| 文件 | 内容 |
+|---|---|
+| `parammodeler_dlutils.cpp` | metadata 导出新 target；DL 回填支持新旧两套 key |
+| `scripts/train_pct_reg.sh` | PCT target 列表同步 |
+| `scripts/train_reg_with_rot.sh` | 旧 rot 脚本 target 列表同步，虽然该路线仍不推荐 |
+| `README.md` / `dl-pipeline-log.md` | 参数设计说明同步 |
+
+#### 未验证
+
+未跑 MSBuild / cl / cmake，也未重训。下一步需要重新生成 metadata / 数据集或至少确认
+`sample_params.json` 里的新 key 被训练脚本正确读取，然后从这 4 类开始重训对比。
+
+---
+
+### v2.3.11 (2026-09-15) — PCT + 数据驱动参数校正：最小闭环
+
+先不做 13 类，按最小闭环只接 3 类：
+
+| 类 | 校正内容 | 目的 |
+|---|---|---|
+| `Cuboid` | 底部 footprint 修 `length/width`，Z range 修 `height` | 验证长宽高强几何参数是否比 PCT 更稳 |
+| `Cylinder` | 稳健 XY 半径分位数修 `radius`，Z range 修 `height` | 验证半径/高度这类直接可见量 |
+| `GabledRoof` | 底部 footprint 修 `length/width`，高度剖面估 `wallRatio` | 验证 `wallRatio` 这类弱几何参数是否可被点云剖面辅助 |
+
+#### 当前对应 A/B/C 实验里的哪一步
+
+| 实验 | 状态 |
+|---|---|
+| A: PCT v4 原始回归 | 已有 baseline |
+| B: PCT + 几何强修正 | ✅ 本版已接入插件 |
+| C: PCT + 几何强修正 + 残差校正 | 未做，需要先导出 A/B 误差后训练传统残差模型 |
+
+#### 实现口径
+
+- 入口：`ParamModelerDock::applyDataDrivenParamCorrections()`。
+- UI 开关：`Enable geometry correction`，默认关闭；主面板和分类/参数估计弹窗里同步显示，关闭时就是纯 PCT 回填。
+- 调用点：两个回归入口都走，分别是估计弹窗流程和主面板 `onInverseParams()`。
+- 时机：`pointNetParamsToUiParams()` 后、`PointNetRunner::applyToUI()` 前。
+- 点云：读取当前 `m_inputDataPath`，如果看起来是 DL 归一化点云，则用 metadata `center/scale` 反归一化。
+- 朝向：优先用 metadata `rz` 把点云逆旋回 canonical，再量 footprint；没有 rz 时按当前坐标直接量。
+- 失败策略：点云不可读、bbox 无效、wallRatio 剖面估不出来时跳过对应项，保留 PCT 输出。
+- 日志：`[ParamCorrection] ...`，用于对比修正值和 PCT 原值。
+
+#### 注意
+
+这只是 B 档几何强修正，不是残差校正模型。它有意保守：只改能从点云直接看见的强几何量；
+`GabledRoof.wallRatio` 如果剖面信号不足会保留 PCT 值。
+
+---
+
+### v2.3.12 (2026-09-16) — v4-1 四类模型验证 + 3D 拾取对齐技术检查
+
+#### 1. v4-1 四类重参数化模型
+
+已完成 v2.3.10 中 4 类新 target 的最小重训闭环：
+
+| 类 | 目录 |
+|---|---|
+| `LHouse` | `E:/pointnet/pct_simple/logs/pct_reg_lhouse_v4-1_normals` |
+| `TruncatedPyramidRoof` | `E:/pointnet/pct_simple/logs/pct_reg_truncatedpyramid_v4-1_normals` |
+| `HalfCylinderRoof` | `E:/pointnet/pct_simple/logs/pct_reg_halfcylinder_v4-1_normals` |
+| `IndentedCuboid` | `E:/pointnet/pct_simple/logs/pct_reg_indentedcuboid_v4-1_normals` |
+
+训练日志：`E:/pointnet/pct_simple/logs/v4_1_reg_train.log`。完整指标已同步到第七章
+《回归 v4-1_normals — 四类重参数化验证》。
+
+结论简述：
+
+- `HalfCylinderRoof`：明显可用，`radius=width/2` 派生是正确方向。
+- `TruncatedPyramidRoof`：底面尺寸/高度/墙高比例可用，顶部比例仍一般。
+- `LHouse`：外包络和高度很好，缺口比例仍弱。
+- `IndentedCuboid`：外框和高度很好，内凹比例一般，内凹位置仍不适合纯 PCT 回归。
+
+#### 2. 一步式 2D 锚点平移保持
+
+手动平移功能最终仍保持一步式：
+
+1. 按 `Pick target for model anchor`。
+2. 2D 地图画布显示当前模型 source 红 X。
+3. 用户点击一个 2D target。
+4. 插件按 `target - source` 更新 `TX/TY`，不改 `TZ`、旋转和形状参数。
+
+曾短暂试过“两步式 source → target”，但实际使用更绕，已改回一步式。
+
+#### 3. 真 3D 拾取对齐检查结论
+
+目标是后续做“在 QGIS 3D 视图里直接点点云目标”。本轮只检查可行性，未实现。
+
+**能用的基础设施：**
+
+- QGIS 3D 有原生工具接口：`Qgs3DMapTool`。
+- `Qgs3DMapCanvas::setMapTool()` 会把 3D 视图鼠标事件转发给 map tool。
+- QGIS 3D 有屏幕点转射线与场景 raycast：
+  - `Qgs3DUtils::rayFromScreenPoint(...)`
+  - `Qgs3DUtils::castRay(...)`
+- 插件 `CMakeLists.txt` 已链接 `qgis_3d`，构建层面不需要大改。
+
+**当前坑点：**
+
+- 插件加载外部 txt 点云时，不是用原生 `QgsPointCloudLayer`，而是转成
+  `QgsVectorLayer("PointZ?crs=EPSG:3857", ..., "memory")`，再用 `QgsPoint3DSymbol` 画球。
+- QGIS 当前的 vector 3D raycast 只支持 `QgsTessellatedPolygonGeometry` 一类三角面，
+  对 PointZ 点要素会跳过；因此直接 `Qgs3DUtils::castRay()` 点这个 memory 点云，大概率拿不到 hit。
+- 原生 `QgsPointCloudLayer` 的 chunk entity 有 `rayIntersection()`，但这不是我们当前显示路径。
+
+**推荐实现路线：**
+
+第一版不强依赖 QGIS 的点云 raycast，而是自己做插件级点云拾取：
+
+```text
+激活 3D map tool
+-> 鼠标点击 3D 视图
+-> 用 Qgs3DUtils::rayFromScreenPoint 生成射线
+-> 将当前显示点云缓存逐点投影到屏幕，或算点到射线距离
+-> 找离鼠标最近且在阈值内的点云点
+-> target = 该点真实 XYZ
+-> source = 当前模型红 X
+-> 只平移 TX/TY
+```
+
+因为当前 DL 点云通常只有 2048 点，逐点投影/最近点搜索成本很低；这比先把显示路径改成
+`QgsPointCloudLayer` 更稳，也更贴合当前 txt 工作流。
+
+第二版再考虑两点式 3D 拾取：第一下点模型 source，第二下点点云 target。

@@ -141,7 +141,7 @@ logs/pointnext_reg_cuboid_aux/
 
 | 版本 | 后缀 | 回归目标 | 状态 |
 |------|------|---------|------|
-| `_aux` | 当前主力 | 纯形状参数（length, width, height, radius, bulge, wallRatio...） | ✅ 使用中 |
+| `_aux` | 当前主力 | 纯形状参数（length, width, height, ratio, bulge, wallRatio...） | ✅ 使用中 |
 | `_rot` | 已弃用 | 形状参数 + rz | ❌ 形状参数精度明显更差，不建议使用 |
 
 > `_rot` 版本虽然能预测旋转角，但形状参数精度下降严重。**根因不是数据量**：rz 这个标签在
@@ -233,10 +233,21 @@ scp -r xubo@<ubuntu-ip>:/home/xubo/pointnet/pointnext_simple/logs/pointnext_reg_
 | `--num_points` | 1024 | 2048 |
 | `--epochs` | 100 | 100 |
 | `--batch_size` | 32 | 32 |
-| `--targets` | — | 纯形状参数（length, width, height, radius, bulge, wallRatio...，各基元不同） |
+| `--targets` | — | 纯形状参数（length, width, height, ratio, bulge, wallRatio...，各基元不同） |
 | `--random_rotate` | — | **不传**（`_aux` 不预测旋转） |
 | `--aux_features` | — | `bbox_x bbox_y bbox_z scale` |
 | 数据集规模 | 500/类 | 500/类（train 400 + val 50 + test 50） |
+
+### v2.3.10 target 重参数化
+
+以下 4 类的回归 target 已改成更适合数据驱动学习的形式；旧模型输出仍由插件兼容映射。
+
+| 类 | 新 target |
+|---|---|
+| `HalfCylinderRoof` | `length width wallHeight`（`radius = width/2` 派生） |
+| `TruncatedPyramidRoof` | `bottomLength bottomWidth topLengthRatio topWidthRatio totalHeight wallRatio` |
+| `LHouse` | `outerLength outerWidth cutoutLengthRatio cutoutWidthRatio height` |
+| `IndentedCuboid` | `outerLength outerWidth outerHeight innerLengthRatio innerWidthRatio innerHeight innerMinXRatio innerMinYRatio` |
 
 ### 未来模型升级参考
 

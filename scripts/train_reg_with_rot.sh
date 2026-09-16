@@ -55,14 +55,14 @@ run_reg () {
 # ========== 13 类逐个训练（每个 target 加了 rx ry rz） ==========
 run_reg Cuboid               logs/pointnext_reg_cuboid_rot               length width height rx ry rz
 run_reg Cylinder             logs/pointnext_reg_cylinder_rot             radius height rx ry rz
-run_reg LHouse               logs/pointnext_reg_lhouse_rot               totalLength wingRatio totalWidth wingWidthRatio height rx ry rz
+run_reg LHouse               logs/pointnext_reg_lhouse_rot               outerLength outerWidth cutoutLengthRatio cutoutWidthRatio height rx ry rz
 run_reg ConeCylinder         logs/pointnext_reg_conecylinder_rot         radius totalHeight cylinderRatio rx ry rz
 run_reg GabledRoof           logs/pointnext_reg_gabledroof_rot           length width totalHeight wallRatio rx ry rz
 run_reg PyramidRoof          logs/pointnext_reg_pyramidroof_rot          length width totalHeight wallRatio rx ry rz
-run_reg TruncatedPyramidRoof logs/pointnext_reg_truncatedpyramid_rot     bottomLength bottomWidth topLength topWidth totalHeight wallRatio rx ry rz
-run_reg HalfCylinderRoof     logs/pointnext_reg_halfcylinder_rot         length width wallHeight radius rx ry rz
+run_reg TruncatedPyramidRoof logs/pointnext_reg_truncatedpyramid_rot     bottomLength bottomWidth topLengthRatio topWidthRatio totalHeight wallRatio rx ry rz
+run_reg HalfCylinderRoof     logs/pointnext_reg_halfcylinder_rot         length width wallHeight rx ry rz
 run_reg CylinderDome         logs/pointnext_reg_cylinderdome_rot         radius totalHeight cylinderRatio bulge rx ry rz
-run_reg IndentedCuboid       logs/pointnext_reg_indentedcuboid_rot       outerLength outerWidth outerHeight innerLength innerWidth innerHeight offsetX offsetY rx ry rz
+run_reg IndentedCuboid       logs/pointnext_reg_indentedcuboid_rot       outerLength outerWidth outerHeight innerLengthRatio innerWidthRatio innerHeight innerMinXRatio innerMinYRatio rx ry rz
 run_reg AsymmetricGableHouse logs/pointnext_reg_asymgable_rot            length width totalHeight wallRatio ridgeLength ridgeRatio rx ry rz
 run_reg FourStageRoundTower  logs/pointnext_reg_fourstage_rot            baseRadius baseHeight middleHeight middleTopRadius middleBulge coneHeight rx ry rz
 run_reg TwoGableHouses       logs/pointnext_reg_twogable_rot             length1 length2 width totalHeight wallRatio angle ridgeRatio rx ry rz

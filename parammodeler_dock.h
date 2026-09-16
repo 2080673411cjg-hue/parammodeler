@@ -194,6 +194,11 @@ private:
   // 返回 false = 该输入没有可用的 rz，pose 保持不变。
   bool applyMetadataRz();
 
+  // 实验性参数级数据驱动校正：PCT 回归后、写 UI 前，对少数强几何参数用点云统计量覆盖。
+  // 当前只启用 Cuboid / Cylinder / GabledRoof，失败即跳过，保留原 PCT 输出。
+  void applyDataDrivenParamCorrections( const QString &primitiveType,
+                                        QMap<QString, double> &uiParams ) const;
+
   Ui::ParamModelerDock *ui;
   QgisInterface *mIface;
 		QString m_currentPrimitive;                  // 记录当前基元名
@@ -236,6 +241,7 @@ private:
   QMap<QString, double> m_dlAnchorParams;
   bool m_hasDlAnchor = false;
   QPushButton *m_resetAnchorBtn = nullptr;
+  QCheckBox *m_geometryCorrectionCheckBox = nullptr;
   void resetToDlAnchor();
 
   // ===== 手动目标点平移对齐（2D canvas 拾取） =====

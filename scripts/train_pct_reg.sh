@@ -102,14 +102,14 @@ run_pct_reg () {
 # ========== 13 类逐个训练（纯形状参数，不含 rz） ==========
 run_pct_reg Cuboid               logs/pct_reg_cuboid_v1               length width height
 run_pct_reg Cylinder             logs/pct_reg_cylinder_v1             radius height
-run_pct_reg LHouse               logs/pct_reg_lhouse_v1               totalLength wingRatio totalWidth wingWidthRatio height
+run_pct_reg LHouse               logs/pct_reg_lhouse_v1               outerLength outerWidth cutoutLengthRatio cutoutWidthRatio height
 run_pct_reg ConeCylinder         logs/pct_reg_conecylinder_v1         radius totalHeight cylinderRatio
 run_pct_reg GabledRoof           logs/pct_reg_gabledroof_v1           length width totalHeight wallRatio
 run_pct_reg PyramidRoof          logs/pct_reg_pyramidroof_v1          length width totalHeight wallRatio
-run_pct_reg TruncatedPyramidRoof logs/pct_reg_truncatedpyramid_v1     bottomLength bottomWidth topLength topWidth totalHeight wallRatio
-run_pct_reg HalfCylinderRoof     logs/pct_reg_halfcylinder_v1         length width wallHeight radius
+run_pct_reg TruncatedPyramidRoof logs/pct_reg_truncatedpyramid_v1     bottomLength bottomWidth topLengthRatio topWidthRatio totalHeight wallRatio
+run_pct_reg HalfCylinderRoof     logs/pct_reg_halfcylinder_v1         length width wallHeight
 run_pct_reg CylinderDome         logs/pct_reg_cylinderdome_v1         radius totalHeight cylinderRatio bulge
-run_pct_reg IndentedCuboid       logs/pct_reg_indentedcuboid_v1       outerLength outerWidth outerHeight innerLength innerWidth innerHeight offsetX offsetY
+run_pct_reg IndentedCuboid       logs/pct_reg_indentedcuboid_v1       outerLength outerWidth outerHeight innerLengthRatio innerWidthRatio innerHeight innerMinXRatio innerMinYRatio
 run_pct_reg AsymmetricGableHouse logs/pct_reg_asymgable_v1            length width totalHeight wallRatio ridgeLength ridgeRatio
 run_pct_reg FourStageRoundTower  logs/pct_reg_fourstage_v1            baseRadius baseHeight middleHeight middleTopRadius middleBulge coneHeight
 run_pct_reg TwoGableHouses       logs/pct_reg_twogable_v1             length1 length2 width totalHeight wallRatio angle ridgeRatio

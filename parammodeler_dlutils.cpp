@@ -39,6 +39,7 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
   QMap<QString, double> uiParams;
   const auto has = [&]( const QString &key ) { return nn.contains( key ); };
   const auto val = [&]( const QString &key, double fallback = 0.0 ) { return nn.value( key, fallback ); };
+  const auto clamp01 = []( double x ) { return std::max( 0.0, std::min( 1.0, x ) ); };
   const auto put = [&]( const QString &from, const QString &to ) {
     if ( has( from ) )
       uiParams.insert( to, val( from ) );
@@ -79,10 +80,27 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
   }
   else if ( prim == QStringLiteral( "LHouse" ) )
   {
-    put( QStringLiteral( "totalLength" ), QStringLiteral( "lTotalL" ) );
-    put( QStringLiteral( "wingRatio" ), QStringLiteral( "lWingR" ) );
-    put( QStringLiteral( "totalWidth" ), QStringLiteral( "lTotalW" ) );
-    put( QStringLiteral( "wingWidthRatio" ), QStringLiteral( "lWingWR" ) );
+    const bool hasFootprintParams =
+      has( QStringLiteral( "outerLength" ) ) ||
+      has( QStringLiteral( "outerWidth" ) ) ||
+      has( QStringLiteral( "cutoutLengthRatio" ) ) ||
+      has( QStringLiteral( "cutoutWidthRatio" ) );
+    if ( hasFootprintParams )
+    {
+      put( QStringLiteral( "outerLength" ), QStringLiteral( "lTotalL" ) );
+      put( QStringLiteral( "outerWidth" ), QStringLiteral( "lTotalW" ) );
+      if ( has( QStringLiteral( "cutoutLengthRatio" ) ) )
+        uiParams.insert( QStringLiteral( "lWingR" ), clamp01( val( QStringLiteral( "cutoutLengthRatio" ) ) ) );
+      if ( has( QStringLiteral( "cutoutWidthRatio" ) ) )
+        uiParams.insert( QStringLiteral( "lWingWR" ), clamp01( 1.0 - val( QStringLiteral( "cutoutWidthRatio" ) ) ) );
+    }
+    else
+    {
+      put( QStringLiteral( "totalLength" ), QStringLiteral( "lTotalL" ) );
+      put( QStringLiteral( "wingRatio" ), QStringLiteral( "lWingR" ) );
+      put( QStringLiteral( "totalWidth" ), QStringLiteral( "lTotalW" ) );
+      put( QStringLiteral( "wingWidthRatio" ), QStringLiteral( "lWingWR" ) );
+    }
     put( QStringLiteral( "height" ), QStringLiteral( "lHeight" ) );
   }
   else if ( prim == QStringLiteral( "ConeCylinder" ) )
@@ -106,8 +124,16 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
   {
     put( QStringLiteral( "bottomLength" ), QStringLiteral( "tpBottomLength" ) );
     put( QStringLiteral( "bottomWidth" ), QStringLiteral( "tpBottomWidth" ) );
-    put( QStringLiteral( "topLength" ), QStringLiteral( "tpTopLength" ) );
-    put( QStringLiteral( "topWidth" ), QStringLiteral( "tpTopWidth" ) );
+    if ( has( QStringLiteral( "topLengthRatio" ) ) && has( QStringLiteral( "bottomLength" ) ) )
+      uiParams.insert( QStringLiteral( "tpTopLength" ),
+                       val( QStringLiteral( "bottomLength" ) ) * clamp01( val( QStringLiteral( "topLengthRatio" ) ) ) );
+    else
+      put( QStringLiteral( "topLength" ), QStringLiteral( "tpTopLength" ) );
+    if ( has( QStringLiteral( "topWidthRatio" ) ) && has( QStringLiteral( "bottomWidth" ) ) )
+      uiParams.insert( QStringLiteral( "tpTopWidth" ),
+                       val( QStringLiteral( "bottomWidth" ) ) * clamp01( val( QStringLiteral( "topWidthRatio" ) ) ) );
+    else
+      put( QStringLiteral( "topWidth" ), QStringLiteral( "tpTopWidth" ) );
     putWallRatio( QStringLiteral( "tpWallHeight" ), QStringLiteral( "tpRoofHeight" ) );
   }
   else if ( prim == QStringLiteral( "HalfCylinderRoof" ) )
@@ -127,11 +153,32 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
     put( QStringLiteral( "outerLength" ), QStringLiteral( "icOuterL" ) );
     put( QStringLiteral( "outerWidth" ), QStringLiteral( "icOuterW" ) );
     put( QStringLiteral( "outerHeight" ), QStringLiteral( "icOuterH" ) );
-    put( QStringLiteral( "innerLength" ), QStringLiteral( "icInnerL" ) );
-    put( QStringLiteral( "innerWidth" ), QStringLiteral( "icInnerW" ) );
+    const double outerLength = val( QStringLiteral( "outerLength" ), 0.0 );
+    const double outerWidth = val( QStringLiteral( "outerWidth" ), 0.0 );
+    const bool hasInnerLengthRatio = has( QStringLiteral( "innerLengthRatio" ) ) && outerLength > 1e-6;
+    const bool hasInnerWidthRatio = has( QStringLiteral( "innerWidthRatio" ) ) && outerWidth > 1e-6;
+    if ( hasInnerLengthRatio )
+      uiParams.insert( QStringLiteral( "icInnerL" ),
+                       outerLength * clamp01( val( QStringLiteral( "innerLengthRatio" ) ) ) );
+    else
+      put( QStringLiteral( "innerLength" ), QStringLiteral( "icInnerL" ) );
+    if ( hasInnerWidthRatio )
+      uiParams.insert( QStringLiteral( "icInnerW" ),
+                       outerWidth * clamp01( val( QStringLiteral( "innerWidthRatio" ) ) ) );
+    else
+      put( QStringLiteral( "innerWidth" ), QStringLiteral( "icInnerW" ) );
     put( QStringLiteral( "innerHeight" ), QStringLiteral( "icInnerH" ) );
-    put( QStringLiteral( "offsetX" ), QStringLiteral( "icOffsetX" ) );
-    put( QStringLiteral( "offsetY" ), QStringLiteral( "icOffsetY" ) );
+    // innerMin*Ratio is a training label in outer-envelope coordinates.
+    // Convert it to an absolute offset here; PointNetRunner::applyToUI()
+    // then converts that offset to the UI slider ratio over the movable span.
+    if ( has( QStringLiteral( "innerMinXRatio" ) ) && outerLength > 1e-6 )
+      uiParams.insert( QStringLiteral( "icOffsetX" ), outerLength * clamp01( val( QStringLiteral( "innerMinXRatio" ) ) ) );
+    else
+      put( QStringLiteral( "offsetX" ), QStringLiteral( "icOffsetX" ) );
+    if ( has( QStringLiteral( "innerMinYRatio" ) ) && outerWidth > 1e-6 )
+      uiParams.insert( QStringLiteral( "icOffsetY" ), outerWidth * clamp01( val( QStringLiteral( "innerMinYRatio" ) ) ) );
+    else
+      put( QStringLiteral( "offsetY" ), QStringLiteral( "icOffsetY" ) );
   }
   else if ( prim == QStringLiteral( "AsymmetricGableHouse" ) )
   {
@@ -184,10 +231,10 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
   }
   else if ( prim == "LHouse" )
   {
-    params["totalLength"]    = dock->LTotalLength();
-    params["wingRatio"]      = dock->LWingRatio();
-    params["totalWidth"]     = dock->LTotalWidth();
-    params["wingWidthRatio"] = dock->LWingWidthRatio();
+    params["outerLength"]       = dock->LTotalLength();
+    params["outerWidth"]        = dock->LTotalWidth();
+    params["cutoutLengthRatio"] = dock->LWingRatio();
+    params["cutoutWidthRatio"]  = 1.0 - dock->LWingWidthRatio();
     params["height"] = dock->LHeight();
   }
   else if ( prim == "ConeCylinder" )
@@ -221,10 +268,12 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
   }
   else if ( prim == "TruncatedPyramidRoof" )
   {
-    params["bottomLength"] = dock->tpBottomLength();
-    params["bottomWidth"] = dock->tpBottomWidth();
-    params["topLength"] = dock->tpTopLength();
-    params["topWidth"] = dock->tpTopWidth();
+    const double bottomLength = dock->tpBottomLength();
+    const double bottomWidth = dock->tpBottomWidth();
+    params["bottomLength"] = bottomLength;
+    params["bottomWidth"] = bottomWidth;
+    params["topLengthRatio"] = bottomLength > 1e-6 ? dock->tpTopLength() / bottomLength : 0.6;
+    params["topWidthRatio"] = bottomWidth > 1e-6 ? dock->tpTopWidth() / bottomWidth : 0.6;
     const double wallH = dock->tpWallHeight();
     const double roofH = dock->tpRoofHeight();
     const double totalH = wallH + roofH;
@@ -236,7 +285,6 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["length"] = dock->hcrLength();
     params["width"] = dock->hcrWidth();
     params["wallHeight"] = dock->hcrWallHeight();
-    params["radius"] = dock->hcrRadius();
   }
   else if ( prim == "CylinderDome" || prim == "CylinderHemisphere" )
   {
@@ -250,14 +298,16 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
   }
   else if ( prim == "IndentedCuboid" )
   {
-    params["outerLength"] = dock->icOuterLength();
-    params["outerWidth"] = dock->icOuterWidth();
+    const double outerLength = dock->icOuterLength();
+    const double outerWidth = dock->icOuterWidth();
+    params["outerLength"] = outerLength;
+    params["outerWidth"] = outerWidth;
     params["outerHeight"] = dock->icOuterHeight();
-    params["innerLength"] = dock->icInnerLength();
-    params["innerWidth"] = dock->icInnerWidth();
+    params["innerLengthRatio"] = outerLength > 1e-6 ? dock->icInnerLength() / outerLength : 0.4;
+    params["innerWidthRatio"] = outerWidth > 1e-6 ? dock->icInnerWidth() / outerWidth : 0.4;
     params["innerHeight"] = dock->icInnerHeight();
-    params["offsetX"] = dock->icOffsetX();
-    params["offsetY"] = dock->icOffsetY();
+    params["innerMinXRatio"] = outerLength > 1e-6 ? dock->icOffsetX() / outerLength : 0.2;
+    params["innerMinYRatio"] = outerWidth > 1e-6 ? dock->icOffsetY() / outerWidth : 0.2;
   }
   else if ( prim == "AsymmetricGableHouse" )
   {

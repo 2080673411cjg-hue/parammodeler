@@ -508,6 +508,7 @@ ParamModelerDock::~ParamModelerDock()
     delete m_manualTranslateYAxisMarker;
     m_manualTranslateYAxisMarker = nullptr;
   }
+  m_manualTranslateHasSource = false;
   ParamModelerScene3D::clearRealtimePreviewMesh( mIface );
   m_modelLayer = nullptr;
   delete ui;
@@ -956,8 +957,15 @@ void ParamModelerDock::initPointNet()
   ui->formLayoutPrimitive->addRow( tr( "DL anchor:" ), m_resetAnchorBtn );
   connect( m_resetAnchorBtn, &QPushButton::clicked, this, &ParamModelerDock::resetToDlAnchor );
 
+  m_geometryCorrectionCheckBox = new QCheckBox( tr( "Enable geometry correction" ), this );
+  m_geometryCorrectionCheckBox->setToolTip(
+    tr( "Experimental: after PCT regression, adjust strong geometric parameters from the current point cloud for Cuboid, Cylinder, and GabledRoof." )
+  );
+  m_geometryCorrectionCheckBox->setChecked( false );
+  ui->formLayoutPrimitive->addRow( tr( "Param correction:" ), m_geometryCorrectionCheckBox );
+
   m_manualTranslateBtn = new QPushButton( tr( "Pick target for model anchor" ), this );
-  m_manualTranslateBtn->setToolTip( tr( "Shows the current model anchor as a red X in the 2D map canvas. Click the point cloud target position to translate the model there. Only TX/TY are changed." ) );
+  m_manualTranslateBtn->setToolTip( tr( "Shows the current model anchor as a red X in the 2D map canvas. Click the point-cloud target position to translate the model there. Only TX/TY are changed." ) );
   ui->formLayoutPrimitive->addRow( tr( "Manual align:" ), m_manualTranslateBtn );
   connect( m_manualTranslateBtn, &QPushButton::clicked, this, &ParamModelerDock::startManualTranslateByClick );
 }
@@ -1063,7 +1071,7 @@ void ParamModelerDock::startManualTranslateByClick()
   if ( m_manualTranslateBtn )
     m_manualTranslateBtn->setText( tr( "Click target point..." ) );
 
-  DEBUG_LOG( QString( "[ManualAlign] started prim=%1 anchor=(%2,%3) localRef=(%4,%5,%6) +X=(%7,%8) +Y=(%9,%10); click target on the 2D map canvas\n" )
+  DEBUG_LOG( QString( "[ManualAlign] started prim=%1 source=(%2,%3) localRef=(%4,%5,%6) +X=(%7,%8) +Y=(%9,%10); click target on the 2D map canvas\n" )
                .arg( prim )
                .arg( m_manualTranslateSource.x(), 0, 'f', 3 )
                .arg( m_manualTranslateSource.y(), 0, 'f', 3 )
@@ -1266,6 +1274,23 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   modelLayout->addWidget( btnSettings );
 
   modelLayout->addStretch();
+  auto *chkGeometryCorrection = new QCheckBox( tr( "Enable geometry correction" ), &dialog );
+  chkGeometryCorrection->setToolTip(
+    tr( "Experimental: after PCT regression, adjust strong geometric parameters from the current point cloud for Cuboid, Cylinder, and GabledRoof." )
+  );
+  chkGeometryCorrection->setChecked( m_geometryCorrectionCheckBox && m_geometryCorrectionCheckBox->isChecked() );
+  connect( chkGeometryCorrection, &QCheckBox::toggled, this, [this]( bool checked ) {
+    if ( m_geometryCorrectionCheckBox )
+      m_geometryCorrectionCheckBox->setChecked( checked );
+  } );
+  if ( m_geometryCorrectionCheckBox )
+  {
+    connect( m_geometryCorrectionCheckBox, &QCheckBox::toggled, chkGeometryCorrection, [chkGeometryCorrection]( bool checked ) {
+      if ( chkGeometryCorrection->isChecked() != checked )
+        chkGeometryCorrection->setChecked( checked );
+    } );
+  }
+
   auto *resultLabel = new QLabel( tr( "Result: -" ), &dialog );
   resultLabel->setWordWrap( true );
   resultLabel->setStyleSheet( QStringLiteral( "font-weight: bold; padding: 4px 0;" ) );
@@ -1301,6 +1326,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   mainLayout->addWidget( inputInfo );
   mainLayout->addWidget( processTitle );
   mainLayout->addLayout( modelLayout );
+  mainLayout->addWidget( chkGeometryCorrection );
   mainLayout->addWidget( resultLabel );
   mainLayout->addWidget( progress );
   mainLayout->addLayout( buttonLayout );
@@ -1430,7 +1456,8 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       return;
     }
 
-    const QMap<QString, double> params = pointNetParamsToUiParams( prim, regression.params );
+    QMap<QString, double> params = pointNetParamsToUiParams( prim, regression.params );
+    applyDataDrivenParamCorrections( prim, params );
     if ( params.isEmpty() )
     {
       QMessageBox::warning( &dialog, tr( "Parameter estimation failed" ), tr( "No parameters returned." ) );
@@ -1894,6 +1921,255 @@ static void robustBBoxFromPoints( const QVector<QVector3D> &pts,
   outMax = QVector3D( mx[0], mx[1], mx[2] );
 }
 
+static bool loadRestoredPointsForGeometryCorrection( const QString &filePath,
+                                                     QVector<QVector3D> &points )
+{
+  points.clear();
+  if ( filePath.isEmpty() )
+    return false;
+
+  QVector3D metadataCenter;
+  double metadataScale = 1.0;
+  const bool hasMetadata = metadataPointCloudInfoForInput( filePath, nullptr, nullptr,
+                                                           &metadataCenter, &metadataScale );
+  const PointCloud pc = PointCloudLoader::load( filePath );
+  if ( pc.points.isEmpty() )
+    return false;
+
+  points.reserve( pc.points.size() );
+  const bool restoreFromDlNormalization = hasMetadata && pointCloudLooksNormalizedForDisplay( pc );
+  for ( const QVector3D &p : pc.points )
+  {
+    QVector3D q = restoreFromDlNormalization
+      ? p * static_cast<float>( metadataScale ) + metadataCenter
+      : p;
+    if ( q.z() < 0.0f && restoreFromDlNormalization )
+      q.setZ( 0.0f );
+    points.append( q );
+  }
+  return !points.isEmpty();
+}
+
+static QVector<QVector3D> unrotatePointsAroundZ( const QVector<QVector3D> &points, double rzDeg )
+{
+  QVector<QVector3D> out;
+  out.reserve( points.size() );
+  constexpr double pi = 3.14159265358979323846;
+  const double a = -rzDeg * pi / 180.0;
+  const double c = std::cos( a );
+  const double s = std::sin( a );
+  for ( const QVector3D &p : points )
+  {
+    const double x = static_cast<double>( p.x() );
+    const double y = static_cast<double>( p.y() );
+    out.append( QVector3D( static_cast<float>( x * c - y * s ),
+                           static_cast<float>( x * s + y * c ),
+                           p.z() ) );
+  }
+  return out;
+}
+
+static bool footprintBBoxForGeometryCorrection( const QVector<QVector3D> &points,
+                                                QVector3D &outMin, QVector3D &outMax,
+                                                QString &source )
+{
+  if ( points.isEmpty() )
+    return false;
+
+  QVector3D hardMin, hardMax;
+  hardBBoxFromPoints( points, hardMin, hardMax );
+  QVector3D fullMin, fullMax;
+  robustBBoxFromPoints( points, fullMin, fullMax );
+
+  const double height = static_cast<double>( hardMax.z() - hardMin.z() );
+  const double sliceTop = static_cast<double>( hardMin.z() ) + std::max( 0.5, height * 0.12 );
+  QVector<QVector3D> bottom;
+  bottom.reserve( points.size() );
+  for ( const QVector3D &p : points )
+  {
+    if ( static_cast<double>( p.z() ) <= sliceTop )
+      bottom.append( p );
+  }
+
+  const int minSlicePoints = std::max( 50, static_cast<int>( std::ceil( points.size() * 0.05 ) ) );
+  if ( bottom.size() >= minSlicePoints )
+  {
+    QVector3D sliceMin, sliceMax;
+    robustBBoxFromPoints( bottom, sliceMin, sliceMax );
+    const QVector3D fullRange = fullMax - fullMin;
+    const QVector3D sliceRange = sliceMax - sliceMin;
+    const bool xReasonable = fullRange.x() <= 1e-6f || sliceRange.x() >= fullRange.x() * 0.25f;
+    const bool yReasonable = fullRange.y() <= 1e-6f || sliceRange.y() >= fullRange.y() * 0.25f;
+    if ( xReasonable && yReasonable )
+    {
+      outMin = QVector3D( sliceMin.x(), sliceMin.y(), hardMin.z() );
+      outMax = QVector3D( sliceMax.x(), sliceMax.y(), hardMax.z() );
+      source = QStringLiteral( "bottom" );
+      return true;
+    }
+  }
+
+  outMin = QVector3D( fullMin.x(), fullMin.y(), hardMin.z() );
+  outMax = QVector3D( fullMax.x(), fullMax.y(), hardMax.z() );
+  source = QStringLiteral( "full" );
+  return true;
+}
+
+static bool estimateGabledWallRatioFromProfile( const QVector<QVector3D> &points,
+                                                double baseWidth,
+                                                double zMin,
+                                                double height,
+                                                double &outRatio )
+{
+  if ( points.size() < 100 || baseWidth <= 1e-6 || height <= 1e-6 )
+    return false;
+
+  constexpr int bins = 24;
+  QVector<QVector<float>> yByBin;
+  yByBin.resize( bins );
+  for ( const QVector3D &p : points )
+  {
+    const double t = ( static_cast<double>( p.z() ) - zMin ) / height;
+    const int idx = std::max( 0, std::min( bins - 1, static_cast<int>( std::floor( t * bins ) ) ) );
+    yByBin[idx].append( p.y() );
+  }
+
+  for ( int i = 2; i < bins - 2; ++i )
+  {
+    QVector<float> col = yByBin[i];
+    if ( col.size() < 10 )
+      continue;
+    std::sort( col.begin(), col.end() );
+    const int lo = static_cast<int>( std::floor( col.size() * 0.05 ) );
+    const int hi = std::max( lo, static_cast<int>( std::ceil( col.size() * 0.95 ) ) - 1 );
+    const double yRange = static_cast<double>( col[hi] - col[lo] );
+    if ( yRange < baseWidth * 0.88 )
+    {
+      outRatio = std::max( 0.2, std::min( 0.9, ( i + 0.5 ) / bins ) );
+      return true;
+    }
+  }
+  return false;
+}
+
+void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitiveType,
+                                                        QMap<QString, double> &uiParams ) const
+{
+  if ( !m_geometryCorrectionCheckBox || !m_geometryCorrectionCheckBox->isChecked() )
+    return;
+
+  const QString prim = primitiveType == QStringLiteral( "CylinderHemisphere" )
+                         ? QStringLiteral( "CylinderDome" )
+                         : primitiveType;
+  if ( prim != QStringLiteral( "Cuboid" ) &&
+       prim != QStringLiteral( "Cylinder" ) &&
+       prim != QStringLiteral( "GabledRoof" ) )
+    return;
+
+  QVector<QVector3D> points;
+  if ( !loadRestoredPointsForGeometryCorrection( m_inputDataPath, points ) )
+  {
+    DEBUG_LOG( QString( "[ParamCorrection] %1 skipped: no readable points\n" ).arg( prim ).toStdWString().c_str() );
+    return;
+  }
+
+  double correctionRz = m_hasMetadataRz ? m_metadataRz : qQNaN();
+  if ( !std::isfinite( correctionRz ) )
+  {
+    double metadataRz = qQNaN();
+    metadataPointCloudInfoForInput( m_inputDataPath, nullptr, nullptr, nullptr, nullptr, &metadataRz );
+    if ( std::isfinite( metadataRz ) )
+      correctionRz = metadataRz;
+  }
+  const bool hasCorrectionRz = std::isfinite( correctionRz );
+
+  const QVector<QVector3D> canonicalPoints = hasCorrectionRz
+    ? unrotatePointsAroundZ( points, correctionRz )
+    : points;
+
+  QVector3D hardMin, hardMax;
+  hardBBoxFromPoints( canonicalPoints, hardMin, hardMax );
+  const double height = static_cast<double>( hardMax.z() - hardMin.z() );
+  if ( height <= 1e-6 )
+    return;
+
+  QVector3D fpMin, fpMax;
+  QString fpSource;
+  if ( !footprintBBoxForGeometryCorrection( canonicalPoints, fpMin, fpMax, fpSource ) )
+    return;
+  const double fpLength = static_cast<double>( fpMax.x() - fpMin.x() );
+  const double fpWidth = static_cast<double>( fpMax.y() - fpMin.y() );
+
+  if ( prim == QStringLiteral( "Cuboid" ) )
+  {
+    if ( fpLength > 1e-6 ) uiParams.insert( QStringLiteral( "length" ), fpLength );
+    if ( fpWidth > 1e-6 ) uiParams.insert( QStringLiteral( "width" ), fpWidth );
+    uiParams.insert( QStringLiteral( "height" ), height );
+    DEBUG_LOG( QString( "[ParamCorrection] Cuboid source=%1 length=%2 width=%3 height=%4 rz=%5\n" )
+                 .arg( fpSource )
+                 .arg( fpLength, 0, 'f', 3 )
+                 .arg( fpWidth, 0, 'f', 3 )
+                 .arg( height, 0, 'f', 3 )
+                 .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "Cylinder" ) )
+  {
+    QVector3D robustMin, robustMax;
+    robustBBoxFromPoints( canonicalPoints, robustMin, robustMax );
+    const double cx = ( static_cast<double>( robustMin.x() ) + static_cast<double>( robustMax.x() ) ) * 0.5;
+    const double cy = ( static_cast<double>( robustMin.y() ) + static_cast<double>( robustMax.y() ) ) * 0.5;
+    QVector<double> radii;
+    radii.reserve( canonicalPoints.size() );
+    for ( const QVector3D &p : canonicalPoints )
+      radii.append( std::hypot( static_cast<double>( p.x() ) - cx,
+                                static_cast<double>( p.y() ) - cy ) );
+    std::sort( radii.begin(), radii.end() );
+    const int idx = std::max( 0, std::min( radii.size() - 1, static_cast<int>( std::floor( radii.size() * 0.90 ) ) ) );
+    const double radius = radii[idx];
+    if ( radius > 1e-6 ) uiParams.insert( QStringLiteral( "radius" ), radius );
+    uiParams.insert( QStringLiteral( "cylHeight" ), height );
+    DEBUG_LOG( QString( "[ParamCorrection] Cylinder radius=%1 height=%2 n=%3\n" )
+                 .arg( radius, 0, 'f', 3 )
+                 .arg( height, 0, 'f', 3 )
+                 .arg( canonicalPoints.size() )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "GabledRoof" ) )
+  {
+    if ( fpLength > 1e-6 ) uiParams.insert( QStringLiteral( "grLength" ), fpLength );
+    if ( fpWidth > 1e-6 ) uiParams.insert( QStringLiteral( "grWidth" ), fpWidth );
+
+    double wallRatio = 0.0;
+    if ( estimateGabledWallRatioFromProfile( canonicalPoints, fpWidth, hardMin.z(), height, wallRatio ) )
+    {
+      uiParams.insert( QStringLiteral( "grWallHeight" ), height * wallRatio );
+      uiParams.insert( QStringLiteral( "grRoofHeight" ), height * ( 1.0 - wallRatio ) );
+      DEBUG_LOG( QString( "[ParamCorrection] GabledRoof source=%1 length=%2 width=%3 height=%4 wallRatio=%5 rz=%6\n" )
+                   .arg( fpSource )
+                   .arg( fpLength, 0, 'f', 3 )
+                   .arg( fpWidth, 0, 'f', 3 )
+                   .arg( height, 0, 'f', 3 )
+                   .arg( wallRatio, 0, 'f', 3 )
+                   .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                   .toStdWString().c_str() );
+    }
+    else
+    {
+      DEBUG_LOG( QString( "[ParamCorrection] GabledRoof source=%1 length=%2 width=%3 height=%4 wallRatio=<kept PCT>\n" )
+                   .arg( fpSource )
+                   .arg( fpLength, 0, 'f', 3 )
+                   .arg( fpWidth, 0, 'f', 3 )
+                   .arg( height, 0, 'f', 3 )
+                   .toStdWString().c_str() );
+    }
+  }
+}
+
 bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool showMessage )
 {
   if ( filePath.isEmpty() )
@@ -2262,6 +2538,7 @@ void ParamModelerDock::onInverseParams()
     return;
   }
   QMap<QString, double> params = pointNetParamsToUiParams( prim, regression.params );
+  applyDataDrivenParamCorrections( prim, params );
 
   if ( !params.isEmpty() )
   {
