@@ -1,0 +1,94 @@
+*** Begin Patch
+*** Update File: ../../3d/qgscamerapose.h
+@@
+     void setDistanceFromCenterPoint( float distance );
++    //! Sets distance with an explicit positive minimum for close-range editing.
++    void setDistanceFromCenterPoint( float distance, float minimumDistance );
+*** Update File: ../../3d/qgscamerapose.cpp
+@@
+ void QgsCameraPose::setDistanceFromCenterPoint( float distance )
+ {
+   mDistanceFromCenterPoint = std::max( distance, 10.0f );
+ }
++
++void QgsCameraPose::setDistanceFromCenterPoint( float distance, float minimumDistance )
++{
++  if ( std::isfinite( distance ) && std::isfinite( minimumDistance ) )
++    mDistanceFromCenterPoint = std::max( distance, std::max( minimumDistance, 0.001f ) );
++}
+*** Update File: ../../3d/qgscameracontroller.cpp
+@@
+ #include "qgslogger.h"
++
++namespace
++{
++  // Opt-in per canvas. Existing map views retain their original distance limits.
++  float minimumZoomDistance( const QgsCameraController *controller )
++  {
++    const float value = controller->property( "localMinimumZoomDistance" ).toFloat();
++    return std::isfinite( value ) && value > 0 ? std::max( value, 0.001f ) : 10.0f;
++  }
++}
+@@
+   double newDistance = mCameraPose.distanceFromCenterPoint() * zoomFactor;
++  mCameraPose.setDistanceFromCenterPoint( newDistance, minimumZoomDistance( this ) );
++  newDistance = mCameraPose.distanceFromCenterPoint();
+@@
+-  mCameraPose.setDistanceFromCenterPoint( newDistance );
+   mCameraPose.setCenterPoint( newViewCenter );
+@@
+-  camPose.setDistanceFromCenterPoint( distance );
++  camPose.setDistanceFromCenterPoint( distance, minimumZoomDistance( this ) );
+@@
+-  camPose.setDistanceFromCenterPoint( distance );
++  camPose.setDistanceFromCenterPoint( distance, minimumZoomDistance( this ) );
+@@
+-  mCameraPose.setDistanceFromCenterPoint( dist );
++  mCameraPose.setDistanceFromCenterPoint( dist, minimumZoomDistance( this ) );
+@@
+   double oldDist = ( mZoomPoint - mCameraBefore->position() ).length();
++  if ( !mZoomPointCalculated || !std::isfinite( oldDist ) || oldDist <= 0 )
++  {
++    mCumulatedWheelY = 0;
++    setMouseParameters( MouseOperation::None );
++    return;
++  }
+@@
+-  newDist = std::max( newDist, 2.0 );
++  newDist = std::max( newDist, minimumZoomDistance( this ) * 0.2 );
+@@
+-      mCameraPose.setDistanceFromCenterPoint( mCameraPose.distanceFromCenterPoint() * mulFactor );
++      mCameraPose.setDistanceFromCenterPoint( mCameraPose.distanceFromCenterPoint() * mulFactor, minimumZoomDistance( this ) );
+*** Update File: ../../3d/qgs3dmapscene.cpp
+@@
+-  if ( fnear < 1 )
+-    fnear = 1; // does not really make sense to use negative far plane (behind camera)
++  // Custom preview entities are not part of mSceneEntities. Include their
++  // map-coordinate bounds before selecting clipping planes (floating origin aware).
++  const QVariantList extraBounds = property( "localPreviewBounds" ).toList();
++  if ( extraBounds.size() == 6 )
++  {
++    const QgsRectangle extent( extraBounds[0].toDouble(), extraBounds[1].toDouble(),
++                               extraBounds[3].toDouble(), extraBounds[4].toDouble() );
++    const QgsAABB bbox = Qgs3DUtils::mapToWorldExtent( extent, extraBounds[2].toDouble(),
++                                                     extraBounds[5].toDouble(), mMap.origin() );
++    float extraNear = 1e9, extraFar = 0;
++    Qgs3DUtils::computeBoundingBoxNearFarPlanes( bbox, viewMatrix, extraNear, extraFar );
++    fnear = std::min( fnear, extraNear );
++    ffar = std::max( ffar, extraFar );
++  }
++  const float requestedMinimum = cameraController()->property( "localMinimumZoomDistance" ).toFloat();
++  const float nearFloor = std::isfinite( requestedMinimum ) && requestedMinimum > 0
++                          ? std::max( 0.0001f, requestedMinimum * 0.02f ) : 1.0f;
++
++  if ( fnear < nearFloor )
++    fnear = nearFloor;
+@@
+   float newFar = ffar * 2;
+   float newNear = fnear / 2;
++  if ( requestedMinimum > 0 )
++  {
++    newNear = std::max( nearFloor / 2, newNear );
++    newFar = std::max( newNear * 2, newFar );
++  }
+*** End Patch

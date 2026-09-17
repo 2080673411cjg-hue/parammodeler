@@ -1,0 +1,47 @@
+{
+  "description": "Reconstructed pre-close-zoom source backup, not a historical binary backup",
+  "files": [
+    {
+      "path": "src/3d/qgscamerapose.h",
+      "method": "reverse recorded core patch; forward round-trip verified",
+      "before_sha256": "4dc414beed402e0212525763093facf8c0d44f67a37d688046cef8b6b895c471",
+      "after_sha256": "7f0bf9ff062106a4860ce005811863b87af21afa8a48bed69f06cff424dbc140"
+    },
+    {
+      "path": "src/3d/qgscamerapose.cpp",
+      "method": "reverse recorded core patch; forward round-trip verified",
+      "before_sha256": "cc7a913ea8e9043feb9a60aee94796cad7934266ffda8e1f68c4ef69038a11a9",
+      "after_sha256": "3eab2f509c8894cb9e405dd2f2b9bdd0dbe2c66a9c16cac8a80fd6b42a499972"
+    },
+    {
+      "path": "src/3d/qgscameracontroller.cpp",
+      "method": "reverse recorded core patch; forward round-trip verified",
+      "before_sha256": "a639d38934bdd959a969b6c19f40db0a0ca21791dbf35a8fca19787956129dc2",
+      "after_sha256": "4dced4de5e2ea45277806f94540f5a2b87538f27c8e870330062a1faec3e6097"
+    },
+    {
+      "path": "src/3d/qgs3dmapscene.cpp",
+      "method": "reverse recorded core patch; forward round-trip verified",
+      "before_sha256": "71eb4f5a7646eb352b78a106f5cf4c63f96e9b2bba42b86fe2dc8a092649e149",
+      "after_sha256": "a9f70eb30a0eee0fcb9706d51315b666dd4c14e865a953b5358ee0fc9a487776"
+    },
+    {
+      "path": "src/plugins/parammodeler/parammodeler_scene3d.cpp",
+      "method": "HEAD baseline; diff reviewed as close-zoom-only",
+      "before_sha256": "155047b760b5d6cc82a344a965c08a57a9916c432e8c5a36b7647ccfeacab932",
+      "after_sha256": "4bdc0348135b93a6f52532f0c4ca1fc32f2b37671a9d30f5d44c423710998b57"
+    },
+    {
+      "path": "src/plugins/parammodeler/parammodeler_scene3d.h",
+      "method": "HEAD baseline; diff reviewed as close-zoom-only",
+      "before_sha256": "2c1f976693267ecf651e9550d7b313de0a85cfdec3c989a4309835effb4fc815",
+      "after_sha256": "9041fe0dd357de717083c0712b4393819f3af429543a029fa99175a0d34c65d1"
+    },
+    {
+      "path": "src/plugins/parammodeler/parammodeler_dock.cpp",
+      "method": "only focus button/includes reversed; earlier uncommitted features retained",
+      "before_sha256": "d2196071529efe83c32e8ed9238877e97a7fbf41797769c9b96d400fd8369e2c",
+      "after_sha256": "0a06e83e1dc4666018b7ec0b16cbd49351ec28b9863351fe67ef7a9aa87141ea"
+    }
+  ]
+}

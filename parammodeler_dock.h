@@ -28,6 +28,7 @@
 #include <QMap>
 #include <QVector>
 #include <QVector3D>
+#include <QPointer>
 #include <qgspointxy.h>
 
 class QCheckBox;
@@ -41,6 +42,9 @@ class QgsMapTool;
 class QgsMapToolEmitPoint;
 class QgsRubberBand;
 class QgsVectorLayer;
+class Qgs3DMapCanvas;
+class Qgs3DMapTool;
+class ParamModelerPick3D;
 class QMenu;                    // ← 新增这一行（推荐显式包含）
 
 namespace Ui {
@@ -165,6 +169,7 @@ private slots:
   void onOpenPointCloudEstimateDialog();
   void onRandomizeCurrentPrimitive();
   void startManualTranslateByClick();
+  void startManualTranslate3D();
   void handleManualTranslateClick( const QgsPointXY &point, Qt::MouseButton button );
 		
   void onUpdatePreview();//主刷新入口
@@ -172,6 +177,7 @@ private slots:
 
 private:
   void initUiControls();
+  void initHeightDirectionControls();
   void initConnections();
   void initPreview();
   void initPointNet();
@@ -231,7 +237,7 @@ private:
   bool             m_previewUpdateInProgress = false;
 		
   QgsVectorLayer *m_modelLayer = nullptr;//新增一个成员变量，缓存图层指针
-  QgsMapLayer    *m_pointCloudLayer = nullptr;    // 缓存外部点云图层，用于清除
+  QPointer<QgsMapLayer> m_pointCloudLayer;    // 缓存外部点云图层，用于清除
 		bool            m_isUpdating = false; 
 			QString         m_lastGpkgPath;             // 上一次临时 GPKG 文件路径，用于清理
   bool m_realtimeModelLoaded = false;
@@ -241,7 +247,8 @@ private:
   QMap<QString, double> m_dlAnchorParams;
   bool m_hasDlAnchor = false;
   QPushButton *m_resetAnchorBtn = nullptr;
-  QCheckBox *m_geometryCorrectionCheckBox = nullptr;
+  bool m_geometryCorrectionEnabled = false;
+  bool m_suspendHeightCompensation = false;
   void resetToDlAnchor();
 
   // ===== 手动目标点平移对齐（2D canvas 拾取） =====
@@ -253,6 +260,13 @@ private:
   QgsRubberBand *m_manualTranslateYAxisMarker = nullptr;
   bool m_manualTranslateHasSource = false;
   QgsPointXY m_manualTranslateSource;
+
+  QPushButton *m_manualTranslate3DBtn = nullptr;
+  QPointer<ParamModelerPick3D> m_manualTranslate3DTool;
+  QPointer<Qgs3DMapCanvas> m_manualTranslate3DCanvas;
+  QPointer<Qgs3DMapTool> m_previous3DMapTool;
+  QVector3D m_manualTranslate3DLocalAnchor;
+  void stopManualTranslate3D();
 };
 
 #endif // PARAMMODELER_DOCK_H

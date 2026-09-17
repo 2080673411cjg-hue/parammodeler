@@ -14,12 +14,14 @@
 
 #include <QRandomGenerator>
 #include <QDoubleSpinBox>
+#include <QScopedValueRollback>
 #include <cmath>
 
 void randomizePrimitiveParams( ParamModelerDock *dock,
                                bool refreshPreview,
                                bool randomizePose )
 {
+  const QScopedValueRollback<bool> heightGuard( dock->m_suspendHeightCompensation, true );
   auto rnd = []( double minVal, double maxVal, double step = 0.1 ) {
     const double raw = minVal + QRandomGenerator::global()->generateDouble() * ( maxVal - minVal );
     return std::round( raw / step ) * step;

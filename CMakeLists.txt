@@ -18,6 +18,7 @@ set (parammodeler_SRCS
   parammodeler_config.cpp
 
   parammodeler_scene3d.cpp
+  parammodeler_pick3d.cpp
 )
 set (parammodeler_UIS
   parammodeler_dock.ui

@@ -2,6 +2,7 @@
 #include "parammodeler_config.h"
 #include "parammodeler_pcdloader.h"
 #include "parammodeler_dock.h"
+#include <QScopedValueRollback>
 #include "ui_parammodeler_dock.h"
 
 #include <QCoreApplication>
@@ -508,6 +509,7 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
 void PointNetRunner::applyToUI( ParamModelerDock *dock,
                                  const QMap<QString, double> &params )
 {
+    const QScopedValueRollback<bool> heightGuard( dock->m_suspendHeightCompensation, true );
     // Slider 由 bindSliderSpin 双向绑定自动同步，无需手动设置
     // （否则 multiplier≠100 的参数如 tgAngle 会被错误覆盖）
     auto set = [&]( const QString &key, QDoubleSpinBox *spin, QSlider * /*slider*/ ) {

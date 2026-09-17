@@ -66,6 +66,8 @@
 #include <QSplitter>
 #include <QLabel>
 #include <QPushButton>
+#include <QToolButton>
+#include <QToolTip>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QProgressBar>
@@ -1005,7 +1007,23 @@ void ParamModelerDock::initPointNet()
   mWireframeModeCheckBox = new QCheckBox( tr( "Wireframe" ), this );
   mWireframeModeCheckBox->setChecked( false );
   mWireframeModeCheckBox->setToolTip( tr( "Show only model edges so the point cloud is fully visible during fine-tuning." ) );
-  workflowLayout->addWidget( mWireframeModeCheckBox );
+  auto *viewActions = new QHBoxLayout();
+  viewActions->addWidget( mWireframeModeCheckBox );
+  viewActions->addStretch();
+  auto *focusModel = new QToolButton( workflow );
+  focusModel->setObjectName( QStringLiteral( "focusModel3D" ) );
+  focusModel->setAutoRaise( true );
+  focusModel->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/mActionZoomToLayer.svg" ) ) );
+  focusModel->setToolTip( tr( "Focus current model in 3D" ) );
+  focusModel->setAccessibleName( focusModel->toolTip() );
+  viewActions->addWidget( focusModel );
+  workflowLayout->addLayout( viewActions );
+  connect( focusModel, &QToolButton::clicked, this, [this, focusModel]() {
+    stopManualTranslate3D();
+    if ( !ParamModelerScene3D::focusRealtimePreviewMesh( mIface ) )
+      QToolTip::showText( focusModel->mapToGlobal( QPoint( 0, focusModel->height() ) ),
+                         tr( "Load the current model into the 3D view first." ), focusModel );
+  } );
   connect( mWireframeModeCheckBox, &QCheckBox::toggled, this, [this]( bool checked ) {
     ParamModelerScene3D::setWireframeMode( checked );
     if ( m_realtimeModelLoaded )
