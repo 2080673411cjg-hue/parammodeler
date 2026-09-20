@@ -2,6 +2,7 @@
 #define PARAMMODELER_HEIGHTCONTROL_H
 
 #include <QDoubleSpinBox>
+#include <QCoreApplication>
 #include <QHBoxLayout>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -32,8 +33,8 @@ public:
     auto showMode = [this, lowerName, upperName]( bool upper ) {
       mButton->setArrowType( upper ? Qt::DownArrow : Qt::UpArrow );
       const QString text = upper
-        ? tr( "Keep %1 fixed; increasing height moves the lower end down." ).arg( upperName )
-        : tr( "Keep %1 fixed; increasing height moves the upper end up." ).arg( lowerName );
+        ? QCoreApplication::translate( "ParamModelerHeightControl", "Keep %1 fixed; increasing height moves the lower end down." ).arg( upperName )
+        : QCoreApplication::translate( "ParamModelerHeightControl", "Keep %1 fixed; increasing height moves the upper end up." ).arg( lowerName );
       mButton->setToolTip( text );
       mButton->setAccessibleName( text );
     };
@@ -54,7 +55,7 @@ public:
         slider->setValue( qRound( previous * 100.0 ) );
         mPrevious = previous;
         QToolTip::showText( mButton->mapToGlobal( QPoint( 0, mButton->height() ) ),
-                           tr( "Height unchanged: translation limit reached." ) );
+                           QCoreApplication::translate( "ParamModelerHeightControl", "Height unchanged: translation limit reached." ) );
       } );
   }
 

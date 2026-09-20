@@ -47,91 +47,105 @@
        </property>
        <widget class="QMenu" name="menuModelExport">
         <property name="title">
-          <string>Model Export</string>
+          <string>Model mesh</string>
         </property>
         <addaction name="actOBJ"/>
         <addaction name="actMesh"/>
-        <addaction name="actJSON"/>
        </widget>
        <widget class="QMenu" name="menuPointCloudExport">
         <property name="title">
-          <string>Point Cloud / Dataset Export</string>
+          <string>Model-sampled point cloud</string>
         </property>
         <addaction name="actPLY"/>
         <addaction name="actDLPointCloud"/>
-        <addaction name="actLoadedDLPointCloud"/>
-        <addaction name="actDLDataset"/>
-        <addaction name="actCurrentPrimitiveDLDataset"/>
        </widget>
+       <addaction name="actEvaluationCSV"/>
+       <addaction name="actJSON"/>
+       <addaction name="separator"/>
        <addaction name="menuModelExport"/>
        <addaction name="menuPointCloudExport"/>
        </widget>
       <widget class="QMenu" name="menuLoad3D">
        <property name="title">
-         <string>Load to 3D</string>
+         <string>Scene</string>
        </property>
        <addaction name="actTo3D"/>
        <addaction name="actLoadPC"/>
        <addaction name="separator"/>
        <addaction name="actClear3D"/>
       </widget>
+      <widget class="QMenu" name="menuDataset">
+       <property name="title">
+         <string>Dataset</string>
+       </property>
+       <addaction name="actLoadedDLPointCloud"/>
+       <addaction name="separator"/>
+       <addaction name="actCurrentPrimitiveDLDataset"/>
+       <addaction name="actDLDataset"/>
+      </widget>
+      <action name="actEvaluationCSV">
+       <property name="text">
+         <string>Current evaluation CSV...</string>
+       </property>
+      </action>
       <action name="actOBJ">
        <property name="text">
-         <string>Export OBJ file (*.obj)</string>
+         <string>OBJ...</string>
        </property>
       </action>
       <action name="actJSON">
        <property name="text">
-         <string>Export JSON parameters (*.json)</string>
+         <string>Model parameters JSON...</string>
        </property>
       </action>
       <action name="actPLY">
        <property name="text">
-         <string>Export point cloud PLY (*.ply)</string>
+         <string>PLY...</string>
        </property>
       </action>
       <action name="actDLPointCloud">
        <property name="text">
-         <string>Export DL point cloud TXT (*.txt)</string>
+         <string>Training TXT...</string>
        </property>
       </action>
       <action name="actLoadedDLPointCloud">
        <property name="text">
-          <string>Export loaded point cloud as DL TXT (*.txt)</string>
+          <string>Convert input point cloud to training TXT...</string>
        </property>
       </action>
        <action name="actDLDataset">
         <property name="text">
-          <string>Batch generate all primitive dataset</string>
+          <string>Generate all primitive datasets...</string>
         </property>
        </action>
        <action name="actCurrentPrimitiveDLDataset">
         <property name="text">
-          <string>Batch generate current primitive dataset</string>
+          <string>Generate current primitive dataset...</string>
         </property>
        </action>
        <action name="actMesh">
        <property name="text">
-         <string>Export STL Mesh file (*.stl)</string>
+         <string>STL...</string>
        </property>
       </action>
       <action name="actTo3D">
        <property name="text">
-         <string>Load current model to QGIS 3D scene</string>
+         <string>Load current model to 3D</string>
        </property>
       </action>
       <action name="actLoadPC">
        <property name="text">
-         <string>Load external point cloud to QGIS 3D scene</string>
+         <string>Load external point cloud...</string>
        </property>
       </action>
       <action name="actClear3D">
        <property name="text">
-         <string>Clear 3D scene</string>
+         <string>Clear plugin models and point clouds</string>
        </property>
       </action>
-      <addaction name="menuExport"/>
       <addaction name="menuLoad3D"/>
+      <addaction name="menuExport"/>
+      <addaction name="menuDataset"/>
      </widget>
     </item>
     <item>
@@ -166,72 +180,72 @@
             <widget class="QComboBox" name="comboPrimitive">
              <item>
               <property name="text">
-               <string>Cuboid</string>
+               <string notr="true">Cuboid</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>Cylinder</string>
+               <string notr="true">Cylinder</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>LHouse</string>
+               <string notr="true">LHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>ConeCylinder</string>
+               <string notr="true">ConeCylinder</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>GabledRoof</string>
+               <string notr="true">GabledRoof</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>PyramidRoof</string>
+               <string notr="true">PyramidRoof</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>TruncatedPyramidRoof</string>
+               <string notr="true">TruncatedPyramidRoof</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>HalfCylinderRoof</string>
+               <string notr="true">HalfCylinderRoof</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>CylinderDome</string>
+               <string notr="true">CylinderDome</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>IndentedCuboid</string>
+               <string notr="true">IndentedCuboid</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>AsymmetricGableHouse</string>
+               <string notr="true">AsymmetricGableHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>FourStageRoundTower</string>
+               <string notr="true">FourStageRoundTower</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>TwoGableHouses</string>
+               <string notr="true">TwoGableHouses</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string>TriPrismPyramid</string>
+               <string notr="true">TriPrismPyramid</string>
               </property>
              </item>
             </widget>

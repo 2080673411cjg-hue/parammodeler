@@ -1,4 +1,5 @@
 #include "parammodeler_pick3d.h"
+#include <QCoreApplication>
 #include "parammodeler_pick3d_math.h"
 #include "parammodeler_pick3d_overlay.h"
 #include "qgs3dmapcanvas.h"
@@ -165,7 +166,7 @@ void ParamModelerPick3D::mouseReleaseEvent( QMouseEvent *event )
   updateMarkers( candidate );
   if ( candidate < 0 )
   {
-    QToolTip::showText( event->globalPos(), tr( "No point within 12 pixels." ) );
+    QToolTip::showText( event->globalPos(), QCoreApplication::translate( "ParamModelerPick3D", "No point within 12 pixels." ) );
     return;
   }
   mFinished = true;

@@ -153,6 +153,7 @@ private slots:
   void onPrimitiveChanged(const QString &prim); // 基元切换槽函数
   void onExportOBJClicked();
   void onExportJSONClicked();
+  void onExportEvaluationCsv();
   void onExportPLYClicked();
   void onExportDLPointCloudClicked();
   void onExportLoadedDLPointCloudClicked();
@@ -246,6 +247,11 @@ private:
   // ===== DL预测值锚点（微调复位用） =====
   QMap<QString, double> m_dlAnchorParams;
   bool m_hasDlAnchor = false;
+  QMap<QString, double> m_evaluationRaw, m_evaluationCorrected;
+  QString m_evaluationInput, m_evaluationPrimitive, m_evaluationModel, m_evaluationCheckpoint;
+  bool m_evaluationCorrectionEnabled = false;
+  QVector3D m_evaluationCloudMin, m_evaluationCloudMax;
+  bool m_evaluationCloudAvailable = false;
   QPushButton *m_resetAnchorBtn = nullptr;
   bool m_geometryCorrectionEnabled = false;
   bool m_suspendHeightCompensation = false;

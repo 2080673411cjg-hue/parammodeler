@@ -20,6 +20,8 @@ struct PointNetPredictResult
 
 struct PointNetRegressionResult
 {
+  QString modelName;
+  QString checkpointPath;
   QString className;
   QMap<QString, double> params;
   QString rawOutput;

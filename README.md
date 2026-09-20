@@ -10,7 +10,19 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 
 项目的核心目标不是只输出一个不可编辑的三角网格，而是把建筑点云转换为结构化、可解释、可编辑、可复现的参数化三维模型。
 
+## 最近更新（2026-09-20）
+
+基于 v2.3.13 增加当前评估 CSV、整理顶部菜单，并接入简体中文界面。CSV 记录原始预测、几何校正、当前微调值和对齐差值，同时保留实际权重路径；v4-1 仍仅对应四类重训模型，不代表全类别升级。
+
+用户已反馈中文界面可用。开发侧通过 4 个 C++ 文件的语法检查及 5 项离屏翻译测试；尚未完成 CSV 导出的完整 QGIS 流程验收。本轮仅修改插件，QGIS 本机只补充语言包，没有修改核心源码。具体变更与验证范围见 `dl-pipeline-log.md`。
+
 ## 主要功能
+
+- 支持简体中文界面，随 QGIS 界面语言在插件启动时加载。基元类型名、参数键、模型路径和 CSV 字段保持英文原值；切换语言需重启 QGIS。
+
+- 顶部菜单按 `Scene`（场景）、`Export`（导出）、`Dataset`（数据集）分组。导出区分模型采样点云与输入点云转换；无有效输入文件时禁用转换，无插件场景内容时禁用清除。
+- 支持从导出菜单选择 `Current evaluation CSV...`，保存原始预测（映射到 UI 参数语义）、几何校正结果、当前微调参数和位姿。记录实际回归权重路径，区分四类 v4-1 与其他模型；未推理或切换输入/基元后预测列留空。
+- CSV 的对齐差值为当前模型世界坐标 bbox 减去当前显示点云的全点云稳健 bbox；`min_delta_z` / `max_delta_z` 对应底部/顶部差值。它们不是真值误差，也不是点到面的拟合误差；缺少匹配的显示点云时不计算。每次导出一个快照，不追加。
 
 - 支持 14 类建筑基元的参数化建模。
 - 支持本地 OpenGL 快速预览。
@@ -342,11 +354,22 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 
 ## 后续建议
 
+功能优先级：先补“保存/恢复微调会话”（点云路径、基元、参数、位姿和预测记录），再加入微调撤销/重做，随后考虑显示点云到模型表面的距离。以上是后续建议，尚未实现；当前参数 JSON 导出不等于完整会话保存。
+
 1. 🔴 **数据端增强**：法向量通道 + 数据扩量（TwoGable/IndentedCuboid 各 1000+）+ 随机裁切。详见 `dl-pipeline-log.md` 第九章。
 2. 加入位姿参数回归（先 rz，再 rx/ry/tx/ty/tz）。
 3. 每种基元加小示意图帮助理解参数含义。
 4. 稳定 QGIS 3D 中点云和模型的一键加载、透明显示和实时微调体验。
 5. 整理论文或项目报告中的实验章节。
+
+## 中文界面
+
+在 `Settings > Options > General` 勾选 `Override System Locale`，将 `User interface translation` 设为简体中文（`zh_CN`），保存后重启 QGIS。不要仅修改数字/日期的 Locale。
+
+- 插件：`i18n/parammodeler_zh_CN.ts` 是翻译源文件，`.qm` 已生成并通过 `parammodeler.qrc` 嵌入 DLL。重新编译 `plugin_parammodeler` 即可，不需要重编 `qgis_3d`。支持 QGIS 的 `zh_CN` 和 `zh-Hans` 简体中文标识，其他语言保留原文。
+- QGIS：本机已将其自带 `i18n/qgis_zh-Hans.ts` 编译为 `build/output/i18n/qgis_zh_CN.qm`，只补语言包，未改核心源码。使用 `zh_CN` 文件名可同时匹配本机 Qt 的 `qt_zh_CN.qm` / `qtbase_zh_CN.qm`。其他安装目录需要在实际 `QgsApplication.i18nPath()` 目录部署语言包；本机生成的 QGIS 语言包不属于插件仓库。
+- 后续新增文案：运行 `powershell -File scripts/update_translations.ps1 -Extract` 提取，再用 Qt Linguist 编辑 `.ts`，最后运行 `powershell -File scripts/update_translations.ps1` 重新生成 `.qm`，两者一起保存。
+- 离屏验证：`E:/mambaforge/envs/qgis_dev/python.exe tests/test_translations.py`，检查嵌入资源、中英文界面、占位符与内部基元标识。
 
 ## 项目定位
 

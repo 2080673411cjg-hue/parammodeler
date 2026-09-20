@@ -22,6 +22,9 @@
 #include <QMenu>
 #include <QDockWidget>
 #include <QMessageBox>
+#include <QCoreApplication>
+#include <QLocale>
+#include "qgsapplication.h"
 
 // ========================================================================
 // ==================== 静态常量定义（插件元数据）=======================
@@ -44,6 +47,7 @@ ParamModeler::ParamModeler( QgisInterface *iface )
 }
 ParamModeler::~ParamModeler()
 {
+  QCoreApplication::removeTranslator( &mTranslator );
   // 不要 delete mIface 或 mDock，QGIS 会管理
   mAction = nullptr;
   mDock = nullptr;
@@ -51,6 +55,12 @@ ParamModeler::~ParamModeler()
 // 注册插件菜单、工具栏
 void ParamModeler::initGui()
 {
+  // Use QGIS's interface language, not its independently configurable number locale.
+  const auto app = QgsApplication::instance();
+  const QLocale language( app ? app->translation() : QStringLiteral( "en" ) );
+  if ( language.language() == QLocale::Chinese && language.script() != QLocale::TraditionalHanScript
+       && mTranslator.load( QStringLiteral( ":/parammodeler/i18n/parammodeler_zh_CN.qm" ) ) )
+    QCoreApplication::installTranslator( &mTranslator );
   QIcon icon( sPluginIcon );
   mAction = new QAction( icon, tr( "Open ParamModeler" ), this );
   mAction->setObjectName( "paramModelerAction" );
@@ -71,6 +81,7 @@ void ParamModeler::unload()
     delete mAction;
     mAction = nullptr;
   }
+  QCoreApplication::removeTranslator( &mTranslator );
   // mDock 不 delete（QGIS 管理）
 }
 // 点击插件按钮

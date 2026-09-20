@@ -1,5 +1,6 @@
 <RCC>
     <qresource prefix="/parammodeler">
         <file>plugin_icon.png</file>
+        <file>i18n/parammodeler_zh_CN.qm</file>
     </qresource>
 </RCC>

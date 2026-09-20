@@ -416,6 +416,8 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
 {
   PointNetRegressionResult result;
   const PointNetRegressionConfig config = regressionConfig( backend, primitiveType );
+  result.modelName = config.modelName;
+  result.checkpointPath = QDir( config.logDir ).absoluteFilePath( QStringLiteral( "best_model.pth" ) );
 
   if ( config.logDir.isEmpty() )
   {

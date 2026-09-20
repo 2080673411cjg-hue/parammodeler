@@ -37,6 +37,7 @@
 #include <cmath>
 
 #include <QFileInfo>
+#include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
@@ -323,6 +324,8 @@ static void alignModelToPointCloud( const MeshData &mesh, const QVector3D &pcRef
 // ============================================================
 void ParamModelerDock::cacheInputMetadata( const QString &filePath )
 {
+  m_evaluationRaw.clear();
+  m_evaluationCorrected.clear();
   QVector3D metadataBBoxMin, metadataBBoxSize;
   double metadataRz = qQNaN();
   m_hasMetadata = metadataPointCloudInfoForInput( filePath, &metadataBBoxMin, &metadataBBoxSize,
@@ -827,6 +830,27 @@ void ParamModelerDock::initConnections()
 
   connect( ui->actOBJ, &QAction::triggered, this, &ParamModelerDock::onExportOBJClicked );
   connect( ui->actJSON, &QAction::triggered, this, &ParamModelerDock::onExportJSONClicked );
+  ui->actEvaluationCSV->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/mActionFileSave.svg" ) ) );
+  connect( ui->actEvaluationCSV, &QAction::triggered, this, &ParamModelerDock::onExportEvaluationCsv );
+  const auto updateMenuAvailability = [this]() {
+    ui->actLoadedDLPointCloud->setEnabled( !m_inputDataPath.isEmpty() && QFileInfo( m_inputDataPath ).isFile() );
+    bool hasSceneContent = m_realtimeModelLoaded || !m_pointCloudLayer.isNull();
+    const auto layers = QgsProject::instance()->mapLayers();
+    for ( QgsMapLayer *layer : layers )
+    {
+      const QString name = layer->name();
+      hasSceneContent = hasSceneContent
+        || name == QStringLiteral( "ParamModeler_Model" )
+        || name == QStringLiteral( "ParamModeler_Model_Roof" )
+        || name == QStringLiteral( "ParamModeler_Model_Edges" )
+        || name == QStringLiteral( "ParamModeler_3D_Anchor" )
+        || name.startsWith( QStringLiteral( "External point cloud - " ) );
+    }
+    ui->actClear3D->setEnabled( hasSceneContent );
+  };
+  connect( ui->menuDataset, &QMenu::aboutToShow, this, updateMenuAvailability );
+  connect( ui->menuLoad3D, &QMenu::aboutToShow, this, updateMenuAvailability );
+  updateMenuAvailability();
   connect( ui->actPLY, &QAction::triggered, this, &ParamModelerDock::onExportPLYClicked );
   connect( ui->actDLPointCloud, &QAction::triggered, this, &ParamModelerDock::onExportDLPointCloudClicked );
   connect( ui->actLoadedDLPointCloud, &QAction::triggered, this, &ParamModelerDock::onExportLoadedDLPointCloudClicked );
@@ -1399,6 +1423,8 @@ void ParamModelerDock::onPrimitiveChanged( const QString &prim )
   // 切换基元后 DL 锚点失效（锚点参数与基元类型绑定），禁用复位按钮
   m_hasDlAnchor = false;
   m_dlAnchorParams.clear();
+  m_evaluationRaw.clear();
+  m_evaluationCorrected.clear();
   if ( m_resetAnchorBtn )
     m_resetAnchorBtn->setEnabled( false );
 
@@ -1640,6 +1666,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     }
 
     QMap<QString, double> params = pointNetParamsToUiParams( prim, regression.params );
+    const auto rawParams = params;
     applyDataDrivenParamCorrections( prim, params );
     if ( params.isEmpty() )
     {
@@ -1648,6 +1675,13 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     }
 
     PointNetRunner::applyToUI( this, params );
+    m_evaluationRaw = rawParams;
+    m_evaluationCorrected = params;
+    m_evaluationInput = QFileInfo( m_inputDataPath ).absoluteFilePath();
+    m_evaluationPrimitive = prim;
+    m_evaluationModel = regression.modelName;
+    m_evaluationCheckpoint = regression.checkpointPath;
+    m_evaluationCorrectionEnabled = m_geometryCorrectionEnabled;
 
     // 保存 DL 预测值作为微调锚点（对话框流程也需要）
     m_dlAnchorParams = params;
@@ -1756,6 +1790,136 @@ void ParamModelerDock::onExportOBJClicked()
       tr( "OBJ file could not be exported. Please check parameters or output path." )
     );
   }
+}
+
+void ParamModelerDock::onExportEvaluationCsv()
+{
+  const QString primitive = ui->comboPrimitive->currentText();
+  if ( !checkMeshValid( primitive, this ) )
+    return;
+  const bool hasPrediction = !m_evaluationRaw.isEmpty()
+    && m_evaluationPrimitive == primitive
+    && m_evaluationInput == QFileInfo( m_inputDataPath ).absoluteFilePath();
+  QString path = QFileDialog::getSaveFileName( this, tr( "Export evaluation CSV" ),
+    QFileInfo( m_inputDataPath ).completeBaseName() + QStringLiteral( "_evaluation.csv" ),
+    tr( "CSV files (*.csv)" ) );
+  if ( path.isEmpty() )
+    return;
+  if ( !path.endsWith( QStringLiteral( ".csv" ), Qt::CaseInsensitive ) )
+    path += QStringLiteral( ".csv" );
+
+  // Reuse physical parameter getters; widget values can be ratios instead of lengths.
+  QJsonObject physical = ExportJSON::buildParams( this, primitive );
+  if ( primitive == QStringLiteral( "TruncatedPyramidRoof" ) )
+  {
+    physical.insert( QStringLiteral( "bottomLength" ), tpBottomLength() );
+    physical.insert( QStringLiteral( "bottomWidth" ), tpBottomWidth() );
+  }
+  if ( primitive == QStringLiteral( "CylinderDome" ) || primitive == QStringLiteral( "CylinderHemisphere" ) )
+    physical.insert( QStringLiteral( "bulge" ), cylHemiBulge() );
+  QMap<QString, double> physicalMap;
+  for ( auto it = physical.constBegin(); it != physical.constEnd(); ++it )
+    physicalMap.insert( it.key(), it.value().toDouble() );
+  const auto current = pointNetParamsToUiParams( primitive, physicalMap );
+
+  QSaveFile file( path );
+  if ( !file.open( QIODevice::WriteOnly ) )
+  {
+    QMessageBox::warning( this, tr( "Export failed" ), file.errorString() );
+    return;
+  }
+  QByteArray csv = QByteArray::fromHex( "efbbbf" );
+  const auto number = []( double value ) {
+    return std::isfinite( value ) ? QString::number( value, 'g', 15 ) : QString();
+  };
+  const QString timestamp = QDateTime::currentDateTimeUtc().toString( Qt::ISODateWithMs );
+  const auto line = [&]( QStringList cells ) {
+    for ( QString &cell : cells )
+    {
+      cell.replace( QLatin1Char( '"' ), QStringLiteral( "\"\"" ) );
+      cell = QLatin1Char( '"' ) + cell + QLatin1Char( '"' );
+    }
+    csv += cells.join( QLatin1Char( ',' ) ).toUtf8() + "\r\n";
+  };
+  line( { "schema_version", "export_time_utc", "input_file", "primitive", "model",
+          "checkpoint", "correction_enabled_at_inference", "section", "name",
+          "raw_prediction", "corrected_prediction", "current_value",
+          "correction_delta", "current_minus_corrected" } );
+  const auto row = [&]( const QString &section, const QString &name, const QString &raw,
+                        const QString &corrected, const QString &value,
+                        const QString &correctionDelta = QString(), const QString &editDelta = QString() ) {
+    line( { "1", timestamp, m_inputDataPath, primitive,
+            hasPrediction ? m_evaluationModel : QString(),
+            hasPrediction ? m_evaluationCheckpoint : QString(),
+            hasPrediction ? QString::number( m_evaluationCorrectionEnabled ) : QString(),
+            section, name, raw, corrected, value, correctionDelta, editDelta } );
+  };
+  auto keys = current;
+  if ( hasPrediction )
+    for ( auto it = m_evaluationRaw.cbegin(); it != m_evaluationRaw.cend(); ++it )
+      keys.insert( it.key(), it.value() );
+  for ( auto it = keys.cbegin(); it != keys.cend(); ++it )
+  {
+    const QString key = it.key();
+    const bool raw = hasPrediction && m_evaluationRaw.contains( key );
+    const bool corrected = hasPrediction && m_evaluationCorrected.contains( key );
+    row( "parameter_ui_semantics", key,
+         raw ? number( m_evaluationRaw.value( key ) ) : QString(),
+         corrected ? number( m_evaluationCorrected.value( key ) ) : QString(),
+         current.contains( key ) ? number( current.value( key ) ) : QString(),
+         raw && corrected ? number( m_evaluationCorrected.value( key ) - m_evaluationRaw.value( key ) ) : QString(),
+         corrected && current.contains( key ) ? number( current.value( key ) - m_evaluationCorrected.value( key ) ) : QString() );
+  }
+  // Include the complete physical model snapshot, including non-regressed parameters.
+  for ( auto it = physicalMap.cbegin(); it != physicalMap.cend(); ++it )
+    row( "physical_parameter", it.key(), {}, {}, number( it.value() ) );
+  const auto metric = [&]( const QString &name, double value ) {
+    row( "current_alignment", name, {}, {}, number( value ) );
+  };
+  metric( "tx", poseTranslateX() );
+  metric( "ty", poseTranslateY() );
+  metric( "tz", poseTranslateZ() );
+  metric( "rx_degrees", poseRotateX() );
+  metric( "ry_degrees", poseRotateY() );
+  metric( "rz_degrees", poseRotateZ() );
+  const MeshData mesh = BuildMesh::build( primitive, this );
+  const QMatrix4x4 rotation = modelRotationMatrix( this );
+  const QVector3D translation( poseTranslateX(), poseTranslateY(), poseTranslateZ() );
+  QVector3D modelMin = rotation.map( mesh.vertices.first() ) + translation;
+  QVector3D modelMax = modelMin;
+  for ( const QVector3D &vertex : mesh.vertices )
+  {
+    const QVector3D world = rotation.map( vertex ) + translation;
+    for ( int axis = 0; axis < 3; ++axis )
+    {
+      modelMin[axis] = std::min( modelMin[axis], world[axis] );
+      modelMax[axis] = std::max( modelMax[axis], world[axis] );
+    }
+  }
+  const bool hasCloud = m_evaluationCloudAvailable && m_pointCloudLayer && m_hasDisplayCloudBBox
+    && QFileInfo( m_displayCloudSourcePath ).absoluteFilePath() == QFileInfo( m_inputDataPath ).absoluteFilePath();
+  row( "status", "cloud_bbox_source", {}, {}, hasCloud ? "displayed_cloud_full_robust_bbox" : "unavailable" );
+  row( "status", "prediction", {}, {}, hasPrediction ? "available" : "unavailable" );
+  row( "status", "ground_truth", {}, {}, "not_evaluated" );
+  for ( int axis = 0; axis < 3; ++axis )
+  {
+    const QString suffix = QStringLiteral( "_" ) + QStringLiteral( "xyz" ).mid( axis, 1 );
+    metric( "model_min" + suffix, modelMin[axis] );
+    metric( "model_max" + suffix, modelMax[axis] );
+    if ( hasCloud )
+    {
+      metric( "cloud_min" + suffix, m_evaluationCloudMin[axis] );
+      metric( "cloud_max" + suffix, m_evaluationCloudMax[axis] );
+      metric( "min_delta" + suffix, modelMin[axis] - m_evaluationCloudMin[axis] );
+      metric( "max_delta" + suffix, modelMax[axis] - m_evaluationCloudMax[axis] );
+      metric( "size_delta" + suffix, ( modelMax[axis] - modelMin[axis] ) - ( m_evaluationCloudMax[axis] - m_evaluationCloudMin[axis] ) );
+      metric( "center_delta" + suffix, ( modelMin[axis] + modelMax[axis] - m_evaluationCloudMin[axis] - m_evaluationCloudMax[axis] ) * 0.5 );
+    }
+  }
+  if ( file.write( csv ) != csv.size() || !file.commit() )
+    QMessageBox::warning( this, tr( "Export failed" ), file.errorString() );
+  else
+    QMessageBox::information( this, tr( "Export succeeded" ), tr( "Evaluation CSV saved to:\n%1" ).arg( path ) );
 }
 
 void ParamModelerDock::onExportJSONClicked()
@@ -2355,6 +2519,7 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
 
 bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool showMessage )
 {
+  m_evaluationCloudAvailable = false;
   stopManualTranslate3D();
   if ( filePath.isEmpty() )
     return false;
@@ -2390,6 +2555,8 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
     hardBBoxFromPoints( points, hardMin, hardMax );
     QVector3D fullRobustMin, fullRobustMax;
     robustBBoxFromPoints( points, fullRobustMin, fullRobustMax );
+    m_evaluationCloudMin = fullRobustMin;
+    m_evaluationCloudMax = fullRobustMax;
 
     const double fullHeight = static_cast<double>( hardMax.z() - hardMin.z() );
     const double sliceHeight = std::max( 0.5, fullHeight * 0.12 );
@@ -2562,6 +2729,7 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
   }
 
   m_pointCloudLayer = loadedLayer;
+  m_evaluationCloudAvailable = hasDisplayBBox;
 
   if ( showMessage )
     QMessageBox::information( this, tr( "Load succeeded" ), tr( "Point cloud loaded successfully.\nLayer: %1\n\nYou can view and adjust it in the 3D scene." ).arg( layerName ) );
@@ -2729,12 +2897,20 @@ void ParamModelerDock::onInverseParams()
     return;
   }
   QMap<QString, double> params = pointNetParamsToUiParams( prim, regression.params );
+  const auto rawParams = params;
   applyDataDrivenParamCorrections( prim, params );
 
   if ( !params.isEmpty() )
   {
     DEBUG_LOG( QString( "[PointNet] parameter regression done, returned %1 parameters\n" ).arg( params.size() ).toStdWString().c_str() );
     PointNetRunner::applyToUI( this, params );
+    m_evaluationRaw = rawParams;
+    m_evaluationCorrected = params;
+    m_evaluationInput = QFileInfo( m_inputDataPath ).absoluteFilePath();
+    m_evaluationPrimitive = prim;
+    m_evaluationModel = regression.modelName;
+    m_evaluationCheckpoint = regression.checkpointPath;
+    m_evaluationCorrectionEnabled = m_geometryCorrectionEnabled;
 
     // 保存 DL 预测值作为微调锚点，供 resetToDlAnchor() 一键复位
     m_dlAnchorParams = params;

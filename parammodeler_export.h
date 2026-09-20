@@ -25,6 +25,7 @@ public:
 
 class ExportJSON
 {
+    friend class ParamModelerDock;
 public:
     static bool writeJSON( ParamModelerDock *dock );
 

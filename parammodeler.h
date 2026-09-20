@@ -20,6 +20,7 @@
 
 #include "qgisplugin.h"
 #include <QObject>
+#include <QTranslator>
 
 class QAction;
 class QgisInterface;
@@ -56,6 +57,7 @@ class ParamModeler : public QObject, public QgisPlugin
     QgisInterface *mIface;        //!< QGIS 接口
     QAction *mAction;             //!< 插件按钮
     ParamModelerDock *mDock;      //!< Dock 面板
+    QTranslator mTranslator;
 };
 
 #endif // PARAMMODELER_H
