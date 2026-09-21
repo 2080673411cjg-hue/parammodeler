@@ -34,6 +34,7 @@
 class QCheckBox;
 class QProgressDialog;
 class QPushButton;
+class QToolButton;
 class QJsonArray;
 
 class QgisInterface;
@@ -250,10 +251,12 @@ private:
   QMap<QString, double> m_evaluationRaw, m_evaluationCorrected;
   QString m_evaluationInput, m_evaluationPrimitive, m_evaluationModel, m_evaluationCheckpoint;
   bool m_evaluationCorrectionEnabled = false;
+  double m_evaluationCorrectionStrength = 0.0;
   QVector3D m_evaluationCloudMin, m_evaluationCloudMax;
   bool m_evaluationCloudAvailable = false;
   QPushButton *m_resetAnchorBtn = nullptr;
   bool m_geometryCorrectionEnabled = false;
+  double m_geometryCorrectionStrength = 0.70;
   bool m_suspendHeightCompensation = false;
   void resetToDlAnchor();
 
@@ -267,12 +270,13 @@ private:
   bool m_manualTranslateHasSource = false;
   QgsPointXY m_manualTranslateSource;
 
-  QPushButton *m_manualTranslate3DBtn = nullptr;
+  QToolButton *m_manualTranslate3DBtn = nullptr;
   QPointer<ParamModelerPick3D> m_manualTranslate3DTool;
   QPointer<Qgs3DMapCanvas> m_manualTranslate3DCanvas;
   QPointer<Qgs3DMapTool> m_previous3DMapTool;
   QVector3D m_manualTranslate3DLocalAnchor;
   void stopManualTranslate3D();
+  void startTranslate3D( bool fitCorner );
 };
 
 #endif // PARAMMODELER_DOCK_H

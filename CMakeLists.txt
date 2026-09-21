@@ -1,6 +1,13 @@
 ########################################################
 # Files
 find_package(Qt5 COMPONENTS OpenGL 3DCore 3DRender 3DExtras REQUIRED)
+# Visual Studio regeneration may run without an activated conda environment.
+# Prefer an explicit Eigen3_DIR, with the configured Qt prefix as a search hint.
+get_filename_component(_parammodeler_qt_prefix "${Qt5_DIR}/../../.." ABSOLUTE)
+find_package(Eigen3 3.3 REQUIRED NO_MODULE
+  HINTS "${_parammodeler_qt_prefix}/share/eigen3/cmake"
+)
+unset(_parammodeler_qt_prefix)
 
 set(CMAKE_AUTOMOC ON)
 set (parammodeler_SRCS
@@ -42,6 +49,7 @@ include_directories(
   ${CMAKE_CURRENT_BINARY_DIR}
 )
 target_link_libraries(plugin_parammodeler
+  Eigen3::Eigen
   qgis_core
   qgis_gui
   Qt5::OpenGL

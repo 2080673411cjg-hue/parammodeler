@@ -1,6 +1,6 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-09-20
+> 最后更新: 2026-09-21
 > **开发边界提醒**：原则上只修改自己的 ParamModeler 插件，不修改 QGIS 核心。2026-09-17 的近距离缩放核心实验已按用户要求撤回，当前源码不再包含本次 `qgis_3d` 修改。备份和回退记录见文末“QGIS 核心实验的备份与回退”。后续核心改动必须先说明影响、确认并提前备份。
 > 插件版本: **v2.3.13**（插件内 3D 拾取对齐 + 上部红 X + 高度方向控制 + 主面板整理；QGIS 核心近距离缩放实验已撤回并留备份；含 v2.3.12 v4-1 四类重参数化模型验证 / v2.3.11 参数级数据驱动校正 / v2.3.10 回归 target 重参数化）
 > 后续更新: **2026-09-20**（评估 CSV、顶部菜单整理、简体中文翻译；本轮保存到 GitHub，不另建版本标签）
@@ -13,6 +13,27 @@
 > 后端: PCT（PointNeXt 保留但不再使用）
 
 ---
+
+## 2026-09-21 更新：三面拟合虚拟角点与 v4-1 几何校正
+
+- 同日新增估计窗口“一键完成”，位于“估计参数”与“返回微调”之间：复用分类、参数估计、场景加载和 bbox/底部截面对齐，成功后返回微调；保留单独操作按钮，不自动触发三面拟合。无有效输入时禁用，任一步失败短路中止，不把旧预测当作成功结果。
+- 推理过程中禁用输入、模型选择、设置、几何校正和操作按钮，拒绝关闭估计窗口，防止 QProcess 事件处理期间重复执行或销毁局部回调。失败后恢复操作。中文译文已补齐；已做语法与语言包检查，完整一键推理/加载交互仍待 QGIS 实测。
+- 几何校正增加正则化式强度百分比：`0%` 保留 PCT，`100%` 等价旧版几何强覆盖，默认 `70%` 采用 `PCT + alpha * (geometry - PCT)`。已从 Cuboid / Cylinder / GabledRoof 扩展到第一批 v4-1 四类 HalfCylinderRoof / TruncatedPyramidRoof / LHouse / IndentedCuboid；CSV schema v2 新增 `correction_strength_at_inference`，日志 `[ParamCorrection]` 同步记录 strength、几何测量值和融合后值。
+
+- 构建跟进：用户反馈插件 CMake 自定义生成退出代码 1；检查发现 `Eigen3_DIR=Eigen3_DIR-NOTFOUND`，而 Eigen3 3.4.0 实际安装在 qgis_dev 的 `Library/share/eigen3/cmake`。插件 CMake 增加基于 `Qt5_DIR` 安装前缀的搜索提示，保留显式 `Eigen3_DIR` 的优先级；修复 VS 未激活 conda 时找不到该依赖的问题。上一轮 `/Zs` 使用显式 include 路径，因此未覆盖此配置阶段问题。
+- 修复验证：在原有 build 目录重新运行 CMake，`Configuring done`、`Generating done`，退出码 0；缓存已解析到正确的 Eigen3 目录。只更新构建工程文件，未执行完整 DLL 编译，也未修改 QGIS 核心源码。
+
+- 保留原有点云点拾取；“3D 对齐”改为带下拉菜单的按钮，新增“三面拟合角点...”，对 Cuboid / TruncatedPyramidRoof / LHouse / IndentedCuboid 启用。其他类型仍用直接拾取，TriPrismPyramid 不调整。
+- 用户依次在同一个外角附近选两面墙及平顶面，程序按真实 XYZ 球形邻域拟合，不要求角点本身存在采样点。默认半径为模型包围盒对角线的 15%，可调整；修改半径清空已选面。
+- 交互补强：选面失败不再只“没反应”，浮窗和鼠标提示会区分未点到点云、附近点太少、邻域像边线/不是面、半径混到多个面、面方向不符、第二墙不垂直及三面交点不稳定，便于现场调整选点和半径。
+- 宽容候选模式：局部平面拟合从严格的 60% 支撑、低残差和窄方向阈值放宽为可用候选；强候选用青色十字，弱候选或被拒候选用橙色十字显示。弱候选允许继续三面求交，同时提示内点数/RMS；方向不符、第二墙过平行或三面交点不稳定时保留候选中心，避免“点了但不知道拟合到哪”。
+- 新增 `parammodeler_cornerfit.h`：固定种子一致性筛选 + Eigen PCA 精修；基础可用候选至少 8 个支撑点、35% 支撑比例，达到旧版 12 点/60%/低残差时标为强候选，否则标为弱候选。两墙和顶面的方向判断已放宽以适应轻微姿态误差；使用中心化双精度三平面求交，拒绝退化和超过各邻域半径四倍的远距离外推。邻域拟合最多均匀抽取 4096 点。
+- 青色十字显示已选面的拟合中心，黄框预览虚拟交点；仅点击“应用对齐”后复用现有红 X 到 target 的平移流程，TX/TY/TZ 范围检查保留。不改变模型尺寸或朝向；整面缺失时不强行推算。
+- 浮动工具窗口支持上一步、取消及相机导航。导航开启时暂停拾取，可转到其他面，关闭导航后继续；关闭窗口、Esc、选面时右键及切换基元会退出。图层移除或 CRS 不匹配时取消。记录 `[CornerFit3D]` 支撑数/半径/残差，最终平移沿用 `[ManualAlign3D]` 日志。
+- TruncatedPyramidRoof 顶面长宽的构建语义改为固定顶面左下角、向局部 +X/+Y 生长，不再绕底面中心双向缩放；这样顶面角点与三面拟合/人工微调的“左下角”语义一致。IndentedCuboid 的外框仍固定左下角向 +X/+Y 生长，innerHeight 保持从顶面向下凹的原语义。
+- 新增 Eigen3 CMake 依赖（本机 qgis_dev 已安装）；中文语言包更新为 284 条。仅修改插件，无 QGIS 核心改动。
+- 验证：MSVC 相关 C++ 文件语法检查通过；28 项拟合检查覆盖角点缺失、噪声/离群点、大小尺度、旋转、大坐标、重复面、非平面及远距离交点；原 22 项拾取数学检查通过；直接/拟合标记在 400x300、800x600、1600x1200 共 6 组离屏 OpenGL 检查通过，截图已检查。按当前开发约定，本轮未再运行翻译测试。
+- 待验收：尚未完整构建 DLL、未在 QGIS 中实测三面选择/相机导航/取消交互。重新编译插件后优先用 TruncatedPyramidRoof 顶面角点、IndentedCuboid 内凹和带缺角采样的 Cuboid 验证。测试命令：`powershell -File scripts/test_cornerfit.ps1 -WithPicking`。
 
 ## 2026-09-20 更新：评估 CSV、菜单整理与中文界面
 
@@ -1367,13 +1388,17 @@ rz≈45° 时接近正方形（实例 `Cuboid/sample_00001`：`14.5×6.8` 的真
 
 ### v2.3.11 (2026-09-15) — PCT + 数据驱动参数校正：最小闭环
 
-先不做 13 类，按最小闭环只接 3 类：
+先不做 13 类，最小闭环先接 3 类；2026-09-21 已在同一框架上扩展第一批 v4-1 四类：
 
 | 类 | 校正内容 | 目的 |
 |---|---|---|
 | `Cuboid` | 底部 footprint 修 `length/width`，Z range 修 `height` | 验证长宽高强几何参数是否比 PCT 更稳 |
 | `Cylinder` | 稳健 XY 半径分位数修 `radius`，Z range 修 `height` | 验证半径/高度这类直接可见量 |
 | `GabledRoof` | 底部 footprint 修 `length/width`，高度剖面估 `wallRatio` | 验证 `wallRatio` 这类弱几何参数是否可被点云剖面辅助 |
+| `HalfCylinderRoof` | 底部 footprint 修 `length/width`，按 `height - width/2` 修 `wallHeight` | 半圆屋顶半径由宽度派生，不再单独回归 |
+| `TruncatedPyramidRoof` | 底面 footprint 修底长/宽，顶部切片估顶长/宽，高度剖面估墙/屋顶分段 | 利用 v4-1 的比例 target，让可见截面约束弱参数 |
+| `LHouse` | 外包络修 `outerLength/outerWidth/height`，底部占据区估缺口比例 | 外框强约束，缺口比例估不稳则保留 PCT |
+| `IndentedCuboid` | 外框修 `outerLength/outerWidth/outerHeight`，内部点集估内凹尺寸/深度/偏移 | 内凹位置仍弱，只有候选稳定时才融合 |
 
 #### 当前对应 A/B/C 实验里的哪一步
 
@@ -1391,13 +1416,13 @@ rz≈45° 时接近正方形（实例 `Cuboid/sample_00001`：`14.5×6.8` 的真
 - 时机：`pointNetParamsToUiParams()` 后、`PointNetRunner::applyToUI()` 前。
 - 点云：读取当前 `m_inputDataPath`，如果看起来是 DL 归一化点云，则用 metadata `center/scale` 反归一化。
 - 朝向：优先用 metadata `rz` 把点云逆旋回 canonical，再量 footprint；没有 rz 时按当前坐标直接量。
-- 失败策略：点云不可读、bbox 无效、wallRatio 剖面估不出来时跳过对应项，保留 PCT 输出。
+- 失败策略：点云不可读、bbox 无效、剖面/切片/缺口估不出来时跳过对应项，保留 PCT 输出。
 - 日志：`[ParamCorrection] ...`，用于对比修正值和 PCT 原值。
 
 #### 注意
 
-这只是 B 档几何强修正，不是残差校正模型。它有意保守：只改能从点云直接看见的强几何量；
-`GabledRoof.wallRatio` 如果剖面信号不足会保留 PCT 值。
+这只是 B 档几何强修正，不是残差校正模型。它有意保守：优先改能从点云直接看见的强几何量；
+`GabledRoof.wallRatio`、`TruncatedPyramidRoof` 顶面/墙屋顶分段、`LHouse` 缺口比例和 `IndentedCuboid` 内凹参数如果信号不足会保留 PCT 值。
 
 ---
 

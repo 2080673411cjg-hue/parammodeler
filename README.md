@@ -10,7 +10,23 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 
 项目的核心目标不是只输出一个不可编辑的三角网格，而是把建筑点云转换为结构化、可解释、可编辑、可复现的参数化三维模型。
 
-## 最近更新（2026-09-20）
+## 最近更新（2026-09-21）
+
+参数估计窗口按钮顺序为“分类 / 估计参数 / 一键完成 / 返回微调”。加载有效点云后，“一键完成”按当前后端依次执行分类、回归（沿用几何校正开关和强度百分比）、加载模型与点云、自动对齐，成功后关闭窗口返回微调。任何一步失败即中止并保留窗口；运行时禁用输入修改和重复点击。原有分步按钮保留，三面拟合角点仍需人工选面，不包含在自动流程中。
+
+几何校正从“完全覆盖”改为可调融合：`0%` 保持 PCT 预测，`100%` 等价于旧版点云几何强修正，默认 `70%` 按 `PCT + 0.7 * (几何测量 - PCT)` 写回参数。当前支持 Cuboid / Cylinder / GabledRoof，并已扩展到第一批 v4-1 四类 HalfCylinderRoof / TruncatedPyramidRoof / LHouse / IndentedCuboid；评估 CSV schema v2 会记录当次推理是否启用校正及强度。
+
+新增辅助虚拟角点对齐（待 QGIS 实测）：点击“3D 对齐”右侧下拉箭头，选择“三面拟合角点...”，依次选同一外角附近的两面墙和一个平顶面。青色十字表示已选面的拟合中心，黄色方框表示最终虚拟角点；确认后点击“应用对齐”才移动模型。直接点击“3D 对齐”仍使用原来的点云点拾取。
+
+第一版仅启用 Cuboid、LHouse、IndentedCuboid；圆形和斜屋顶类不启用。选点应靠近同一个目标角，但落在面内部。邻域半径使用点云坐标单位，修改会清空已选面；“上一步”可重选，“相机导航”可暂停拾取以旋转观察，取消勾选后继续。右键（选面时）、Esc 或取消按钮退出，不移动模型。角点本身不必有采样点，但三面都需要足够的局部点云支持；若选点失败，浮窗和鼠标提示会说明是未点到点云、点数太少、像边线、混到多个面、面方向不符或交点不稳定。
+
+三面拟合已从严格判据改为宽容候选模式：青色十字表示质量较好的拟合面，橙色十字表示弱候选面或被拒候选中心。弱候选也允许继续三面求交，但会提示内点数和 RMS；方向不符、第二墙过平行或三面交点不稳定时，橙色十字会保留最后一次候选位置，方便调整选点和半径。
+
+算法使用局部一致性筛选和 Eigen 平面拟合，拒绝点数不足、退化、方向不符及远距离外推的交点；只修改平移，不自动旋转或改变参数。新增 Eigen3 构建依赖（本机 qgis_dev 已有）。28 项拟合检查、22 项拾取数学检查、6 组标记绘制检查及 5 项翻译测试通过；未完整构建 DLL 或在 QGIS 中验证交互。
+
+若 VS 报插件 `CMakeLists.txt` 自定义生成退出代码 1，应查看前面的 CMake 错误。本机曾因 `Eigen3_DIR-NOTFOUND` 失败：插件现从已配置的 `Qt5_DIR` 对应安装前缀补充 Eigen3 搜索路径，无需在 VS 中激活 conda。独立安装 Eigen3 时仍可通过 CMake 的 `Eigen3_DIR` 指定位置。
+
+### 2026-09-20
 
 基于 v2.3.13 增加当前评估 CSV、整理顶部菜单，并接入简体中文界面。CSV 记录原始预测、几何校正、当前微调值和对齐差值，同时保留实际权重路径；v4-1 仍仅对应四类重训模型，不代表全类别升级。
 
@@ -262,7 +278,7 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 -> 网格表面采样点云 + 归一化
 -> PCT 分类（98.92% F1）
 -> PCT 回归（v4_normals：basic + PCA 法向量，修复数据集上重训）
--> 参数级数据驱动校正（实验：Cuboid / Cylinder / GabledRoof）
+-> 参数级数据驱动校正（实验：Cuboid / Cylinder / GabledRoof + v4-1 四类）
 -> pointNetParamsToUiParams 映射 + applyToUI 回填
 -> applyMetadataRz 回填朝向（metadata 的导出真值，不是 DL 预测）
 -> alignModelToPointCloud 自动对齐（同锚点语义、旋转后的 bbox 极值对齐）
@@ -284,10 +300,11 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 
 ## 已解决（v2.3.11）
 
-- ✅ **参数级数据驱动校正最小闭环**：新增 `Enable geometry correction` 开关（默认关闭；主面板和分类/参数估计弹窗里同步显示）。开启后在 PCT 回归后、写 UI 前，对 Cuboid / Cylinder / GabledRoof 加一层点云几何强修正。
+- ✅ **参数级数据驱动校正最小闭环**：新增 `Enable geometry correction` 开关（默认关闭；主面板和分类/参数估计弹窗里同步显示）。开启后在 PCT 回归后、写 UI 前，对 Cuboid / Cylinder / GabledRoof 加一层点云几何修正；2026-09-21 起增加强度百分比，避免几何测量值完全覆盖 PCT 预测，并扩展到 v4-1 第一批四类。
 - ✅ **Cuboid**：用反归一化后的点云、按 metadata rz 逆旋到 canonical 后，从底部 footprint 修正 `length/width`，从 Z range 修正 `height`。
 - ✅ **Cylinder**：用稳健 XY 中心和半径分位数修正 `radius`，用 Z range 修正 `height`。
 - ✅ **GabledRoof**：用底部 footprint 修正 `length/width`，并尝试从高度剖面估计 `wallRatio`；估不出来时保留 PCT 的墙/屋顶比例。
+- ✅ **v4-1 第一批四类**：HalfCylinderRoof 修外框和墙高；TruncatedPyramidRoof 修底面、顶面和墙/屋顶高度比例；LHouse 修外包络和可见缺口比例；IndentedCuboid 修外框并在可估时修内凹尺寸、深度和偏移。弱几何量估不稳时保留 PCT。
 - ✅ **实验安全边界**：点云读不到、metadata 缺失或估计失败时直接跳过，不影响原始 PCT 回填；当前不做残差校正模型。
 
 ## 已解决（v2.3.10）

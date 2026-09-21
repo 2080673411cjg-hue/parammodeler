@@ -86,7 +86,9 @@ public:
 
   ~ParamModelerPickOverlay() { delete mEntity.data(); }
 
-  static QVector<float> vertices( const QSize &viewport, const QPointF *source, const QPointF *target )
+  static QVector<float> vertices( const QSize &viewport, const QPointF *source, const QPointF *target,
+                                  const QVector<QPointF> &faces = {},
+                                  const QVector<QPointF> &weakFaces = {} )
   {
     QVector<float> data;
     if ( viewport.isEmpty() ) return data;
@@ -102,6 +104,20 @@ public:
       vertex( a + n, color ); vertex( a - n, color ); vertex( b - n, color );
       vertex( a + n, color ); vertex( b - n, color ); vertex( b + n, color );
     };
+    for ( const QPointF &face : faces )
+    {
+      line( face + QPointF( -6, 0 ), face + QPointF( 6, 0 ), 6, Qt::black );
+      line( face + QPointF( 0, -6 ), face + QPointF( 0, 6 ), 6, Qt::black );
+      line( face + QPointF( -6, 0 ), face + QPointF( 6, 0 ), 3, QColor( 0, 230, 230 ) );
+      line( face + QPointF( 0, -6 ), face + QPointF( 0, 6 ), 3, QColor( 0, 230, 230 ) );
+    }
+    for ( const QPointF &face : weakFaces )
+    {
+      line( face + QPointF( -6, 0 ), face + QPointF( 6, 0 ), 6, Qt::black );
+      line( face + QPointF( 0, -6 ), face + QPointF( 0, 6 ), 6, Qt::black );
+      line( face + QPointF( -6, 0 ), face + QPointF( 6, 0 ), 3, QColor( 255, 150, 0 ) );
+      line( face + QPointF( 0, -6 ), face + QPointF( 0, 6 ), 3, QColor( 255, 150, 0 ) );
+    }
     if ( target )
     {
       const QPointF corners[] = { *target + QPointF( -9, -9 ), *target + QPointF( 9, -9 ),
@@ -119,10 +135,12 @@ public:
     return data;
   }
 
-  void update( const QSize &viewport, const QPointF *source, const QPointF *target )
+  void update( const QSize &viewport, const QPointF *source, const QPointF *target,
+               const QVector<QPointF> &faces = {},
+               const QVector<QPointF> &weakFaces = {} )
   {
     if ( !mEntity ) return;
-    const QVector<float> data = vertices( viewport, source, target );
+    const QVector<float> data = vertices( viewport, source, target, faces, weakFaces );
     mBuffer->setData( QByteArray( reinterpret_cast<const char *>( data.constData() ), data.size() * sizeof( float ) ) );
     const int count = data.size() / 6;
     mPosition->setCount( count );

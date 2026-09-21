@@ -385,9 +385,9 @@ MeshData BuildMesh::buildTruncatedPyramidRoof( const TruncatedPyramidRoofParams 
 
     QVector3D v0(0,0,0), v1(W,0,0), v2(W,D,0), v3(0,D,0);
     QVector3D v4(0,0,HW), v5(W,0,HW), v6(W,D,HW), v7(0,D,HW);
-    double cx=W/2, cy=D/2, Z=HW+HR;
-    QVector3D t0(cx-WT/2, cy-DT/2, Z), t1(cx+WT/2, cy-DT/2, Z);
-    QVector3D t2(cx+WT/2, cy+DT/2, Z), t3(cx-WT/2, cy+DT/2, Z);
+    double Z=HW+HR;
+    QVector3D t0(0, 0, Z), t1(WT, 0, Z);
+    QVector3D t2(WT, DT, Z), t3(0, DT, Z);
 
     m.addQuad( v0, v3, v2, v1 );
     m.addQuad( v0, v1, v5, v4 );

@@ -12,6 +12,7 @@ $toolset = Get-ChildItem -LiteralPath (Join-Path $vs 'VC/Tools/MSVC') -Directory
 $sdkRoot = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits/10/Include'
 $sdk = Get-ChildItem -LiteralPath $sdkRoot -Directory | Sort-Object Name -Descending | Select-Object -First 1
 $arguments = @('/nologo', '/Zs', '/std:c++17', '/EHsc', '/MD', '/utf-8', '/bigobj')
+$arguments += '/IE:/mambaforge/envs/qgis_dev/Library/include/eigen3'
 $qtBin = 'E:/mambaforge/envs/qgis_dev/Library/bin'
 $uiTemp = Join-Path ([System.IO.Path]::GetTempPath()) ('parammodeler-syntax-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $uiTemp | Out-Null

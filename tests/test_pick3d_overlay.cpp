@@ -34,11 +34,15 @@ int main( int argc, char **argv )
   check( shader.addShaderFromSourceCode( QOpenGLShader::Fragment, ParamModelerPickOverlay::fragmentShader() ), "fragment shader" );
   check( shader.link(), "shader link" );
   auto *gl = context.functions();
+  for ( bool fit : { false, true } )
   for ( const QSize size : { QSize( 800, 600 ), QSize( 400, 300 ), QSize( 1600, 1200 ) } )
   {
     const QPointF source( size.width() / 3, size.height() / 2 );
     const QPointF target( size.width() * 2 / 3, size.height() / 2 );
-    const auto vertices = ParamModelerPickOverlay::vertices( size, &source, &target );
+    const QVector<QPointF> faces = fit ? QVector<QPointF>{ QPointF( size.width() / 3, size.height() / 4 ),
+      QPointF( size.width() * 2 / 3, size.height() / 4 ) } : QVector<QPointF>();
+    const QVector<QPointF> weakFaces = fit ? QVector<QPointF>{ QPointF( size.width() / 2, size.height() * 3 / 4 ) } : QVector<QPointF>();
+    const auto vertices = ParamModelerPickOverlay::vertices( size, &source, &target, faces, weakFaces );
     QOpenGLFramebufferObject framebuffer( size, QOpenGLFramebufferObject::CombinedDepthStencil );
     check( framebuffer.bind(), "framebuffer" );
     gl->glViewport( 0, 0, size.width(), size.height() );
@@ -64,7 +68,7 @@ int main( int argc, char **argv )
     gl->glFinish();
     check( gl->glGetError() == GL_NO_ERROR, "render" );
     const QImage image = framebuffer.toImage();
-    int red = 0, white = 0, yellow = 0;
+    int red = 0, white = 0, yellow = 0, cyan = 0, orange = 0;
     for ( int y = 0; y < image.height(); ++y )
       for ( int x = 0; x < image.width(); ++x )
       {
@@ -76,10 +80,15 @@ int main( int argc, char **argv )
         }
         if ( color.red() > 230 && color.green() > 230 && color.blue() > 230 ) ++white;
         if ( color.red() > 230 && color.green() > 180 && color.green() < 230 && color.blue() < 30 ) ++yellow;
+        if ( color.red() < 40 && color.green() > 200 && color.blue() > 200 ) ++cyan;
+        if ( color.red() > 230 && color.green() > 110 && color.green() < 190 && color.blue() < 40 ) ++orange;
       }
     check( red > 100 && white > 100 && yellow > 100, "visible red X, white outline and yellow target" );
-    if ( argc > 1 ) check( image.save( QString::fromLocal8Bit( argv[1] ) + QStringLiteral( "/markers_%1.png" ).arg( size.width() ) ), "screenshot" );
+    check( fit ? cyan > 100 : cyan == 0, "selected face markers only in fitting mode" );
+    check( fit ? orange > 40 : orange == 0, "weak face markers only in fitting mode" );
+    if ( argc > 1 ) check( image.save( QString::fromLocal8Bit( argv[1] ) + QStringLiteral( "/markers_%1_%2.png" ).arg( size.width() ).arg( fit ) ), "screenshot" );
     std::cout << "PASS: overlay " << size.width() << "x" << size.height()
-              << " red=" << red << " white=" << white << " yellow=" << yellow << '\n';
+              << " red=" << red << " white=" << white << " yellow=" << yellow
+              << " cyan=" << cyan << " orange=" << orange << '\n';
   }
 }

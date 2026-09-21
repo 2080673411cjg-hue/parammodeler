@@ -35,6 +35,7 @@
 #include <limits>
 #include <algorithm>
 #include <cmath>
+#include <functional>
 
 #include <QFileInfo>
 #include <QDateTime>
@@ -53,6 +54,7 @@
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QDialog>
+#include <QCloseEvent>
 #include <QObject>
 #include <QEvent>
 #include <QWheelEvent>
@@ -67,9 +69,11 @@
 #include <QSplitter>
 #include <QLabel>
 #include <QPushButton>
+#include <QToolButton>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QProgressBar>
+#include <QSpinBox>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QPainter>
@@ -1072,12 +1076,32 @@ void ParamModelerDock::initPointNet()
   m_manualTranslateBtn->setToolTip( tr( "Shows the current model anchor as a red X in the 2D map canvas. Click the point-cloud target position to translate the model there. Only TX/TY are changed." ) );
   connect( m_manualTranslateBtn, &QPushButton::clicked, this, &ParamModelerDock::startManualTranslateByClick );
 
-  m_manualTranslate3DBtn = new QPushButton( tr( "Align in 3D" ), this );
+  m_manualTranslate3DBtn = new QToolButton( this );
+  m_manualTranslate3DBtn->setText( tr( "Align in 3D" ) );
+  m_manualTranslate3DBtn->setToolButtonStyle( Qt::ToolButtonTextBesideIcon );
+  m_manualTranslate3DBtn->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
+  m_manualTranslate3DBtn->setPopupMode( QToolButton::MenuButtonPopup );
+  auto *alignMenu = new QMenu( m_manualTranslate3DBtn );
+  auto *fitCornerAction = alignMenu->addAction( tr( "Fit corner from three faces..." ) );
+  fitCornerAction->setToolTip( tr( "Available for Cuboid, TruncatedPyramidRoof, LHouse and IndentedCuboid. Select two walls and the flat top, then confirm the virtual corner." ) );
+  alignMenu->setToolTipsVisible( true );
+  m_manualTranslate3DBtn->setMenu( alignMenu );
+  connect( alignMenu, &QMenu::aboutToShow, this, [this, fitCornerAction] {
+    const QString type = ui->comboPrimitive->currentText();
+    fitCornerAction->setEnabled( type == QStringLiteral( "Cuboid" ) ||
+                                 type == QStringLiteral( "TruncatedPyramidRoof" ) ||
+                                 type == QStringLiteral( "LHouse" ) ||
+                                 type == QStringLiteral( "IndentedCuboid" ) );
+  } );
+  connect( fitCornerAction, &QAction::triggered, this, [this] {
+    stopManualTranslate3D();
+    startTranslate3D( true );
+  } );
   m_manualTranslate3DBtn->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/3d.svg" ) ) );
   m_manualTranslate3DBtn->setToolTip( tr( "Move the upper-corner red X (top center for round models) to a 3D cloud point. Right-click or Esc cancels." ) );
   alignLayout->addWidget( m_manualTranslate3DBtn, 1 );
   alignLayout->addWidget( m_manualTranslateBtn, 1 );
-  connect( m_manualTranslate3DBtn, &QPushButton::clicked, this, &ParamModelerDock::startManualTranslate3D );
+  connect( m_manualTranslate3DBtn, &QToolButton::clicked, this, &ParamModelerDock::startManualTranslate3D );
 }
 
 void ParamModelerDock::stopManualTranslate3D()
@@ -1097,6 +1121,11 @@ void ParamModelerDock::stopManualTranslate3D()
 }
 
 void ParamModelerDock::startManualTranslate3D()
+{
+  startTranslate3D( false );
+}
+
+void ParamModelerDock::startTranslate3D( bool fitCorner )
 {
   if ( m_manualTranslate3DTool )
   {
@@ -1147,6 +1176,28 @@ void ParamModelerDock::startManualTranslate3D()
     return QgsPoint( poseTranslateX() + anchor.x(), poseTranslateY() + anchor.y(), poseTranslateZ() + anchor.z() );
   };
   auto *tool = new ParamModelerPick3D( canvas, layer, source );
+  if ( fitCorner )
+  {
+    const QString type = ui->comboPrimitive->currentText();
+    if ( type != QStringLiteral( "Cuboid" ) &&
+         type != QStringLiteral( "TruncatedPyramidRoof" ) &&
+         type != QStringLiteral( "LHouse" ) &&
+         type != QStringLiteral( "IndentedCuboid" ) )
+    {
+      delete tool;
+      return;
+    }
+    const auto vertices = BuildMesh::build( type, this ).vertices;
+    QVector3D minimum = vertices.first(), maximum = minimum;
+    for ( const QVector3D &v : vertices )
+      for ( int axis = 0; axis < 3; ++axis )
+      {
+        minimum[axis] = std::min( minimum[axis], v[axis] );
+        maximum[axis] = std::max( maximum[axis], v[axis] );
+      }
+    tool->enableCornerFit( std::max( 0.001, static_cast<double>( ( maximum - minimum ).length() ) * 0.15 ),
+                           modelRotationMatrix( this ).mapVector( QVector3D( 0, 0, 1 ) ), window() );
+  }
   m_manualTranslate3DTool = tool;
   m_manualTranslate3DCanvas = canvas;
   m_previous3DMapTool = canvas->mapTool();
@@ -1455,7 +1506,21 @@ void ParamModelerDock::randomizeCurrentPrimitiveParams( bool refreshPreview, boo
 
 void ParamModelerDock::onOpenPointCloudEstimateDialog()
 {
-  QDialog dialog( this );
+  // Inference pumps Qt events; keep the modal workflow alive until it returns.
+  class EstimateDialog : public QDialog
+  {
+  public:
+    using QDialog::QDialog;
+    bool busy = false;
+    void reject() override { if ( !busy ) QDialog::reject(); }
+  protected:
+    void closeEvent( QCloseEvent *event ) override
+    {
+      if ( busy ) event->ignore();
+      else QDialog::closeEvent( event );
+    }
+  };
+  EstimateDialog dialog( this );
   dialog.setWindowTitle( tr( "Point cloud classification and parameter estimation" ) );
   dialog.resize( 560, 520 );
 
@@ -1493,12 +1558,29 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   modelLayout->addStretch();
   auto *chkGeometryCorrection = new QCheckBox( tr( "Enable geometry correction" ), &dialog );
   chkGeometryCorrection->setToolTip(
-    tr( "Experimental: after PCT regression, adjust strong geometric parameters from the current point cloud for Cuboid, Cylinder, and GabledRoof." )
+    tr( "Experimental: after PCT regression, blend supported parameters with geometry measured from the current point cloud." )
   );
   chkGeometryCorrection->setChecked( m_geometryCorrectionEnabled );
   connect( chkGeometryCorrection, &QCheckBox::toggled, this, [this]( bool checked ) {
     m_geometryCorrectionEnabled = checked;
   } );
+  auto *correctionStrengthLayout = new QHBoxLayout();
+  auto *correctionStrengthLabel = new QLabel( tr( "Geometry correction strength:" ), &dialog );
+  auto *spinGeometryStrength = new QSpinBox( &dialog );
+  spinGeometryStrength->setRange( 0, 100 );
+  spinGeometryStrength->setSuffix( tr( "%" ) );
+  spinGeometryStrength->setValue( qBound( 0, static_cast<int>( std::round( m_geometryCorrectionStrength * 100.0 ) ), 100 ) );
+  spinGeometryStrength->setToolTip(
+    tr( "0% keeps the PCT prediction; 100% uses the measured point-cloud geometry. Intermediate values blend both." )
+  );
+  spinGeometryStrength->setEnabled( m_geometryCorrectionEnabled );
+  connect( spinGeometryStrength, QOverload<int>::of( &QSpinBox::valueChanged ), this, [this]( int value ) {
+    m_geometryCorrectionStrength = qBound( 0.0, value / 100.0, 1.0 );
+  } );
+  connect( chkGeometryCorrection, &QCheckBox::toggled, spinGeometryStrength, &QSpinBox::setEnabled );
+  correctionStrengthLayout->addWidget( correctionStrengthLabel );
+  correctionStrengthLayout->addWidget( spinGeometryStrength );
+  correctionStrengthLayout->addStretch();
 
   auto *resultLabel = new QLabel( tr( "Result: -" ), &dialog );
   resultLabel->setWordWrap( true );
@@ -1511,12 +1593,16 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   auto *buttonLayout = new QHBoxLayout();
   auto *btnClassify = new QPushButton( tr( "Classify" ), &dialog );
   auto *btnInverse = new QPushButton( tr( "Estimate parameters" ), &dialog );
+  auto *btnComplete = new QPushButton( tr( "Complete all" ), &dialog );
+  btnComplete->setObjectName( QStringLiteral( "btnCompleteEstimate" ) );
   auto *btnFinish = new QPushButton( tr( "Return to fine tuning" ), &dialog );
   btnClassify->setMinimumHeight( 28 );
   btnInverse->setMinimumHeight( 28 );
+  btnComplete->setMinimumHeight( 28 );
   btnFinish->setMinimumHeight( 28 );
   buttonLayout->addWidget( btnClassify );
   buttonLayout->addWidget( btnInverse );
+  buttonLayout->addWidget( btnComplete );
   buttonLayout->addWidget( btnFinish );
 
   auto *table = new QTableWidget( &dialog );
@@ -1529,6 +1615,33 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   table->setEditTriggers( QAbstractItemView::NoEditTriggers );
   table->setMinimumHeight( 160 );
   bool parametersApplied = false;
+  bool inputReady = false;
+  bool classified = false;
+  QString classificationSummary;
+
+  const auto clearEstimate = [&]() {
+    parametersApplied = false;
+    table->setRowCount( 0 );
+    m_evaluationRaw.clear();
+    m_evaluationCorrected.clear();
+    m_dlAnchorParams.clear();
+    m_hasDlAnchor = false;
+    if ( m_resetAnchorBtn ) m_resetAnchorBtn->setEnabled( false );
+  };
+  const auto setBusy = [&]( bool busy ) {
+    dialog.busy = busy;
+    btnLoad->setEnabled( !busy );
+    btnSettings->setEnabled( !busy );
+    comboModel->setEnabled( !busy );
+    chkGeometryCorrection->setEnabled( !busy );
+    spinGeometryStrength->setEnabled( !busy && chkGeometryCorrection->isChecked() );
+    btnClassify->setEnabled( !busy && inputReady );
+    btnInverse->setEnabled( !busy && inputReady && classified );
+    btnComplete->setEnabled( !busy && inputReady );
+    btnFinish->setEnabled( !busy );
+    progress->setRange( 0, busy ? 0 : 100 );
+    progress->setVisible( busy );
+  };
 
   mainLayout->addWidget( inputTitle );
   mainLayout->addWidget( btnLoad );
@@ -1536,12 +1649,19 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   mainLayout->addWidget( processTitle );
   mainLayout->addLayout( modelLayout );
   mainLayout->addWidget( chkGeometryCorrection );
+  mainLayout->addLayout( correctionStrengthLayout );
   mainLayout->addWidget( resultLabel );
   mainLayout->addWidget( progress );
   mainLayout->addLayout( buttonLayout );
   mainLayout->addWidget( table );
 
   auto updateInputInfo = [&]() {
+    inputReady = false;
+    classified = false;
+    parametersApplied = false;
+    table->setRowCount( 0 );
+    resultLabel->setText( tr( "Result: -" ) );
+    setBusy( false );
     if ( m_inputDataPath.isEmpty() )
     {
       inputInfo->setText( tr( "No point cloud loaded" ) );
@@ -1572,6 +1692,8 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
         .arg( pc.bboxMax.z(), 0, 'f', 3 )
     );
     btnClassify->setEnabled( true );
+    inputReady = true;
+    btnComplete->setEnabled( true );
     btnInverse->setEnabled( false );
     resultLabel->setText( tr( "Result: -" ) );
     table->setRowCount( 0 );
@@ -1587,6 +1709,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       return;
 
     m_inputDataPath = filePath;
+    clearEstimate();
     cacheInputMetadata( filePath );   // 对话框流程也要缓存，否则对齐没有退化备选
     updateInputInfo();
   } );
@@ -1602,67 +1725,64 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     return PointNetBackend::PointNet2;
   };
 
-  connect( btnClassify, &QPushButton::clicked, &dialog, [&]() {
+  const auto classify = [&]() -> bool {
     if ( m_inputDataPath.isEmpty() )
-      return;
+      return false;
 
-    progress->setRange( 0, 0 );
-    progress->setVisible( true );
+    classified = false;
+    clearEstimate();
     resultLabel->setText( tr( "Classifying..." ) );
-    btnClassify->setEnabled( false );
-    btnInverse->setEnabled( false );
     QApplication::processEvents();
 
     PointNetPredictResult result = PointNetRunner::predict( m_inputDataPath, selectedBackend(), 2048, 3 );
-    progress->setRange( 0, 100 );
-    progress->setValue( 100 );
-    progress->setVisible( false );
-    btnClassify->setEnabled( true );
 
     if ( !result.errorMessage.isEmpty() )
     {
       QMessageBox::warning( &dialog, tr( "Classification failed" ), result.errorMessage );
       resultLabel->setText( tr( "Result: -" ) );
-      return;
+      return false;
     }
     if ( result.predictions.isEmpty() )
     {
       QMessageBox::warning( &dialog, tr( "Classification failed" ), tr( "No prediction returned." ) );
       resultLabel->setText( tr( "Result: -" ) );
-      return;
+      return false;
     }
 
     const PointNetPrediction top1 = result.predictions.first();
+    if ( ui->comboPrimitive->findText( top1.className ) < 0 )
+    {
+      QMessageBox::warning( &dialog, tr( "Classification failed" ), tr( "Unsupported primitive: %1" ).arg( top1.className ) );
+      resultLabel->setText( tr( "Result: -" ) );
+      return false;
+    }
     resultLabel->setText(
       tr( "Result: %1\nConfidence: %2%\nSwitched to corresponding primitive. You can estimate parameters and return to fine tuning." )
         .arg( top1.className )
         .arg( top1.probability * 100.0, 0, 'f', 1 )
     );
     ui->comboPrimitive->setCurrentText( top1.className );
-    btnInverse->setEnabled( true );
-  } );
+    classificationSummary = resultLabel->text();
+    classified = true;
+    return true;
+  };
 
-  connect( btnInverse, &QPushButton::clicked, &dialog, [&]() {
+  const auto estimate = [&]() -> bool {
     if ( m_inputDataPath.isEmpty() )
-      return;
+      return false;
 
-    progress->setRange( 0, 0 );
-    progress->setVisible( true );
-    btnInverse->setEnabled( false );
+    clearEstimate();
+    resultLabel->setText( tr( "Estimating parameters..." ) );
     QApplication::processEvents();
 
     const QString prim = ui->comboPrimitive->currentText();
     const PointNetRegressionResult regression = PointNetRunner::predictParams( m_inputDataPath, selectedBackend(), prim, 2048 );
 
-    progress->setRange( 0, 100 );
-    progress->setValue( 100 );
-    progress->setVisible( false );
-    btnInverse->setEnabled( true );
-
     if ( !regression.errorMessage.isEmpty() )
     {
+      resultLabel->setText( tr( "Parameter estimation failed" ) );
       QMessageBox::warning( &dialog, tr( "Parameter estimation failed" ), regression.errorMessage );
-      return;
+      return false;
     }
 
     QMap<QString, double> params = pointNetParamsToUiParams( prim, regression.params );
@@ -1670,8 +1790,9 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     applyDataDrivenParamCorrections( prim, params );
     if ( params.isEmpty() )
     {
+      resultLabel->setText( tr( "Parameter estimation failed" ) );
       QMessageBox::warning( &dialog, tr( "Parameter estimation failed" ), tr( "No parameters returned." ) );
-      return;
+      return false;
     }
 
     PointNetRunner::applyToUI( this, params );
@@ -1682,6 +1803,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     m_evaluationModel = regression.modelName;
     m_evaluationCheckpoint = regression.checkpointPath;
     m_evaluationCorrectionEnabled = m_geometryCorrectionEnabled;
+    m_evaluationCorrectionStrength = m_geometryCorrectionEnabled ? m_geometryCorrectionStrength : 0.0;
 
     // 保存 DL 预测值作为微调锚点（对话框流程也需要）
     m_dlAnchorParams = params;
@@ -1698,10 +1820,58 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       table->setItem( row, 1, new QTableWidgetItem( QString::number( it.value(), 'f', 2 ) ) );
     }
     onUpdatePreview();
-    resultLabel->setText( resultLabel->text() + tr( "\nParameters applied to main panel." ) );
+    resultLabel->setText( classificationSummary + tr( "\nParameters applied to main panel." ) );
+    return true;
+  };
+
+  const auto loadAndAlign = [&]() -> bool {
+    resultLabel->setText( tr( "Loading and aligning..." ) );
+    if ( m_isUpdating || BuildMesh::build( ui->comboPrimitive->currentText(), this ).isEmpty() )
+    {
+      QMessageBox::warning( &dialog, tr( "Load failed" ), tr( "Current parameters cannot generate a valid model." ) );
+      return false;
+    }
+    onLoadToQGIS3D( false );
+    if ( !m_realtimeModelLoaded )
+    {
+      QMessageBox::warning( &dialog, tr( "Load failed" ), tr( "Could not load the model into QGIS 3D." ) );
+      return false;
+    }
+    if ( !loadPointCloudToQGIS3D( m_inputDataPath, false ) )
+    {
+      QMessageBox::warning( &dialog, tr( "Point cloud load failed" ), tr( "The model was loaded, but the point cloud was not loaded into QGIS 3D." ) );
+      return false;
+    }
+    if ( !applyMetadataRz() )
+      DEBUG_LOG( QString( "[Align] no metadata rz for %1, keeping current pose rotation\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
+    QVector3D alignTarget;
+    if ( !pointCloudAlignTarget( alignTarget ) )
+    {
+      QMessageBox::warning( &dialog, tr( "Alignment unavailable" ), tr( "No point-cloud alignment reference is available. Use manual alignment." ) );
+      return false;
+    }
+    alignModelToPointCloud( BuildMesh::build( ui->comboPrimitive->currentText(), this ),
+                            alignTarget, ui->comboPrimitive->currentText(), this, QStringLiteral( "dialog" ) );
+    onUpdatePreview();
+    return true;
+  };
+  const auto run = [&]( const auto &operation ) -> bool {
+    if ( dialog.busy || !inputReady ) return false;
+    setBusy( true );
+    const bool ok = operation();
+    setBusy( false );
+    if ( !ok && parametersApplied )
+      resultLabel->setText( tr( "Loading or alignment failed. You can retry or return to fine tuning." ) );
+    return ok;
+  };
+  connect( btnClassify, &QPushButton::clicked, &dialog, [&] { run( classify ); } );
+  connect( btnInverse, &QPushButton::clicked, &dialog, [&] { run( estimate ); } );
+  connect( btnComplete, &QPushButton::clicked, &dialog, [&] {
+    if ( run( [&] { return classify() && estimate() && loadAndAlign(); } ) ) dialog.accept();
   } );
 
   connect( btnFinish, &QPushButton::clicked, &dialog, [&]() {
+    if ( dialog.busy ) return;
     if ( parametersApplied && !m_inputDataPath.isEmpty() )
     {
       const QMessageBox::StandardButton answer = QMessageBox::question(
@@ -1711,30 +1881,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
         QMessageBox::Yes | QMessageBox::No,
         QMessageBox::Yes
       );
-      if ( answer == QMessageBox::Yes )
-      {
-        onLoadToQGIS3D( true );
-        if ( !loadPointCloudToQGIS3D( m_inputDataPath, false ) )
-          QMessageBox::warning( &dialog, tr( "Point cloud load failed" ), tr( "The model was loaded, but the point cloud was not loaded into QGIS 3D." ) );
-
-        // --- 朝向：先回填 metadata 里的导出 rz（点云已转过这个角），再对齐 ---
-        if ( !applyMetadataRz() )
-          DEBUG_LOG( QString( "[Align] no metadata rz for %1, keeping current pose rotation\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
-
-        // --- Auto-align：必须在点云显示**之后**做，对齐目标 = 实际显示点云的 bbox 极值 ---
-        QVector3D alignTarget;
-        if ( pointCloudAlignTarget( alignTarget ) )
-        {
-          alignModelToPointCloud( BuildMesh::build( ui->comboPrimitive->currentText(), this ),
-                                  alignTarget, ui->comboPrimitive->currentText(),
-                                  this, QStringLiteral( "dialog" ) );
-          onUpdatePreview();  // 把新位姿推给 Qt3D 实时实体（模型图层已加载）
-        }
-        else
-        {
-          DEBUG_LOG( QString( "[Align] no point cloud bbox for %1, skipping\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
-        }
-      }
+      if ( answer == QMessageBox::Yes && !run( loadAndAlign ) ) return;
     }
     dialog.accept();
   } );
@@ -1842,16 +1989,17 @@ void ParamModelerDock::onExportEvaluationCsv()
     csv += cells.join( QLatin1Char( ',' ) ).toUtf8() + "\r\n";
   };
   line( { "schema_version", "export_time_utc", "input_file", "primitive", "model",
-          "checkpoint", "correction_enabled_at_inference", "section", "name",
+          "checkpoint", "correction_enabled_at_inference", "correction_strength_at_inference", "section", "name",
           "raw_prediction", "corrected_prediction", "current_value",
           "correction_delta", "current_minus_corrected" } );
   const auto row = [&]( const QString &section, const QString &name, const QString &raw,
                         const QString &corrected, const QString &value,
                         const QString &correctionDelta = QString(), const QString &editDelta = QString() ) {
-    line( { "1", timestamp, m_inputDataPath, primitive,
+    line( { "2", timestamp, m_inputDataPath, primitive,
             hasPrediction ? m_evaluationModel : QString(),
             hasPrediction ? m_evaluationCheckpoint : QString(),
             hasPrediction ? QString::number( m_evaluationCorrectionEnabled ) : QString(),
+            hasPrediction ? number( m_evaluationCorrectionStrength ) : QString(),
             section, name, raw, corrected, value, correctionDelta, editDelta } );
   };
   auto keys = current;
@@ -2399,6 +2547,178 @@ static bool estimateGabledWallRatioFromProfile( const QVector<QVector3D> &points
   return false;
 }
 
+static bool robustSliceBBox( const QVector<QVector3D> &points,
+                             const std::function<bool( const QVector3D & )> &accept,
+                             QVector3D &outMin, QVector3D &outMax, int minPoints = 24 )
+{
+  QVector<QVector3D> slice;
+  slice.reserve( points.size() );
+  for ( const QVector3D &p : points )
+    if ( accept( p ) )
+      slice.append( p );
+  if ( slice.size() < minPoints )
+    return false;
+  robustBBoxFromPoints( slice, outMin, outMax );
+  return true;
+}
+
+static bool estimateShrinkWallRatio( const QVector<QVector3D> &points,
+                                     double baseLength,
+                                     double baseWidth,
+                                     double zMin,
+                                     double height,
+                                     double &outRatio )
+{
+  if ( points.size() < 100 || baseLength <= 1e-6 || baseWidth <= 1e-6 || height <= 1e-6 )
+    return false;
+
+  constexpr int bins = 24;
+  QVector<QVector<QVector3D>> byBin;
+  byBin.resize( bins );
+  for ( const QVector3D &p : points )
+  {
+    const double t = ( static_cast<double>( p.z() ) - zMin ) / height;
+    const int idx = std::max( 0, std::min( bins - 1, static_cast<int>( std::floor( t * bins ) ) ) );
+    byBin[idx].append( p );
+  }
+
+  for ( int i = 2; i < bins - 2; ++i )
+  {
+    if ( byBin[i].size() < 10 )
+      continue;
+    QVector3D mn, mx;
+    robustBBoxFromPoints( byBin[i], mn, mx );
+    const double xRange = static_cast<double>( mx.x() - mn.x() );
+    const double yRange = static_cast<double>( mx.y() - mn.y() );
+    if ( xRange < baseLength * 0.90 || yRange < baseWidth * 0.90 )
+    {
+      outRatio = std::max( 0.15, std::min( 0.95, ( i + 0.5 ) / bins ) );
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool estimateLHouseCutoutRatios( const QVector<QVector3D> &points,
+                                        const QVector3D &fpMin,
+                                        const QVector3D &fpMax,
+                                        double zMin,
+                                        double height,
+                                        double &cutoutLengthRatio,
+                                        double &wingWidthRatio )
+{
+  const double length = static_cast<double>( fpMax.x() - fpMin.x() );
+  const double width = static_cast<double>( fpMax.y() - fpMin.y() );
+  if ( points.size() < 100 || length <= 1e-6 || width <= 1e-6 || height <= 1e-6 )
+    return false;
+
+  const double sliceTop = zMin + std::max( 0.5, height * 0.30 );
+  double maxXInUpperY = -std::numeric_limits<double>::infinity();
+  double maxYInRightX = -std::numeric_limits<double>::infinity();
+  int upperCount = 0, rightCount = 0;
+  for ( const QVector3D &p : points )
+  {
+    if ( static_cast<double>( p.z() ) > sliceTop )
+      continue;
+    const double x = ( static_cast<double>( p.x() ) - static_cast<double>( fpMin.x() ) ) / length;
+    const double y = ( static_cast<double>( p.y() ) - static_cast<double>( fpMin.y() ) ) / width;
+    if ( y > 0.60 )
+    {
+      maxXInUpperY = std::max( maxXInUpperY, x );
+      ++upperCount;
+    }
+    if ( x > 0.60 )
+    {
+      maxYInRightX = std::max( maxYInRightX, y );
+      ++rightCount;
+    }
+  }
+  if ( upperCount < 12 || rightCount < 12 || !std::isfinite( maxXInUpperY ) || !std::isfinite( maxYInRightX ) )
+    return false;
+
+  cutoutLengthRatio = std::max( 0.2, std::min( 0.9, 1.0 - maxXInUpperY ) );
+  wingWidthRatio = std::max( 0.2, std::min( 0.9, maxYInRightX ) );
+  return true;
+}
+
+static bool estimateIndentedInnerBox( const QVector<QVector3D> &points,
+                                      const QVector3D &fpMin,
+                                      const QVector3D &fpMax,
+                                      double zMin,
+                                      double height,
+                                      QVector3D &innerMin,
+                                      QVector3D &innerMax,
+                                      double &innerHeight )
+{
+  const double length = static_cast<double>( fpMax.x() - fpMin.x() );
+  const double width = static_cast<double>( fpMax.y() - fpMin.y() );
+  if ( points.size() < 100 || length <= 1e-6 || width <= 1e-6 || height <= 1e-6 )
+    return false;
+
+  const double marginX = length * 0.08;
+  const double marginY = width * 0.08;
+  QVector3D recessMin, recessMax;
+  if ( !robustSliceBBox( points, [&]( const QVector3D &p ) {
+         const double x = static_cast<double>( p.x() );
+         const double y = static_cast<double>( p.y() );
+         const double z = static_cast<double>( p.z() );
+         return x > static_cast<double>( fpMin.x() ) + marginX &&
+                x < static_cast<double>( fpMax.x() ) - marginX &&
+                y > static_cast<double>( fpMin.y() ) + marginY &&
+                y < static_cast<double>( fpMax.y() ) - marginY &&
+                z > zMin + height * 0.20;
+       }, recessMin, recessMax, std::max( 20, static_cast<int>( points.size() * 0.02 ) ) ) )
+    return false;
+
+  const double innerLength = static_cast<double>( recessMax.x() - recessMin.x() );
+  const double innerWidth = static_cast<double>( recessMax.y() - recessMin.y() );
+  if ( innerLength < length * 0.08 || innerLength > length * 0.92 ||
+       innerWidth < width * 0.08 || innerWidth > width * 0.92 )
+    return false;
+
+  double recessFloor = std::numeric_limits<double>::infinity();
+  int floorCount = 0;
+  for ( const QVector3D &p : points )
+  {
+    const double x = static_cast<double>( p.x() );
+    const double y = static_cast<double>( p.y() );
+    if ( x >= static_cast<double>( recessMin.x() ) && x <= static_cast<double>( recessMax.x() ) &&
+         y >= static_cast<double>( recessMin.y() ) && y <= static_cast<double>( recessMax.y() ) )
+    {
+      recessFloor = std::min( recessFloor, static_cast<double>( p.z() ) );
+      ++floorCount;
+    }
+  }
+  if ( floorCount < 12 || !std::isfinite( recessFloor ) )
+    return false;
+
+  innerMin = recessMin;
+  innerMax = recessMax;
+  innerHeight = std::max( 0.0, zMin + height - recessFloor );
+  return innerHeight > 1e-6;
+}
+
+static double regularizedGeometryValue( double pctValue, double geometryValue, double strength )
+{
+  if ( !std::isfinite( geometryValue ) )
+    return pctValue;
+  if ( !std::isfinite( pctValue ) )
+    return geometryValue;
+  const double alpha = std::max( 0.0, std::min( 1.0, strength ) );
+  return pctValue + alpha * ( geometryValue - pctValue );
+}
+
+static double applyRegularizedGeometryValue( QMap<QString, double> &uiParams,
+                                             const QString &key,
+                                             double geometryValue,
+                                             double strength )
+{
+  const double pctValue = uiParams.value( key, geometryValue );
+  const double correctedValue = regularizedGeometryValue( pctValue, geometryValue, strength );
+  uiParams.insert( key, correctedValue );
+  return correctedValue;
+}
+
 void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitiveType,
                                                         QMap<QString, double> &uiParams ) const
 {
@@ -2410,7 +2730,11 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
                          : primitiveType;
   if ( prim != QStringLiteral( "Cuboid" ) &&
        prim != QStringLiteral( "Cylinder" ) &&
-       prim != QStringLiteral( "GabledRoof" ) )
+       prim != QStringLiteral( "GabledRoof" ) &&
+       prim != QStringLiteral( "HalfCylinderRoof" ) &&
+       prim != QStringLiteral( "TruncatedPyramidRoof" ) &&
+       prim != QStringLiteral( "LHouse" ) &&
+       prim != QStringLiteral( "IndentedCuboid" ) )
     return;
 
   QVector<QVector3D> points;
@@ -2446,17 +2770,22 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
     return;
   const double fpLength = static_cast<double>( fpMax.x() - fpMin.x() );
   const double fpWidth = static_cast<double>( fpMax.y() - fpMin.y() );
+  const double strength = std::max( 0.0, std::min( 1.0, m_geometryCorrectionStrength ) );
 
   if ( prim == QStringLiteral( "Cuboid" ) )
   {
-    if ( fpLength > 1e-6 ) uiParams.insert( QStringLiteral( "length" ), fpLength );
-    if ( fpWidth > 1e-6 ) uiParams.insert( QStringLiteral( "width" ), fpWidth );
-    uiParams.insert( QStringLiteral( "height" ), height );
-    DEBUG_LOG( QString( "[ParamCorrection] Cuboid source=%1 length=%2 width=%3 height=%4 rz=%5\n" )
+    const double length = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "length" ), fpLength, strength ) : uiParams.value( QStringLiteral( "length" ), fpLength );
+    const double width = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "width" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "width" ), fpWidth );
+    const double correctedHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "height" ), height, strength );
+    DEBUG_LOG( QString( "[ParamCorrection] Cuboid source=%1 strength=%2 geo=(%3,%4,%5) corrected=(%6,%7,%8) rz=%9\n" )
                  .arg( fpSource )
+                 .arg( strength, 0, 'f', 2 )
                  .arg( fpLength, 0, 'f', 3 )
                  .arg( fpWidth, 0, 'f', 3 )
                  .arg( height, 0, 'f', 3 )
+                 .arg( length, 0, 'f', 3 )
+                 .arg( width, 0, 'f', 3 )
+                 .arg( correctedHeight, 0, 'f', 3 )
                  .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
                  .toStdWString().c_str() );
     return;
@@ -2476,11 +2805,14 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
     std::sort( radii.begin(), radii.end() );
     const int idx = std::max( 0, std::min( radii.size() - 1, static_cast<int>( std::floor( radii.size() * 0.90 ) ) ) );
     const double radius = radii[idx];
-    if ( radius > 1e-6 ) uiParams.insert( QStringLiteral( "radius" ), radius );
-    uiParams.insert( QStringLiteral( "cylHeight" ), height );
-    DEBUG_LOG( QString( "[ParamCorrection] Cylinder radius=%1 height=%2 n=%3\n" )
+    const double correctedRadius = radius > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "radius" ), radius, strength ) : uiParams.value( QStringLiteral( "radius" ), radius );
+    const double correctedHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "cylHeight" ), height, strength );
+    DEBUG_LOG( QString( "[ParamCorrection] Cylinder strength=%1 geoRadius=%2 geoHeight=%3 correctedRadius=%4 correctedHeight=%5 n=%6\n" )
+                 .arg( strength, 0, 'f', 2 )
                  .arg( radius, 0, 'f', 3 )
                  .arg( height, 0, 'f', 3 )
+                 .arg( correctedRadius, 0, 'f', 3 )
+                 .arg( correctedHeight, 0, 'f', 3 )
                  .arg( canonicalPoints.size() )
                  .toStdWString().c_str() );
     return;
@@ -2488,32 +2820,209 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
 
   if ( prim == QStringLiteral( "GabledRoof" ) )
   {
-    if ( fpLength > 1e-6 ) uiParams.insert( QStringLiteral( "grLength" ), fpLength );
-    if ( fpWidth > 1e-6 ) uiParams.insert( QStringLiteral( "grWidth" ), fpWidth );
+    const double length = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "grLength" ), fpLength, strength ) : uiParams.value( QStringLiteral( "grLength" ), fpLength );
+    const double width = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "grWidth" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "grWidth" ), fpWidth );
 
     double wallRatio = 0.0;
     if ( estimateGabledWallRatioFromProfile( canonicalPoints, fpWidth, hardMin.z(), height, wallRatio ) )
     {
-      uiParams.insert( QStringLiteral( "grWallHeight" ), height * wallRatio );
-      uiParams.insert( QStringLiteral( "grRoofHeight" ), height * ( 1.0 - wallRatio ) );
-      DEBUG_LOG( QString( "[ParamCorrection] GabledRoof source=%1 length=%2 width=%3 height=%4 wallRatio=%5 rz=%6\n" )
+      const double wallHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "grWallHeight" ), height * wallRatio, strength );
+      const double roofHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "grRoofHeight" ), height * ( 1.0 - wallRatio ), strength );
+      DEBUG_LOG( QString( "[ParamCorrection] GabledRoof source=%1 strength=%2 geo=(%3,%4,%5) corrected=(%6,%7,%8,%9) wallRatio=%10 rz=%11\n" )
                    .arg( fpSource )
+                   .arg( strength, 0, 'f', 2 )
                    .arg( fpLength, 0, 'f', 3 )
                    .arg( fpWidth, 0, 'f', 3 )
                    .arg( height, 0, 'f', 3 )
+                   .arg( length, 0, 'f', 3 )
+                   .arg( width, 0, 'f', 3 )
+                   .arg( wallHeight, 0, 'f', 3 )
+                   .arg( roofHeight, 0, 'f', 3 )
                    .arg( wallRatio, 0, 'f', 3 )
                    .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
                    .toStdWString().c_str() );
     }
     else
     {
-      DEBUG_LOG( QString( "[ParamCorrection] GabledRoof source=%1 length=%2 width=%3 height=%4 wallRatio=<kept PCT>\n" )
+      DEBUG_LOG( QString( "[ParamCorrection] GabledRoof source=%1 strength=%2 geo=(%3,%4,%5) corrected=(%6,%7) wallRatio=<kept PCT>\n" )
                    .arg( fpSource )
+                   .arg( strength, 0, 'f', 2 )
                    .arg( fpLength, 0, 'f', 3 )
                    .arg( fpWidth, 0, 'f', 3 )
                    .arg( height, 0, 'f', 3 )
+                   .arg( length, 0, 'f', 3 )
+                   .arg( width, 0, 'f', 3 )
                    .toStdWString().c_str() );
     }
+  }
+
+  if ( prim == QStringLiteral( "HalfCylinderRoof" ) )
+  {
+    const double length = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "hcrLength" ), fpLength, strength ) : uiParams.value( QStringLiteral( "hcrLength" ), fpLength );
+    const double width = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "hcrWidth" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "hcrWidth" ), fpWidth );
+    const double roofRadius = std::max( 0.0, fpWidth * 0.5 );
+    const double wallHeightGeo = std::max( 0.0, height - roofRadius );
+    const double wallHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "hcrWallHeight" ), wallHeightGeo, strength );
+    DEBUG_LOG( QString( "[ParamCorrection] HalfCylinderRoof source=%1 strength=%2 geo=(length=%3,width=%4,totalHeight=%5,wallHeight=%6) corrected=(%7,%8,%9) rz=%10\n" )
+                 .arg( fpSource )
+                 .arg( strength, 0, 'f', 2 )
+                 .arg( fpLength, 0, 'f', 3 )
+                 .arg( fpWidth, 0, 'f', 3 )
+                 .arg( height, 0, 'f', 3 )
+                 .arg( wallHeightGeo, 0, 'f', 3 )
+                 .arg( length, 0, 'f', 3 )
+                 .arg( width, 0, 'f', 3 )
+                 .arg( wallHeight, 0, 'f', 3 )
+                 .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "TruncatedPyramidRoof" ) )
+  {
+    const double bottomLength = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpBottomLength" ), fpLength, strength ) : uiParams.value( QStringLiteral( "tpBottomLength" ), fpLength );
+    const double bottomWidth = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpBottomWidth" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "tpBottomWidth" ), fpWidth );
+
+    double topLengthGeo = qQNaN();
+    double topWidthGeo = qQNaN();
+    QVector3D topMin, topMax;
+    const double topSliceBottom = static_cast<double>( hardMin.z() ) + std::max( 0.0, height - std::max( 0.3, height * 0.15 ) );
+    if ( robustSliceBBox( canonicalPoints, [&]( const QVector3D &p ) {
+           return static_cast<double>( p.z() ) >= topSliceBottom;
+         }, topMin, topMax, std::max( 16, static_cast<int>( canonicalPoints.size() * 0.015 ) ) ) )
+    {
+      const double measuredTopLength = static_cast<double>( topMax.x() - topMin.x() );
+      const double measuredTopWidth = static_cast<double>( topMax.y() - topMin.y() );
+      if ( measuredTopLength > fpLength * 0.05 && measuredTopLength < fpLength * 1.05 )
+        topLengthGeo = measuredTopLength;
+      if ( measuredTopWidth > fpWidth * 0.05 && measuredTopWidth < fpWidth * 1.05 )
+        topWidthGeo = measuredTopWidth;
+    }
+    const double topLength = std::isfinite( topLengthGeo )
+                               ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpTopLength" ), topLengthGeo, strength )
+                               : uiParams.value( QStringLiteral( "tpTopLength" ), qMax( 0.0, fpLength * 0.55 ) );
+    const double topWidth = std::isfinite( topWidthGeo )
+                              ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpTopWidth" ), topWidthGeo, strength )
+                              : uiParams.value( QStringLiteral( "tpTopWidth" ), qMax( 0.0, fpWidth * 0.55 ) );
+
+    double wallRatio = qQNaN();
+    if ( !estimateShrinkWallRatio( canonicalPoints, fpLength, fpWidth, hardMin.z(), height, wallRatio ) )
+    {
+      const double pctWall = uiParams.value( QStringLiteral( "tpWallHeight" ), qQNaN() );
+      const double pctRoof = uiParams.value( QStringLiteral( "tpRoofHeight" ), qQNaN() );
+      if ( std::isfinite( pctWall ) && std::isfinite( pctRoof ) && pctWall + pctRoof > 1e-6 )
+        wallRatio = std::max( 0.05, std::min( 0.95, pctWall / ( pctWall + pctRoof ) ) );
+    }
+
+    double wallHeight = uiParams.value( QStringLiteral( "tpWallHeight" ), qQNaN() );
+    double roofHeight = uiParams.value( QStringLiteral( "tpRoofHeight" ), qQNaN() );
+    if ( std::isfinite( wallRatio ) )
+    {
+      wallHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpWallHeight" ), height * wallRatio, strength );
+      roofHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpRoofHeight" ), height * ( 1.0 - wallRatio ), strength );
+    }
+    DEBUG_LOG( QString( "[ParamCorrection] TruncatedPyramidRoof source=%1 strength=%2 geoBase=(%3,%4,%5) geoTop=(%6,%7) corrected=(%8,%9,%10,%11,%12,%13) wallRatio=%14 rz=%15\n" )
+                 .arg( fpSource )
+                 .arg( strength, 0, 'f', 2 )
+                 .arg( fpLength, 0, 'f', 3 )
+                 .arg( fpWidth, 0, 'f', 3 )
+                 .arg( height, 0, 'f', 3 )
+                 .arg( std::isfinite( topLengthGeo ) ? QString::number( topLengthGeo, 'f', 3 ) : QStringLiteral( "<kept PCT>" ) )
+                 .arg( std::isfinite( topWidthGeo ) ? QString::number( topWidthGeo, 'f', 3 ) : QStringLiteral( "<kept PCT>" ) )
+                 .arg( bottomLength, 0, 'f', 3 )
+                 .arg( bottomWidth, 0, 'f', 3 )
+                 .arg( topLength, 0, 'f', 3 )
+                 .arg( topWidth, 0, 'f', 3 )
+                 .arg( wallHeight, 0, 'f', 3 )
+                 .arg( roofHeight, 0, 'f', 3 )
+                 .arg( std::isfinite( wallRatio ) ? QString::number( wallRatio, 'f', 3 ) : QStringLiteral( "<kept PCT>" ) )
+                 .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "LHouse" ) )
+  {
+    const double totalLength = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "lTotalL" ), fpLength, strength ) : uiParams.value( QStringLiteral( "lTotalL" ), fpLength );
+    const double totalWidth = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "lTotalW" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "lTotalW" ), fpWidth );
+    const double totalHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "lHeight" ), height, strength );
+
+    double cutoutLengthRatio = qQNaN();
+    double wingWidthRatio = qQNaN();
+    const bool hasCutout = estimateLHouseCutoutRatios( canonicalPoints, fpMin, fpMax, hardMin.z(), height,
+                                                       cutoutLengthRatio, wingWidthRatio );
+    double correctedWingRatio = uiParams.value( QStringLiteral( "lWingR" ), qQNaN() );
+    double correctedWingWidthRatio = uiParams.value( QStringLiteral( "lWingWR" ), qQNaN() );
+    if ( hasCutout )
+    {
+      correctedWingRatio = applyRegularizedGeometryValue( uiParams, QStringLiteral( "lWingR" ), cutoutLengthRatio, strength );
+      correctedWingWidthRatio = applyRegularizedGeometryValue( uiParams, QStringLiteral( "lWingWR" ), wingWidthRatio, strength );
+    }
+    DEBUG_LOG( QString( "[ParamCorrection] LHouse source=%1 strength=%2 geoOuter=(%3,%4,%5) geoCutout=(%6,%7) corrected=(%8,%9,%10,%11,%12) rz=%13\n" )
+                 .arg( fpSource )
+                 .arg( strength, 0, 'f', 2 )
+                 .arg( fpLength, 0, 'f', 3 )
+                 .arg( fpWidth, 0, 'f', 3 )
+                 .arg( height, 0, 'f', 3 )
+                 .arg( hasCutout ? QString::number( cutoutLengthRatio, 'f', 3 ) : QStringLiteral( "<kept PCT>" ) )
+                 .arg( hasCutout ? QString::number( wingWidthRatio, 'f', 3 ) : QStringLiteral( "<kept PCT>" ) )
+                 .arg( totalLength, 0, 'f', 3 )
+                 .arg( totalWidth, 0, 'f', 3 )
+                 .arg( totalHeight, 0, 'f', 3 )
+                 .arg( correctedWingRatio, 0, 'f', 3 )
+                 .arg( correctedWingWidthRatio, 0, 'f', 3 )
+                 .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "IndentedCuboid" ) )
+  {
+    const double outerLength = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOuterL" ), fpLength, strength ) : uiParams.value( QStringLiteral( "icOuterL" ), fpLength );
+    const double outerWidth = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOuterW" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "icOuterW" ), fpWidth );
+    const double outerHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOuterH" ), height, strength );
+
+    QVector3D innerMin, innerMax;
+    double innerHeightGeo = qQNaN();
+    const bool hasInner = estimateIndentedInnerBox( canonicalPoints, fpMin, fpMax, hardMin.z(), height,
+                                                    innerMin, innerMax, innerHeightGeo );
+    double innerLength = uiParams.value( QStringLiteral( "icInnerL" ), qQNaN() );
+    double innerWidth = uiParams.value( QStringLiteral( "icInnerW" ), qQNaN() );
+    double innerHeight = uiParams.value( QStringLiteral( "icInnerH" ), qQNaN() );
+    double offsetX = uiParams.value( QStringLiteral( "icOffsetX" ), qQNaN() );
+    double offsetY = uiParams.value( QStringLiteral( "icOffsetY" ), qQNaN() );
+    if ( hasInner )
+    {
+      innerLength = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icInnerL" ), static_cast<double>( innerMax.x() - innerMin.x() ), strength );
+      innerWidth = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icInnerW" ), static_cast<double>( innerMax.y() - innerMin.y() ), strength );
+      innerHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icInnerH" ), innerHeightGeo, strength );
+      offsetX = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOffsetX" ), static_cast<double>( innerMin.x() - fpMin.x() ), strength );
+      offsetY = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOffsetY" ), static_cast<double>( innerMin.y() - fpMin.y() ), strength );
+    }
+    DEBUG_LOG( QString( "[ParamCorrection] IndentedCuboid source=%1 strength=%2 geoOuter=(%3,%4,%5) geoInner=%6 corrected=(%7,%8,%9,%10,%11,%12,%13,%14) rz=%15\n" )
+                 .arg( fpSource )
+                 .arg( strength, 0, 'f', 2 )
+                 .arg( fpLength, 0, 'f', 3 )
+                 .arg( fpWidth, 0, 'f', 3 )
+                 .arg( height, 0, 'f', 3 )
+                 .arg( hasInner ? QString( "(%1,%2,%3,%4,%5)" )
+                                      .arg( innerMax.x() - innerMin.x(), 0, 'f', 3 )
+                                      .arg( innerMax.y() - innerMin.y(), 0, 'f', 3 )
+                                      .arg( innerHeightGeo, 0, 'f', 3 )
+                                      .arg( innerMin.x() - fpMin.x(), 0, 'f', 3 )
+                                      .arg( innerMin.y() - fpMin.y(), 0, 'f', 3 )
+                                : QStringLiteral( "<kept PCT>" ) )
+                 .arg( outerLength, 0, 'f', 3 )
+                 .arg( outerWidth, 0, 'f', 3 )
+                 .arg( outerHeight, 0, 'f', 3 )
+                 .arg( innerLength, 0, 'f', 3 )
+                 .arg( innerWidth, 0, 'f', 3 )
+                 .arg( innerHeight, 0, 'f', 3 )
+                 .arg( offsetX, 0, 'f', 3 )
+                 .arg( offsetY, 0, 'f', 3 )
+                 .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                 .toStdWString().c_str() );
+    return;
   }
 }
 
@@ -2911,6 +3420,7 @@ void ParamModelerDock::onInverseParams()
     m_evaluationModel = regression.modelName;
     m_evaluationCheckpoint = regression.checkpointPath;
     m_evaluationCorrectionEnabled = m_geometryCorrectionEnabled;
+    m_evaluationCorrectionStrength = m_geometryCorrectionEnabled ? m_geometryCorrectionStrength : 0.0;
 
     // 保存 DL 预测值作为微调锚点，供 resetToDlAnchor() 一键复位
     m_dlAnchorParams = params;

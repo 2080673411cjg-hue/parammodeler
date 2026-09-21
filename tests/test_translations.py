@@ -78,8 +78,8 @@ class TranslationsTest(unittest.TestCase):
 
     def test_dynamic_tooltips(self):
         self.app.installTranslator(self.translator)
-        self.assertEqual(QtCore.QCoreApplication.translate("ParamModelerPick3D", "No point within 12 pixels."),
-                         "鼠标周围 12 像素内没有点云点。")
+        self.assertEqual(QtCore.QCoreApplication.translate("ParamModelerPick3D", "No point-cloud point within 12 pixels. Zoom in and click directly on a visible point."),
+                         "鼠标 12 像素范围内没有点云点。请放大后直接点击可见点。")
         self.assertEqual(QtCore.QCoreApplication.translate("ParamModelerHeightControl", "Height unchanged: translation limit reached."),
                          "已达平移范围限制，高度未改变。")
 
