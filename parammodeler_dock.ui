@@ -261,6 +261,112 @@
          </widget>
         </item>
         <item>
+         <widget class="QWidget" name="pointCloudWorkflow">
+          <layout class="QVBoxLayout" name="layoutPointCloudWorkflow">
+           <property name="spacing">
+            <number>6</number>
+           </property>
+           <property name="leftMargin">
+            <number>8</number>
+           </property>
+           <property name="topMargin">
+            <number>2</number>
+           </property>
+           <property name="rightMargin">
+            <number>8</number>
+           </property>
+           <property name="bottomMargin">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="labelPointCloudWorkflowTitle">
+             <property name="text">
+              <string>Point Cloud &amp; Alignment</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btnWorkflowEstimate">
+             <property name="text">
+              <string>Classify and estimate parameters...</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="layoutAlignmentButtons">
+             <property name="spacing">
+              <number>6</number>
+             </property>
+             <item>
+              <widget class="QWidget" name="widgetAlign3DControls">
+               <layout class="QHBoxLayout" name="layoutAlign3DControls">
+                <property name="spacing">
+                 <number>2</number>
+                </property>
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <item>
+                 <widget class="QPushButton" name="btnAlign3D">
+                  <property name="text">
+                   <string>Align in 3D</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QToolButton" name="btnAlign3DMenu">
+                  <property name="minimumSize">
+                   <size>
+                    <width>24</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="maximumSize">
+                   <size>
+                    <width>24</width>
+                    <height>16777215</height>
+                   </size>
+                  </property>
+                  <property name="text">
+                   <string>...</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btnAlign2D">
+               <property name="text">
+                <string>Align in 2D</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="checkBoxWireframe">
+             <property name="text">
+              <string>Wireframe</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
          <widget class="QGroupBox" name="groupBoxTransform">
           <property name="title">
            <string>Pose Transform</string>

@@ -233,7 +233,6 @@ bool ParamModelerPick3D::eventFilter( QObject *watched, QEvent *event )
 bool ParamModelerPick3D::sceneValid() const
 {
   return mLayer && mCanvas->mapSettings() && mCanvas->cameraController() &&
-    mCanvas->mapSettings()->layers().contains( mLayer.data() ) &&
     mCanvas->mapSettings()->crs() == mLayer->crs() &&
     mCanvas->mapSettings()->sceneMode() == Qgis::SceneMode::Local;
 }

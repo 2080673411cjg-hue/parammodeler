@@ -21,6 +21,12 @@
 #include <cmath>
 #include <cstring>
 #include <functional>
+#include <limits>
+#include <windows.h>
+
+#include <Eigen/Eigenvalues>
+
+#define DEBUG_LOG( msg ) OutputDebugStringW( msg )
 
 #include <qgis.h>
 #include <qgisinterface.h>
@@ -103,9 +109,24 @@ struct RealtimePreviewState
   QPointer<Qgs3DMapSettings> mapSettings;  // for origin tracking
 };
 
+struct ClassifiedPointCloud
+{
+  QVector<QVector3D> top;
+  QVector<QVector3D> side;
+  QVector<QVector3D> other;
+};
+
 QHash<Qgs3DMapScene *, RealtimePreviewState> sRealtimePreviewMeshes;
 bool sWireframeMode = false;
 const QString REALTIME_ANCHOR_LAYER_NAME = QStringLiteral( "ParamModeler_3D_Anchor" );
+
+void applyParamModeler3DSceneStyle( Qgs3DMapSettings *settings )
+{
+  if ( !settings )
+    return;
+  settings->setTerrainRenderingEnabled( false );
+  settings->setBackgroundColor( QColor( 0, 0, 0 ) );
+}
 
 QString meshPointKey( const QVector3D &p )
 {
@@ -121,6 +142,56 @@ QString meshEdgeKey( const QVector3D &a, const QVector3D &b )
   const QString ka = meshPointKey( a );
   const QString kb = meshPointKey( b );
   return ka < kb ? ka + QStringLiteral( "|" ) + kb : kb + QStringLiteral( "|" ) + ka;
+}
+
+bool isSparseCircularGuideAngle( double angle )
+{
+  constexpr double twoPi = 6.28318530717958647692;
+  constexpr int guideCount = 4;
+  const double step = twoPi / guideCount;
+  if ( angle < 0.0 )
+    angle += twoPi;
+  const double nearest = std::round( angle / step ) * step;
+  return std::abs( angle - nearest ) < 0.001 || std::abs( angle - nearest + twoPi ) < 0.001;
+}
+
+bool isRadialCircularGuideEdge( const QVector3D &a, const QVector3D &b, double minZ )
+{
+  if ( std::abs( a.z() - b.z() ) > 0.001 )
+    return false;
+  if ( std::abs( a.z() - minZ ) < 0.001 )
+    return false;
+
+  const double r0 = std::hypot( a.x(), a.y() );
+  const double r1 = std::hypot( b.x(), b.y() );
+  const QVector3D rim = r0 > r1 ? a : b;
+  const double rimRadius = std::max( r0, r1 );
+  const double centerRadius = std::min( r0, r1 );
+  if ( rimRadius < 0.001 || centerRadius > std::max( 0.002, rimRadius * 0.03 ) )
+    return false;
+
+  return isSparseCircularGuideAngle( std::atan2( rim.y(), rim.x() ) );
+}
+
+bool isVerticalCircularGuideEdge( const QVector3D &a, const QVector3D &b )
+{
+  if ( std::abs( a.z() - b.z() ) < 0.001 )
+    return false;
+
+  const double r0 = std::hypot( a.x(), a.y() );
+  const double r1 = std::hypot( b.x(), b.y() );
+  const double radius = ( r0 + r1 ) * 0.5;
+  if ( radius < 0.001 || std::abs( r0 - r1 ) > std::max( 0.002, radius * 0.01 ) )
+    return false;
+
+  double delta = std::abs( std::atan2( b.y(), b.x() ) - std::atan2( a.y(), a.x() ) );
+  constexpr double twoPi = 6.28318530717958647692;
+  if ( delta > twoPi * 0.5 )
+    delta = twoPi - delta;
+  if ( delta > 0.001 )
+    return false;
+
+  return isSparseCircularGuideAngle( std::atan2( a.y(), a.x() ) );
 }
 
 void removeTempGpkgPaths( const QString &paths )
@@ -329,7 +400,9 @@ void appendRealtimeTriangle( QVector<float> &values,
 }
 
 // ────────────────────────────────────────────────────────────
-//  线框边提取：三角形面片摊平为线段顶点（不去重，零哈希开销）
+//  线框边提取：合并三角网格边，只保留外轮廓/折边。
+//  圆柱等曲面仍用高分段实体网格，但线框不再显示所有三角面内部边，
+//  微调时更容易看清点云和主体轮廓。
 // ────────────────────────────────────────────────────────────
 static QVector<float> extractWireframeEdges( const MeshData &mesh,
                                               const QMatrix4x4 &poseMat )
@@ -339,21 +412,58 @@ static QVector<float> extractWireframeEdges( const MeshData &mesh,
   if ( triCount == 0 )
     return lineVerts;
 
-  lineVerts.reserve( triCount * 6 * 3 );  // 3 条边 × 6 floats per edge
+  QMap<QString, MeshEdgeRecord> edgeMap;
+  double minZ = std::numeric_limits<double>::max();
 
   for ( int i = 0; i < triCount; ++i )
   {
-    QVector3D v0 = poseMat.map( mesh.vertices[mesh.indices[i * 3]] );
-    QVector3D v1 = poseMat.map( mesh.vertices[mesh.indices[i * 3 + 1]] );
-    QVector3D v2 = poseMat.map( mesh.vertices[mesh.indices[i * 3 + 2]] );
+    const int idx0 = mesh.indices[i * 3];
+    const int idx1 = mesh.indices[i * 3 + 1];
+    const int idx2 = mesh.indices[i * 3 + 2];
+    const QVector3D local0 = mesh.vertices[idx0];
+    const QVector3D local1 = mesh.vertices[idx1];
+    const QVector3D local2 = mesh.vertices[idx2];
+    minZ = std::min( minZ, static_cast<double>( std::min( local0.z(), std::min( local1.z(), local2.z() ) ) ) );
+    const QVector3D normal = QVector3D::crossProduct( local1 - local0, local2 - local0 ).normalized();
 
-    auto pushEdge = [&]( const QVector3D &a, const QVector3D &b ) {
-      lineVerts << a.x() << a.y() << a.z()
-                << b.x() << b.y() << b.z();
-    };
-    pushEdge( v0, v1 );
-    pushEdge( v1, v2 );
-    pushEdge( v2, v0 );
+    const QVector3D points[3] = { local0, local1, local2 };
+    const int edges[3][2] = { { 0, 1 }, { 1, 2 }, { 2, 0 } };
+    for ( const auto &edge : edges )
+    {
+      const QVector3D p0 = points[edge[0]];
+      const QVector3D p1 = points[edge[1]];
+      const QString key = meshEdgeKey( p0, p1 );
+      MeshEdgeRecord record = edgeMap.value( key );
+      if ( record.count == 0 )
+      {
+        record.p0 = p0;
+        record.p1 = p1;
+        record.firstNormal = normal;
+      }
+      else if ( std::abs( QVector3D::dotProduct( record.firstNormal, normal ) ) < 0.985f )
+      {
+        record.crease = true;
+      }
+      record.count++;
+      edgeMap.insert( key, record );
+    }
+  }
+
+  lineVerts.reserve( edgeMap.size() * 6 );
+  for ( const MeshEdgeRecord &record : edgeMap )
+  {
+    // 圆形模型：圆环保持原始细分，顶面放射线/侧面竖向线只保留十字方向。
+    const bool keepSparseCircularGuide =
+      isRadialCircularGuideEdge( record.p0, record.p1, minZ )
+      || isVerticalCircularGuideEdge( record.p0, record.p1 );
+
+    if ( record.count > 1 && !record.crease && !keepSparseCircularGuide )
+      continue;
+
+    const QVector3D a = poseMat.map( record.p0 );
+    const QVector3D b = poseMat.map( record.p1 );
+    lineVerts << a.x() << a.y() << a.z()
+              << b.x() << b.y() << b.z();
   }
 
   return lineVerts;
@@ -635,14 +745,166 @@ Qgs3DMapCanvas *ensureRealtimePreviewCanvas( QgisInterface *iface, const QgsRect
       continue;
     // One-shot: configure scene appearance only when the canvas is first created
     if ( isNewCanvas )
-    {
-      s->setTerrainRenderingEnabled( false );
-      s->setBackgroundColor( QColor( 45, 48, 50 ) );
-    }
+      applyParamModeler3DSceneStyle( s );
     if ( canvas->scene() )
       return canvas;
   }
   return nullptr;
+}
+
+QgsVectorLayer *makePointCloudLayer( const QString &layerName,
+                                     const QVector<QVector3D> &points,
+                                     double radius,
+                                     const QColor &color,
+                                     bool visibleIn3D )
+{
+  QgsVectorLayer *vl = new QgsVectorLayer( "PointZ?crs=EPSG:3857", layerName, "memory" );
+  if ( !vl || !vl->isValid() )
+  {
+    delete vl;
+    return nullptr;
+  }
+
+  QgsFeatureList features;
+  features.reserve( std::min( points.size(), 1000 ) );
+  for ( const QVector3D &p : points )
+  {
+    QgsFeature feat;
+    feat.setGeometry( QgsGeometry( new QgsPoint( p.x(), p.y(), p.z() ) ) );
+    features.append( feat );
+    if ( features.size() >= 1000 )
+    {
+      vl->dataProvider()->addFeatures( features );
+      features.clear();
+    }
+  }
+  if ( !features.isEmpty() )
+    vl->dataProvider()->addFeatures( features );
+  vl->updateExtents();
+
+  if ( visibleIn3D )
+  {
+    QgsPoint3DSymbol *symbol3D = new QgsPoint3DSymbol();
+    symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
+    symbol3D->setShape( Qgis::Point3DShape::Sphere );
+    QVariantMap props;
+    props["radius"] = radius;
+    symbol3D->setShapeProperties( props );
+
+    QgsPhongMaterialSettings material;
+    material.setAmbient( color );
+    material.setDiffuse( color );
+    material.setSpecular( Qt::black );
+    material.setShininess( 0 );
+    symbol3D->setMaterialSettings( material.clone() );
+
+    QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
+    renderer3D->setSymbol( symbol3D );
+    vl->setRenderer3D( renderer3D );
+  }
+
+  return vl;
+}
+
+QVector3D estimatePointNormal( const QVector<QVector3D> &points, int index, int k )
+{
+  struct Neighbor
+  {
+    double d2 = std::numeric_limits<double>::max();
+    int index = -1;
+  };
+
+  const QVector3D &p = points[index];
+  QVector<Neighbor> neighbors;
+  neighbors.reserve( k );
+  for ( int i = 0; i < points.size(); ++i )
+  {
+    if ( i == index )
+      continue;
+    const QVector3D delta = points[i] - p;
+    const double d2 = static_cast<double>( delta.lengthSquared() );
+    if ( neighbors.size() < k )
+    {
+      neighbors.push_back( { d2, i } );
+      if ( neighbors.size() == k )
+        std::sort( neighbors.begin(), neighbors.end(), []( const Neighbor &a, const Neighbor &b ) { return a.d2 < b.d2; } );
+      continue;
+    }
+    if ( d2 >= neighbors.back().d2 )
+      continue;
+    neighbors.back() = { d2, i };
+    std::sort( neighbors.begin(), neighbors.end(), []( const Neighbor &a, const Neighbor &b ) { return a.d2 < b.d2; } );
+  }
+
+  if ( neighbors.size() < 3 )
+    return QVector3D( 0.0f, 0.0f, 1.0f );
+
+  Eigen::Vector3d centroid( p.x(), p.y(), p.z() );
+  for ( const Neighbor &n : neighbors )
+  {
+    const QVector3D &q = points[n.index];
+    centroid += Eigen::Vector3d( q.x(), q.y(), q.z() );
+  }
+  centroid /= static_cast<double>( neighbors.size() + 1 );
+
+  Eigen::Matrix3d covariance = Eigen::Matrix3d::Zero();
+  auto accumulatePoint = [&]( const QVector3D &q ) {
+    const Eigen::Vector3d v( q.x(), q.y(), q.z() );
+    const Eigen::Vector3d centered = v - centroid;
+    covariance += centered * centered.transpose();
+  };
+  accumulatePoint( p );
+  for ( const Neighbor &n : neighbors )
+    accumulatePoint( points[n.index] );
+
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver( covariance );
+  if ( solver.info() != Eigen::Success )
+    return QVector3D( 0.0f, 0.0f, 1.0f );
+
+  const Eigen::Vector3d normal = solver.eigenvectors().col( 0 ).normalized();
+  return QVector3D( static_cast<float>( normal.x() ),
+                    static_cast<float>( normal.y() ),
+                    static_cast<float>( normal.z() ) );
+}
+
+ClassifiedPointCloud classifyPointCloudSurfaces( const PointCloud &pc )
+{
+  ClassifiedPointCloud classified;
+  const QVector<QVector3D> &points = pc.points;
+  const double minZ = pc.bboxMin.z();
+  const double maxZ = pc.bboxMax.z();
+  const double height = std::max( 0.0, maxZ - minZ );
+  const double bottomGuard = minZ + height * 0.08;
+
+  if ( points.size() <= 6000 )
+  {
+    const int k = std::min( 18, std::max( 6, points.size() - 1 ) );
+    for ( int i = 0; i < points.size(); ++i )
+    {
+      const QVector3D normal = estimatePointNormal( points, i, k );
+      const double nz = std::abs( static_cast<double>( normal.z() ) );
+      const bool aboveBottom = height <= 0.0001 || points[i].z() > bottomGuard;
+      if ( nz >= 0.58 && aboveBottom )
+        classified.top.push_back( points[i] );
+      else if ( nz <= 0.45 )
+        classified.side.push_back( points[i] );
+      else
+        classified.other.push_back( points[i] );
+    }
+  }
+  else
+  {
+    const double topThreshold = maxZ - std::max( height * 0.12, 0.05 );
+    for ( const QVector3D &p : points )
+    {
+      if ( p.z() >= topThreshold )
+        classified.top.push_back( p );
+      else
+        classified.side.push_back( p );
+    }
+  }
+
+  return classified;
 }
 }
 
@@ -787,6 +1049,7 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
     Qgs3DMapSettings *settings = canvas3D->mapSettings();
     if ( !settings )
       continue;
+    applyParamModeler3DSceneStyle( settings );
 
     if ( !viewExtent.isNull() )
       settings->setExtent( viewExtent );
@@ -1221,50 +1484,14 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
     return nullptr;
   }
 
-  QgsVectorLayer *vl = new QgsVectorLayer( "PointZ?crs=EPSG:3857", layerName, "memory" );
-
-  QgsPoint3DSymbol *symbol3D = new QgsPoint3DSymbol();
-  symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
-  symbol3D->setShape( Qgis::Point3DShape::Sphere );
-  QVariantMap props;
   const QVector3D bboxSize = pc.bboxMax - pc.bboxMin;
   const double maxDim = std::max( { std::abs( static_cast<double>( bboxSize.x() ) ),
                                     std::abs( static_cast<double>( bboxSize.y() ) ),
                                     std::abs( static_cast<double>( bboxSize.z() ) ) } );
-  props["radius"] = std::max( maxDim / 350.0, 0.003 );
-  symbol3D->setShapeProperties( props );
+  const double pointRadius = std::max( maxDim / 350.0, 0.003 );
+  QgsVectorLayer *vl = makePointCloudLayer( layerName, pc.points, pointRadius, QColor( 30, 100, 255, 255 ), false );
 
-  QgsPhongMaterialSettings material;
-  QColor pointColor( 30, 100, 255, 255 );
-  material.setAmbient( pointColor );
-  material.setDiffuse( pointColor );
-  material.setSpecular( Qt::black );
-  material.setShininess( 0 );
-  symbol3D->setMaterialSettings( material.clone() );
-
-  QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
-  renderer3D->setSymbol( symbol3D );
-  vl->setRenderer3D( renderer3D );
-
-  QgsFeatureList features;
-  features.reserve( 1000 );
-  for ( const QVector3D &p : pc.points )
-  {
-    QgsFeature feat;
-    feat.setGeometry( QgsGeometry( new QgsPoint( p.x(), p.y(), p.z() ) ) );
-    features.append( feat );
-
-    if ( features.size() >= 1000 )
-    {
-      vl->dataProvider()->addFeatures( features );
-      features.clear();
-    }
-  }
-
-  if ( !features.isEmpty() )
-    vl->dataProvider()->addFeatures( features );
-
-  if ( !vl->isValid() )
+  if ( !vl || !vl->isValid() )
   {
     if ( errorMessage )
       *errorMessage = QObject::tr( "点云图层无效：%1" ).arg( filePath );
@@ -1295,7 +1522,43 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
 
   removeLayersByNamePrefix( QStringLiteral( "External point cloud - " ) );
   removeLayerByName( layerName );
-  QgsProject::instance()->addMapLayer( vl );
+  QgsProject::instance()->addMapLayer( vl, false );
+
+  const ClassifiedPointCloud classified = classifyPointCloudSurfaces( pc );
+  DEBUG_LOG( QString( "[PointCloudSurface] pick=%1 top=%2 side=%3 other=%4\n" )
+               .arg( pc.points.size() )
+               .arg( classified.top.size() )
+               .arg( classified.side.size() )
+               .arg( classified.other.size() )
+               .toStdWString().c_str() );
+  QVector<QgsVectorLayer *> displayLayers;
+  QgsVectorLayer *topLayer = makePointCloudLayer( layerName + QStringLiteral( " [top]" ),
+                                                  classified.top,
+                                                  pointRadius,
+                                                  QColor( 0, 210, 220, 255 ),
+                                                  true );
+  QgsVectorLayer *sideLayer = makePointCloudLayer( layerName + QStringLiteral( " [side]" ),
+                                                   classified.side,
+                                                   pointRadius,
+                                                   QColor( 255, 170, 45, 255 ),
+                                                   true );
+  QgsVectorLayer *otherLayer = makePointCloudLayer( layerName + QStringLiteral( " [other]" ),
+                                                    classified.other,
+                                                    pointRadius,
+                                                    QColor( 145, 150, 155, 180 ),
+                                                    true );
+  for ( QgsVectorLayer *displayLayer : { topLayer, sideLayer, otherLayer } )
+  {
+    if ( displayLayer && displayLayer->isValid() && displayLayer->featureCount() > 0 )
+    {
+      QgsProject::instance()->addMapLayer( displayLayer );
+      displayLayers.push_back( displayLayer );
+    }
+    else
+    {
+      delete displayLayer;
+    }
+  }
 
   QgsRectangle viewExtent = padded3DViewExtent( vl->extent() );
 
@@ -1327,6 +1590,7 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
     Qgs3DMapSettings *settings = canvas3D->mapSettings();
     if ( !settings )
       continue;
+    applyParamModeler3DSceneStyle( settings );
 
     if ( !viewExtent.isNull() )
       settings->setExtent( viewExtent );
@@ -1335,12 +1599,19 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
     // 旧 layer 已在上面从 settings 移除，这里只需追加新 layer，避免再遍历已删除指针。
     if ( !curLayers.contains( vl ) )
       curLayers.append( vl );
+    for ( QgsVectorLayer *displayLayer : displayLayers )
+    {
+      if ( displayLayer && !curLayers.contains( displayLayer ) )
+        curLayers.append( displayLayer );
+    }
     settings->setLayers( curLayers );
     if ( !viewExtent.isNull() )
       canvas3D->setViewFrom2DExtent( viewExtent );
   }
 
   vl->triggerRepaint();
+  for ( QgsVectorLayer *displayLayer : displayLayers )
+    displayLayer->triggerRepaint();
 
   Q_UNUSED( parent );
   return vl;

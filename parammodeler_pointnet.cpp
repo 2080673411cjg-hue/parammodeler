@@ -125,22 +125,43 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
   if ( !stemNames.contains( prim ) )
     return { modelName, prim, script, QString() };
 
-  // PCT variant: v4_normals (basic + PCA normals, retrained on the fixed
-  // datasets_aug) is the single production variant for all 13 classes
-  // (2026-09).  No per-class override needed; the suffix comes from config.
-  // Re-add a pctBestSuffix map here if a future run favours a different
-  // variant per class.
+  // PCT variant selection: recent experiments showed that no single suffix is
+  // best for all primitives.  Prefer the per-class test winner when it exists,
+  // then fall back to the user-configured default suffix.
+  static const QMap<QString, QString> pctBestSuffix = {
+    { QStringLiteral( "AsymmetricGableHouse" ), QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "ConeCylinder" ),         QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "Cuboid" ),               QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "Cylinder" ),             QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "CylinderDome" ),         QStringLiteral( "_v4_normals" ) },
+    { QStringLiteral( "FourStageRoundTower" ),  QStringLiteral( "_v4_normals" ) },
+    { QStringLiteral( "GabledRoof" ),           QStringLiteral( "_v5_normals" ) },
+    { QStringLiteral( "HalfCylinderRoof" ),     QStringLiteral( "_v5_normals" ) },
+    { QStringLiteral( "IndentedCuboid" ),       QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "LHouse" ),               QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "PyramidRoof" ),          QStringLiteral( "_v4_normals" ) },
+    { QStringLiteral( "TruncatedPyramidRoof" ), QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "TwoGableHouses" ),       QStringLiteral( "_v4_normals" ) }
+  };
 
   const QString prefix = isPCT
     ? QStringLiteral( "pct_reg_" )
     : usePointNeXt
     ? ParamModelerConfig::regressionModelPrefix()
     : QStringLiteral( "reg_" );
-  const QString suffix = isPCT
-    ? ParamModelerConfig::pctRegressionSuffix()
+  QString suffix = isPCT
+    ? pctBestSuffix.value( prim, ParamModelerConfig::pctRegressionSuffix() )
     : usePointNeXt
     ? ParamModelerConfig::regressionModelSuffix()
     : QStringLiteral( "_v2" );
+
+  if ( isPCT )
+  {
+    const QString preferredDirName = prefix + stemNames.value( prim ) + suffix;
+    const QString preferredModel = base + preferredDirName + QStringLiteral( "/best_model.pth" );
+    if ( !QFileInfo::exists( preferredModel ) )
+      suffix = ParamModelerConfig::pctRegressionSuffix();
+  }
   const QString dirName = prefix + stemNames.value( prim ) + suffix;
 
   return { modelName, prim, script, base + dirName };

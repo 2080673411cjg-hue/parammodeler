@@ -60,6 +60,7 @@
 #include <QWheelEvent>
 #include <QMenu>
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QProgressDialog>
 #include <QVBoxLayout>
@@ -855,6 +856,26 @@ void ParamModelerDock::initConnections()
   connect( ui->menuDataset, &QMenu::aboutToShow, this, updateMenuAvailability );
   connect( ui->menuLoad3D, &QMenu::aboutToShow, this, updateMenuAvailability );
   updateMenuAvailability();
+  QMenu *helpMenu = ui->menuBar->addMenu( tr( "Help" ) );
+  QAction *usageAction = helpMenu->addAction( tr( "Plugin usage..." ) );
+  usageAction->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/mActionHelpContents.svg" ) ) );
+  connect( usageAction, &QAction::triggered, this, [this]() {
+    QMessageBox::information(
+      this,
+      tr( "Plugin usage" ),
+      tr( "Basic workflow:\n"
+          "1. Load an input point cloud.\n"
+          "2. Use Classify and estimate parameters... or Complete all.\n"
+          "3. Enable geometry correction when the visible footprint is reliable.\n"
+          "4. Use Align in 3D for point picking, or Fit corner from three faces... for missing-corner cases.\n"
+          "5. Fine-tune parameters, position and rotation in the main panel.\n"
+          "6. Export model files or Current evaluation CSV from the Export menu.\n\n"
+          "Notes:\n"
+          "- Wireframe helps compare the model with the point cloud.\n"
+          "- Reset prediction restores the last deep-learning parameter result.\n"
+          "- Three-face fitting moves the model only; it does not resize or rotate it." )
+    );
+  } );
   connect( ui->actPLY, &QAction::triggered, this, &ParamModelerDock::onExportPLYClicked );
   connect( ui->actDLPointCloud, &QAction::triggered, this, &ParamModelerDock::onExportDLPointCloudClicked );
   connect( ui->actLoadedDLPointCloud, &QAction::triggered, this, &ParamModelerDock::onExportLoadedDLPointCloudClicked );
@@ -905,15 +926,20 @@ void ParamModelerDock::initConnections()
 
   auto schedulePreview = [this]( int ) { schedulePreviewUpdate(); };
   auto schedulePreviewD = [this]( double ) { schedulePreviewUpdate(); };
+  auto schedulePoseTranslationPreview = [this]( double ) {
+    if ( !m_anchorLockCompensating )
+      retargetAnchorLockToCurrentPosition();
+    schedulePreviewUpdate();
+  };
   for ( QDoubleSpinBox *spin : ui->stackedWidgetParams->findChildren<QDoubleSpinBox *>() )
     connect( spin, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
 
   connect( ui->spinBoxROmega, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
   connect( ui->spinBoxRPhi, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
   connect( ui->spinBoxRKappa, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this, schedulePreviewD );
-  connect( ui->spinBoxTX, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, schedulePreviewD );
-  connect( ui->spinBoxTY, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, schedulePreviewD );
-  connect( ui->spinBoxTZ, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, schedulePreviewD );
+  connect( ui->spinBoxTX, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, schedulePoseTranslationPreview );
+  connect( ui->spinBoxTY, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, schedulePoseTranslationPreview );
+  connect( ui->spinBoxTZ, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, schedulePoseTranslationPreview );
 
   connect( ui->sliderCLength, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderCWidth, &QSlider::valueChanged, this, schedulePreview );
@@ -985,7 +1011,7 @@ void ParamModelerDock::initConnections()
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, &ParamModelerDock::onPrimitiveChanged );
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, [this]( const QString & ) { onUpdatePreview(); } );
   connect( ui->btnRandomParams, &QPushButton::clicked, this, &ParamModelerDock::onRandomizeCurrentPrimitive );
-  connect( ui->btnToggleInversion, &QPushButton::clicked, this, &ParamModelerDock::onOpenPointCloudEstimateDialog );
+  connect( ui->btnWorkflowEstimate, &QPushButton::clicked, this, &ParamModelerDock::onOpenPointCloudEstimateDialog );
 
   connect( ui->btnLoadPointCloud, &QPushButton::clicked, this, &ParamModelerDock::onLoadInputData );
   connect( ui->btnPointNetClassify, &QPushButton::clicked, this, &ParamModelerDock::onPointNetClassify );
@@ -1009,31 +1035,24 @@ void ParamModelerDock::initPreview()
 
 void ParamModelerDock::initPointNet()
 {
+  ui->widgetInversionPanel->setVisible( false );
+  ui->widgetInversionPanel->setMinimumWidth( 0 );
+  ui->widgetInversionPanel->setMaximumWidth( 0 );
   ui->frameInversion->setVisible( false );
-  ui->btnToggleInversion->setCheckable( false );
-  ui->btnToggleInversion->setFlat( false );
-  ui->btnToggleInversion->setStyleSheet( QString() );
-  ui->btnToggleInversion->setText( tr( "Classify and estimate parameters..." ) );
-  ui->btnToggleInversion->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/mIconPointCloudLayer.svg" ) ) );
+  ui->btnWorkflowEstimate->setCheckable( false );
+  ui->btnWorkflowEstimate->setFlat( false );
+  ui->btnWorkflowEstimate->setStyleSheet( QString() );
+  ui->btnWorkflowEstimate->setText( tr( "Classify and estimate parameters..." ) );
+  ui->btnWorkflowEstimate->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/mIconPointCloudLayer.svg" ) ) );
   ui->btnPointNetClassify->setText( tr( "Classify" ) );
   ui->btnInverseParams->setText( tr( "Estimate parameters" ) );
-  auto *workflow = new QWidget( ui->scrollContentsTab1 );
-  workflow->setObjectName( QStringLiteral( "pointCloudWorkflow" ) );
-  auto *workflowLayout = new QVBoxLayout( workflow );
-  workflowLayout->setContentsMargins( 8, 2, 8, 4 );
-  workflowLayout->setSpacing( 6 );
-  workflowLayout->addWidget( new SectionDivider( tr( "Point Cloud & Alignment" ), workflow ) );
-  workflowLayout->addWidget( ui->btnToggleInversion );
-  auto *alignLayout = new QHBoxLayout();
-  alignLayout->setSpacing( 6 );
-  workflowLayout->addLayout( alignLayout );
-  ui->verticalLayoutScrollTab1->insertWidget( 1, workflow );
+  ui->labelPointCloudWorkflowTitle->setText( tr( "Point Cloud & Alignment" ) );
 
   // 线框模式复选框：微调参数时只显示模型边线，不遮挡点云
-  mWireframeModeCheckBox = new QCheckBox( tr( "Wireframe" ), this );
+  mWireframeModeCheckBox = ui->checkBoxWireframe;
+  mWireframeModeCheckBox->setText( tr( "Wireframe" ) );
   mWireframeModeCheckBox->setChecked( false );
   mWireframeModeCheckBox->setToolTip( tr( "Show only model edges so the point cloud is fully visible during fine-tuning." ) );
-  workflowLayout->addWidget( mWireframeModeCheckBox );
   connect( mWireframeModeCheckBox, &QCheckBox::toggled, this, [this]( bool checked ) {
     ParamModelerScene3D::setWireframeMode( checked );
     if ( m_realtimeModelLoaded )
@@ -1071,21 +1090,54 @@ void ParamModelerDock::initPointNet()
   fitParameterPage( ui->stackedWidgetParams->currentIndex() );
   connect( m_resetAnchorBtn, &QPushButton::clicked, this, &ParamModelerDock::resetToDlAnchor );
 
-  m_manualTranslateBtn = new QPushButton( tr( "Align in 2D" ), this );
+  m_manualTranslateBtn = ui->btnAlign2D;
+  m_manualTranslateBtn->setText( tr( "Align in 2D" ) );
+  m_manualTranslateBtn->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
   m_manualTranslateBtn->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/mActionIdentify.svg" ) ) );
   m_manualTranslateBtn->setToolTip( tr( "Shows the current model anchor as a red X in the 2D map canvas. Click the point-cloud target position to translate the model there. Only TX/TY are changed." ) );
   connect( m_manualTranslateBtn, &QPushButton::clicked, this, &ParamModelerDock::startManualTranslateByClick );
 
-  m_manualTranslate3DBtn = new QToolButton( this );
+  ui->widgetAlign3DControls->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
+  ui->layoutAlignmentButtons->setStretch( 0, 1 );
+  ui->layoutAlignmentButtons->setStretch( 1, 1 );
+  m_manualTranslate3DBtn = ui->btnAlign3D;
   m_manualTranslate3DBtn->setText( tr( "Align in 3D" ) );
-  m_manualTranslate3DBtn->setToolButtonStyle( Qt::ToolButtonTextBesideIcon );
   m_manualTranslate3DBtn->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
-  m_manualTranslate3DBtn->setPopupMode( QToolButton::MenuButtonPopup );
-  auto *alignMenu = new QMenu( m_manualTranslate3DBtn );
+  auto *align3DMenuBtn = ui->btnAlign3DMenu;
+  align3DMenuBtn->setArrowType( Qt::DownArrow );
+  align3DMenuBtn->setPopupMode( QToolButton::InstantPopup );
+  align3DMenuBtn->setFixedWidth( 24 );
+  align3DMenuBtn->setSizePolicy( QSizePolicy::Fixed, QSizePolicy::Fixed );
+  align3DMenuBtn->setToolTip( tr( "More 3D alignment options" ) );
+  auto *alignMenu = new QMenu( align3DMenuBtn );
+  auto *anchorMenu = alignMenu->addMenu( tr( "Anchor point" ) );
+  auto *anchorGroup = new QActionGroup( anchorMenu );
+  anchorGroup->setExclusive( true );
+  auto addAnchorAction = [this, anchorMenu, anchorGroup]( const QString &text, AnchorPointMode mode, bool checked = false ) {
+    QAction *action = anchorMenu->addAction( text );
+    action->setCheckable( true );
+    action->setChecked( checked );
+    anchorGroup->addAction( action );
+    connect( action, &QAction::triggered, this, [this, mode] {
+      m_manualAlign3DAnchorMode = mode;
+      if ( m_anchorLockMode != AnchorPointMode::None )
+      {
+        m_anchorLockMode = mode;
+        retargetAnchorLockToCurrentPosition();
+      }
+    } );
+  };
+  addAnchorAction( tr( "Upper current anchor" ), AnchorPointMode::UpperOrigin, true );
+  addAnchorAction( tr( "Top min X / min Y" ), AnchorPointMode::TopMinMin );
+  addAnchorAction( tr( "Top max X / min Y" ), AnchorPointMode::TopMaxMin );
+  addAnchorAction( tr( "Top min X / max Y" ), AnchorPointMode::TopMinMax );
+  addAnchorAction( tr( "Top max X / max Y" ), AnchorPointMode::TopMaxMax );
+  addAnchorAction( tr( "Top center" ), AnchorPointMode::TopCenter );
+  alignMenu->addSeparator();
   auto *fitCornerAction = alignMenu->addAction( tr( "Fit corner from three faces..." ) );
   fitCornerAction->setToolTip( tr( "Available for Cuboid, TruncatedPyramidRoof, LHouse and IndentedCuboid. Select two walls and the flat top, then confirm the virtual corner." ) );
   alignMenu->setToolTipsVisible( true );
-  m_manualTranslate3DBtn->setMenu( alignMenu );
+  align3DMenuBtn->setMenu( alignMenu );
   connect( alignMenu, &QMenu::aboutToShow, this, [this, fitCornerAction] {
     const QString type = ui->comboPrimitive->currentText();
     fitCornerAction->setEnabled( type == QStringLiteral( "Cuboid" ) ||
@@ -1099,9 +1151,7 @@ void ParamModelerDock::initPointNet()
   } );
   m_manualTranslate3DBtn->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/3d.svg" ) ) );
   m_manualTranslate3DBtn->setToolTip( tr( "Move the upper-corner red X (top center for round models) to a 3D cloud point. Right-click or Esc cancels." ) );
-  alignLayout->addWidget( m_manualTranslate3DBtn, 1 );
-  alignLayout->addWidget( m_manualTranslateBtn, 1 );
-  connect( m_manualTranslate3DBtn, &QToolButton::clicked, this, &ParamModelerDock::startManualTranslate3D );
+  connect( m_manualTranslate3DBtn, &QPushButton::clicked, this, &ParamModelerDock::startManualTranslate3D );
 }
 
 void ParamModelerDock::stopManualTranslate3D()
@@ -1147,9 +1197,9 @@ void ParamModelerDock::startTranslate3D( bool fitCorner )
     if ( candidate && candidate->scene() ) { canvas = candidate; break; }
   }
   if ( !m_realtimeModelLoaded || !canvas || !canvas->scene() || !canvas->mapSettings() ||
-       !canvas->cameraController() || !canvas->mapSettings()->layers().contains( layer ) )
+       !canvas->cameraController() )
   {
-    QMessageBox::warning( this, tr( "3D align" ), tr( "The model's 3D view must contain the loaded point cloud." ) );
+    QMessageBox::warning( this, tr( "3D align" ), tr( "The model and point cloud must be loaded into a valid 3D view first." ) );
     return;
   }
   if ( canvas->mapSettings()->crs() != layer->crs() ||
@@ -1163,12 +1213,11 @@ void ParamModelerDock::startTranslate3D( bool fitCorner )
     // Finish the 2D interaction at its own source, with zero translation.
     handleManualTranslateClick( m_manualTranslateSource, Qt::LeftButton );
   }
+  MeshData sourceMesh = BuildMesh::build( ui->comboPrimitive->currentText(), this );
   m_manualTranslate3DLocalAnchor = QVector3D();
-  if ( ui->comboPrimitive->currentText() != QStringLiteral( "TriPrismPyramid" ) &&
-       !ParamModelerPicking::upperAnchor( BuildMesh::build( ui->comboPrimitive->currentText(), this ).vertices,
-                                         m_manualTranslate3DLocalAnchor ) )
+  if ( !anchorLocalPoint( m_manualAlign3DAnchorMode, sourceMesh, m_manualTranslate3DLocalAnchor ) )
   {
-    QMessageBox::warning( this, tr( "3D align" ), tr( "The model has no upper alignment anchor." ) );
+    QMessageBox::warning( this, tr( "3D align" ), tr( "The model has no valid alignment anchor." ) );
     return;
   }
   auto source = [this] {
@@ -1187,7 +1236,7 @@ void ParamModelerDock::startTranslate3D( bool fitCorner )
       delete tool;
       return;
     }
-    const auto vertices = BuildMesh::build( type, this ).vertices;
+    const auto vertices = sourceMesh.vertices;
     QVector3D minimum = vertices.first(), maximum = minimum;
     for ( const QVector3D &v : vertices )
       for ( int axis = 0; axis < 3; ++axis )
@@ -1216,6 +1265,10 @@ void ParamModelerDock::startTranslate3D( bool fitCorner )
       return;
     }
     setPoseTranslate( tx, ty, tz );
+    enableAnchorLock( m_manualAlign3DAnchorMode,
+                      QVector3D( static_cast<float>( target.x() ),
+                                 static_cast<float>( target.y() ),
+                                 static_cast<float>( target.z() ) ) );
     const QString message = QStringLiteral( "[ManualAlign3D] source=(%1,%2,%3) target=(%4,%5,%6) translation=(%7,%8,%9)" )
       .arg( from.x(), 0, 'f', 3 ).arg( from.y(), 0, 'f', 3 ).arg( from.z(), 0, 'f', 3 )
       .arg( target.x(), 0, 'f', 3 ).arg( target.y(), 0, 'f', 3 ).arg( target.z(), 0, 'f', 3 )
@@ -1367,6 +1420,10 @@ void ParamModelerDock::handleManualTranslateClick( const QgsPointXY &point, Qt::
   const double oldTy = poseTranslateY();
   const double oldTz = poseTranslateZ();
   setPoseTranslate( oldTx + dx, oldTy + dy, oldTz );
+  enableAnchorLock( AnchorPointMode::GrowthOrigin,
+                    QVector3D( static_cast<float>( point.x() ),
+                               static_cast<float>( point.y() ),
+                               static_cast<float>( poseTranslateZ() ) ) );
 
   DEBUG_LOG( QString( "[ManualAlign] target=(%1,%2) delta=(%3,%4) tx=%5→%6 ty=%7→%8 tz=%9\n" )
                .arg( point.x(), 0, 'f', 3 )
@@ -1411,6 +1468,7 @@ void ParamModelerDock::handleManualTranslateClick( const QgsPointXY &point, Qt::
 void ParamModelerDock::onPrimitiveChanged( const QString &prim )
 {
   stopManualTranslate3D();
+  clearAnchorLock();
   QString dbg = QString( "[ParamModeler] primitive changed: %1 -> %2\n" ).arg( m_currentPrimitive ).arg( prim );
   DEBUG_LOG( dbg.toStdWString().c_str() );
 
@@ -2886,7 +2944,7 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
     double topLengthGeo = qQNaN();
     double topWidthGeo = qQNaN();
     QVector3D topMin, topMax;
-    const double topSliceBottom = static_cast<double>( hardMin.z() ) + std::max( 0.0, height - std::max( 0.3, height * 0.15 ) );
+    const double topSliceBottom = static_cast<double>( hardMax.z() ) - std::max( 0.05, height * 0.03 );
     if ( robustSliceBBox( canonicalPoints, [&]( const QVector3D &p ) {
            return static_cast<double>( p.z() ) >= topSliceBottom;
          }, topMin, topMax, std::max( 16, static_cast<int>( canonicalPoints.size() * 0.015 ) ) ) )
@@ -3260,6 +3318,167 @@ void ParamModelerDock::onLoadExternalPointCloud()
 }
 
 
+void ParamModelerDock::enableAnchorLock( AnchorPointMode mode, const QVector3D &worldTarget )
+{
+  if ( mode == AnchorPointMode::None )
+  {
+    clearAnchorLock();
+    return;
+  }
+  m_anchorLockMode = mode;
+  m_anchorLockWorldTarget = worldTarget;
+  auto modeName = []( AnchorPointMode mode ) {
+    switch ( mode )
+    {
+      case AnchorPointMode::GrowthOrigin: return QStringLiteral( "growth-origin" );
+      case AnchorPointMode::UpperOrigin: return QStringLiteral( "upper-origin" );
+      case AnchorPointMode::TopMinMin: return QStringLiteral( "top-min-x-min-y" );
+      case AnchorPointMode::TopMaxMin: return QStringLiteral( "top-max-x-min-y" );
+      case AnchorPointMode::TopMinMax: return QStringLiteral( "top-min-x-max-y" );
+      case AnchorPointMode::TopMaxMax: return QStringLiteral( "top-max-x-max-y" );
+      case AnchorPointMode::TopCenter: return QStringLiteral( "top-center" );
+      case AnchorPointMode::None: break;
+    }
+    return QStringLiteral( "none" );
+  };
+  DEBUG_LOG( QString( "[AnchorLock] enabled mode=%1 target=(%2,%3,%4)\n" )
+               .arg( modeName( mode ) )
+               .arg( worldTarget.x(), 0, 'f', 3 )
+               .arg( worldTarget.y(), 0, 'f', 3 )
+               .arg( worldTarget.z(), 0, 'f', 3 )
+               .toStdWString().c_str() );
+}
+
+void ParamModelerDock::clearAnchorLock()
+{
+  if ( m_anchorLockMode != AnchorPointMode::None )
+    DEBUG_LOG( L"[AnchorLock] cleared\n" );
+  m_anchorLockMode = AnchorPointMode::None;
+  m_anchorLockWorldTarget = QVector3D();
+}
+
+bool ParamModelerDock::anchorLocalPoint( AnchorPointMode mode, const MeshData &mesh, QVector3D &localPoint ) const
+{
+  if ( mode == AnchorPointMode::GrowthOrigin )
+  {
+    localPoint = QVector3D( 0.0f, 0.0f, 0.0f );
+    return true;
+  }
+  if ( mode == AnchorPointMode::UpperOrigin )
+    return ParamModelerPicking::upperAnchor( mesh.vertices, localPoint );
+  if ( mesh.vertices.isEmpty() )
+    return false;
+
+  QVector3D minimum = mesh.vertices.first();
+  QVector3D maximum = minimum;
+  for ( const QVector3D &v : mesh.vertices )
+  {
+    minimum.setX( std::min( minimum.x(), v.x() ) );
+    minimum.setY( std::min( minimum.y(), v.y() ) );
+    minimum.setZ( std::min( minimum.z(), v.z() ) );
+    maximum.setX( std::max( maximum.x(), v.x() ) );
+    maximum.setY( std::max( maximum.y(), v.y() ) );
+    maximum.setZ( std::max( maximum.z(), v.z() ) );
+  }
+
+  switch ( mode )
+  {
+    case AnchorPointMode::TopMinMin:
+      localPoint = QVector3D( minimum.x(), minimum.y(), maximum.z() );
+      return true;
+    case AnchorPointMode::TopMaxMin:
+      localPoint = QVector3D( maximum.x(), minimum.y(), maximum.z() );
+      return true;
+    case AnchorPointMode::TopMinMax:
+      localPoint = QVector3D( minimum.x(), maximum.y(), maximum.z() );
+      return true;
+    case AnchorPointMode::TopMaxMax:
+      localPoint = QVector3D( maximum.x(), maximum.y(), maximum.z() );
+      return true;
+    case AnchorPointMode::TopCenter:
+      localPoint = QVector3D( ( minimum.x() + maximum.x() ) * 0.5f,
+                              ( minimum.y() + maximum.y() ) * 0.5f,
+                              maximum.z() );
+      return true;
+    default:
+      break;
+  }
+  return false;
+}
+
+bool ParamModelerDock::anchorLockLocalPoint( const MeshData &mesh, QVector3D &localPoint ) const
+{
+  return anchorLocalPoint( m_anchorLockMode, mesh, localPoint );
+}
+
+void ParamModelerDock::retargetAnchorLockToCurrentPosition()
+{
+  if ( m_anchorLockMode == AnchorPointMode::None || m_anchorLockCompensating )
+    return;
+
+  const MeshData mesh = BuildMesh::build( ui->comboPrimitive->currentText(), this );
+  QVector3D localPoint;
+  if ( !anchorLockLocalPoint( mesh, localPoint ) )
+    return;
+
+  const QVector3D rotated = modelRotationMatrix( this ).map( localPoint );
+  m_anchorLockWorldTarget = QVector3D(
+    static_cast<float>( poseTranslateX() ) + rotated.x(),
+    static_cast<float>( poseTranslateY() ) + rotated.y(),
+    static_cast<float>( poseTranslateZ() ) + rotated.z() );
+  DEBUG_LOG( QString( "[AnchorLock] retargeted target=(%1,%2,%3)\n" )
+               .arg( m_anchorLockWorldTarget.x(), 0, 'f', 3 )
+               .arg( m_anchorLockWorldTarget.y(), 0, 'f', 3 )
+               .arg( m_anchorLockWorldTarget.z(), 0, 'f', 3 )
+               .toStdWString().c_str() );
+}
+
+void ParamModelerDock::applyAnchorLockCompensation( const MeshData &mesh )
+{
+  if ( m_anchorLockMode == AnchorPointMode::None || m_anchorLockCompensating )
+    return;
+
+  QVector3D localPoint;
+  if ( !anchorLockLocalPoint( mesh, localPoint ) )
+    return;
+
+  const QVector3D rotated = modelRotationMatrix( this ).map( localPoint );
+  const QVector3D currentWorld(
+    static_cast<float>( poseTranslateX() ) + rotated.x(),
+    static_cast<float>( poseTranslateY() ) + rotated.y(),
+    static_cast<float>( poseTranslateZ() ) + rotated.z() );
+  const QVector3D delta = m_anchorLockWorldTarget - currentWorld;
+  if ( delta.lengthSquared() < 1e-10f )
+    return;
+
+  const double tx = poseTranslateX() + static_cast<double>( delta.x() );
+  const double ty = poseTranslateY() + static_cast<double>( delta.y() );
+  const double tz = poseTranslateZ() + static_cast<double>( delta.z() );
+  if ( tx < ui->spinBoxTX->minimum() || tx > ui->spinBoxTX->maximum() ||
+       ty < ui->spinBoxTY->minimum() || ty > ui->spinBoxTY->maximum() ||
+       tz < ui->spinBoxTZ->minimum() || tz > ui->spinBoxTZ->maximum() )
+  {
+    DEBUG_LOG( QString( "[AnchorLock] skipped: compensation out of range delta=(%1,%2,%3)\n" )
+                 .arg( delta.x(), 0, 'f', 3 )
+                 .arg( delta.y(), 0, 'f', 3 )
+                 .arg( delta.z(), 0, 'f', 3 )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  m_anchorLockCompensating = true;
+  setPoseTranslate( tx, ty, tz );
+  m_anchorLockCompensating = false;
+  DEBUG_LOG( QString( "[AnchorLock] compensated delta=(%1,%2,%3) tx=%4 ty=%5 tz=%6\n" )
+               .arg( delta.x(), 0, 'f', 3 )
+               .arg( delta.y(), 0, 'f', 3 )
+               .arg( delta.z(), 0, 'f', 3 )
+               .arg( tx, 0, 'f', 3 )
+               .arg( ty, 0, 'f', 3 )
+               .arg( tz, 0, 'f', 3 )
+               .toStdWString().c_str() );
+}
+
 void ParamModelerDock::schedulePreviewUpdate()
 {
   m_previewUpdatePending = true;
@@ -3279,11 +3498,11 @@ void ParamModelerDock::onUpdatePreview()
 
   QString prim = ui->comboPrimitive->currentText();
   MeshData mesh = BuildMesh::build( prim, this );
+  applyAnchorLockCompensation( mesh );
 
   if ( m_manualTranslate3DTool )
   {
-    if ( prim != QStringLiteral( "TriPrismPyramid" ) )
-      ParamModelerPicking::upperAnchor( mesh.vertices, m_manualTranslate3DLocalAnchor );
+    anchorLocalPoint( m_manualAlign3DAnchorMode, mesh, m_manualTranslate3DLocalAnchor );
     m_manualTranslate3DTool->refreshMarkers();
   }
 

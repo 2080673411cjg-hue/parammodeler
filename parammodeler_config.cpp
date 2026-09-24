@@ -230,8 +230,7 @@ void showSettingsDialog( QWidget *parent )
   {
     form->addRow( QStringLiteral( "PCT 回归默认后缀:" ), edtPctSuffix );
     auto *pctHint = new QLabel(
-      QStringLiteral( "  默认 _v4_normals (basic + PCA 法向量，13 类统一；"
-                      "v4 用修复离群点/坐标系后的 datasets_aug 重训)。" ), &dlg );
+      QStringLiteral( "  作为兜底后缀使用；PCT 会优先按基元类型选择 v4/v5/v6 最佳模型。" ), &dlg );
     pctHint->setStyleSheet( QStringLiteral( "color: #888; font-size: 11px;" ) );
     form->addRow( QString(), pctHint );
   }

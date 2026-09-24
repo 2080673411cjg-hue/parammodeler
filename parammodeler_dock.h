@@ -36,6 +36,7 @@ class QProgressDialog;
 class QPushButton;
 class QToolButton;
 class QJsonArray;
+struct MeshData;
 
 class QgisInterface;
 class QgsMapLayer;
@@ -260,6 +261,28 @@ private:
   bool m_suspendHeightCompensation = false;
   void resetToDlAnchor();
 
+  enum class AnchorPointMode
+  {
+    None,
+    GrowthOrigin,
+    UpperOrigin,
+    TopMinMin,
+    TopMaxMin,
+    TopMinMax,
+    TopMaxMax,
+    TopCenter
+  };
+  AnchorPointMode m_anchorLockMode = AnchorPointMode::None;
+  AnchorPointMode m_manualAlign3DAnchorMode = AnchorPointMode::UpperOrigin;
+  QVector3D m_anchorLockWorldTarget;
+  bool m_anchorLockCompensating = false;
+  void enableAnchorLock( AnchorPointMode mode, const QVector3D &worldTarget );
+  void clearAnchorLock();
+  bool anchorLocalPoint( AnchorPointMode mode, const MeshData &mesh, QVector3D &localPoint ) const;
+  bool anchorLockLocalPoint( const MeshData &mesh, QVector3D &localPoint ) const;
+  void retargetAnchorLockToCurrentPosition();
+  void applyAnchorLockCompensation( const MeshData &mesh );
+
   // ===== 手动目标点平移对齐（2D canvas 拾取） =====
   QPushButton *m_manualTranslateBtn = nullptr;
   QgsMapToolEmitPoint *m_manualTranslateTool = nullptr;
@@ -270,7 +293,7 @@ private:
   bool m_manualTranslateHasSource = false;
   QgsPointXY m_manualTranslateSource;
 
-  QToolButton *m_manualTranslate3DBtn = nullptr;
+  QPushButton *m_manualTranslate3DBtn = nullptr;
   QPointer<ParamModelerPick3D> m_manualTranslate3DTool;
   QPointer<Qgs3DMapCanvas> m_manualTranslate3DCanvas;
   QPointer<Qgs3DMapTool> m_previous3DMapTool;

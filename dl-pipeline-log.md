@@ -1,18 +1,36 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-09-21
+> 最后更新: 2026-09-24
 > **开发边界提醒**：原则上只修改自己的 ParamModeler 插件，不修改 QGIS 核心。2026-09-17 的近距离缩放核心实验已按用户要求撤回，当前源码不再包含本次 `qgis_3d` 修改。备份和回退记录见文末“QGIS 核心实验的备份与回退”。后续核心改动必须先说明影响、确认并提前备份。
-> 插件版本: **v2.3.13**（插件内 3D 拾取对齐 + 上部红 X + 高度方向控制 + 主面板整理；QGIS 核心近距离缩放实验已撤回并留备份；含 v2.3.12 v4-1 四类重参数化模型验证 / v2.3.11 参数级数据驱动校正 / v2.3.10 回归 target 重参数化）
+> 插件版本: **v2.3.14**（棱台顶面居中修复 + 棱台顶面几何校正薄层测量 + 圆柱类线框简化 + PCT 回归按类优先使用 v4/v5/v6 最佳后缀；保留 v2.3.13 插件内 3D 拾取对齐、锚点锁定、点云分面显示与主面板整理）
 > 后续更新: **2026-09-20**（评估 CSV、顶部菜单整理、简体中文翻译；本轮保存到 GitHub，不另建版本标签）
 > ⚠️ **待办**：分类重训（`train_pct_cls_v4.sh`）**尚未执行**，下方分类指标仍是旧数据上 `pct_cls_v2` 的结果
 > 当前模型: **PCT**（Point Cloud Transformer）— Li & Shan 2025 风格 offset-attention
 > 分类模型: `pct_cls_v2` — 98.92% F1（旧数据；v4 重训待跑）
-> 回归模型: 13 类（TriPrismPyramid 无需回归），生产默认仍为 **`pct_reg_*_v4_normals`**；另有 4 类重参数化验证模型 **`pct_reg_{lhouse,truncatedpyramid,halfcylinder,indentedcuboid}_v4-1_normals`**
+> 回归模型: 13 类（TriPrismPyramid 无需回归），插件按基元优先加载 v4/v5/v6 中当前较优的 PCT 回归后缀；设置中的默认后缀作为缺失模型时的 fallback
 > 法向量实验: 阶段 0/1/2 全部完成，bulge 转正（v4 corr=0.578）、middleBulge 仍≈0（详见第七章）
 > 数据集: **500 样本/类**（train 400 + val 50 + test 50），TwoGableHouses **1000 样本**（仅扩充数据量，无额外增强），14 类共 7500 样本；**v4 起用修复后的 `datasets_aug`**（离群点 extent 0.08 + 坐标系不漂移）
 > 后端: PCT（PointNeXt 保留但不再使用）
 
 ---
+
+## 2026-09-24 更新：v2.3.14 棱台几何修复、圆柱线框简化与按类最佳回归模型
+
+- 修复 `TruncatedPyramidRoof` 建模几何：顶面原先从局部 `(0,0)` 向 `+X/+Y` 生长，导致顶面贴在底面左下角；现改为按底面中心居中，保持底面左下角锚点不变，不新增 top offset target，也不需要因此重新训练。
+- 棱台点云的“顶面尺寸”几何校正不再把斜坡上半段算进顶面。`topLength/topWidth` 的点云测量由最高 15% 厚切片改为最高 Z 附近薄层；薄层点数不足时保留 PCT/当前值，不强行覆盖。这里的顶面指水平顶面，斜坡仍属于屋顶斜面/侧坡，不参与顶面 bbox 尺寸估计。
+- 复查其他主要几何中心语义：`GabledRoof` 屋脊位于宽度中线，`PyramidRoof` 顶点位于底面中心，圆柱/圆顶/圆塔以底面中心为原点，`LHouse`、`IndentedCuboid`、`TwoGableHouses` 维持外包络左下角锚定；未发现同类“应居中却贴边”的顶面错误。
+- 实时线框模式调整圆形模型显示：上下圆环保留原始细分以保持圆滑，顶面径向辅助线改为十字，底面不显示径向线，侧面只保留十字方向的少量竖向线。实体网格、导出网格和训练数据不受影响。
+- PCT 回归加载改为按基元优先选择当前验证/测试效果较好的后缀：部分基元使用 `_v6_normals`，`GabledRoof/HalfCylinderRoof` 等可回退到 `_v5_normals`，`CylinderDome/FourStageRoundTower/PyramidRoof/TwoGableHouses` 保留 `_v4_normals`；若目标目录缺失，则退回设置中的默认 PCT 回归后缀。
+- 按当前约定，本轮未更新翻译文件、未运行翻译测试；已做 `git diff --check`，尚未完整编译 DLL 或在 QGIS 中实测最终交互效果。
+
+## 2026-09-22 更新：多锚点 3D 对齐、锚点锁定与点云分面显示
+
+- `Point Cloud & Alignment` 主入口从运行时动态拼控件回收到 `parammodeler_dock.ui`：`Classify and estimate parameters...`、`Align in 3D`、`Align in 2D`、`Wireframe` 现在可在 Qt Designer 中直接看到；C++ 仅保留图标、tooltip、菜单和信号连接。`Align in 3D` 主按钮改为普通按钮，右侧单独下拉箭头，避免文字偏位和箭头显示异常。
+- `Align in 3D` 下拉菜单新增 `Anchor point`：支持 `Upper current anchor`、顶面四角（min/max X/Y）和 `Top center`。红 X/source、拾取对齐和后续锚点锁定均按当前锚点模式计算；切换锚点时若已有锁定，会把新锚点当前世界位置设为新的锁定目标。
+- 新增“当前对齐锚点锁定”机制：3D 对齐成功后锁定所选锚点，2D 对齐成功后锁定底部生长原点；后续调长宽高或旋转时按新 mesh 重新计算对应锚点，并自动补偿 `TX/TY/TZ`，尽量保持该点世界坐标不漂。手动修改 `TX/TY/TZ` 时不拉回旧位置，而是重定当前锚点目标；切换基元清除锁定。记录 `[AnchorLock] enabled/retargeted/compensated/skipped`。
+- 点云加载到 3D 时增加仅用于显示的分面点层：小点云用邻域 PCA 估计法向区分顶面/侧面/其他，大点云退化为高度带判断；顶面青色、侧面橙色、其他灰色。完整点云层保留为隐藏拾取层，3D 对齐仍使用全量真实点，不因分色而只拾取子层；已放宽 3D 拾取前“必须在可见 layer 列表中”的旧检查，并输出 `[PointCloudSurface] pick/top/side/other`。
+- 3D 视图风格统一为黑色背景并关闭 terrain 渲染，覆盖实时预览、模型加载和点云加载路径，避免点云分层后新建/刷新 3D canvas 回到白色背景。
+- 构建修复：`parammodeler_dock.h` 补充 `struct MeshData;` 前置声明，修复锚点锁定函数声明导致的 MSVC `C4430/C2143` 连锁报错。按当前开发约定未更新翻译文件、未运行翻译测试；本轮已做 `git diff --check`，尚未完整编译 DLL、未在 QGIS 中完成实测。
 
 ## 2026-09-21 更新：三面拟合虚拟角点与 v4-1 几何校正
 
@@ -30,7 +48,8 @@
 - 新增 `parammodeler_cornerfit.h`：固定种子一致性筛选 + Eigen PCA 精修；基础可用候选至少 8 个支撑点、35% 支撑比例，达到旧版 12 点/60%/低残差时标为强候选，否则标为弱候选。两墙和顶面的方向判断已放宽以适应轻微姿态误差；使用中心化双精度三平面求交，拒绝退化和超过各邻域半径四倍的远距离外推。邻域拟合最多均匀抽取 4096 点。
 - 青色十字显示已选面的拟合中心，黄框预览虚拟交点；仅点击“应用对齐”后复用现有红 X 到 target 的平移流程，TX/TY/TZ 范围检查保留。不改变模型尺寸或朝向；整面缺失时不强行推算。
 - 浮动工具窗口支持上一步、取消及相机导航。导航开启时暂停拾取，可转到其他面，关闭导航后继续；关闭窗口、Esc、选面时右键及切换基元会退出。图层移除或 CRS 不匹配时取消。记录 `[CornerFit3D]` 支撑数/半径/残差，最终平移沿用 `[ManualAlign3D]` 日志。
-- TruncatedPyramidRoof 顶面长宽的构建语义改为固定顶面左下角、向局部 +X/+Y 生长，不再绕底面中心双向缩放；这样顶面角点与三面拟合/人工微调的“左下角”语义一致。IndentedCuboid 的外框仍固定左下角向 +X/+Y 生长，innerHeight 保持从顶面向下凹的原语义。
+- TruncatedPyramidRoof 顶面长宽曾在本轮改为固定顶面左下角、向局部 +X/+Y 生长，以配合当时的三面拟合/人工微调假设；该策略后来被 v2.3.14 纠正为“底面左下角锚定、顶面按底面中心居中”。IndentedCuboid 的外框仍固定左下角向 +X/+Y 生长，innerHeight 保持从顶面向下凹的原语义。
+- UI 维护约定：实验中、可能频繁调整的功能先在 `parammodeler_dock.cpp` 运行时动态创建/重排；确认会长期保留的稳定界面，再回收到 `parammodeler_dock.ui`，让 Qt Designer 能看到真实布局，C++ 只负责信号连接和业务逻辑。本轮已将 `Point Cloud & Alignment`、`Classify and estimate parameters...`、`Align in 3D` / `Align in 2D`、`Wireframe` 固定到 `parammodeler_dock.ui`，C++ 仅设置图标、下拉菜单和信号连接。
 - 新增 Eigen3 CMake 依赖（本机 qgis_dev 已安装）；中文语言包更新为 284 条。仅修改插件，无 QGIS 核心改动。
 - 验证：MSVC 相关 C++ 文件语法检查通过；28 项拟合检查覆盖角点缺失、噪声/离群点、大小尺度、旋转、大坐标、重复面、非平面及远距离交点；原 22 项拾取数学检查通过；直接/拟合标记在 400x300、800x600、1600x1200 共 6 组离屏 OpenGL 检查通过，截图已检查。按当前开发约定，本轮未再运行翻译测试。
 - 待验收：尚未完整构建 DLL、未在 QGIS 中实测三面选择/相机导航/取消交互。重新编译插件后优先用 TruncatedPyramidRoof 顶面角点、IndentedCuboid 内凹和带缺角采样的 Cuboid 验证。测试命令：`powershell -File scripts/test_cornerfit.ps1 -WithPicking`。
