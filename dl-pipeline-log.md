@@ -21,7 +21,7 @@
 - 复查其他主要几何中心语义：`GabledRoof` 屋脊位于宽度中线，`PyramidRoof` 顶点位于底面中心，圆柱/圆顶/圆塔以底面中心为原点，`LHouse`、`IndentedCuboid`、`TwoGableHouses` 维持外包络左下角锚定；未发现同类“应居中却贴边”的顶面错误。
 - 实时线框模式调整圆形模型显示：上下圆环保留原始细分以保持圆滑，顶面径向辅助线改为十字，底面不显示径向线，侧面只保留十字方向的少量竖向线。实体网格、导出网格和训练数据不受影响。
 - PCT 回归加载改为按基元优先选择当前验证/测试效果较好的后缀：部分基元使用 `_v6_normals`，`GabledRoof/HalfCylinderRoof` 等可回退到 `_v5_normals`，`CylinderDome/FourStageRoundTower/PyramidRoof/TwoGableHouses` 保留 `_v4_normals`；若目标目录缺失，则退回设置中的默认 PCT 回归后缀。
-- 按当前约定，本轮未更新翻译文件、未运行翻译测试；已做 `git diff --check`，尚未完整编译 DLL 或在 QGIS 中实测最终交互效果。
+- 翻译已同步到 `i18n/parammodeler_zh_CN.ts/.qm`，新增 Help、锚点菜单和 3D 对齐提示等文案；`lrelease` 生成 297 条完成译文、0 条未完成。未运行翻译自动测试；已做 `git diff --check`，尚未完整编译 DLL 或在 QGIS 中实测最终交互效果。
 
 ## 2026-09-22 更新：多锚点 3D 对齐、锚点锁定与点云分面显示
 
