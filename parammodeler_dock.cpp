@@ -2944,7 +2944,7 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
     double topLengthGeo = qQNaN();
     double topWidthGeo = qQNaN();
     QVector3D topMin, topMax;
-    const double topSliceBottom = static_cast<double>( hardMax.z() ) - std::max( 0.05, height * 0.03 );
+    const double topSliceBottom = static_cast<double>( hardMin.z() ) + std::max( 0.0, height - std::max( 0.3, height * 0.15 ) );
     if ( robustSliceBBox( canonicalPoints, [&]( const QVector3D &p ) {
            return static_cast<double>( p.z() ) >= topSliceBottom;
          }, topMin, topMax, std::max( 16, static_cast<int>( canonicalPoints.size() * 0.015 ) ) ) )

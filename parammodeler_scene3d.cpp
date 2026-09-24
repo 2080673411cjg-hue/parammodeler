@@ -884,9 +884,9 @@ ClassifiedPointCloud classifyPointCloudSurfaces( const PointCloud &pc )
       const QVector3D normal = estimatePointNormal( points, i, k );
       const double nz = std::abs( static_cast<double>( normal.z() ) );
       const bool aboveBottom = height <= 0.0001 || points[i].z() > bottomGuard;
-      if ( nz >= 0.58 && aboveBottom )
+      if ( nz >= 0.25 && aboveBottom )
         classified.top.push_back( points[i] );
-      else if ( nz <= 0.45 )
+      else if ( nz <= 0.20 )
         classified.side.push_back( points[i] );
       else
         classified.other.push_back( points[i] );
