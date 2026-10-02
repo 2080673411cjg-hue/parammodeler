@@ -1,16 +1,16 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-09-24
+> 最后更新: 2026-10-02
 > **开发边界提醒**：原则上只修改自己的 ParamModeler 插件，不修改 QGIS 核心。2026-09-17 的近距离缩放核心实验已按用户要求撤回，当前源码不再包含本次 `qgis_3d` 修改。备份和回退记录见文末“QGIS 核心实验的备份与回退”。后续核心改动必须先说明影响、确认并提前备份。
-> 插件版本: **v2.3.14**（棱台顶面居中修复 + 屋顶语义分面/几何校正继续包含斜屋面 + 圆柱类线框简化 + PCT 回归按类优先使用 v4/v5/v6 最佳后缀；保留 v2.3.13 插件内 3D 拾取对齐、锚点锁定、点云分面显示与主面板整理）
-> 后续更新: **2026-09-20**（评估 CSV、顶部菜单整理、简体中文翻译；本轮保存到 GitHub，不另建版本标签）
+> 插件版本: **未发布工作区 2026-10-02**（PTv3 远程推理接入 + PTv3/PCT 双模型入口 + 局域网/Tailscale 服务地址切换 + v2 回归模型口径更新；保留 v2.3.14 棱台几何修复、锚点锁定、点云分面显示与主面板整理）
+> 后续更新: **2026-10-02**（PTv3 classify/regress 远程服务、路径设置整理、矩形外框类稳定长短边目标；HalfCylinderRoof 保持原语义）
 > ⚠️ **待办**：分类重训（`train_pct_cls_v4.sh`）**尚未执行**，下方分类指标仍是旧数据上 `pct_cls_v2` 的结果
-> 当前模型: **PCT**（Point Cloud Transformer）— Li & Shan 2025 风格 offset-attention
-> 分类模型: `pct_cls_v2` — 98.92% F1（旧数据；v4 重训待跑）
-> 回归模型: 13 类（TriPrismPyramid 无需回归），插件按基元优先加载 v4/v5/v6 中当前较优的 PCT 回归后缀；设置中的默认后缀作为缺失模型时的 fallback
+> 当前模型入口: **PTv3**（默认远程 Ubuntu/GPU 服务）与 **PCT**（本机兜底）
+> 分类模型: PTv3 `ptv3_cls_v2`；PCT 保留 `pct_cls_v4` 路径设置
+> 回归模型: PTv3 `ptv3_reg_<类别短名>_v2_normals`；Cuboid/PyramidRoof/TruncatedPyramidRoof/IndentedCuboid 使用稳定长短边目标，HalfCylinderRoof 保持轴向长度/直径/墙高原语义
 > 法向量实验: 阶段 0/1/2 全部完成，bulge 转正（v4 corr=0.578）、middleBulge 仍≈0（详见第七章）
 > 数据集: **500 样本/类**（train 400 + val 50 + test 50），TwoGableHouses **1000 样本**（仅扩充数据量，无额外增强），14 类共 7500 样本；**v4 起用修复后的 `datasets_aug`**（离群点 extent 0.08 + 坐标系不漂移）
-> 后端: PCT（PointNeXt 保留但不再使用）
+> 后端: PTv3 远程优先；PCT 本机可选；PointNet/PointNet++/PointNeXt 不再作为估计窗口下拉选项
 
 ---
 
