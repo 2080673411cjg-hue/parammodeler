@@ -28,6 +28,7 @@
 #include <QTextStream>
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 // ====================================================================
 // DL parameter mapping
@@ -40,6 +41,18 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
   const auto has = [&]( const QString &key ) { return nn.contains( key ); };
   const auto val = [&]( const QString &key, double fallback = 0.0 ) { return nn.value( key, fallback ); };
   const auto clamp01 = []( double x ) { return std::max( 0.0, std::min( 1.0, x ) ); };
+  const auto clampMarginPair = []( double a, double b ) {
+    a = std::max( 0.0, std::min( 1.0, a ) );
+    b = std::max( 0.0, std::min( 1.0, b ) );
+    const double sum = a + b;
+    if ( sum > 0.95 )
+    {
+      const double factor = 0.95 / sum;
+      a *= factor;
+      b *= factor;
+    }
+    return std::pair<double, double>( a, b );
+  };
   const auto put = [&]( const QString &from, const QString &to ) {
     if ( has( from ) )
       uiParams.insert( to, val( from ) );
@@ -155,30 +168,49 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
     put( QStringLiteral( "outerHeight" ), QStringLiteral( "icOuterH" ) );
     const double outerLength = val( QStringLiteral( "outerLength" ), 0.0 );
     const double outerWidth = val( QStringLiteral( "outerWidth" ), 0.0 );
-    const bool hasInnerLengthRatio = has( QStringLiteral( "innerLengthRatio" ) ) && outerLength > 1e-6;
-    const bool hasInnerWidthRatio = has( QStringLiteral( "innerWidthRatio" ) ) && outerWidth > 1e-6;
-    if ( hasInnerLengthRatio )
-      uiParams.insert( QStringLiteral( "icInnerL" ),
-                       outerLength * clamp01( val( QStringLiteral( "innerLengthRatio" ) ) ) );
-    else
-      put( QStringLiteral( "innerLength" ), QStringLiteral( "icInnerL" ) );
-    if ( hasInnerWidthRatio )
-      uiParams.insert( QStringLiteral( "icInnerW" ),
-                       outerWidth * clamp01( val( QStringLiteral( "innerWidthRatio" ) ) ) );
-    else
-      put( QStringLiteral( "innerWidth" ), QStringLiteral( "icInnerW" ) );
     put( QStringLiteral( "innerHeight" ), QStringLiteral( "icInnerH" ) );
-    // innerMin*Ratio is a training label in outer-envelope coordinates.
-    // Convert it to an absolute offset here; PointNetRunner::applyToUI()
-    // then converts that offset to the UI slider ratio over the movable span.
-    if ( has( QStringLiteral( "innerMinXRatio" ) ) && outerLength > 1e-6 )
-      uiParams.insert( QStringLiteral( "icOffsetX" ), outerLength * clamp01( val( QStringLiteral( "innerMinXRatio" ) ) ) );
+    const bool hasMarginX = has( QStringLiteral( "leftMarginRatio" ) ) ||
+                            has( QStringLiteral( "rightMarginRatio" ) );
+    const bool hasMarginY = has( QStringLiteral( "frontMarginRatio" ) ) ||
+                            has( QStringLiteral( "backMarginRatio" ) );
+    if ( hasMarginX && outerLength > 1e-6 )
+    {
+      auto margins = clampMarginPair( val( QStringLiteral( "leftMarginRatio" ) ),
+                                      val( QStringLiteral( "rightMarginRatio" ) ) );
+      uiParams.insert( QStringLiteral( "icOffsetX" ), outerLength * margins.first );
+      uiParams.insert( QStringLiteral( "icInnerL" ), outerLength * std::max( 0.05, 1.0 - margins.first - margins.second ) );
+    }
     else
-      put( QStringLiteral( "offsetX" ), QStringLiteral( "icOffsetX" ) );
-    if ( has( QStringLiteral( "innerMinYRatio" ) ) && outerWidth > 1e-6 )
-      uiParams.insert( QStringLiteral( "icOffsetY" ), outerWidth * clamp01( val( QStringLiteral( "innerMinYRatio" ) ) ) );
+    {
+      if ( has( QStringLiteral( "innerLengthRatio" ) ) && outerLength > 1e-6 )
+        uiParams.insert( QStringLiteral( "icInnerL" ),
+                         outerLength * clamp01( val( QStringLiteral( "innerLengthRatio" ) ) ) );
+      else
+        put( QStringLiteral( "innerLength" ), QStringLiteral( "icInnerL" ) );
+      if ( has( QStringLiteral( "innerMinXRatio" ) ) && outerLength > 1e-6 )
+        uiParams.insert( QStringLiteral( "icOffsetX" ), outerLength * clamp01( val( QStringLiteral( "innerMinXRatio" ) ) ) );
+      else
+        put( QStringLiteral( "offsetX" ), QStringLiteral( "icOffsetX" ) );
+    }
+    if ( hasMarginY && outerWidth > 1e-6 )
+    {
+      auto margins = clampMarginPair( val( QStringLiteral( "frontMarginRatio" ) ),
+                                      val( QStringLiteral( "backMarginRatio" ) ) );
+      uiParams.insert( QStringLiteral( "icOffsetY" ), outerWidth * margins.first );
+      uiParams.insert( QStringLiteral( "icInnerW" ), outerWidth * std::max( 0.05, 1.0 - margins.first - margins.second ) );
+    }
     else
-      put( QStringLiteral( "offsetY" ), QStringLiteral( "icOffsetY" ) );
+    {
+      if ( has( QStringLiteral( "innerWidthRatio" ) ) && outerWidth > 1e-6 )
+        uiParams.insert( QStringLiteral( "icInnerW" ),
+                         outerWidth * clamp01( val( QStringLiteral( "innerWidthRatio" ) ) ) );
+      else
+        put( QStringLiteral( "innerWidth" ), QStringLiteral( "icInnerW" ) );
+      if ( has( QStringLiteral( "innerMinYRatio" ) ) && outerWidth > 1e-6 )
+        uiParams.insert( QStringLiteral( "icOffsetY" ), outerWidth * clamp01( val( QStringLiteral( "innerMinYRatio" ) ) ) );
+      else
+        put( QStringLiteral( "offsetY" ), QStringLiteral( "icOffsetY" ) );
+    }
   }
   else if ( prim == QStringLiteral( "AsymmetricGableHouse" ) )
   {
@@ -300,14 +332,18 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
   {
     const double outerLength = dock->icOuterLength();
     const double outerWidth = dock->icOuterWidth();
+    const double innerLength = dock->icInnerLength();
+    const double innerWidth = dock->icInnerWidth();
+    const double offsetX = dock->icOffsetX();
+    const double offsetY = dock->icOffsetY();
     params["outerLength"] = outerLength;
     params["outerWidth"] = outerWidth;
     params["outerHeight"] = dock->icOuterHeight();
-    params["innerLengthRatio"] = outerLength > 1e-6 ? dock->icInnerLength() / outerLength : 0.4;
-    params["innerWidthRatio"] = outerWidth > 1e-6 ? dock->icInnerWidth() / outerWidth : 0.4;
     params["innerHeight"] = dock->icInnerHeight();
-    params["innerMinXRatio"] = outerLength > 1e-6 ? dock->icOffsetX() / outerLength : 0.2;
-    params["innerMinYRatio"] = outerWidth > 1e-6 ? dock->icOffsetY() / outerWidth : 0.2;
+    params["leftMarginRatio"] = outerLength > 1e-6 ? offsetX / outerLength : 0.2;
+    params["rightMarginRatio"] = outerLength > 1e-6 ? ( outerLength - offsetX - innerLength ) / outerLength : 0.4;
+    params["frontMarginRatio"] = outerWidth > 1e-6 ? offsetY / outerWidth : 0.2;
+    params["backMarginRatio"] = outerWidth > 1e-6 ? ( outerWidth - offsetY - innerWidth ) / outerWidth : 0.4;
   }
   else if ( prim == "AsymmetricGableHouse" )
   {
@@ -523,9 +559,40 @@ bool denormInfoFromPlyComment( const QString &filePath, QVector3D &center, doubl
   return hasCenter && hasScale;
 }
 
-QString metadataRelativePathForPointCloud( const QString &filePath )
+struct MetadataLookup
+{
+  QString relativePath;
+  QString metadataPath;
+};
+
+MetadataLookup metadataLookupForPointCloud( const QString &filePath )
 {
   QString normalized = QDir::fromNativeSeparators( QFileInfo( filePath ).absoluteFilePath() );
+  QFileInfo fileInfo( normalized );
+
+  // Prefer the metadata stored next to the dataset root. This supports versioned
+  // dataset folders such as datasets_aug_v7 without requiring settings changes.
+  QDir dir = fileInfo.absoluteDir();
+  while ( true )
+  {
+    const QString candidate = dir.filePath( QStringLiteral( "metadata/sample_params.json" ) );
+    if ( QFileInfo::exists( candidate ) )
+    {
+      QString rel = QDir::fromNativeSeparators( dir.relativeFilePath( normalized ) );
+      if ( !rel.isEmpty() && !rel.startsWith( QStringLiteral( "../" ) ) &&
+           !rel.startsWith( QStringLiteral( "metadata/" ), Qt::CaseInsensitive ) )
+      {
+        QFileInfo relInfo( rel );
+        const QString relDir = relInfo.path() == QStringLiteral( "." ) ? QString() : relInfo.path() + QStringLiteral( "/" );
+        return { relDir + relInfo.completeBaseName() + QStringLiteral( ".txt" ),
+                 QDir::fromNativeSeparators( QFileInfo( candidate ).absoluteFilePath() ) };
+      }
+    }
+
+    if ( !dir.cdUp() )
+      break;
+  }
+
   const QString lower = normalized.toLower();
   QString rel;
 
@@ -546,11 +613,12 @@ QString metadataRelativePathForPointCloud( const QString &filePath )
     rel = normalized.mid( rawIdx + rawMarker.size() );
 
   if ( rel.isEmpty() || rel.startsWith( QStringLiteral( "metadata/" ), Qt::CaseInsensitive ) )
-    return QString();
+    return {};
 
   QFileInfo relInfo( rel );
-  const QString dir = relInfo.path() == QStringLiteral( "." ) ? QString() : relInfo.path() + QStringLiteral( "/" );
-  return dir + relInfo.completeBaseName() + QStringLiteral( ".txt" );
+  const QString relDir = relInfo.path() == QStringLiteral( "." ) ? QString() : relInfo.path() + QStringLiteral( "/" );
+  return { relDir + relInfo.completeBaseName() + QStringLiteral( ".txt" ),
+           QDir::fromNativeSeparators( QFileInfo( ParamModelerConfig::metadataJsonPath() ).absoluteFilePath() ) };
 }
 
 bool metadataPointCloudInfoForInput( const QString &filePath,
@@ -565,17 +633,17 @@ bool metadataPointCloudInfoForInput( const QString &filePath,
   if ( rz )
     *rz = qQNaN();
 
-  const QString rel = metadataRelativePathForPointCloud( filePath );
-  if ( !rel.isEmpty() )
+  const MetadataLookup lookup = metadataLookupForPointCloud( filePath );
+  if ( !lookup.relativePath.isEmpty() && !lookup.metadataPath.isEmpty() )
   {
-    QFile metadataFile( ParamModelerConfig::metadataJsonPath() );
+    QFile metadataFile( lookup.metadataPath );
     if ( metadataFile.open( QIODevice::ReadOnly ) )
     {
       QJsonParseError parseError;
       const QJsonDocument doc = QJsonDocument::fromJson( metadataFile.readAll(), &parseError );
       if ( parseError.error == QJsonParseError::NoError && doc.isArray() )
       {
-        const QString relLower = rel.toLower();
+        const QString relLower = lookup.relativePath.toLower();
         const QJsonArray records = doc.array();
         for ( const QJsonValue &value : records )
         {
@@ -673,8 +741,19 @@ QString safeClassDirName( const QString &primitiveType )
 QString datasetRootFromSelectedFolder( const QString &selectedPath )
 {
   const QFileInfo selectedInfo( selectedPath );
-  if ( selectedInfo.fileName().compare( QStringLiteral( "datasets" ), Qt::CaseInsensitive ) == 0 )
+  const QString folderName = selectedInfo.fileName();
+  if ( folderName.compare( QStringLiteral( "datasets" ), Qt::CaseInsensitive ) == 0 ||
+       folderName.startsWith( QStringLiteral( "datasets_" ), Qt::CaseInsensitive ) )
     return selectedPath;
 
-  return QDir( selectedPath ).filePath( QStringLiteral( "datasets" ) );
+  const QDir selectedDir( selectedPath );
+  const bool looksLikeDatasetRoot =
+    selectedDir.exists( QStringLiteral( "metadata" ) ) ||
+    selectedDir.exists( QStringLiteral( "train" ) ) ||
+    selectedDir.exists( QStringLiteral( "val" ) ) ||
+    selectedDir.exists( QStringLiteral( "test" ) );
+  if ( looksLikeDatasetRoot )
+    return selectedPath;
+
+  return selectedDir.filePath( QStringLiteral( "datasets" ) );
 }

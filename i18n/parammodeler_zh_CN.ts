@@ -129,57 +129,63 @@
         <translation>随机参数</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="343"/>
+        <location filename="../parammodeler_dock.ui" line="304"/>
+        <location filename="../parammodeler_dock.cpp" line="1049"/>
+        <source>Point Cloud Tools</source>
+        <translation>点云工具</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_dock.ui" line="363"/>
         <source>...</source>
         <translation>...</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="372"/>
+        <location filename="../parammodeler_dock.ui" line="392"/>
         <source>Pose Transform</source>
         <translation>位姿变换</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="386"/>
+        <location filename="../parammodeler_dock.ui" line="406"/>
         <source>Translate X:</source>
         <translation>X 平移：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="426"/>
+        <location filename="../parammodeler_dock.ui" line="446"/>
         <source>Translate Y:</source>
         <translation>Y 平移：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="466"/>
+        <location filename="../parammodeler_dock.ui" line="486"/>
         <source>Translate Z:</source>
         <translation>Z 平移：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="508"/>
+        <location filename="../parammodeler_dock.ui" line="528"/>
         <source>Rotate X:</source>
         <translation>X 旋转：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="551"/>
+        <location filename="../parammodeler_dock.ui" line="571"/>
         <source>Rotate Y:</source>
         <translation>Y 旋转：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="594"/>
+        <location filename="../parammodeler_dock.ui" line="614"/>
         <source>Rotate Z:</source>
         <translation>Z 旋转：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="641"/>
+        <location filename="../parammodeler_dock.ui" line="661"/>
         <source>Model Parameters</source>
         <translation>模型参数</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="672"/>
-        <location filename="../parammodeler_dock.ui" line="1004"/>
-        <location filename="../parammodeler_dock.ui" line="1108"/>
-        <location filename="../parammodeler_dock.ui" line="1366"/>
-        <location filename="../parammodeler_dock.ui" line="1790"/>
-        <location filename="../parammodeler_dock.ui" line="2147"/>
+        <location filename="../parammodeler_dock.ui" line="692"/>
+        <location filename="../parammodeler_dock.ui" line="1024"/>
+        <location filename="../parammodeler_dock.ui" line="1128"/>
+        <location filename="../parammodeler_dock.ui" line="1386"/>
+        <location filename="../parammodeler_dock.ui" line="1810"/>
+        <location filename="../parammodeler_dock.ui" line="2167"/>
         <location filename="../parammodeler_dock.cpp" line="712"/>
         <location filename="../parammodeler_dock.cpp" line="726"/>
         <location filename="../parammodeler_dock.cpp" line="730"/>
@@ -190,9 +196,9 @@
         <translation>宽度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="693"/>
-        <location filename="../parammodeler_dock.ui" line="753"/>
-        <location filename="../parammodeler_dock.ui" line="887"/>
+        <location filename="../parammodeler_dock.ui" line="713"/>
+        <location filename="../parammodeler_dock.ui" line="773"/>
+        <location filename="../parammodeler_dock.ui" line="907"/>
         <location filename="../parammodeler_dock.cpp" line="713"/>
         <location filename="../parammodeler_dock.cpp" line="716"/>
         <location filename="../parammodeler_dock.cpp" line="721"/>
@@ -200,11 +206,11 @@
         <translation>高度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="714"/>
-        <location filename="../parammodeler_dock.ui" line="979"/>
-        <location filename="../parammodeler_dock.ui" line="1083"/>
-        <location filename="../parammodeler_dock.ui" line="1341"/>
-        <location filename="../parammodeler_dock.ui" line="1765"/>
+        <location filename="../parammodeler_dock.ui" line="734"/>
+        <location filename="../parammodeler_dock.ui" line="999"/>
+        <location filename="../parammodeler_dock.ui" line="1103"/>
+        <location filename="../parammodeler_dock.ui" line="1361"/>
+        <location filename="../parammodeler_dock.ui" line="1785"/>
         <location filename="../parammodeler_dock.cpp" line="714"/>
         <location filename="../parammodeler_dock.cpp" line="725"/>
         <location filename="../parammodeler_dock.cpp" line="729"/>
@@ -214,9 +220,9 @@
         <translation>长度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="725"/>
-        <location filename="../parammodeler_dock.ui" line="912"/>
-        <location filename="../parammodeler_dock.ui" line="1445"/>
+        <location filename="../parammodeler_dock.ui" line="745"/>
+        <location filename="../parammodeler_dock.ui" line="932"/>
+        <location filename="../parammodeler_dock.ui" line="1465"/>
         <location filename="../parammodeler_dock.cpp" line="715"/>
         <location filename="../parammodeler_dock.cpp" line="722"/>
         <location filename="../parammodeler_dock.cpp" line="743"/>
@@ -224,38 +230,38 @@
         <translation>半径：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="785"/>
+        <location filename="../parammodeler_dock.ui" line="805"/>
         <location filename="../parammodeler_dock.cpp" line="717"/>
         <source>Total length:</source>
         <translation>总长度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="810"/>
+        <location filename="../parammodeler_dock.ui" line="830"/>
         <location filename="../parammodeler_dock.cpp" line="718"/>
         <source>Total width:</source>
         <translation>总宽度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="831"/>
+        <location filename="../parammodeler_dock.ui" line="851"/>
         <location filename="../parammodeler_dock.cpp" line="719"/>
         <source>Wing length ratio:</source>
         <translation>翼部长比：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="859"/>
+        <location filename="../parammodeler_dock.ui" line="879"/>
         <location filename="../parammodeler_dock.cpp" line="720"/>
         <source>Wing width ratio:</source>
         <translation>翼部宽比：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="933"/>
-        <location filename="../parammodeler_dock.ui" line="1029"/>
-        <location filename="../parammodeler_dock.ui" line="1133"/>
-        <location filename="../parammodeler_dock.ui" line="1287"/>
-        <location filename="../parammodeler_dock.ui" line="1470"/>
-        <location filename="../parammodeler_dock.ui" line="1815"/>
-        <location filename="../parammodeler_dock.ui" line="2172"/>
-        <location filename="../parammodeler_dock.ui" line="2362"/>
+        <location filename="../parammodeler_dock.ui" line="953"/>
+        <location filename="../parammodeler_dock.ui" line="1049"/>
+        <location filename="../parammodeler_dock.ui" line="1153"/>
+        <location filename="../parammodeler_dock.ui" line="1307"/>
+        <location filename="../parammodeler_dock.ui" line="1490"/>
+        <location filename="../parammodeler_dock.ui" line="1835"/>
+        <location filename="../parammodeler_dock.ui" line="2192"/>
+        <location filename="../parammodeler_dock.ui" line="2382"/>
         <location filename="../parammodeler_dock.cpp" line="652"/>
         <location filename="../parammodeler_dock.cpp" line="723"/>
         <location filename="../parammodeler_dock.cpp" line="727"/>
@@ -269,19 +275,19 @@
         <translation>总高度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="954"/>
-        <location filename="../parammodeler_dock.ui" line="1495"/>
+        <location filename="../parammodeler_dock.ui" line="974"/>
+        <location filename="../parammodeler_dock.ui" line="1515"/>
         <location filename="../parammodeler_dock.cpp" line="724"/>
         <location filename="../parammodeler_dock.cpp" line="745"/>
         <source>Cylinder ratio:</source>
         <translation>圆柱高度比例：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1054"/>
-        <location filename="../parammodeler_dock.ui" line="1158"/>
-        <location filename="../parammodeler_dock.ui" line="1312"/>
-        <location filename="../parammodeler_dock.ui" line="1840"/>
-        <location filename="../parammodeler_dock.ui" line="2197"/>
+        <location filename="../parammodeler_dock.ui" line="1074"/>
+        <location filename="../parammodeler_dock.ui" line="1178"/>
+        <location filename="../parammodeler_dock.ui" line="1332"/>
+        <location filename="../parammodeler_dock.ui" line="1860"/>
+        <location filename="../parammodeler_dock.ui" line="2217"/>
         <location filename="../parammodeler_dock.cpp" line="653"/>
         <location filename="../parammodeler_dock.cpp" line="728"/>
         <location filename="../parammodeler_dock.cpp" line="732"/>
@@ -292,260 +298,260 @@
         <translation>墙高比例：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1187"/>
+        <location filename="../parammodeler_dock.ui" line="1207"/>
         <location filename="../parammodeler_dock.cpp" line="733"/>
         <source>Bottom length:</source>
         <translation>底部长：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1212"/>
+        <location filename="../parammodeler_dock.ui" line="1232"/>
         <location filename="../parammodeler_dock.cpp" line="734"/>
         <source>Bottom width:</source>
         <translation>底部宽：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1237"/>
+        <location filename="../parammodeler_dock.ui" line="1257"/>
         <location filename="../parammodeler_dock.cpp" line="735"/>
         <source>Top length:</source>
         <translation>顶部长：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1262"/>
+        <location filename="../parammodeler_dock.ui" line="1282"/>
         <location filename="../parammodeler_dock.cpp" line="736"/>
         <source>Top width:</source>
         <translation>顶部宽：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1391"/>
+        <location filename="../parammodeler_dock.ui" line="1411"/>
         <location filename="../parammodeler_dock.cpp" line="741"/>
         <source>Wall height:</source>
         <translation>墙体高度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1416"/>
+        <location filename="../parammodeler_dock.ui" line="1436"/>
         <location filename="../parammodeler_dock.cpp" line="742"/>
         <source>Roof radius:</source>
         <translation>屋顶半径：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1520"/>
+        <location filename="../parammodeler_dock.ui" line="1540"/>
         <location filename="../parammodeler_dock.cpp" line="746"/>
         <source>Bulge:</source>
         <translation>鼓出系数：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1555"/>
+        <location filename="../parammodeler_dock.ui" line="1575"/>
         <location filename="../parammodeler_dock.cpp" line="747"/>
         <source>Outer length:</source>
         <translation>外部长：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1580"/>
+        <location filename="../parammodeler_dock.ui" line="1600"/>
         <location filename="../parammodeler_dock.cpp" line="748"/>
         <source>Outer width:</source>
         <translation>外部宽：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1605"/>
+        <location filename="../parammodeler_dock.ui" line="1625"/>
         <location filename="../parammodeler_dock.cpp" line="749"/>
         <source>Outer height:</source>
         <translation>外部高：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1630"/>
+        <location filename="../parammodeler_dock.ui" line="1650"/>
         <location filename="../parammodeler_dock.cpp" line="750"/>
         <source>Inner length:</source>
         <translation>内部长：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1655"/>
+        <location filename="../parammodeler_dock.ui" line="1675"/>
         <location filename="../parammodeler_dock.cpp" line="751"/>
         <source>Inner width:</source>
         <translation>内部宽：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1680"/>
+        <location filename="../parammodeler_dock.ui" line="1700"/>
         <location filename="../parammodeler_dock.cpp" line="752"/>
         <source>Inner height:</source>
         <translation>内部高：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1705"/>
+        <location filename="../parammodeler_dock.ui" line="1725"/>
         <location filename="../parammodeler_dock.cpp" line="753"/>
         <source>Offset X ratio:</source>
         <translation>X 偏移比例：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1733"/>
+        <location filename="../parammodeler_dock.ui" line="1753"/>
         <location filename="../parammodeler_dock.cpp" line="754"/>
         <source>Offset Y ratio:</source>
         <translation>Y 偏移比例：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1865"/>
+        <location filename="../parammodeler_dock.ui" line="1885"/>
         <location filename="../parammodeler_dock.cpp" line="759"/>
         <source>Ridge length:</source>
         <translation>屋脊长度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1893"/>
-        <location filename="../parammodeler_dock.ui" line="2262"/>
+        <location filename="../parammodeler_dock.ui" line="1913"/>
+        <location filename="../parammodeler_dock.ui" line="2282"/>
         <location filename="../parammodeler_dock.cpp" line="760"/>
         <location filename="../parammodeler_dock.cpp" line="773"/>
         <source>Ridge ratio:</source>
         <translation>屋脊比例：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1937"/>
+        <location filename="../parammodeler_dock.ui" line="1957"/>
         <location filename="../parammodeler_dock.cpp" line="761"/>
         <source>Base radius:</source>
         <translation>底座半径：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1962"/>
+        <location filename="../parammodeler_dock.ui" line="1982"/>
         <location filename="../parammodeler_dock.cpp" line="762"/>
         <source>Base height:</source>
         <translation>底座高度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1987"/>
+        <location filename="../parammodeler_dock.ui" line="2007"/>
         <location filename="../parammodeler_dock.cpp" line="763"/>
         <source>Middle height:</source>
         <translation>中段高度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2012"/>
+        <location filename="../parammodeler_dock.ui" line="2032"/>
         <location filename="../parammodeler_dock.cpp" line="764"/>
         <source>Middle top radius:</source>
         <translation>中段顶部半径：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2037"/>
+        <location filename="../parammodeler_dock.ui" line="2057"/>
         <location filename="../parammodeler_dock.cpp" line="765"/>
         <source>Middle bulge:</source>
         <translation>中段鼓出系数：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2068"/>
+        <location filename="../parammodeler_dock.ui" line="2088"/>
         <location filename="../parammodeler_dock.cpp" line="766"/>
         <source>Cone height:</source>
         <translation>圆锥高度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2097"/>
+        <location filename="../parammodeler_dock.ui" line="2117"/>
         <location filename="../parammodeler_dock.cpp" line="767"/>
         <source>House 1 length:</source>
         <translation>房屋 1 长度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2122"/>
+        <location filename="../parammodeler_dock.ui" line="2142"/>
         <location filename="../parammodeler_dock.cpp" line="768"/>
         <source>House 2 length:</source>
         <translation>房屋 2 长度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2222"/>
+        <location filename="../parammodeler_dock.ui" line="2242"/>
         <location filename="../parammodeler_dock.cpp" line="772"/>
         <source>Angle:</source>
         <translation>角度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2306"/>
+        <location filename="../parammodeler_dock.ui" line="2326"/>
         <location filename="../parammodeler_dock.cpp" line="775"/>
         <source>Leg length:</source>
         <translation>直角边长：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2334"/>
+        <location filename="../parammodeler_dock.ui" line="2354"/>
         <location filename="../parammodeler_dock.cpp" line="776"/>
         <source>Base length:</source>
         <translation>底边长度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2390"/>
+        <location filename="../parammodeler_dock.ui" line="2410"/>
         <location filename="../parammodeler_dock.cpp" line="778"/>
         <source>Pyramid ratio:</source>
         <translation>棱锥高度比例：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2453"/>
+        <location filename="../parammodeler_dock.ui" line="2473"/>
         <source>QPushButton { text-align: left; font-weight: bold; padding: 4px; border-bottom: 1px solid #aaa; }</source>
         <translation>QPushButton { text-align: left; font-weight: bold; padding: 4px; border-bottom: 1px solid #aaa; }</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2456"/>
+        <location filename="../parammodeler_dock.ui" line="2476"/>
         <source>Point Cloud Classification and Parameter Estimation</source>
         <translation>点云分类与参数估计</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2496"/>
-        <location filename="../parammodeler_dock.cpp" line="1591"/>
-        <location filename="../parammodeler_dock.cpp" line="1763"/>
-        <location filename="../parammodeler_dock.cpp" line="3537"/>
+        <location filename="../parammodeler_dock.ui" line="2516"/>
+        <location filename="../parammodeler_dock.cpp" line="1592"/>
+        <location filename="../parammodeler_dock.cpp" line="1764"/>
+        <location filename="../parammodeler_dock.cpp" line="3538"/>
         <source>Load point cloud</source>
         <translation>加载点云</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2503"/>
+        <location filename="../parammodeler_dock.ui" line="2523"/>
         <source>color: #666; font-size: 11px;</source>
         <translation>color: #666; font-size: 11px;</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2506"/>
-        <location filename="../parammodeler_dock.cpp" line="1725"/>
+        <location filename="../parammodeler_dock.ui" line="2526"/>
+        <location filename="../parammodeler_dock.cpp" line="1726"/>
         <source>No point cloud loaded</source>
         <translation>尚未加载点云</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2516"/>
+        <location filename="../parammodeler_dock.ui" line="2536"/>
         <source>font-weight: bold;</source>
         <translation>font-weight: bold;</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2519"/>
-        <location filename="../parammodeler_dock.cpp" line="1643"/>
-        <location filename="../parammodeler_dock.cpp" line="1721"/>
-        <location filename="../parammodeler_dock.cpp" line="1756"/>
-        <location filename="../parammodeler_dock.cpp" line="1800"/>
-        <location filename="../parammodeler_dock.cpp" line="1806"/>
-        <location filename="../parammodeler_dock.cpp" line="1814"/>
-        <location filename="../parammodeler_dock.cpp" line="3552"/>
+        <location filename="../parammodeler_dock.ui" line="2539"/>
+        <location filename="../parammodeler_dock.cpp" line="1644"/>
+        <location filename="../parammodeler_dock.cpp" line="1722"/>
+        <location filename="../parammodeler_dock.cpp" line="1757"/>
+        <location filename="../parammodeler_dock.cpp" line="1801"/>
+        <location filename="../parammodeler_dock.cpp" line="1807"/>
+        <location filename="../parammodeler_dock.cpp" line="1815"/>
+        <location filename="../parammodeler_dock.cpp" line="3553"/>
         <source>Result: -</source>
         <translation>结果：-</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2550"/>
+        <location filename="../parammodeler_dock.ui" line="2570"/>
         <location filename="../parammodeler_dock.cpp" line="1047"/>
-        <location filename="../parammodeler_dock.cpp" line="1652"/>
+        <location filename="../parammodeler_dock.cpp" line="1653"/>
         <source>Classify</source>
         <translation>分类</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2560"/>
+        <location filename="../parammodeler_dock.ui" line="2580"/>
         <location filename="../parammodeler_dock.cpp" line="1048"/>
-        <location filename="../parammodeler_dock.cpp" line="1653"/>
+        <location filename="../parammodeler_dock.cpp" line="1654"/>
         <source>Estimate parameters</source>
         <translation>估计参数</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2585"/>
-        <location filename="../parammodeler_dock.cpp" line="1668"/>
+        <location filename="../parammodeler_dock.ui" line="2605"/>
+        <location filename="../parammodeler_dock.cpp" line="1669"/>
         <source>Parameter</source>
         <translation>参数</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2590"/>
-        <location filename="../parammodeler_dock.cpp" line="1668"/>
+        <location filename="../parammodeler_dock.ui" line="2610"/>
+        <location filename="../parammodeler_dock.cpp" line="1669"/>
         <source>Value</source>
         <translation>数值</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2618"/>
+        <location filename="../parammodeler_dock.ui" line="2638"/>
         <source>Automatically sync model updates to QGIS 3D scene</source>
         <translation>模型修改后自动同步到 QGIS 3D 场景</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2621"/>
+        <location filename="../parammodeler_dock.ui" line="2641"/>
         <source>Auto sync to 3D</source>
         <translation>自动同步到 3D</translation>
     </message>
@@ -710,19 +716,13 @@
         <translation>屋脊</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="294"/>
+        <location filename="../parammodeler_dock.ui" line="314"/>
         <location filename="../parammodeler_dock.cpp" line="1045"/>
         <source>Classify and estimate parameters...</source>
         <translation>分类与参数估计...</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="284"/>
-        <location filename="../parammodeler_dock.cpp" line="1049"/>
-        <source>Point Cloud &amp; Alignment</source>
-        <translation>点云与对齐</translation>
-    </message>
-    <message>
-        <location filename="../parammodeler_dock.ui" line="362"/>
+        <location filename="../parammodeler_dock.ui" line="380"/>
         <location filename="../parammodeler_dock.cpp" line="1053"/>
         <source>Wireframe</source>
         <translation>线框</translation>
@@ -753,9 +753,9 @@
         <translation>位置与旋转</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="353"/>
+        <location filename="../parammodeler_dock.ui" line="373"/>
         <location filename="../parammodeler_dock.cpp" line="1094"/>
-        <location filename="../parammodeler_dock.cpp" line="1442"/>
+        <location filename="../parammodeler_dock.cpp" line="1443"/>
         <source>Align in 2D</source>
         <translation>2D 对齐</translation>
     </message>
@@ -765,143 +765,143 @@
         <translation>在 2D 地图中以红色叉号显示模型锚点。点击点云目标位置即可平移模型，仅修改 TX/TY。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="324"/>
-        <location filename="../parammodeler_dock.cpp" line="1104"/>
-        <location filename="../parammodeler_dock.cpp" line="1170"/>
-        <location filename="../parammodeler_dock.cpp" line="1283"/>
+        <location filename="../parammodeler_dock.ui" line="344"/>
+        <location filename="../parammodeler_dock.cpp" line="1105"/>
+        <location filename="../parammodeler_dock.cpp" line="1171"/>
+        <location filename="../parammodeler_dock.cpp" line="1284"/>
         <source>Align in 3D</source>
         <translation>3D 对齐</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1137"/>
+        <location filename="../parammodeler_dock.cpp" line="1138"/>
         <source>Fit corner from three faces...</source>
         <translation>三面拟合角点...</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1153"/>
+        <location filename="../parammodeler_dock.cpp" line="1154"/>
         <source>Move the upper-corner red X (top center for round models) to a 3D cloud point. Right-click or Esc cancels.</source>
         <translation>将上部角点红叉（圆形模型为顶部中心）移至 3D 点云目标点。右键或 Esc 取消。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1188"/>
-        <location filename="../parammodeler_dock.cpp" line="1202"/>
-        <location filename="../parammodeler_dock.cpp" line="1208"/>
-        <location filename="../parammodeler_dock.cpp" line="1220"/>
-        <location filename="../parammodeler_dock.cpp" line="1264"/>
+        <location filename="../parammodeler_dock.cpp" line="1189"/>
+        <location filename="../parammodeler_dock.cpp" line="1203"/>
+        <location filename="../parammodeler_dock.cpp" line="1209"/>
+        <location filename="../parammodeler_dock.cpp" line="1221"/>
+        <location filename="../parammodeler_dock.cpp" line="1265"/>
         <source>3D align</source>
         <translation>3D 对齐</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1188"/>
+        <location filename="../parammodeler_dock.cpp" line="1189"/>
         <source>Load a point cloud into the 3D view first.</source>
         <translation>请先在 3D 视图中加载点云。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1208"/>
+        <location filename="../parammodeler_dock.cpp" line="1209"/>
         <source>3D picking requires a local scene using the point cloud&apos;s CRS.</source>
         <translation>3D 拾取需要使用点云坐标参考系的局部场景。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1264"/>
+        <location filename="../parammodeler_dock.cpp" line="1265"/>
         <source>Target exceeds the model translation range.</source>
         <translation>目标超出模型的平移范围。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1287"/>
+        <location filename="../parammodeler_dock.cpp" line="1288"/>
         <source>Cancel 3D</source>
         <translation>取消 3D 对齐</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1295"/>
-        <location filename="../parammodeler_dock.cpp" line="1303"/>
+        <location filename="../parammodeler_dock.cpp" line="1296"/>
+        <location filename="../parammodeler_dock.cpp" line="1304"/>
         <source>Manual align</source>
         <translation>手动对齐</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1295"/>
+        <location filename="../parammodeler_dock.cpp" line="1296"/>
         <source>QGIS map canvas is unavailable.</source>
         <translation>QGIS 地图画布不可用。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1303"/>
-        <location filename="../parammodeler_dock.cpp" line="2296"/>
+        <location filename="../parammodeler_dock.cpp" line="1304"/>
+        <location filename="../parammodeler_dock.cpp" line="2297"/>
         <source>Current model has no geometry data.</source>
         <translation>当前模型没有几何数据。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1390"/>
+        <location filename="../parammodeler_dock.cpp" line="1391"/>
         <source>Pick 2D target...</source>
         <translation>点选 2D 目标...</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1582"/>
+        <location filename="../parammodeler_dock.cpp" line="1583"/>
         <source>Point cloud classification and parameter estimation</source>
         <translation>点云分类与参数估计</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1586"/>
+        <location filename="../parammodeler_dock.cpp" line="1587"/>
         <source>1. Input point cloud</source>
         <translation>1. 输入点云</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1593"/>
+        <location filename="../parammodeler_dock.cpp" line="1594"/>
         <source>2. Classification and parameter estimation</source>
         <translation>2. 分类与参数估计</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1596"/>
+        <location filename="../parammodeler_dock.cpp" line="1597"/>
         <source>Model:</source>
         <translation>模型：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1606"/>
+        <location filename="../parammodeler_dock.cpp" line="1607"/>
         <source>⚙</source>
         <translation>⚙</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1608"/>
+        <location filename="../parammodeler_dock.cpp" line="1609"/>
         <source>PointNet path settings</source>
         <translation>PointNet 路径设置</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1617"/>
+        <location filename="../parammodeler_dock.cpp" line="1618"/>
         <source>Enable geometry correction</source>
         <translation>启用几何校正</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1626"/>
+        <location filename="../parammodeler_dock.cpp" line="1627"/>
         <source>Geometry correction strength:</source>
         <translation>几何校正强度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1629"/>
+        <location filename="../parammodeler_dock.cpp" line="1630"/>
         <source>%</source>
         <translation>%</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1632"/>
+        <location filename="../parammodeler_dock.cpp" line="1633"/>
         <source>0% keeps the PCT prediction; 100% uses the measured point-cloud geometry. Intermediate values blend both.</source>
         <translation>0% 保持 PCT 预测值；100% 使用点云几何测量值；中间值会融合两者。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1654"/>
+        <location filename="../parammodeler_dock.cpp" line="1655"/>
         <source>Complete all</source>
         <translation>一键完成</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1656"/>
+        <location filename="../parammodeler_dock.cpp" line="1657"/>
         <source>Return to fine tuning</source>
         <translation>返回微调</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1735"/>
+        <location filename="../parammodeler_dock.cpp" line="1736"/>
         <source>Selected: %1
 Failed to read point cloud or point count is 0.</source>
         <translation>已选择：%1
 无法读取点云或点数为 0。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1742"/>
+        <location filename="../parammodeler_dock.cpp" line="1743"/>
         <source>Loaded: %1
 Points: %2
 X: [%3, %4]
@@ -914,39 +914,39 @@ Y：[%5, %6]
 Z：[%7, %8]</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1764"/>
-        <location filename="../parammodeler_dock.cpp" line="3538"/>
+        <location filename="../parammodeler_dock.cpp" line="1765"/>
+        <location filename="../parammodeler_dock.cpp" line="3539"/>
         <source>Point cloud files (*.ply *.las *.laz *.xyz *.txt)</source>
         <translation>点云文件 (*.ply *.las *.laz *.xyz *.txt)</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1792"/>
-        <location filename="../parammodeler_dock.cpp" line="3567"/>
+        <location filename="../parammodeler_dock.cpp" line="1793"/>
+        <location filename="../parammodeler_dock.cpp" line="3568"/>
         <source>Classifying...</source>
         <translation>正在分类...</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1799"/>
-        <location filename="../parammodeler_dock.cpp" line="1805"/>
-        <location filename="../parammodeler_dock.cpp" line="1813"/>
-        <location filename="../parammodeler_dock.cpp" line="3581"/>
-        <location filename="../parammodeler_dock.cpp" line="3586"/>
+        <location filename="../parammodeler_dock.cpp" line="1800"/>
+        <location filename="../parammodeler_dock.cpp" line="1806"/>
+        <location filename="../parammodeler_dock.cpp" line="1814"/>
+        <location filename="../parammodeler_dock.cpp" line="3582"/>
+        <location filename="../parammodeler_dock.cpp" line="3587"/>
         <source>Classification failed</source>
         <translation>分类失败</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1805"/>
-        <location filename="../parammodeler_dock.cpp" line="3586"/>
+        <location filename="../parammodeler_dock.cpp" line="1806"/>
+        <location filename="../parammodeler_dock.cpp" line="3587"/>
         <source>No prediction returned.</source>
         <translation>未返回预测结果。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1813"/>
+        <location filename="../parammodeler_dock.cpp" line="1814"/>
         <source>Unsupported primitive: %1</source>
         <translation>不支持的基元类型：%1</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1818"/>
+        <location filename="../parammodeler_dock.cpp" line="1819"/>
         <source>Result: %1
 Confidence: %2%
 Switched to corresponding primitive. You can estimate parameters and return to fine tuning.</source>
@@ -955,68 +955,68 @@ Switched to corresponding primitive. You can estimate parameters and return to f
 已切换到对应基元，可继续估计参数并返回微调。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1833"/>
+        <location filename="../parammodeler_dock.cpp" line="1834"/>
         <source>Estimating parameters...</source>
         <translation>正在估计参数...</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1841"/>
         <location filename="../parammodeler_dock.cpp" line="1842"/>
-        <location filename="../parammodeler_dock.cpp" line="1851"/>
+        <location filename="../parammodeler_dock.cpp" line="1843"/>
         <location filename="../parammodeler_dock.cpp" line="1852"/>
-        <location filename="../parammodeler_dock.cpp" line="3624"/>
+        <location filename="../parammodeler_dock.cpp" line="1853"/>
+        <location filename="../parammodeler_dock.cpp" line="3625"/>
         <source>Parameter estimation failed</source>
         <translation>参数估计失败</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1852"/>
+        <location filename="../parammodeler_dock.cpp" line="1853"/>
         <source>No parameters returned.</source>
         <translation>未返回参数。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1881"/>
+        <location filename="../parammodeler_dock.cpp" line="1882"/>
         <source>
 Parameters applied to main panel.</source>
         <translation>
 参数已应用到主面板。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1886"/>
+        <location filename="../parammodeler_dock.cpp" line="1887"/>
         <source>Loading and aligning...</source>
         <translation>正在加载并对齐...</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1895"/>
+        <location filename="../parammodeler_dock.cpp" line="1896"/>
         <source>Could not load the model into QGIS 3D.</source>
         <translation>无法将模型加载到 QGIS 3D。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1908"/>
+        <location filename="../parammodeler_dock.cpp" line="1909"/>
         <source>Alignment unavailable</source>
         <translation>无法自动对齐</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1908"/>
+        <location filename="../parammodeler_dock.cpp" line="1909"/>
         <source>No point-cloud alignment reference is available. Use manual alignment.</source>
         <translation>没有可用的点云对齐参考，请使用手动对齐。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1922"/>
+        <location filename="../parammodeler_dock.cpp" line="1923"/>
         <source>Loading or alignment failed. You can retry or return to fine tuning.</source>
         <translation>加载或对齐失败，可重试或返回微调。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1937"/>
+        <location filename="../parammodeler_dock.cpp" line="1938"/>
         <source>Load to QGIS 3D</source>
         <translation>加载到 QGIS 3D</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1938"/>
+        <location filename="../parammodeler_dock.cpp" line="1939"/>
         <source>Load the input point cloud and the estimated model into the QGIS 3D scene now?</source>
         <translation>现在将输入点云和估计模型加载到 QGIS 3D 场景吗？</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1900"/>
+        <location filename="../parammodeler_dock.cpp" line="1901"/>
         <source>Point cloud load failed</source>
         <translation>点云加载失败</translation>
     </message>
@@ -1063,183 +1063,183 @@ Notes:
 - 三面拟合只移动模型，不会缩放或旋转模型。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1111"/>
+        <location filename="../parammodeler_dock.cpp" line="1112"/>
         <source>More 3D alignment options</source>
         <translation>更多 3D 对齐选项</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1113"/>
+        <location filename="../parammodeler_dock.cpp" line="1114"/>
         <source>Anchor point</source>
         <translation>锚点</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1130"/>
+        <location filename="../parammodeler_dock.cpp" line="1131"/>
         <source>Upper current anchor</source>
         <translation>当前锚点上方</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1131"/>
+        <location filename="../parammodeler_dock.cpp" line="1132"/>
         <source>Top min X / min Y</source>
         <translation>顶面 min X / min Y</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1132"/>
+        <location filename="../parammodeler_dock.cpp" line="1133"/>
         <source>Top max X / min Y</source>
         <translation>顶面 max X / min Y</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1133"/>
+        <location filename="../parammodeler_dock.cpp" line="1134"/>
         <source>Top min X / max Y</source>
         <translation>顶面 min X / max Y</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1134"/>
+        <location filename="../parammodeler_dock.cpp" line="1135"/>
         <source>Top max X / max Y</source>
         <translation>顶面 max X / max Y</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1135"/>
+        <location filename="../parammodeler_dock.cpp" line="1136"/>
         <source>Top center</source>
         <translation>顶面中心</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1138"/>
+        <location filename="../parammodeler_dock.cpp" line="1139"/>
         <source>Available for Cuboid, TruncatedPyramidRoof, LHouse and IndentedCuboid. Select two walls and the flat top, then confirm the virtual corner.</source>
         <translation>适用于 Cuboid、TruncatedPyramidRoof、LHouse 和 IndentedCuboid。选择两面墙和顶面后，确认虚拟角点。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1202"/>
+        <location filename="../parammodeler_dock.cpp" line="1203"/>
         <source>The model and point cloud must be loaded into a valid 3D view first.</source>
         <translation>请先将模型和点云加载到有效的 3D 视图中。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1220"/>
+        <location filename="../parammodeler_dock.cpp" line="1221"/>
         <source>The model has no valid alignment anchor.</source>
         <translation>当前模型没有有效的对齐锚点。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1619"/>
+        <location filename="../parammodeler_dock.cpp" line="1620"/>
         <source>Experimental: after PCT regression, blend supported parameters with geometry measured from the current point cloud.</source>
         <translation>实验功能：PCT 回归后，将支持的参数与当前点云测得的几何量融合。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1900"/>
+        <location filename="../parammodeler_dock.cpp" line="1901"/>
         <source>The model was loaded, but the point cloud was not loaded into QGIS 3D.</source>
         <translation>模型已加载，但点云未能加载到 QGIS 3D。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1972"/>
+        <location filename="../parammodeler_dock.cpp" line="1973"/>
         <source>Save OBJ file</source>
         <translation>保存 OBJ 文件</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1974"/>
+        <location filename="../parammodeler_dock.cpp" line="1975"/>
         <source>OBJ Files (*.obj)</source>
         <translation>OBJ 文件 (*.obj)</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1986"/>
-        <location filename="../parammodeler_dock.cpp" line="2128"/>
-        <location filename="../parammodeler_dock.cpp" line="2175"/>
-        <location filename="../parammodeler_dock.cpp" line="2331"/>
+        <location filename="../parammodeler_dock.cpp" line="1987"/>
+        <location filename="../parammodeler_dock.cpp" line="2129"/>
+        <location filename="../parammodeler_dock.cpp" line="2176"/>
+        <location filename="../parammodeler_dock.cpp" line="2332"/>
         <source>Export succeeded</source>
         <translation>导出成功</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1987"/>
+        <location filename="../parammodeler_dock.cpp" line="1988"/>
         <source>OBJ file exported to:
 %1</source>
         <translation>OBJ 文件已导出到：
 %1</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1994"/>
-        <location filename="../parammodeler_dock.cpp" line="2033"/>
-        <location filename="../parammodeler_dock.cpp" line="2126"/>
-        <location filename="../parammodeler_dock.cpp" line="2236"/>
-        <location filename="../parammodeler_dock.cpp" line="2249"/>
-        <location filename="../parammodeler_dock.cpp" line="2257"/>
-        <location filename="../parammodeler_dock.cpp" line="2296"/>
+        <location filename="../parammodeler_dock.cpp" line="1995"/>
+        <location filename="../parammodeler_dock.cpp" line="2034"/>
+        <location filename="../parammodeler_dock.cpp" line="2127"/>
+        <location filename="../parammodeler_dock.cpp" line="2237"/>
+        <location filename="../parammodeler_dock.cpp" line="2250"/>
+        <location filename="../parammodeler_dock.cpp" line="2258"/>
+        <location filename="../parammodeler_dock.cpp" line="2297"/>
         <source>Export failed</source>
         <translation>导出失败</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1995"/>
+        <location filename="../parammodeler_dock.cpp" line="1996"/>
         <source>OBJ file could not be exported. Please check parameters or output path.</source>
         <translation>无法导出 OBJ 文件，请检查参数或输出路径。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2008"/>
+        <location filename="../parammodeler_dock.cpp" line="2009"/>
         <source>Export evaluation CSV</source>
         <translation>导出评估 CSV</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2010"/>
+        <location filename="../parammodeler_dock.cpp" line="2011"/>
         <source>CSV files (*.csv)</source>
         <translation>CSV 文件 (*.csv)</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2128"/>
+        <location filename="../parammodeler_dock.cpp" line="2129"/>
         <source>Evaluation CSV saved to:
 %1</source>
         <translation>评估 CSV 已保存到：
 %1</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2149"/>
+        <location filename="../parammodeler_dock.cpp" line="2150"/>
         <source>Save point cloud file</source>
         <translation>保存点云文件</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2149"/>
+        <location filename="../parammodeler_dock.cpp" line="2150"/>
         <source>PLY Files (*.ply)</source>
         <translation>PLY 文件 (*.ply)</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2165"/>
+        <location filename="../parammodeler_dock.cpp" line="2166"/>
         <source>Save deep learning input point cloud</source>
         <translation>保存深度学习输入点云</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2165"/>
-        <location filename="../parammodeler_dock.cpp" line="2241"/>
+        <location filename="../parammodeler_dock.cpp" line="2166"/>
+        <location filename="../parammodeler_dock.cpp" line="2242"/>
         <source>TXT Files (*.txt)</source>
         <translation>TXT 文件 (*.txt)</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2176"/>
+        <location filename="../parammodeler_dock.cpp" line="2177"/>
         <source>Deep learning input point cloud saved to:
 %1</source>
         <translation>深度学习输入点云已保存到：
 %1</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2236"/>
+        <location filename="../parammodeler_dock.cpp" line="2237"/>
         <source>Please load an input point cloud first.</source>
         <translation>请先加载输入点云。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2241"/>
+        <location filename="../parammodeler_dock.cpp" line="2242"/>
         <source>Save PointNet Input TXT</source>
         <translation>保存 PointNet 输入 TXT</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2249"/>
+        <location filename="../parammodeler_dock.cpp" line="2250"/>
         <source>Cannot read points from the loaded input file.</source>
         <translation>无法从输入文件读取点云。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2257"/>
+        <location filename="../parammodeler_dock.cpp" line="2258"/>
         <source>Cannot write PointNet input TXT file.</source>
         <translation>无法写入 PointNet 输入 TXT 文件。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2263"/>
+        <location filename="../parammodeler_dock.cpp" line="2264"/>
         <source>Export complete</source>
         <translation>导出完成</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2264"/>
+        <location filename="../parammodeler_dock.cpp" line="2265"/>
         <source>PointNet input TXT saved.
 Source points: %1
 Exported points: %2
@@ -1250,54 +1250,54 @@ File: %3</source>
 文件：%3</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2286"/>
+        <location filename="../parammodeler_dock.cpp" line="2287"/>
         <source>Save Mesh file</source>
         <translation>保存网格文件</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2286"/>
+        <location filename="../parammodeler_dock.cpp" line="2287"/>
         <source>STL Files (*.stl)</source>
         <translation>STL 文件 (*.stl)</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2331"/>
+        <location filename="../parammodeler_dock.cpp" line="2332"/>
         <source>Mesh has been exported as STL.</source>
         <translation>网格已导出为 STL。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1889"/>
-        <location filename="../parammodeler_dock.cpp" line="1895"/>
-        <location filename="../parammodeler_dock.cpp" line="2349"/>
-        <location filename="../parammodeler_dock.cpp" line="2386"/>
-        <location filename="../parammodeler_dock.cpp" line="3294"/>
+        <location filename="../parammodeler_dock.cpp" line="1890"/>
+        <location filename="../parammodeler_dock.cpp" line="1896"/>
+        <location filename="../parammodeler_dock.cpp" line="2350"/>
+        <location filename="../parammodeler_dock.cpp" line="2387"/>
+        <location filename="../parammodeler_dock.cpp" line="3295"/>
         <source>Load failed</source>
         <translation>加载失败</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1889"/>
-        <location filename="../parammodeler_dock.cpp" line="2349"/>
+        <location filename="../parammodeler_dock.cpp" line="1890"/>
+        <location filename="../parammodeler_dock.cpp" line="2350"/>
         <source>Current parameters cannot generate a valid model.</source>
         <translation>当前参数无法生成有效模型。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2395"/>
+        <location filename="../parammodeler_dock.cpp" line="2396"/>
         <source>Loaded to QGIS 3D</source>
         <translation>已加载到 QGIS 3D</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="2395"/>
+        <location filename="../parammodeler_dock.cpp" line="2396"/>
         <source>Realtime model loaded successfully.
 Triangles: %1</source>
         <translation>实时模型加载成功。
 三角面数：%1</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="3302"/>
+        <location filename="../parammodeler_dock.cpp" line="3303"/>
         <source>Load succeeded</source>
         <translation>加载成功</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="3302"/>
+        <location filename="../parammodeler_dock.cpp" line="3303"/>
         <source>Point cloud loaded successfully.
 Layer: %1
 
@@ -1308,22 +1308,22 @@ You can view and adjust it in the 3D scene.</source>
 可在 3D 场景中查看和调整。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="3311"/>
+        <location filename="../parammodeler_dock.cpp" line="3312"/>
         <source>Select point cloud file</source>
         <translation>选择点云文件</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="3311"/>
+        <location filename="../parammodeler_dock.cpp" line="3312"/>
         <source>Point Cloud Files (*.ply *.las *.laz *.xyz *.txt *.pts)</source>
         <translation>点云文件 (*.ply *.las *.laz *.xyz *.txt *.pts)</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="3551"/>
+        <location filename="../parammodeler_dock.cpp" line="3552"/>
         <source>Loaded: %1</source>
         <translation>已加载：%1</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="3592"/>
+        <location filename="../parammodeler_dock.cpp" line="3593"/>
         <source>Result: %1 (%2%)</source>
         <translation>结果：%1（%2%）</translation>
     </message>
@@ -1687,12 +1687,12 @@ Main metadata updated: %1 (total records: %2)</source>
         <translation>已写入的 JSON 在偏移 %1 处校验失败：%2</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1957"/>
+        <location filename="../parammodeler_dock.cpp" line="1958"/>
         <source>Cannot export</source>
         <translation>无法导出</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1957"/>
+        <location filename="../parammodeler_dock.cpp" line="1958"/>
         <source>Current parameters cannot generate a valid model. Adjust parameters until the preview is visible, then export.</source>
         <translation>当前参数无法生成有效模型，请调整参数至预览可见后再导出。</translation>
     </message>

@@ -1572,3 +1572,15 @@ rz≈45° 时接近正方形（实例 `Cuboid/sample_00001`：`14.5×6.8` 的真
 - **防覆盖**：脚本先检查所有备份校验值和目标源码，发现后续修改时在写入前拒绝直接恢复，届时根据 before/after 差异手动合并撤回本次实验。禁止用整仓重置覆盖其他功能。恢复期间不得并发编辑；磁盘/权限错误可能导致部分完成，排查后可重新校验，已恢复文件会跳过。
 - 实验专用 `parammodeler_camera_math.h` 和 `test_camera_math.cpp` 已移入备份目录的 `experimental-only/`，不再置于插件源码/活动测试目录。
 - **当前状态（已回退）**：按用户明确要求，已恢复 4 个 QGIS 核心文件和 3 个配套插件文件；7 个文件与 before 备份 SHA-256 一致。撤销自适应缩放下限、动态裁剪接入和聚焦按钮，恢复修改前的缩放/裁剪方案。此前高度箭头、3D 拾取、上部红 X 和界面整理保留。没有执行整仓重置，没有替换 DLL，也没有启动完整编译。若用户曾自行编译过实验版，需要重新编译并部署恢复后的 `qgis_3d` 和插件，源码回退不会自动改变现有 DLL。
+
+### 未发布工作区 (2026-10-02) — PTv3 远程推理与 v2 模型接入
+
+- 点云分类与参数估计窗口的模型下拉框收敛为 `PTv3` / `PCT`，默认走 PTv3；旧 PointNet/PointNet++/PointNeXt 不再作为用户可选入口显示。
+- 插件新增 PTv3 远程推理路径：通过 Qt Network 调用 `/classify` 和 `/regress`，把当前点云文本、metadata 中的 `bboxSize/scale` 等 aux 发送到 Ubuntu/GPU 机器。远程地址为空时仍保留本地脚本回退；本地 PTv3 缺 CUDA/spconv 时给出更明确的错误提示。
+- 路径设置整理为：通用 Python、PTv3 Python、PointNet 根目录、数据集根目录、PCT 分类/回归设置、PTv3 分类/回归设置。移除 PointNeXt 路径暴露项。
+- PTv3 远程服务地址拆成两套配置：实验室局域网地址与 Tailscale 地址，并增加“PTv3 服务选择”下拉框。实验室可选局域网 `192.168...`，宿舍可选 Tailscale `100.x...`；保存后下次推理按所选地址请求。
+- 回归训练侧明确 Cuboid 等矩形外框类的长短边语义：Cuboid、PyramidRoof、TruncatedPyramidRoof、IndentedCuboid 使用稳定 `geom_footprint_long/short/total_height` 目标，再映射回插件原参数名，降低 length/width 交换造成的表面误差。
+- HalfCylinderRoof 已从长短边稳定方案撤回，保持原语义：`length` 为半圆柱轴向长度，`width` 为半圆直径，`wallHeight` 为墙高；避免把屋顶轴线和直径方向互换。
+- GabledRoof、AsymmetricGableHouse、TwoGableHouses、LHouse 暂不做简单 long/short 重映射：这些类的参数含屋脊方向、组合房体身份或切角方向语义，后续需要单独的方向规范化方案。
+- 训练/服务约定：PTv3 服务需在 Ubuntu/GPU 环境中保持 `uvicorn ptv3_server:app --host 0.0.0.0 --port 8008` 运行；插件侧只切换访问地址，不改变服务监听方式。
+- 验证：插件语法检查脚本通过；`git diff --check` 通过。远程服务已通过 `/health`、`/classify`、`/regress` 基本连通性测试。完整 QGIS 实机回归仍需在新 DLL 部署后测试。

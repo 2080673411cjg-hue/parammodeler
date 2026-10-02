@@ -7,13 +7,20 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QEventLoop>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkRequest>
 #include <QProcess>
 #include <QTemporaryFile>
 #include <QTextStream>
+#include <QTimer>
+#include <QUrl>
 #include <QJsonParseError>
 #include <algorithm>
 #include <cmath>
@@ -44,9 +51,119 @@ struct PreparedPointCloudInput
   QString errorMessage;
 };
 
-const QString defaultPythonExe()
+const QString pythonExeForBackend( PointNetBackend backend )
 {
-  return ParamModelerConfig::pythonExe();
+  return ParamModelerConfig::pythonExeForBackend( backend );
+}
+
+QString friendlyProcessError( const QString &name, const QString &stderrText )
+{
+  if ( name.contains( QStringLiteral( "PTv3" ), Qt::CaseInsensitive ) )
+  {
+    if ( stderrText.contains( QStringLiteral( "Torch not compiled with CUDA enabled" ) ) ||
+         stderrText.contains( QStringLiteral( "torch.cuda.current_stream" ) ) ||
+         stderrText.contains( QStringLiteral( "PTv3 checkpoints require CUDA" ) ) )
+    {
+      return QStringLiteral(
+        "%1 predict failed.\n\n"
+        "PTv3 uses spconv sparse CUDA operators and cannot run with the current CPU-only PyTorch environment.\n"
+        "Use PCT on this computer, or run PTv3 on a CUDA/GPU machine and connect it as a remote inference backend.\n\n"
+        "Original error: Torch not compiled with CUDA enabled." ).arg( name );
+    }
+    if ( stderrText.contains( QStringLiteral( "No module named 'addict'" ) ) ||
+         stderrText.contains( QStringLiteral( "No module named \"addict\"" ) ) )
+    {
+      return QStringLiteral(
+        "%1 predict failed.\n\n"
+        "The selected PTv3 Python environment is missing dependencies. "
+        "Set the PTv3 Python interpreter to E:/mambaforge/envs/ptv3_cpu/python.exe, "
+        "or rebuild the PTv3 environment." ).arg( name );
+    }
+  }
+
+  return QStringLiteral( "%1 predict failed.\n%2" ).arg( name, stderrText );
+}
+
+QString ptv3RemoteEndpoint( const QString &path )
+{
+  const QString base = ParamModelerConfig::ptv3ServerUrl();
+  if ( base.isEmpty() )
+    return QString();
+  return base + path;
+}
+
+bool readPointText( const QString &path, QString &text, QString &errorMessage )
+{
+  QFile file( path );
+  if ( !file.open( QIODevice::ReadOnly | QIODevice::Text ) )
+  {
+    errorMessage = QStringLiteral( "Failed to read point cloud text: %1" ).arg( file.errorString() );
+    return false;
+  }
+  text = QString::fromUtf8( file.readAll() );
+  return true;
+}
+
+bool postJson( const QString &url,
+               const QJsonObject &payload,
+               const QString &name,
+               QJsonDocument &responseDoc,
+               QString &errorMessage )
+{
+  if ( url.isEmpty() )
+    return false;
+
+  QNetworkAccessManager manager;
+  QNetworkRequest request{ QUrl( url ) };
+  request.setHeader( QNetworkRequest::ContentTypeHeader, QStringLiteral( "application/json" ) );
+
+  QEventLoop loop;
+  QTimer timer;
+  timer.setSingleShot( true );
+
+  QNetworkReply *reply = manager.post( request, QJsonDocument( payload ).toJson( QJsonDocument::Compact ) );
+  QObject::connect( reply, &QNetworkReply::finished, &loop, &QEventLoop::quit );
+  QObject::connect( &timer, &QTimer::timeout, &loop, &QEventLoop::quit );
+  timer.start( 240000 );
+  loop.exec();
+
+  if ( !timer.isActive() )
+  {
+    reply->abort();
+    reply->deleteLater();
+    errorMessage = QStringLiteral( "%1 remote request timed out: %2" ).arg( name, url );
+    return false;
+  }
+  timer.stop();
+
+  const QByteArray body = reply->readAll();
+  if ( reply->error() != QNetworkReply::NoError )
+  {
+    errorMessage = QStringLiteral( "%1 remote request failed: %2\n%3" )
+      .arg( name, reply->errorString(), QString::fromUtf8( body ) );
+    reply->deleteLater();
+    return false;
+  }
+  reply->deleteLater();
+
+  QJsonParseError parseError;
+  responseDoc = QJsonDocument::fromJson( body, &parseError );
+  if ( parseError.error != QJsonParseError::NoError || !responseDoc.isObject() )
+  {
+    errorMessage = QStringLiteral( "Failed to parse %1 remote JSON output: %2\n%3" )
+      .arg( name, parseError.errorString(), QString::fromUtf8( body ) );
+    return false;
+  }
+
+  const QJsonObject envelope = responseDoc.object();
+  if ( !envelope.value( QStringLiteral( "ok" ) ).toBool( false ) )
+  {
+    errorMessage = QStringLiteral( "%1 remote predict failed.\n%2" )
+      .arg( name, envelope.value( QStringLiteral( "error" ) ).toString( QString::fromUtf8( body ) ) );
+    return false;
+  }
+
+  return true;
 }
 
 PointNetBackendConfig backendConfig( PointNetBackend backend )
@@ -75,6 +192,14 @@ PointNetBackendConfig backendConfig( PointNetBackend backend )
       ParamModelerConfig::classifyLogDir( backend )
     };
   }
+  if ( backend == PointNetBackend::PTv3 )
+  {
+    return {
+      QStringLiteral( "PTv3" ),
+      ParamModelerConfig::classifyScript( backend ),
+      ParamModelerConfig::classifyLogDir( backend )
+    };
+  }
 
   return {
     QStringLiteral( "PointNet++" ),
@@ -97,8 +222,10 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
     return { QStringLiteral( "PointNet" ), prim, QString(), QString() };
 
   const bool isPCT = ( backend == PointNetBackend::PCT );
-  const bool usePointNeXt = ( backend == PointNetBackend::PointNeXt || isPCT );
-  const QString modelName = isPCT ? QStringLiteral( "PCT" )
+  const bool isPTv3 = ( backend == PointNetBackend::PTv3 );
+  const bool usePointNeXt = ( backend == PointNetBackend::PointNeXt || isPCT || isPTv3 );
+  const QString modelName = isPTv3 ? QStringLiteral( "PTv3" )
+                           : isPCT ? QStringLiteral( "PCT" )
                            : usePointNeXt ? QStringLiteral( "PointNeXt" )
                            : QStringLiteral( "PointNet++" );
   const QString script = ParamModelerConfig::regressionScript( backend );
@@ -146,11 +273,15 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
 
   const QString prefix = isPCT
     ? QStringLiteral( "pct_reg_" )
+    : isPTv3
+    ? QStringLiteral( "ptv3_reg_" )
     : usePointNeXt
     ? ParamModelerConfig::regressionModelPrefix()
     : QStringLiteral( "reg_" );
   QString suffix = isPCT
     ? pctBestSuffix.value( prim, ParamModelerConfig::pctRegressionSuffix() )
+    : isPTv3
+    ? ParamModelerConfig::ptv3RegressionSuffix()
     : usePointNeXt
     ? ParamModelerConfig::regressionModelSuffix()
     : QStringLiteral( "_v2" );
@@ -298,6 +429,7 @@ double pointCloudNormalizationScale( const QVector<QVector3D> &points )
 }
 
 bool runPythonProcess( const QString &scriptPath,
+                       const QString &pythonExe,
                        const QStringList &args,
                        const QString &name,
                        QString &stdoutText,
@@ -305,7 +437,7 @@ bool runPythonProcess( const QString &scriptPath,
 {
   QProcess process;
   process.setWorkingDirectory( QFileInfo( scriptPath ).absolutePath() );
-  process.start( defaultPythonExe(), args );
+  process.start( pythonExe, args );
   if ( !process.waitForStarted( 5000 ) )
   {
     errorMessage = QStringLiteral( "Failed to start %1 process: %2" ).arg( name, process.errorString() );
@@ -334,7 +466,7 @@ bool runPythonProcess( const QString &scriptPath,
 
   if ( process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0 )
   {
-    errorMessage = QStringLiteral( "%1 predict failed.\n%2" ).arg( name, stderrText );
+    errorMessage = friendlyProcessError( name, stderrText );
     return false;
   }
   return true;
@@ -343,7 +475,7 @@ bool runPythonProcess( const QString &scriptPath,
 
 PointNetPredictResult PointNetRunner::predict ( const QString &inputTxt, int numPoints, int topK )
 {
-  return predict( inputTxt, PointNetBackend::PCT, numPoints, topK );
+  return predict( inputTxt, PointNetBackend::PTv3, numPoints, topK );
 }
 
 PointNetPredictResult PointNetRunner::predict( const QString &inputTxt,
@@ -353,15 +485,59 @@ PointNetPredictResult PointNetRunner::predict( const QString &inputTxt,
 {
   PointNetPredictResult result;
   const PointNetBackendConfig config = backendConfig( backend );
+  const QString pythonExe = pythonExeForBackend( backend );
 
   if ( !QFileInfo::exists( inputTxt ) )
   {
     result.errorMessage = QStringLiteral( "Input TXT does not exist: %1" ).arg( inputTxt );
     return result;
   }
-  if ( !QFileInfo::exists( defaultPythonExe() ) )
+
+  PreparedPointCloudInput prepared = preparePointCloudInput( inputTxt );
+  if ( !prepared.errorMessage.isEmpty() )
   {
-    result.errorMessage = QStringLiteral( "PointNet python.exe does not exist: %1" ).arg( defaultPythonExe() );
+    result.errorMessage = prepared.errorMessage;
+    return result;
+  }
+
+  const QString remoteUrl = backend == PointNetBackend::PTv3
+    ? ptv3RemoteEndpoint( QStringLiteral( "/classify" ) )
+    : QString();
+  if ( !remoteUrl.isEmpty() )
+  {
+    QString pointsText;
+    if ( !readPointText( prepared.pythonInputPath, pointsText, result.errorMessage ) )
+      return result;
+
+    QJsonObject payload;
+    payload.insert( QStringLiteral( "points_text" ), pointsText );
+    payload.insert( QStringLiteral( "topk" ), topK );
+    payload.insert( QStringLiteral( "num_points" ), numPoints );
+
+    QJsonDocument responseDoc;
+    if ( !postJson( remoteUrl, payload, config.name, responseDoc, result.errorMessage ) )
+      return result;
+
+    result.rawOutput = QString::fromUtf8( responseDoc.toJson( QJsonDocument::Compact ) );
+    const QJsonArray array = responseDoc.object().value( QStringLiteral( "result" ) ).toArray();
+    for ( const QJsonValue &value : array )
+    {
+      const QJsonObject obj = value.toObject();
+      PointNetPrediction pred;
+      pred.className = obj.value( QStringLiteral( "class" ) ).toString();
+      pred.probability = obj.value( QStringLiteral( "prob" ) ).toDouble();
+      if ( !pred.className.isEmpty() )
+        result.predictions.append( pred );
+    }
+
+    if ( result.predictions.isEmpty() )
+      result.errorMessage = QStringLiteral( "%1 remote returned no predictions." ).arg( config.name );
+    return result;
+  }
+
+  if ( !QFileInfo::exists( pythonExe ) )
+  {
+    result.errorMessage = QStringLiteral( "%1 python.exe does not exist: %2" ).arg( config.name, pythonExe );
     return result;
   }
   if ( !QFileInfo::exists( config.scriptPath ) )
@@ -375,13 +551,6 @@ PointNetPredictResult PointNetRunner::predict( const QString &inputTxt,
     return result;
   }
 
-  PreparedPointCloudInput prepared = preparePointCloudInput( inputTxt );
-  if ( !prepared.errorMessage.isEmpty() )
-  {
-    result.errorMessage = prepared.errorMessage;
-    return result;
-  }
-
   QStringList args;
   args << config.scriptPath
        << QStringLiteral( "--mode" ) << QStringLiteral( "predict" )
@@ -392,7 +561,7 @@ PointNetPredictResult PointNetRunner::predict( const QString &inputTxt,
        << QStringLiteral( "--cpu" );
 
   QString stdoutText;
-  if ( !runPythonProcess( config.scriptPath, args, config.name, stdoutText, result.errorMessage ) )
+  if ( !runPythonProcess( config.scriptPath, pythonExe, args, config.name, stdoutText, result.errorMessage ) )
     return result;
   result.rawOutput = stdoutText;
 
@@ -427,7 +596,7 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
                                                         const QString &primitiveType,
                                                         int numPoints )
 {
-  return predictParams( inputTxt, PointNetBackend::PCT, primitiveType, numPoints );
+  return predictParams( inputTxt, PointNetBackend::PTv3, primitiveType, numPoints );
 }
 
 PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
@@ -437,6 +606,7 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
 {
   PointNetRegressionResult result;
   const PointNetRegressionConfig config = regressionConfig( backend, primitiveType );
+  const QString pythonExe = pythonExeForBackend( backend );
   result.modelName = config.modelName;
   result.checkpointPath = QDir( config.logDir ).absoluteFilePath( QStringLiteral( "best_model.pth" ) );
 
@@ -444,22 +614,6 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
   {
     result.errorMessage = QStringLiteral( "%1 regression model is not configured for primitive: %2" )
       .arg( config.modelName, primitiveType );
-    return result;
-  }
-  if ( !QFileInfo::exists( defaultPythonExe() ) )
-  {
-    result.errorMessage = QStringLiteral( "PointNet python.exe does not exist: %1" ).arg( defaultPythonExe() );
-    return result;
-  }
-  if ( !QFileInfo::exists( config.scriptPath ) )
-  {
-    result.errorMessage = QStringLiteral( "%1 regression script does not exist: %2" ).arg( config.modelName, config.scriptPath );
-    return result;
-  }
-  if ( !QFileInfo::exists( config.logDir + QStringLiteral( "/best_model.pth" ) ) )
-  {
-    result.errorMessage = QStringLiteral( "%1 %2 regression model does not exist: %3/best_model.pth" )
-      .arg( config.modelName, config.className, config.logDir );
     return result;
   }
 
@@ -473,6 +627,59 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
   QVector3D bboxSize = prepared.pointCloud.bboxMax - prepared.pointCloud.bboxMin;
   double scale = pointCloudNormalizationScale( prepared.pointCloud.points );
   metadataAuxForInput( inputTxt, bboxSize, scale );
+
+  const QString remoteUrl = backend == PointNetBackend::PTv3
+    ? ptv3RemoteEndpoint( QStringLiteral( "/regress" ) )
+    : QString();
+  if ( !remoteUrl.isEmpty() )
+  {
+    QString pointsText;
+    if ( !readPointText( prepared.pythonInputPath, pointsText, result.errorMessage ) )
+      return result;
+
+    QJsonObject payload;
+    payload.insert( QStringLiteral( "points_text" ), pointsText );
+    payload.insert( QStringLiteral( "primitive_type" ), config.className );
+    payload.insert( QStringLiteral( "bbox_x" ), bboxSize.x() );
+    payload.insert( QStringLiteral( "bbox_y" ), bboxSize.y() );
+    payload.insert( QStringLiteral( "bbox_z" ), bboxSize.z() );
+    payload.insert( QStringLiteral( "scale" ), scale );
+    payload.insert( QStringLiteral( "num_points" ), numPoints );
+
+    QJsonDocument responseDoc;
+    if ( !postJson( remoteUrl, payload, config.modelName + QStringLiteral( " parameter regression" ), responseDoc, result.errorMessage ) )
+      return result;
+
+    result.rawOutput = QString::fromUtf8( responseDoc.toJson( QJsonDocument::Compact ) );
+    const QJsonObject obj = responseDoc.object().value( QStringLiteral( "result" ) ).toObject();
+    result.className = obj.value( QStringLiteral( "class" ) ).toString( config.className );
+    const QJsonObject paramsObj = obj.value( QStringLiteral( "params" ) ).toObject();
+    for ( auto it = paramsObj.constBegin(); it != paramsObj.constEnd(); ++it )
+      result.params.insert( it.key(), it.value().toDouble() );
+    if ( obj.contains( QStringLiteral( "poseRotateZ" ) ) )
+      result.params.insert( QStringLiteral( "poseRotateZ" ), obj.value( QStringLiteral( "poseRotateZ" ) ).toDouble() );
+
+    if ( result.params.isEmpty() )
+      result.errorMessage = QStringLiteral( "%1 remote regression returned no parameters." ).arg( config.modelName );
+    return result;
+  }
+
+  if ( !QFileInfo::exists( pythonExe ) )
+  {
+    result.errorMessage = QStringLiteral( "%1 python.exe does not exist: %2" ).arg( config.modelName, pythonExe );
+    return result;
+  }
+  if ( !QFileInfo::exists( config.scriptPath ) )
+  {
+    result.errorMessage = QStringLiteral( "%1 regression script does not exist: %2" ).arg( config.modelName, config.scriptPath );
+    return result;
+  }
+  if ( !QFileInfo::exists( config.logDir + QStringLiteral( "/best_model.pth" ) ) )
+  {
+    result.errorMessage = QStringLiteral( "%1 %2 regression model does not exist: %3/best_model.pth" )
+      .arg( config.modelName, config.className, config.logDir );
+    return result;
+  }
 
   QStringList args;
   args << config.scriptPath
@@ -496,7 +703,7 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
        << QStringLiteral( "--cpu" );
 
   QString stdoutText;
-  if ( !runPythonProcess( config.scriptPath, args, config.modelName + QStringLiteral( " parameter regression" ), stdoutText, result.errorMessage ) )
+  if ( !runPythonProcess( config.scriptPath, pythonExe, args, config.modelName + QStringLiteral( " parameter regression" ), stdoutText, result.errorMessage ) )
     return result;
   result.rawOutput = stdoutText;
 

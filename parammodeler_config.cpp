@@ -9,6 +9,7 @@
 
 #include "parammodeler_config.h"
 #include <QDialog>
+#include <QComboBox>
 #include <QFileDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
@@ -48,6 +49,50 @@ QString pythonExe()
                   QStringLiteral( "E:/mambaforge/envs/pointnet_train/python.exe" ) );
 }
 
+QString ptv3PythonExe()
+{
+  return setting( QStringLiteral( "parammodeler/ptv3PythonExe" ),
+                  QStringLiteral( "E:/mambaforge/envs/ptv3_cpu/python.exe" ) );
+}
+
+QString ptv3ServerUrl()
+{
+  const QString profile = ptv3ServerProfile();
+  QString url = profile == QStringLiteral( "tailscale" )
+    ? ptv3TailscaleServerUrl()
+    : ptv3LanServerUrl();
+  while ( url.endsWith( QLatin1Char( '/' ) ) )
+    url.chop( 1 );
+  return url;
+}
+
+QString ptv3LanServerUrl()
+{
+  return setting( QStringLiteral( "parammodeler/ptv3LanServerUrl" ),
+                  setting( QStringLiteral( "parammodeler/ptv3ServerUrl" ),
+                           QStringLiteral( "http://192.168.1.113:8008" ) ) ).trimmed();
+}
+
+QString ptv3TailscaleServerUrl()
+{
+  return setting( QStringLiteral( "parammodeler/ptv3TailscaleServerUrl" ),
+                  QStringLiteral( "http://100.104.75.49:8008" ) ).trimmed();
+}
+
+QString ptv3ServerProfile()
+{
+  const QString profile = setting( QStringLiteral( "parammodeler/ptv3ServerProfile" ),
+                                   QStringLiteral( "lan" ) ).trimmed().toLower();
+  return profile == QStringLiteral( "tailscale" ) ? QStringLiteral( "tailscale" ) : QStringLiteral( "lan" );
+}
+
+QString pythonExeForBackend( PointNetBackend backend )
+{
+  if ( backend == PointNetBackend::PTv3 )
+    return ptv3PythonExe();
+  return pythonExe();
+}
+
 QString pointnetBaseDir()
 {
   return ensureTrailingSlash( setting( QStringLiteral( "parammodeler/pointnetBase" ),
@@ -82,14 +127,28 @@ QString regressionModelSuffix()
                   QStringLiteral( "_v2" ) );
 }
 
-// ------------------------------------------------------------------
-// PCT model variant (separate from PointNeXt legacy settings)
-// ------------------------------------------------------------------
+QString pctClassifyLogDir()
+{
+  return setting( QStringLiteral( "parammodeler/pctClassifyLogDir" ),
+                  pointnetBaseDir() + QStringLiteral( "pct_simple/logs/pct_cls_v4" ) );
+}
 
 QString pctRegressionSuffix()
 {
   return setting( QStringLiteral( "parammodeler/pctRegressionSuffix" ),
                   QStringLiteral( "_v4_normals" ) );
+}
+
+QString ptv3ClassifyLogDir()
+{
+  return setting( QStringLiteral( "parammodeler/ptv3ClassifyLogDir" ),
+                  pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v2" ) );
+}
+
+QString ptv3RegressionSuffix()
+{
+  return setting( QStringLiteral( "parammodeler/ptv3RegressionSuffix" ),
+                  QStringLiteral( "_v2_normals" ) );
 }
 
 // ------------------------------------------------------------------
@@ -104,6 +163,7 @@ QString classifyScript( PointNetBackend backend )
     case PointNetBackend::PointNet:  return base + QStringLiteral( "pointnet_simple/main.py" );
     case PointNetBackend::PointNeXt: return base + QStringLiteral( "pointnext_simple/main.py" );
     case PointNetBackend::PCT:       return base + QStringLiteral( "pct_simple/main.py" );
+    case PointNetBackend::PTv3:      return base + QStringLiteral( "ptv3_simple/main.py" );
     default:                         return base + QStringLiteral( "pointnet2_simple/main.py" );
   }
 }
@@ -115,7 +175,8 @@ QString classifyLogDir( PointNetBackend backend )
   {
     case PointNetBackend::PointNet:  return base + QStringLiteral( "pointnet_simple/logs/pointnet_aug_roof_guard_v1" );
     case PointNetBackend::PointNeXt: return base + QStringLiteral( "pointnext_simple/logs/" ) + classifyModelName();
-    case PointNetBackend::PCT:       return base + QStringLiteral( "pct_simple/logs/pct_cls_v4" );
+    case PointNetBackend::PCT:       return pctClassifyLogDir();
+    case PointNetBackend::PTv3:      return ptv3ClassifyLogDir();
     default:                         return base + QStringLiteral( "pointnet2_simple/logs/pointnet2_cls_auxdata_250" );
   }
 }
@@ -131,6 +192,8 @@ QString regressionScript( PointNetBackend backend )
     return base + QStringLiteral( "pointnext_simple/main_reg.py" );
   if ( backend == PointNetBackend::PCT )
     return base + QStringLiteral( "pct_simple/main_reg.py" );
+  if ( backend == PointNetBackend::PTv3 )
+    return base + QStringLiteral( "ptv3_simple/main_reg.py" );
   return base + QStringLiteral( "pointnet2_simple/main_reg.py" );
 }
 
@@ -141,6 +204,8 @@ QString regressionLogBase( PointNetBackend backend )
     return base + QStringLiteral( "pointnext_simple/logs/" );
   if ( backend == PointNetBackend::PCT )
     return base + QStringLiteral( "pct_simple/logs/" );
+  if ( backend == PointNetBackend::PTv3 )
+    return base + QStringLiteral( "ptv3_simple/logs/" );
   return base + QStringLiteral( "pointnet2_simple/logs/" );
 }
 
@@ -174,21 +239,33 @@ void showSettingsDialog( QWidget *parent )
 
   // --- current values ---
   const QString curPython   = pythonExe();
+  const QString curPtv3Python = ptv3PythonExe();
+  const QString curPtv3LanServer = ptv3LanServerUrl();
+  const QString curPtv3TailscaleServer = ptv3TailscaleServerUrl();
+  const QString curPtv3ServerProfile = ptv3ServerProfile();
   const QString curBase     = pointnetBaseDir();
   const QString curDataset  = datasetsBaseDir();
-  const QString curClsModel = classifyModelName();
-  const QString curRegPrefix = regressionModelPrefix();
-  const QString curRegSuffix = regressionModelSuffix();
+  const QString curPctClsLog = pctClassifyLogDir();
   const QString curPctSuffix = pctRegressionSuffix();
+  const QString curPtv3ClsLog = ptv3ClassifyLogDir();
+  const QString curPtv3Suffix = ptv3RegressionSuffix();
 
   // --- line edits ---
   auto *edtPython   = new QLineEdit( curPython, &dlg );
+  auto *edtPtv3Python = new QLineEdit( curPtv3Python, &dlg );
+  auto *comboPtv3ServerProfile = new QComboBox( &dlg );
+  comboPtv3ServerProfile->addItem( QStringLiteral( "实验室局域网" ), QStringLiteral( "lan" ) );
+  comboPtv3ServerProfile->addItem( QStringLiteral( "Tailscale" ), QStringLiteral( "tailscale" ) );
+  const int serverProfileIndex = comboPtv3ServerProfile->findData( curPtv3ServerProfile );
+  comboPtv3ServerProfile->setCurrentIndex( serverProfileIndex >= 0 ? serverProfileIndex : 0 );
+  auto *edtPtv3LanServer = new QLineEdit( curPtv3LanServer, &dlg );
+  auto *edtPtv3TailscaleServer = new QLineEdit( curPtv3TailscaleServer, &dlg );
   auto *edtBase     = new QLineEdit( curBase, &dlg );
   auto *edtDataset  = new QLineEdit( curDataset, &dlg );
-  auto *edtClsModel = new QLineEdit( curClsModel, &dlg );
-  auto *edtRegPrefix = new QLineEdit( curRegPrefix, &dlg );
-  auto *edtRegSuffix = new QLineEdit( curRegSuffix, &dlg );
+  auto *edtPctClsLog = new QLineEdit( curPctClsLog, &dlg );
   auto *edtPctSuffix = new QLineEdit( curPctSuffix, &dlg );
+  auto *edtPtv3ClsLog = new QLineEdit( curPtv3ClsLog, &dlg );
+  auto *edtPtv3Suffix = new QLineEdit( curPtv3Suffix, &dlg );
 
   auto makeBrowse = [&]( QLineEdit *edt, bool dirOnly ) {
     auto *btn = new QPushButton( QStringLiteral( "浏览..." ), &dlg );
@@ -213,6 +290,21 @@ void showSettingsDialog( QWidget *parent )
   }
   {
     auto *hb = new QHBoxLayout;
+    hb->addWidget( edtPtv3Python );
+    hb->addWidget( makeBrowse( edtPtv3Python, false ) );
+    form->addRow( QStringLiteral( "PTv3 Python 解释器:" ), hb );
+  }
+  {
+    form->addRow( QStringLiteral( "PTv3 服务选择:" ), comboPtv3ServerProfile );
+  }
+  {
+    form->addRow( QStringLiteral( "PTv3 局域网地址:" ), edtPtv3LanServer );
+  }
+  {
+    form->addRow( QStringLiteral( "PTv3 Tailscale 地址:" ), edtPtv3TailscaleServer );
+  }
+  {
+    auto *hb = new QHBoxLayout;
     hb->addWidget( edtBase );
     hb->addWidget( makeBrowse( edtBase, true ) );
     form->addRow( QStringLiteral( "PointNet 根目录:" ), hb );
@@ -223,11 +315,11 @@ void showSettingsDialog( QWidget *parent )
     hb->addWidget( makeBrowse( edtDataset, true ) );
     form->addRow( QStringLiteral( "数据集根目录:" ), hb );
   }
-  // --- model version settings (no browse — these are relative names) ---
   {
-    form->addRow( QStringLiteral( "分类模型名:" ), edtClsModel );
-  }
-  {
+    auto *hb = new QHBoxLayout;
+    hb->addWidget( edtPctClsLog );
+    hb->addWidget( makeBrowse( edtPctClsLog, true ) );
+    form->addRow( QStringLiteral( "PCT 分类模型目录:" ), hb );
     form->addRow( QStringLiteral( "PCT 回归默认后缀:" ), edtPctSuffix );
     auto *pctHint = new QLabel(
       QStringLiteral( "  作为兜底后缀使用；PCT 会优先按基元类型选择 v4/v5/v6 最佳模型。" ), &dlg );
@@ -236,28 +328,33 @@ void showSettingsDialog( QWidget *parent )
   }
   {
     auto *hb = new QHBoxLayout;
-    hb->addWidget( edtRegPrefix );
-    hb->addWidget( edtRegSuffix );
-    form->addRow( QStringLiteral( "PointNeXt 回归 (前缀+后缀):" ), hb );
-    auto *pnxHint = new QLabel(
-      QStringLiteral( "  仅 PointNeXt 后端使用，PCT 忽略此项。" ), &dlg );
-    pnxHint->setStyleSheet( QStringLiteral( "color: #888; font-size: 11px;" ) );
-    form->addRow( QString(), pnxHint );
+    hb->addWidget( edtPtv3ClsLog );
+    hb->addWidget( makeBrowse( edtPtv3ClsLog, true ) );
+    form->addRow( QStringLiteral( "PTv3 分类模型目录:" ), hb );
+    form->addRow( QStringLiteral( "PTv3 回归后缀:" ), edtPtv3Suffix );
+    auto *ptv3Hint = new QLabel(
+      QStringLiteral( "  回归目录按 PointNet 根目录下的 ptv3_simple/logs/ptv3_reg_<类别短名><后缀> 查找。" ), &dlg );
+    ptv3Hint->setStyleSheet( QStringLiteral( "color: #888; font-size: 11px;" ) );
+    form->addRow( QString(), ptv3Hint );
   }
 
   auto *lblHint = new QLabel(
-    QStringLiteral( "修改后需重启插件才能生效。" ), &dlg );
+    QStringLiteral( "保存后下次推理生效；若 Python/模型路径仍异常，可重启插件后再试。" ), &dlg );
   lblHint->setStyleSheet( QStringLiteral( "color: #888;" ) );
 
   auto *btnReset = new QPushButton( QStringLiteral( "恢复默认值" ), &dlg );
   QObject::connect( btnReset, &QPushButton::clicked, [&]() {
     edtPython->setText(    QStringLiteral( "E:/mambaforge/envs/pointnet_train/python.exe" ) );
+    edtPtv3Python->setText( QStringLiteral( "E:/mambaforge/envs/ptv3_cpu/python.exe" ) );
+    comboPtv3ServerProfile->setCurrentIndex( 0 );
+    edtPtv3LanServer->setText( QStringLiteral( "http://192.168.1.113:8008" ) );
+    edtPtv3TailscaleServer->setText( QStringLiteral( "http://100.104.75.49:8008" ) );
     edtBase->setText(      QStringLiteral( "E:/pointnet" ) );
     edtDataset->setText(   QStringLiteral( "E:/pointnet/datasets_aug" ) );
-    edtClsModel->setText(  QStringLiteral( "pct_cls_v4" ) );
+    edtPctClsLog->setText( QStringLiteral( "E:/pointnet/pct_simple/logs/pct_cls_v4" ) );
     edtPctSuffix->setText( QStringLiteral( "_v4_normals" ) );
-    edtRegPrefix->setText( QStringLiteral( "pointnext_reg_" ) );
-    edtRegSuffix->setText( QStringLiteral( "_v2" ) );
+    edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v2" ) );
+    edtPtv3Suffix->setText( QStringLiteral( "_v2_normals" ) );
   } );
 
   auto *btnBox = new QHBoxLayout;
@@ -270,12 +367,16 @@ void showSettingsDialog( QWidget *parent )
   QObject::connect( btnOk, &QPushButton::clicked, [&]() {
     QgsSettings s;
     s.setValue( QStringLiteral( "parammodeler/pythonExe" ),            edtPython->text() );
+    s.setValue( QStringLiteral( "parammodeler/ptv3PythonExe" ),        edtPtv3Python->text() );
+    s.setValue( QStringLiteral( "parammodeler/ptv3ServerProfile" ),    comboPtv3ServerProfile->currentData().toString() );
+    s.setValue( QStringLiteral( "parammodeler/ptv3LanServerUrl" ),     edtPtv3LanServer->text() );
+    s.setValue( QStringLiteral( "parammodeler/ptv3TailscaleServerUrl" ), edtPtv3TailscaleServer->text() );
     s.setValue( QStringLiteral( "parammodeler/pointnetBase" ),         edtBase->text() );
     s.setValue( QStringLiteral( "parammodeler/datasetsBase" ),         edtDataset->text() );
-    s.setValue( QStringLiteral( "parammodeler/classifyModelName" ),    edtClsModel->text() );
-    s.setValue( QStringLiteral( "parammodeler/regressionModelPrefix" ), edtRegPrefix->text() );
-    s.setValue( QStringLiteral( "parammodeler/regressionModelSuffix" ), edtRegSuffix->text() );
+    s.setValue( QStringLiteral( "parammodeler/pctClassifyLogDir" ),    edtPctClsLog->text() );
     s.setValue( QStringLiteral( "parammodeler/pctRegressionSuffix" ),   edtPctSuffix->text() );
+    s.setValue( QStringLiteral( "parammodeler/ptv3ClassifyLogDir" ),    edtPtv3ClsLog->text() );
+    s.setValue( QStringLiteral( "parammodeler/ptv3RegressionSuffix" ),   edtPtv3Suffix->text() );
     dlg.accept();
   } );
   QObject::connect( btnCancel, &QPushButton::clicked, &dlg, &QDialog::reject );

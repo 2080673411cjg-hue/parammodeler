@@ -1,6 +1,6 @@
 ########################################################
 # Files
-find_package(Qt5 COMPONENTS OpenGL 3DCore 3DRender 3DExtras REQUIRED)
+find_package(Qt5 COMPONENTS OpenGL 3DCore 3DRender 3DExtras Network REQUIRED)
 # Visual Studio regeneration may run without an activated conda environment.
 # Prefer an explicit Eigen3_DIR, with the configured Qt prefix as a search hint.
 get_filename_component(_parammodeler_qt_prefix "${Qt5_DIR}/../../.." ABSOLUTE)
@@ -56,6 +56,7 @@ target_link_libraries(plugin_parammodeler
   Qt5::3DCore
   Qt5::3DRender
   Qt5::3DExtras
+  Qt5::Network
   opengl32
   qgis_3d
 )

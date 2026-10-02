@@ -1046,7 +1046,7 @@ void ParamModelerDock::initPointNet()
   ui->btnWorkflowEstimate->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/mIconPointCloudLayer.svg" ) ) );
   ui->btnPointNetClassify->setText( tr( "Classify" ) );
   ui->btnInverseParams->setText( tr( "Estimate parameters" ) );
-  ui->labelPointCloudWorkflowTitle->setText( tr( "Point Cloud & Alignment" ) );
+  ui->labelPointCloudWorkflowTitle->setText( tr( "Point Cloud Tools" ) );
 
   // 线框模式复选框：微调参数时只显示模型边线，不遮挡点云
   mWireframeModeCheckBox = ui->checkBoxWireframe;
@@ -1100,6 +1100,7 @@ void ParamModelerDock::initPointNet()
   ui->widgetAlign3DControls->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
   ui->layoutAlignmentButtons->setStretch( 0, 1 );
   ui->layoutAlignmentButtons->setStretch( 1, 1 );
+  ui->layoutAlignmentButtons->setStretch( 2, 0 );
   m_manualTranslate3DBtn = ui->btnAlign3D;
   m_manualTranslate3DBtn->setText( tr( "Align in 3D" ) );
   m_manualTranslate3DBtn->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
@@ -1595,10 +1596,8 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   auto *modelLayout = new QHBoxLayout();
   auto *modelLabel = new QLabel( tr( "Model:" ), &dialog );
   auto *comboModel = new QComboBox( &dialog );
+  comboModel->addItem( QStringLiteral( "PTv3" ) );
   comboModel->addItem( QStringLiteral( "PCT" ) );
-  comboModel->addItem( QStringLiteral( "PointNeXt" ) );
-  comboModel->addItem( QStringLiteral( "PointNet++" ) );
-  comboModel->addItem( QStringLiteral( "PointNet" ) );
   comboModel->setFixedWidth( 160 );
   modelLayout->addWidget( modelLabel );
   modelLayout->addWidget( comboModel );
@@ -1616,7 +1615,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   modelLayout->addStretch();
   auto *chkGeometryCorrection = new QCheckBox( tr( "Enable geometry correction" ), &dialog );
   chkGeometryCorrection->setToolTip(
-    tr( "Experimental: after PCT regression, blend supported parameters with geometry measured from the current point cloud." )
+    tr( "Experimental: after model regression, blend supported parameters with geometry measured from the current point cloud." )
   );
   chkGeometryCorrection->setChecked( m_geometryCorrectionEnabled );
   connect( chkGeometryCorrection, &QCheckBox::toggled, this, [this]( bool checked ) {
@@ -1629,7 +1628,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   spinGeometryStrength->setSuffix( tr( "%" ) );
   spinGeometryStrength->setValue( qBound( 0, static_cast<int>( std::round( m_geometryCorrectionStrength * 100.0 ) ), 100 ) );
   spinGeometryStrength->setToolTip(
-    tr( "0% keeps the PCT prediction; 100% uses the measured point-cloud geometry. Intermediate values blend both." )
+    tr( "0% keeps the model prediction; 100% uses the measured point-cloud geometry. Intermediate values blend both." )
   );
   spinGeometryStrength->setEnabled( m_geometryCorrectionEnabled );
   connect( spinGeometryStrength, QOverload<int>::of( &QSpinBox::valueChanged ), this, [this]( int value ) {
@@ -1774,13 +1773,9 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
 
   auto selectedBackend = [&]() {
     const QString modelName = comboModel->currentText();
-    if ( modelName == QStringLiteral( "PointNet" ) )
-      return PointNetBackend::PointNet;
-    if ( modelName == QStringLiteral( "PointNeXt" ) )
-      return PointNetBackend::PointNeXt;
-    if ( modelName == QStringLiteral( "PCT" ) )
-      return PointNetBackend::PCT;
-    return PointNetBackend::PointNet2;
+    if ( modelName == QStringLiteral( "PTv3" ) )
+      return PointNetBackend::PTv3;
+    return PointNetBackend::PCT;
   };
 
   const auto classify = [&]() -> bool {

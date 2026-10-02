@@ -122,14 +122,27 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
     const double outerHeight = rnd( 4.0, 12.0 );
     const double innerLength = rnd( outerLength * 0.25, outerLength * 0.60 );
     const double innerWidth = rnd( outerWidth * 0.25, outerWidth * 0.60 );
+    auto insetOffsetRatio = [&]( double outer, double inner ) {
+      const double movable = std::max( 0.0, outer - inner );
+      if ( movable <= 1e-6 )
+        return 0.5;
+
+      const double minMargin = outer * 0.12;
+      const double maxOffset = movable - minMargin;
+      if ( maxOffset <= minMargin )
+        return 0.5;
+
+      const double offset = rnd( minMargin, maxOffset );
+      return std::max( 0.0, std::min( 1.0, offset / movable ) );
+    };
     set( dock->ui->spinBoxICLength, outerLength );
     set( dock->ui->spinBoxICWidth, outerWidth );
     set( dock->ui->spinBoxICHeight, outerHeight );
     set( dock->ui->spinBoxICInnerLength, innerLength );
     set( dock->ui->spinBoxICInnerWidth, innerWidth );
     set( dock->ui->spinBoxICInnerHeight, rnd( outerHeight * 0.25, outerHeight * 0.75 ) );
-    set( dock->ui->spinBoxICOffsetX, rnd( 0.0, 1.0, 0.01 ) );
-    set( dock->ui->spinBoxICOffsetY, rnd( 0.0, 1.0, 0.01 ) );
+    set( dock->ui->spinBoxICOffsetX, insetOffsetRatio( outerLength, innerLength ) );
+    set( dock->ui->spinBoxICOffsetY, insetOffsetRatio( outerWidth, innerWidth ) );
   }
   else if ( prim == "AsymmetricGableHouse" )
   {
