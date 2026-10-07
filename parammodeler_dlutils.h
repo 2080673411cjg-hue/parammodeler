@@ -14,8 +14,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMap>
+#include <QMatrix4x4>
 #include <QString>
 #include <QVector3D>
+#include <QVector>
 
 class ParamModelerDock;
 struct PointCloud;
@@ -46,6 +48,16 @@ bool writeJsonDocumentChecked( const QString &path,
 double maxAbsComponent( const QVector3D &v );
 
 bool pointCloudLooksNormalizedForDisplay( const PointCloud &pc );
+bool pointCloudMetadataLooksBuggy( const QVector3D &center, double scale );
+bool usesSemanticUpperAlignment( const QString &primitiveType );
+QMatrix4x4 modelRotationMatrix( const ParamModelerDock *dock );
+void hardBBoxFromPoints( const QVector<QVector3D> &points, QVector3D &outMin, QVector3D &outMax );
+void robustBBoxFromPoints( const QVector<QVector3D> &points, QVector3D &outMin, QVector3D &outMax );
+bool semanticUpperPointCloudTarget( const QString &filePath, const QString &primitiveType,
+                                    double rzDeg, double fallbackUpperOffset,
+                                    bool useDisplayCoordinates, bool displayWasRestored,
+                                    const QVector3D &displayRestoreCenter, double displayRestoreScale,
+                                    QVector3D &out, QString &detail );
 
 bool denormInfoFromPlyComment( const QString &filePath,
                                 QVector3D &center,

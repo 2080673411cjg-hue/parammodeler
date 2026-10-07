@@ -192,10 +192,13 @@ private:
   // 缓存输入文件的 metadata（center 质心用于反归一化，bbox 极值/底面用于对齐）
   void cacheInputMetadata( const QString &filePath );
 
-  // 取模型对齐的目标点。角锚定类取点云 bbox 左下角；中心锚定类取 XY 中心 + Z 底面。
-  // 优先用"实际显示的点云"的 bbox，没有时退回 metadata 记录的 bbox。
+  // 取模型对齐目标点。首批角锚定类优先取左下墙顶/檐口角；圆类仍取底面中心。
+  // 语义角估计失败时，用显示点云或 metadata 的 bbox 底部加模型 upper-origin 高度兜底。
   // 返回 false = 无可用目标，调用方应跳过对齐。
-  bool pointCloudAlignTarget( QVector3D &out ) const;
+  bool pointCloudAlignTarget( QVector3D &out, bool *usesSemanticUpper = nullptr );
+  void alignModelToPointCloud( const MeshData &mesh, const QVector3D &pcRef,
+                               const QString &primitiveType, const QString &context,
+                               bool semanticUpper = false );
 
   // 把 metadata 里记录的导出朝向 rz 回填到 pose（spinBoxRKappa）。
   // 点云坐标导出时已经被 applyPose 转过 rz，模型补上同一个角才能对上朝向。
@@ -233,6 +236,9 @@ private:
   QVector3D m_displayCloudBBoxMin;             // bbox 左下角（角锚定类用）
   bool      m_hasDisplayCloudBBox = false;
   QString   m_displayCloudSourcePath;          // 显示在场景里的那个点云文件
+  bool      m_displayCloudWasRestored = false;
+  QVector3D m_displayCloudRestoreCenter;
+  double    m_displayCloudRestoreScale = 1.0;
 
   // ===== 预览 =====
   QTimer          *m_previewTimer  = nullptr;

@@ -14,6 +14,7 @@
 #include "parammodeler_dock.h"
 #include "parammodeler_pcdloader.h"
 #include "parammodeler_pcdtypes.h"
+#include "parammodeler_pick3d_math.h"
 
 #include <QDir>
 #include <QFile>
@@ -28,7 +29,12 @@
 #include <QTextStream>
 #include <algorithm>
 #include <cmath>
+#include <functional>
+#include <limits>
 #include <utility>
+#include <windows.h>
+
+#define DEBUG_LOG( msg ) OutputDebugStringW( msg )
 
 // ====================================================================
 // DL parameter mapping
@@ -756,4 +762,848 @@ QString datasetRootFromSelectedFolder( const QString &selectedPath )
     return selectedPath;
 
   return selectedDir.filePath( QStringLiteral( "datasets" ) );
+}
+
+// ============================================================
+// metadata 记录明显是"从归一化坐标存下来的坏记录"：center ≈ 0 且 scale ≈ 1。
+// 显示路径和对齐路径必须用同一判据，否则会出现"点云画在 A、模型对到 B"。
+// ============================================================
+bool pointCloudMetadataLooksBuggy( const QVector3D &center, double scale )
+{
+  return scale < 2.0 && center.lengthSquared() < 0.01;
+}
+
+bool usesSemanticUpperAlignment( const QString &primitiveType )
+{
+  return primitiveType == QStringLiteral( "Cuboid" ) ||
+         primitiveType == QStringLiteral( "PyramidRoof" ) ||
+         primitiveType == QStringLiteral( "TruncatedPyramidRoof" ) ||
+         primitiveType == QStringLiteral( "GabledRoof" ) ||
+         primitiveType == QStringLiteral( "AsymmetricGableHouse" ) ||
+         primitiveType == QStringLiteral( "IndentedCuboid" ) ||
+         primitiveType == QStringLiteral( "LHouse" );
+}
+
+QMatrix4x4 modelRotationMatrix( const ParamModelerDock *dock )
+{
+  QMatrix4x4 posMat;
+  posMat.setToIdentity();
+  posMat.rotate( static_cast<float>( dock->poseRotateX() ), 1, 0, 0 );
+  posMat.rotate( static_cast<float>( dock->poseRotateY() ), 0, 1, 0 );
+  posMat.rotate( static_cast<float>( dock->poseRotateZ() ), 0, 0, 1 );
+  return posMat;
+}
+
+// ============================================================
+// 稳健包围盒：XY 取分位数，Z 底部取硬 min。
+//
+// 为什么必须这样：点云里的离群点（真实扫描的误匹配点，或 datasets_aug 里
+// add_outliers 撒的点）数量很少但离得远，硬 min/max 会被它们完全主导。
+// 实测（datasets_aug，每朵云约 1% 离群点、撒在归一化空间 [-1.15,1.15]^3）
+// 角锚定点被拉偏 3–7 m —— 模型对齐就落不到建筑的左下角。
+//
+// 为什么 XY 分位数不会削掉建筑本体：建筑在水平轴上的极值是被一整条边/面（长方体）
+// 或平方根聚集的点列（圆柱）逼近的，1% 分位与真实极值几乎重合。
+// 但 Z 不能用 1% 分位：底面通常不采样，墙脚点也可能很稀，分位数会把模型整体垫高。
+// 所以 Z 的 min 保留硬最小值；显示路径已把反归一化后的负 Z clamp 到 0。
+// 点数 <100 时退回硬 min/max（样本太少，分位数没有意义）。
+// ============================================================
+void hardBBoxFromPoints( const QVector<QVector3D> &pts,
+                                QVector3D &outMin, QVector3D &outMax )
+{
+  outMin = QVector3D();
+  outMax = QVector3D();
+  if ( pts.isEmpty() )
+    return;
+
+  outMin = pts.first();
+  outMax = pts.first();
+  for ( const QVector3D &p : pts )
+  {
+    if ( p.x() < outMin.x() ) outMin.setX( p.x() );
+    if ( p.y() < outMin.y() ) outMin.setY( p.y() );
+    if ( p.z() < outMin.z() ) outMin.setZ( p.z() );
+    if ( p.x() > outMax.x() ) outMax.setX( p.x() );
+    if ( p.y() > outMax.y() ) outMax.setY( p.y() );
+    if ( p.z() > outMax.z() ) outMax.setZ( p.z() );
+  }
+}
+
+void robustBBoxFromPoints( const QVector<QVector3D> &pts,
+                                  QVector3D &outMin, QVector3D &outMax )
+{
+  outMin = QVector3D();
+  outMax = QVector3D();
+  const int n = pts.size();
+  if ( n == 0 )
+    return;
+
+  int lo = 0;
+  int hi = n - 1;
+  if ( n >= 100 )
+  {
+    lo = static_cast<int>( std::floor( 0.01 * n ) );
+    hi = n - 1 - lo;
+  }
+
+  QVector<float> col;
+  col.resize( n );
+  float mn[3] = { pts[0].x(), pts[0].y(), pts[0].z() };
+  float mx[3] = { pts[0].x(), pts[0].y(), pts[0].z() };
+  for ( int a = 0; a < 3; ++a )
+  {
+    for ( int i = 0; i < n; ++i )
+      col[i] = pts[i][a];
+    std::sort( col.begin(), col.end() );
+    if ( a < 2 )
+    {
+      mn[a] = col[lo];
+      mx[a] = col[hi];
+    }
+    else
+    {
+      mn[a] = col.first();
+      mx[a] = col.last();
+    }
+  }
+  outMin = QVector3D( mn[0], mn[1], mn[2] );
+  outMax = QVector3D( mx[0], mx[1], mx[2] );
+}
+
+static bool loadRestoredPointsForGeometryCorrection( const QString &filePath,
+                                                     QVector<QVector3D> &points )
+{
+  points.clear();
+  if ( filePath.isEmpty() )
+    return false;
+
+  QVector3D metadataCenter;
+  double metadataScale = 1.0;
+  const bool hasMetadata = metadataPointCloudInfoForInput( filePath, nullptr, nullptr,
+                                                           &metadataCenter, &metadataScale );
+  const PointCloud pc = PointCloudLoader::load( filePath );
+  if ( pc.points.isEmpty() )
+    return false;
+
+  points.reserve( pc.points.size() );
+  const bool restoreFromDlNormalization = hasMetadata && pointCloudLooksNormalizedForDisplay( pc );
+  for ( const QVector3D &p : pc.points )
+  {
+    QVector3D q = restoreFromDlNormalization
+      ? p * static_cast<float>( metadataScale ) + metadataCenter
+      : p;
+    if ( q.z() < 0.0f && restoreFromDlNormalization )
+      q.setZ( 0.0f );
+    points.append( q );
+  }
+  return !points.isEmpty();
+}
+
+static QVector<QVector3D> unrotatePointsAroundZ( const QVector<QVector3D> &points, double rzDeg )
+{
+  QVector<QVector3D> out;
+  out.reserve( points.size() );
+  constexpr double pi = 3.14159265358979323846;
+  const double a = -rzDeg * pi / 180.0;
+  const double c = std::cos( a );
+  const double s = std::sin( a );
+  for ( const QVector3D &p : points )
+  {
+    const double x = static_cast<double>( p.x() );
+    const double y = static_cast<double>( p.y() );
+    out.append( QVector3D( static_cast<float>( x * c - y * s ),
+                           static_cast<float>( x * s + y * c ),
+                           p.z() ) );
+  }
+  return out;
+}
+
+static bool footprintBBoxForGeometryCorrection( const QVector<QVector3D> &points,
+                                                QVector3D &outMin, QVector3D &outMax,
+                                                QString &source )
+{
+  if ( points.isEmpty() )
+    return false;
+
+  QVector3D hardMin, hardMax;
+  hardBBoxFromPoints( points, hardMin, hardMax );
+  QVector3D fullMin, fullMax;
+  robustBBoxFromPoints( points, fullMin, fullMax );
+
+  const double height = static_cast<double>( hardMax.z() - hardMin.z() );
+  const double sliceTop = static_cast<double>( hardMin.z() ) + std::max( 0.5, height * 0.12 );
+  QVector<QVector3D> bottom;
+  bottom.reserve( points.size() );
+  for ( const QVector3D &p : points )
+  {
+    if ( static_cast<double>( p.z() ) <= sliceTop )
+      bottom.append( p );
+  }
+
+  const int minSlicePoints = std::max( 50, static_cast<int>( std::ceil( points.size() * 0.05 ) ) );
+  if ( bottom.size() >= minSlicePoints )
+  {
+    QVector3D sliceMin, sliceMax;
+    robustBBoxFromPoints( bottom, sliceMin, sliceMax );
+    const QVector3D fullRange = fullMax - fullMin;
+    const QVector3D sliceRange = sliceMax - sliceMin;
+    const bool xReasonable = fullRange.x() <= 1e-6f || sliceRange.x() >= fullRange.x() * 0.25f;
+    const bool yReasonable = fullRange.y() <= 1e-6f || sliceRange.y() >= fullRange.y() * 0.25f;
+    if ( xReasonable && yReasonable )
+    {
+      outMin = QVector3D( sliceMin.x(), sliceMin.y(), hardMin.z() );
+      outMax = QVector3D( sliceMax.x(), sliceMax.y(), hardMax.z() );
+      source = QStringLiteral( "bottom" );
+      return true;
+    }
+  }
+
+  outMin = QVector3D( fullMin.x(), fullMin.y(), hardMin.z() );
+  outMax = QVector3D( fullMax.x(), fullMax.y(), hardMax.z() );
+  source = QStringLiteral( "full" );
+  return true;
+}
+
+static bool estimateGabledWallRatioFromProfile( const QVector<QVector3D> &points,
+                                                double baseWidth,
+                                                double zMin,
+                                                double height,
+                                                double &outRatio )
+{
+  if ( points.size() < 100 || baseWidth <= 1e-6 || height <= 1e-6 )
+    return false;
+
+  constexpr int bins = 24;
+  QVector<QVector<float>> yByBin;
+  yByBin.resize( bins );
+  for ( const QVector3D &p : points )
+  {
+    const double t = ( static_cast<double>( p.z() ) - zMin ) / height;
+    const int idx = std::max( 0, std::min( bins - 1, static_cast<int>( std::floor( t * bins ) ) ) );
+    yByBin[idx].append( p.y() );
+  }
+
+  for ( int i = 2; i < bins - 2; ++i )
+  {
+    QVector<float> col = yByBin[i];
+    if ( col.size() < 10 )
+      continue;
+    std::sort( col.begin(), col.end() );
+    const int lo = static_cast<int>( std::floor( col.size() * 0.05 ) );
+    const int hi = std::max( lo, static_cast<int>( std::ceil( col.size() * 0.95 ) ) - 1 );
+    const double yRange = static_cast<double>( col[hi] - col[lo] );
+    if ( yRange < baseWidth * 0.88 )
+    {
+      outRatio = std::max( 0.2, std::min( 0.9, ( i + 0.5 ) / bins ) );
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool robustSliceBBox( const QVector<QVector3D> &points,
+                             const std::function<bool( const QVector3D & )> &accept,
+                             QVector3D &outMin, QVector3D &outMax, int minPoints = 24 )
+{
+  QVector<QVector3D> slice;
+  slice.reserve( points.size() );
+  for ( const QVector3D &p : points )
+    if ( accept( p ) )
+      slice.append( p );
+  if ( slice.size() < minPoints )
+    return false;
+  robustBBoxFromPoints( slice, outMin, outMax );
+  return true;
+}
+
+static bool estimateShrinkWallRatio( const QVector<QVector3D> &points,
+                                     double baseLength,
+                                     double baseWidth,
+                                     double zMin,
+                                     double height,
+                                     double &outRatio )
+{
+  if ( points.size() < 100 || baseLength <= 1e-6 || baseWidth <= 1e-6 || height <= 1e-6 )
+    return false;
+
+  constexpr int bins = 24;
+  QVector<QVector<QVector3D>> byBin;
+  byBin.resize( bins );
+  for ( const QVector3D &p : points )
+  {
+    const double t = ( static_cast<double>( p.z() ) - zMin ) / height;
+    const int idx = std::max( 0, std::min( bins - 1, static_cast<int>( std::floor( t * bins ) ) ) );
+    byBin[idx].append( p );
+  }
+
+  for ( int i = 2; i < bins - 2; ++i )
+  {
+    if ( byBin[i].size() < 10 )
+      continue;
+    QVector3D mn, mx;
+    robustBBoxFromPoints( byBin[i], mn, mx );
+    const double xRange = static_cast<double>( mx.x() - mn.x() );
+    const double yRange = static_cast<double>( mx.y() - mn.y() );
+    if ( xRange < baseLength * 0.90 || yRange < baseWidth * 0.90 )
+    {
+      outRatio = std::max( 0.15, std::min( 0.95, ( i + 0.5 ) / bins ) );
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool estimateRoofEaveFromOuterWalls( const QVector<QVector3D> &points,
+                                            const QVector3D &fpMin, const QVector3D &fpMax,
+                                            bool gabled, double zMin, double height,
+                                            double &eaveZ )
+{
+  const double length = static_cast<double>( fpMax.x() - fpMin.x() );
+  const double width = static_cast<double>( fpMax.y() - fpMin.y() );
+  if ( length <= 1e-6 || width <= 1e-6 || height <= 1e-6 )
+    return false;
+
+  QVector<float> wallZ;
+  wallZ.reserve( points.size() / 3 );
+  for ( const QVector3D &p : points )
+  {
+    const bool nearYWall = std::abs( p.y() - fpMin.y() ) <= width * 0.04 ||
+                           std::abs( p.y() - fpMax.y() ) <= width * 0.04;
+    const bool nearXWall = std::abs( p.x() - fpMin.x() ) <= length * 0.04 ||
+                           std::abs( p.x() - fpMax.x() ) <= length * 0.04;
+    if ( nearYWall || ( !gabled && nearXWall ) )
+      wallZ.append( p.z() );
+  }
+  if ( wallZ.size() < std::max( 32, static_cast<int>( points.size() * 0.03 ) ) )
+    return false;
+
+  std::sort( wallZ.begin(), wallZ.end() );
+  const double low = wallZ[static_cast<int>( wallZ.size() * 0.10 )];
+  const double high = wallZ[static_cast<int>( wallZ.size() * 0.98 )];
+  if ( low > zMin + height * 0.35 ||
+       high < zMin + height * 0.15 || high > zMin + height * 0.98 )
+    return false;
+  eaveZ = high;
+  return true;
+}
+
+// Locate the point-cloud counterpart of the manual alignment UpperOrigin.
+// XY is the robust lower-left footprint corner in the unrotated model frame.
+// Z is the global top for flat-topped solids, or the wall/roof transition for roofs.
+// Roof eaves are measured from outer wall samples, so the exact corner may be absent.
+bool semanticUpperPointCloudTarget( const QString &filePath,
+                                           const QString &primitiveType,
+                                           double rzDeg,
+                                           double fallbackUpperOffset,
+                                           bool useDisplayCoordinates,
+                                           bool displayWasRestored,
+                                           const QVector3D &displayRestoreCenter,
+                                           double displayRestoreScale,
+                                           QVector3D &out,
+                                           QString &detail )
+{
+  if ( !usesSemanticUpperAlignment( primitiveType ) || !std::isfinite( rzDeg ) )
+    return false;
+
+  QVector<QVector3D> points;
+  if ( useDisplayCoordinates )
+  {
+    const PointCloud pc = PointCloudLoader::load( filePath );
+    points.reserve( pc.points.size() );
+    for ( const QVector3D &p : pc.points )
+    {
+      QVector3D q = displayWasRestored
+        ? p * static_cast<float>( displayRestoreScale ) + displayRestoreCenter : p;
+      if ( displayWasRestored && q.z() < 0.0f )
+        q.setZ( 0.0f );
+      points.append( q );
+    }
+  }
+  else if ( !loadRestoredPointsForGeometryCorrection( filePath, points ) )
+    return false;
+  if ( points.size() < 32 )
+    return false;
+
+  const QVector<QVector3D> canonicalPoints = std::abs( rzDeg ) > 1e-9
+    ? unrotatePointsAroundZ( points, rzDeg )
+    : points;
+
+  QVector3D hardMin, hardMax;
+  hardBBoxFromPoints( canonicalPoints, hardMin, hardMax );
+  const double height = static_cast<double>( hardMax.z() - hardMin.z() );
+  if ( height <= 1e-6 )
+    return false;
+
+  QVector3D fpMin, fpMax;
+  QString footprintSource;
+  if ( !footprintBBoxForGeometryCorrection( canonicalPoints, fpMin, fpMax, footprintSource ) )
+    return false;
+  const double length = static_cast<double>( fpMax.x() - fpMin.x() );
+  const double width = static_cast<double>( fpMax.y() - fpMin.y() );
+  if ( length <= 1e-6 || width <= 1e-6 )
+    return false;
+
+  double targetZ = static_cast<double>( hardMax.z() );
+  detail = QStringLiteral( "top/%1" ).arg( footprintSource );
+
+  const bool gabled = primitiveType == QStringLiteral( "GabledRoof" ) ||
+                      primitiveType == QStringLiteral( "AsymmetricGableHouse" );
+  const bool shrinkingRoof = primitiveType == QStringLiteral( "PyramidRoof" ) ||
+                             primitiveType == QStringLiteral( "TruncatedPyramidRoof" );
+  if ( gabled || shrinkingRoof )
+  {
+    if ( estimateRoofEaveFromOuterWalls( canonicalPoints, fpMin, fpMax, gabled,
+                                        static_cast<double>( hardMin.z() ), height, targetZ ) )
+    {
+      detail = QStringLiteral( "wall-eave/%1" ).arg( footprintSource );
+    }
+    else
+    {
+      // Missing walls near the chosen corner do not make alignment fail: preserve
+      // base-height alignment using the regressed model's own eave offset.
+      if ( !std::isfinite( fallbackUpperOffset ) || fallbackUpperOffset < 0.0 ||
+           fallbackUpperOffset > height * 1.5 )
+        return false;
+      targetZ = static_cast<double>( hardMin.z() ) + fallbackUpperOffset;
+      detail = QStringLiteral( "predicted-eave/%1" ).arg( footprintSource );
+    }
+  }
+
+  constexpr double pi = 3.14159265358979323846;
+  const double a = rzDeg * pi / 180.0;
+  const double c = std::cos( a );
+  const double s = std::sin( a );
+  const double x = static_cast<double>( fpMin.x() );
+  const double y = static_cast<double>( fpMin.y() );
+  out = QVector3D( static_cast<float>( x * c - y * s ),
+                   static_cast<float>( x * s + y * c ),
+                   static_cast<float>( targetZ ) );
+  return std::isfinite( out.x() ) && std::isfinite( out.y() ) && std::isfinite( out.z() );
+}
+
+static bool estimateLHouseCutoutRatios( const QVector<QVector3D> &points,
+                                        const QVector3D &fpMin,
+                                        const QVector3D &fpMax,
+                                        double zMin,
+                                        double height,
+                                        double &cutoutLengthRatio,
+                                        double &wingWidthRatio )
+{
+  const double length = static_cast<double>( fpMax.x() - fpMin.x() );
+  const double width = static_cast<double>( fpMax.y() - fpMin.y() );
+  if ( points.size() < 100 || length <= 1e-6 || width <= 1e-6 || height <= 1e-6 )
+    return false;
+
+  const double sliceTop = zMin + std::max( 0.5, height * 0.30 );
+  double maxXInUpperY = -std::numeric_limits<double>::infinity();
+  double maxYInRightX = -std::numeric_limits<double>::infinity();
+  int upperCount = 0, rightCount = 0;
+  for ( const QVector3D &p : points )
+  {
+    if ( static_cast<double>( p.z() ) > sliceTop )
+      continue;
+    const double x = ( static_cast<double>( p.x() ) - static_cast<double>( fpMin.x() ) ) / length;
+    const double y = ( static_cast<double>( p.y() ) - static_cast<double>( fpMin.y() ) ) / width;
+    if ( y > 0.60 )
+    {
+      maxXInUpperY = std::max( maxXInUpperY, x );
+      ++upperCount;
+    }
+    if ( x > 0.60 )
+    {
+      maxYInRightX = std::max( maxYInRightX, y );
+      ++rightCount;
+    }
+  }
+  if ( upperCount < 12 || rightCount < 12 || !std::isfinite( maxXInUpperY ) || !std::isfinite( maxYInRightX ) )
+    return false;
+
+  cutoutLengthRatio = std::max( 0.2, std::min( 0.9, 1.0 - maxXInUpperY ) );
+  wingWidthRatio = std::max( 0.2, std::min( 0.9, maxYInRightX ) );
+  return true;
+}
+
+static bool estimateIndentedInnerBox( const QVector<QVector3D> &points,
+                                      const QVector3D &fpMin,
+                                      const QVector3D &fpMax,
+                                      double zMin,
+                                      double height,
+                                      QVector3D &innerMin,
+                                      QVector3D &innerMax,
+                                      double &innerHeight )
+{
+  const double length = static_cast<double>( fpMax.x() - fpMin.x() );
+  const double width = static_cast<double>( fpMax.y() - fpMin.y() );
+  if ( points.size() < 100 || length <= 1e-6 || width <= 1e-6 || height <= 1e-6 )
+    return false;
+
+  const double marginX = length * 0.08;
+  const double marginY = width * 0.08;
+  QVector3D recessMin, recessMax;
+  if ( !robustSliceBBox( points, [&]( const QVector3D &p ) {
+         const double x = static_cast<double>( p.x() );
+         const double y = static_cast<double>( p.y() );
+         const double z = static_cast<double>( p.z() );
+         return x > static_cast<double>( fpMin.x() ) + marginX &&
+                x < static_cast<double>( fpMax.x() ) - marginX &&
+                y > static_cast<double>( fpMin.y() ) + marginY &&
+                y < static_cast<double>( fpMax.y() ) - marginY &&
+                z > zMin + height * 0.20;
+       }, recessMin, recessMax, std::max( 20, static_cast<int>( points.size() * 0.02 ) ) ) )
+    return false;
+
+  const double innerLength = static_cast<double>( recessMax.x() - recessMin.x() );
+  const double innerWidth = static_cast<double>( recessMax.y() - recessMin.y() );
+  if ( innerLength < length * 0.08 || innerLength > length * 0.92 ||
+       innerWidth < width * 0.08 || innerWidth > width * 0.92 )
+    return false;
+
+  double recessFloor = std::numeric_limits<double>::infinity();
+  int floorCount = 0;
+  for ( const QVector3D &p : points )
+  {
+    const double x = static_cast<double>( p.x() );
+    const double y = static_cast<double>( p.y() );
+    if ( x >= static_cast<double>( recessMin.x() ) && x <= static_cast<double>( recessMax.x() ) &&
+         y >= static_cast<double>( recessMin.y() ) && y <= static_cast<double>( recessMax.y() ) )
+    {
+      recessFloor = std::min( recessFloor, static_cast<double>( p.z() ) );
+      ++floorCount;
+    }
+  }
+  if ( floorCount < 12 || !std::isfinite( recessFloor ) )
+    return false;
+
+  innerMin = recessMin;
+  innerMax = recessMax;
+  innerHeight = std::max( 0.0, zMin + height - recessFloor );
+  return innerHeight > 1e-6;
+}
+
+static double regularizedGeometryValue( double pctValue, double geometryValue, double strength )
+{
+  if ( !std::isfinite( geometryValue ) )
+    return pctValue;
+  if ( !std::isfinite( pctValue ) )
+    return geometryValue;
+  const double alpha = std::max( 0.0, std::min( 1.0, strength ) );
+  return pctValue + alpha * ( geometryValue - pctValue );
+}
+
+static double applyRegularizedGeometryValue( QMap<QString, double> &uiParams,
+                                             const QString &key,
+                                             double geometryValue,
+                                             double strength )
+{
+  const double pctValue = uiParams.value( key, geometryValue );
+  const double correctedValue = regularizedGeometryValue( pctValue, geometryValue, strength );
+  uiParams.insert( key, correctedValue );
+  return correctedValue;
+}
+
+void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitiveType,
+                                                        QMap<QString, double> &uiParams ) const
+{
+  if ( !m_geometryCorrectionEnabled )
+    return;
+
+  const QString prim = primitiveType == QStringLiteral( "CylinderHemisphere" )
+                         ? QStringLiteral( "CylinderDome" )
+                         : primitiveType;
+  if ( prim != QStringLiteral( "Cuboid" ) &&
+       prim != QStringLiteral( "Cylinder" ) &&
+       prim != QStringLiteral( "GabledRoof" ) &&
+       prim != QStringLiteral( "HalfCylinderRoof" ) &&
+       prim != QStringLiteral( "TruncatedPyramidRoof" ) &&
+       prim != QStringLiteral( "LHouse" ) &&
+       prim != QStringLiteral( "IndentedCuboid" ) )
+    return;
+
+  QVector<QVector3D> points;
+  if ( !loadRestoredPointsForGeometryCorrection( m_inputDataPath, points ) )
+  {
+    DEBUG_LOG( QString( "[ParamCorrection] %1 skipped: no readable points\n" ).arg( prim ).toStdWString().c_str() );
+    return;
+  }
+
+  double correctionRz = m_hasMetadataRz ? m_metadataRz : qQNaN();
+  if ( !std::isfinite( correctionRz ) )
+  {
+    double metadataRz = qQNaN();
+    metadataPointCloudInfoForInput( m_inputDataPath, nullptr, nullptr, nullptr, nullptr, &metadataRz );
+    if ( std::isfinite( metadataRz ) )
+      correctionRz = metadataRz;
+  }
+  const bool hasCorrectionRz = std::isfinite( correctionRz );
+
+  const QVector<QVector3D> canonicalPoints = hasCorrectionRz
+    ? unrotatePointsAroundZ( points, correctionRz )
+    : points;
+
+  QVector3D hardMin, hardMax;
+  hardBBoxFromPoints( canonicalPoints, hardMin, hardMax );
+  const double height = static_cast<double>( hardMax.z() - hardMin.z() );
+  if ( height <= 1e-6 )
+    return;
+
+  QVector3D fpMin, fpMax;
+  QString fpSource;
+  if ( !footprintBBoxForGeometryCorrection( canonicalPoints, fpMin, fpMax, fpSource ) )
+    return;
+  const double fpLength = static_cast<double>( fpMax.x() - fpMin.x() );
+  const double fpWidth = static_cast<double>( fpMax.y() - fpMin.y() );
+  const double strength = std::max( 0.0, std::min( 1.0, m_geometryCorrectionStrength ) );
+
+  if ( prim == QStringLiteral( "Cuboid" ) )
+  {
+    const double length = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "length" ), fpLength, strength ) : uiParams.value( QStringLiteral( "length" ), fpLength );
+    const double width = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "width" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "width" ), fpWidth );
+    const double correctedHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "height" ), height, strength );
+    DEBUG_LOG( QString( "[ParamCorrection] Cuboid source=%1 strength=%2 geo=(%3,%4,%5) corrected=(%6,%7,%8) rz=%9\n" )
+                 .arg( fpSource )
+                 .arg( strength, 0, 'f', 2 )
+                 .arg( fpLength, 0, 'f', 3 )
+                 .arg( fpWidth, 0, 'f', 3 )
+                 .arg( height, 0, 'f', 3 )
+                 .arg( length, 0, 'f', 3 )
+                 .arg( width, 0, 'f', 3 )
+                 .arg( correctedHeight, 0, 'f', 3 )
+                 .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "Cylinder" ) )
+  {
+    QVector3D robustMin, robustMax;
+    robustBBoxFromPoints( canonicalPoints, robustMin, robustMax );
+    const double cx = ( static_cast<double>( robustMin.x() ) + static_cast<double>( robustMax.x() ) ) * 0.5;
+    const double cy = ( static_cast<double>( robustMin.y() ) + static_cast<double>( robustMax.y() ) ) * 0.5;
+    QVector<double> radii;
+    radii.reserve( canonicalPoints.size() );
+    for ( const QVector3D &p : canonicalPoints )
+      radii.append( std::hypot( static_cast<double>( p.x() ) - cx,
+                                static_cast<double>( p.y() ) - cy ) );
+    std::sort( radii.begin(), radii.end() );
+    const int idx = std::max( 0, std::min( radii.size() - 1, static_cast<int>( std::floor( radii.size() * 0.90 ) ) ) );
+    const double radius = radii[idx];
+    const double correctedRadius = radius > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "radius" ), radius, strength ) : uiParams.value( QStringLiteral( "radius" ), radius );
+    const double correctedHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "cylHeight" ), height, strength );
+    DEBUG_LOG( QString( "[ParamCorrection] Cylinder strength=%1 geoRadius=%2 geoHeight=%3 correctedRadius=%4 correctedHeight=%5 n=%6\n" )
+                 .arg( strength, 0, 'f', 2 )
+                 .arg( radius, 0, 'f', 3 )
+                 .arg( height, 0, 'f', 3 )
+                 .arg( correctedRadius, 0, 'f', 3 )
+                 .arg( correctedHeight, 0, 'f', 3 )
+                 .arg( canonicalPoints.size() )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "GabledRoof" ) )
+  {
+    const double length = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "grLength" ), fpLength, strength ) : uiParams.value( QStringLiteral( "grLength" ), fpLength );
+    const double width = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "grWidth" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "grWidth" ), fpWidth );
+
+    double wallRatio = 0.0;
+    if ( estimateGabledWallRatioFromProfile( canonicalPoints, fpWidth, hardMin.z(), height, wallRatio ) )
+    {
+      const double wallHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "grWallHeight" ), height * wallRatio, strength );
+      const double roofHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "grRoofHeight" ), height * ( 1.0 - wallRatio ), strength );
+      DEBUG_LOG( QString( "[ParamCorrection] GabledRoof source=%1 strength=%2 geo=(%3,%4,%5) corrected=(%6,%7,%8,%9) wallRatio=%10 rz=%11\n" )
+                   .arg( fpSource )
+                   .arg( strength, 0, 'f', 2 )
+                   .arg( fpLength, 0, 'f', 3 )
+                   .arg( fpWidth, 0, 'f', 3 )
+                   .arg( height, 0, 'f', 3 )
+                   .arg( length, 0, 'f', 3 )
+                   .arg( width, 0, 'f', 3 )
+                   .arg( wallHeight, 0, 'f', 3 )
+                   .arg( roofHeight, 0, 'f', 3 )
+                   .arg( wallRatio, 0, 'f', 3 )
+                   .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                   .toStdWString().c_str() );
+    }
+    else
+    {
+      DEBUG_LOG( QString( "[ParamCorrection] GabledRoof source=%1 strength=%2 geo=(%3,%4,%5) corrected=(%6,%7) wallRatio=<kept PCT>\n" )
+                   .arg( fpSource )
+                   .arg( strength, 0, 'f', 2 )
+                   .arg( fpLength, 0, 'f', 3 )
+                   .arg( fpWidth, 0, 'f', 3 )
+                   .arg( height, 0, 'f', 3 )
+                   .arg( length, 0, 'f', 3 )
+                   .arg( width, 0, 'f', 3 )
+                   .toStdWString().c_str() );
+    }
+  }
+
+  if ( prim == QStringLiteral( "HalfCylinderRoof" ) )
+  {
+    const double length = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "hcrLength" ), fpLength, strength ) : uiParams.value( QStringLiteral( "hcrLength" ), fpLength );
+    const double width = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "hcrWidth" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "hcrWidth" ), fpWidth );
+    const double roofRadius = std::max( 0.0, fpWidth * 0.5 );
+    const double wallHeightGeo = std::max( 0.0, height - roofRadius );
+    const double wallHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "hcrWallHeight" ), wallHeightGeo, strength );
+    DEBUG_LOG( QString( "[ParamCorrection] HalfCylinderRoof source=%1 strength=%2 geo=(length=%3,width=%4,totalHeight=%5,wallHeight=%6) corrected=(%7,%8,%9) rz=%10\n" )
+                 .arg( fpSource )
+                 .arg( strength, 0, 'f', 2 )
+                 .arg( fpLength, 0, 'f', 3 )
+                 .arg( fpWidth, 0, 'f', 3 )
+                 .arg( height, 0, 'f', 3 )
+                 .arg( wallHeightGeo, 0, 'f', 3 )
+                 .arg( length, 0, 'f', 3 )
+                 .arg( width, 0, 'f', 3 )
+                 .arg( wallHeight, 0, 'f', 3 )
+                 .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "TruncatedPyramidRoof" ) )
+  {
+    const double bottomLength = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpBottomLength" ), fpLength, strength ) : uiParams.value( QStringLiteral( "tpBottomLength" ), fpLength );
+    const double bottomWidth = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpBottomWidth" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "tpBottomWidth" ), fpWidth );
+
+    double topLengthGeo = qQNaN();
+    double topWidthGeo = qQNaN();
+    QVector3D topMin, topMax;
+    const double topSliceBottom = static_cast<double>( hardMin.z() ) + std::max( 0.0, height - std::max( 0.3, height * 0.15 ) );
+    if ( robustSliceBBox( canonicalPoints, [&]( const QVector3D &p ) {
+           return static_cast<double>( p.z() ) >= topSliceBottom;
+         }, topMin, topMax, std::max( 16, static_cast<int>( canonicalPoints.size() * 0.015 ) ) ) )
+    {
+      const double measuredTopLength = static_cast<double>( topMax.x() - topMin.x() );
+      const double measuredTopWidth = static_cast<double>( topMax.y() - topMin.y() );
+      if ( measuredTopLength > fpLength * 0.05 && measuredTopLength < fpLength * 1.05 )
+        topLengthGeo = measuredTopLength;
+      if ( measuredTopWidth > fpWidth * 0.05 && measuredTopWidth < fpWidth * 1.05 )
+        topWidthGeo = measuredTopWidth;
+    }
+    const double topLength = std::isfinite( topLengthGeo )
+                               ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpTopLength" ), topLengthGeo, strength )
+                               : uiParams.value( QStringLiteral( "tpTopLength" ), qMax( 0.0, fpLength * 0.55 ) );
+    const double topWidth = std::isfinite( topWidthGeo )
+                              ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpTopWidth" ), topWidthGeo, strength )
+                              : uiParams.value( QStringLiteral( "tpTopWidth" ), qMax( 0.0, fpWidth * 0.55 ) );
+
+    double wallRatio = qQNaN();
+    if ( !estimateShrinkWallRatio( canonicalPoints, fpLength, fpWidth, hardMin.z(), height, wallRatio ) )
+    {
+      const double pctWall = uiParams.value( QStringLiteral( "tpWallHeight" ), qQNaN() );
+      const double pctRoof = uiParams.value( QStringLiteral( "tpRoofHeight" ), qQNaN() );
+      if ( std::isfinite( pctWall ) && std::isfinite( pctRoof ) && pctWall + pctRoof > 1e-6 )
+        wallRatio = std::max( 0.05, std::min( 0.95, pctWall / ( pctWall + pctRoof ) ) );
+    }
+
+    double wallHeight = uiParams.value( QStringLiteral( "tpWallHeight" ), qQNaN() );
+    double roofHeight = uiParams.value( QStringLiteral( "tpRoofHeight" ), qQNaN() );
+    if ( std::isfinite( wallRatio ) )
+    {
+      wallHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpWallHeight" ), height * wallRatio, strength );
+      roofHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpRoofHeight" ), height * ( 1.0 - wallRatio ), strength );
+    }
+    DEBUG_LOG( QString( "[ParamCorrection] TruncatedPyramidRoof source=%1 strength=%2 geoBase=(%3,%4,%5) geoTop=(%6,%7) corrected=(%8,%9,%10,%11,%12,%13) wallRatio=%14 rz=%15\n" )
+                 .arg( fpSource )
+                 .arg( strength, 0, 'f', 2 )
+                 .arg( fpLength, 0, 'f', 3 )
+                 .arg( fpWidth, 0, 'f', 3 )
+                 .arg( height, 0, 'f', 3 )
+                 .arg( std::isfinite( topLengthGeo ) ? QString::number( topLengthGeo, 'f', 3 ) : QStringLiteral( "<kept PCT>" ) )
+                 .arg( std::isfinite( topWidthGeo ) ? QString::number( topWidthGeo, 'f', 3 ) : QStringLiteral( "<kept PCT>" ) )
+                 .arg( bottomLength, 0, 'f', 3 )
+                 .arg( bottomWidth, 0, 'f', 3 )
+                 .arg( topLength, 0, 'f', 3 )
+                 .arg( topWidth, 0, 'f', 3 )
+                 .arg( wallHeight, 0, 'f', 3 )
+                 .arg( roofHeight, 0, 'f', 3 )
+                 .arg( std::isfinite( wallRatio ) ? QString::number( wallRatio, 'f', 3 ) : QStringLiteral( "<kept PCT>" ) )
+                 .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "LHouse" ) )
+  {
+    const double totalLength = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "lTotalL" ), fpLength, strength ) : uiParams.value( QStringLiteral( "lTotalL" ), fpLength );
+    const double totalWidth = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "lTotalW" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "lTotalW" ), fpWidth );
+    const double totalHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "lHeight" ), height, strength );
+
+    double cutoutLengthRatio = qQNaN();
+    double wingWidthRatio = qQNaN();
+    const bool hasCutout = estimateLHouseCutoutRatios( canonicalPoints, fpMin, fpMax, hardMin.z(), height,
+                                                       cutoutLengthRatio, wingWidthRatio );
+    double correctedWingRatio = uiParams.value( QStringLiteral( "lWingR" ), qQNaN() );
+    double correctedWingWidthRatio = uiParams.value( QStringLiteral( "lWingWR" ), qQNaN() );
+    if ( hasCutout )
+    {
+      correctedWingRatio = applyRegularizedGeometryValue( uiParams, QStringLiteral( "lWingR" ), cutoutLengthRatio, strength );
+      correctedWingWidthRatio = applyRegularizedGeometryValue( uiParams, QStringLiteral( "lWingWR" ), wingWidthRatio, strength );
+    }
+    DEBUG_LOG( QString( "[ParamCorrection] LHouse source=%1 strength=%2 geoOuter=(%3,%4,%5) geoCutout=(%6,%7) corrected=(%8,%9,%10,%11,%12) rz=%13\n" )
+                 .arg( fpSource )
+                 .arg( strength, 0, 'f', 2 )
+                 .arg( fpLength, 0, 'f', 3 )
+                 .arg( fpWidth, 0, 'f', 3 )
+                 .arg( height, 0, 'f', 3 )
+                 .arg( hasCutout ? QString::number( cutoutLengthRatio, 'f', 3 ) : QStringLiteral( "<kept PCT>" ) )
+                 .arg( hasCutout ? QString::number( wingWidthRatio, 'f', 3 ) : QStringLiteral( "<kept PCT>" ) )
+                 .arg( totalLength, 0, 'f', 3 )
+                 .arg( totalWidth, 0, 'f', 3 )
+                 .arg( totalHeight, 0, 'f', 3 )
+                 .arg( correctedWingRatio, 0, 'f', 3 )
+                 .arg( correctedWingWidthRatio, 0, 'f', 3 )
+                 .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "IndentedCuboid" ) )
+  {
+    const double outerLength = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOuterL" ), fpLength, strength ) : uiParams.value( QStringLiteral( "icOuterL" ), fpLength );
+    const double outerWidth = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOuterW" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "icOuterW" ), fpWidth );
+    const double outerHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOuterH" ), height, strength );
+
+    QVector3D innerMin, innerMax;
+    double innerHeightGeo = qQNaN();
+    const bool hasInner = estimateIndentedInnerBox( canonicalPoints, fpMin, fpMax, hardMin.z(), height,
+                                                    innerMin, innerMax, innerHeightGeo );
+    double innerLength = uiParams.value( QStringLiteral( "icInnerL" ), qQNaN() );
+    double innerWidth = uiParams.value( QStringLiteral( "icInnerW" ), qQNaN() );
+    double innerHeight = uiParams.value( QStringLiteral( "icInnerH" ), qQNaN() );
+    double offsetX = uiParams.value( QStringLiteral( "icOffsetX" ), qQNaN() );
+    double offsetY = uiParams.value( QStringLiteral( "icOffsetY" ), qQNaN() );
+    if ( hasInner )
+    {
+      innerLength = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icInnerL" ), static_cast<double>( innerMax.x() - innerMin.x() ), strength );
+      innerWidth = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icInnerW" ), static_cast<double>( innerMax.y() - innerMin.y() ), strength );
+      innerHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icInnerH" ), innerHeightGeo, strength );
+      offsetX = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOffsetX" ), static_cast<double>( innerMin.x() - fpMin.x() ), strength );
+      offsetY = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOffsetY" ), static_cast<double>( innerMin.y() - fpMin.y() ), strength );
+    }
+    DEBUG_LOG( QString( "[ParamCorrection] IndentedCuboid source=%1 strength=%2 geoOuter=(%3,%4,%5) geoInner=%6 corrected=(%7,%8,%9,%10,%11,%12,%13,%14) rz=%15\n" )
+                 .arg( fpSource )
+                 .arg( strength, 0, 'f', 2 )
+                 .arg( fpLength, 0, 'f', 3 )
+                 .arg( fpWidth, 0, 'f', 3 )
+                 .arg( height, 0, 'f', 3 )
+                 .arg( hasInner ? QString( "(%1,%2,%3,%4,%5)" )
+                                      .arg( innerMax.x() - innerMin.x(), 0, 'f', 3 )
+                                      .arg( innerMax.y() - innerMin.y(), 0, 'f', 3 )
+                                      .arg( innerHeightGeo, 0, 'f', 3 )
+                                      .arg( innerMin.x() - fpMin.x(), 0, 'f', 3 )
+                                      .arg( innerMin.y() - fpMin.y(), 0, 'f', 3 )
+                                : QStringLiteral( "<kept PCT>" ) )
+                 .arg( outerLength, 0, 'f', 3 )
+                 .arg( outerWidth, 0, 'f', 3 )
+                 .arg( outerHeight, 0, 'f', 3 )
+                 .arg( innerLength, 0, 'f', 3 )
+                 .arg( innerWidth, 0, 'f', 3 )
+                 .arg( innerHeight, 0, 'f', 3 )
+                 .arg( offsetX, 0, 'f', 3 )
+                 .arg( offsetY, 0, 'f', 3 )
+                 .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                 .toStdWString().c_str() );
+    return;
+  }
 }

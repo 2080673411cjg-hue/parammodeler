@@ -1,6 +1,7 @@
 param(
     [string]$EigenInclude = 'E:/mambaforge/envs/qgis_dev/Library/include/eigen3',
     [switch]$WithPicking,
+    [switch]$WithWireframe,
     [string]$ScreenshotDirectory
 )
 $ErrorActionPreference = 'Stop'
@@ -20,6 +21,11 @@ $oldPath = $env:PATH
 $oldPlugins = $env:QT_QPA_PLATFORM_PLUGIN_PATH
 if ($WithPicking) {
     $targets += @('test_pick3d_math', 'test_pick3d_overlay')
+}
+if ($WithWireframe) {
+    $targets += 'test_wireframe_guides'
+}
+if ($WithPicking -or $WithWireframe) {
     $qt = 'E:/mambaforge/envs/qgis_dev/Library'
     $env:PATH = (Join-Path $qt 'bin') + ';' + $env:PATH
     $env:QT_QPA_PLATFORM_PLUGIN_PATH = Join-Path $qt 'plugins/platforms'

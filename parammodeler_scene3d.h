@@ -43,6 +43,7 @@ public:
   static bool updateRealtimePreviewMesh( QgisInterface *iface,
                                          const MeshData &mesh,
                                          const ParamModelerPose &pose,
+                                         const QString &primitiveType,
                                          QString *errorMessage = nullptr );
 
   static void clearRealtimePreviewMesh( QgisInterface *iface );

@@ -13,6 +13,8 @@ set(CMAKE_AUTOMOC ON)
 set (parammodeler_SRCS
   parammodeler.cpp
   parammodeler_dock.cpp
+  parammodeler_dock_alignment.cpp
+  parammodeler_dock_estimation.cpp
   parammodeler_datasetgen.cpp
   parammodeler_dlutils.cpp
   parammodeler_export.cpp

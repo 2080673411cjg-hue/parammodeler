@@ -1,5 +1,6 @@
 #include "parammodeler_scene3d.h"
 #include "parammodeler_pcdloader.h"
+#include "parammodeler_wireframe_guides.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -142,56 +143,6 @@ QString meshEdgeKey( const QVector3D &a, const QVector3D &b )
   const QString ka = meshPointKey( a );
   const QString kb = meshPointKey( b );
   return ka < kb ? ka + QStringLiteral( "|" ) + kb : kb + QStringLiteral( "|" ) + ka;
-}
-
-bool isSparseCircularGuideAngle( double angle )
-{
-  constexpr double twoPi = 6.28318530717958647692;
-  constexpr int guideCount = 4;
-  const double step = twoPi / guideCount;
-  if ( angle < 0.0 )
-    angle += twoPi;
-  const double nearest = std::round( angle / step ) * step;
-  return std::abs( angle - nearest ) < 0.001 || std::abs( angle - nearest + twoPi ) < 0.001;
-}
-
-bool isRadialCircularGuideEdge( const QVector3D &a, const QVector3D &b, double minZ )
-{
-  if ( std::abs( a.z() - b.z() ) > 0.001 )
-    return false;
-  if ( std::abs( a.z() - minZ ) < 0.001 )
-    return false;
-
-  const double r0 = std::hypot( a.x(), a.y() );
-  const double r1 = std::hypot( b.x(), b.y() );
-  const QVector3D rim = r0 > r1 ? a : b;
-  const double rimRadius = std::max( r0, r1 );
-  const double centerRadius = std::min( r0, r1 );
-  if ( rimRadius < 0.001 || centerRadius > std::max( 0.002, rimRadius * 0.03 ) )
-    return false;
-
-  return isSparseCircularGuideAngle( std::atan2( rim.y(), rim.x() ) );
-}
-
-bool isVerticalCircularGuideEdge( const QVector3D &a, const QVector3D &b )
-{
-  if ( std::abs( a.z() - b.z() ) < 0.001 )
-    return false;
-
-  const double r0 = std::hypot( a.x(), a.y() );
-  const double r1 = std::hypot( b.x(), b.y() );
-  const double radius = ( r0 + r1 ) * 0.5;
-  if ( radius < 0.001 || std::abs( r0 - r1 ) > std::max( 0.002, radius * 0.01 ) )
-    return false;
-
-  double delta = std::abs( std::atan2( b.y(), b.x() ) - std::atan2( a.y(), a.x() ) );
-  constexpr double twoPi = 6.28318530717958647692;
-  if ( delta > twoPi * 0.5 )
-    delta = twoPi - delta;
-  if ( delta > 0.001 )
-    return false;
-
-  return isSparseCircularGuideAngle( std::atan2( a.y(), a.x() ) );
 }
 
 void removeTempGpkgPaths( const QString &paths )
@@ -405,7 +356,8 @@ void appendRealtimeTriangle( QVector<float> &values,
 //  微调时更容易看清点云和主体轮廓。
 // ────────────────────────────────────────────────────────────
 static QVector<float> extractWireframeEdges( const MeshData &mesh,
-                                              const QMatrix4x4 &poseMat )
+                                              const QMatrix4x4 &poseMat,
+                                              const QString &primitiveType )
 {
   QVector<float> lineVerts;
   const int triCount = mesh.indices.size() / 3;
@@ -414,6 +366,16 @@ static QVector<float> extractWireframeEdges( const MeshData &mesh,
 
   QMap<QString, MeshEdgeRecord> edgeMap;
   double minZ = std::numeric_limits<double>::max();
+  double maxZ = std::numeric_limits<double>::lowest();
+  double minY = std::numeric_limits<double>::max();
+  double maxY = std::numeric_limits<double>::lowest();
+  const bool roundShape = primitiveType == QLatin1String( "Cylinder" )
+                          || primitiveType == QLatin1String( "CylinderDome" )
+                          || primitiveType == QLatin1String( "CylinderHemisphere" )
+                          || primitiveType == QLatin1String( "ConeCylinder" )
+                          || primitiveType == QLatin1String( "FourStageRoundTower" );
+  const bool halfCylinderRoof = primitiveType == QLatin1String( "HalfCylinderRoof" );
+  const bool roundTower = primitiveType == QLatin1String( "FourStageRoundTower" );
 
   for ( int i = 0; i < triCount; ++i )
   {
@@ -424,6 +386,15 @@ static QVector<float> extractWireframeEdges( const MeshData &mesh,
     const QVector3D local1 = mesh.vertices[idx1];
     const QVector3D local2 = mesh.vertices[idx2];
     minZ = std::min( minZ, static_cast<double>( std::min( local0.z(), std::min( local1.z(), local2.z() ) ) ) );
+    if ( halfCylinderRoof )
+    {
+      for ( const QVector3D &p : { local0, local1, local2 } )
+      {
+        minY = std::min( minY, static_cast<double>( p.y() ) );
+        maxY = std::max( maxY, static_cast<double>( p.y() ) );
+        maxZ = std::max( maxZ, static_cast<double>( p.z() ) );
+      }
+    }
     const QVector3D normal = QVector3D::crossProduct( local1 - local0, local2 - local0 ).normalized();
 
     const QVector3D points[3] = { local0, local1, local2 };
@@ -449,15 +420,47 @@ static QVector<float> extractWireframeEdges( const MeshData &mesh,
     }
   }
 
+  double towerBaseRadius = 0.0;
+  double towerBodyTopZ = std::numeric_limits<double>::max();
+  double towerEaveTopZ = std::numeric_limits<double>::max();
+  if ( roundTower )
+  {
+    for ( const QVector3D &p : mesh.vertices )
+    {
+      const double z = p.z();
+      if ( std::abs( z - minZ ) < 0.001 )
+      {
+        towerBaseRadius = std::max( towerBaseRadius, static_cast<double>( std::hypot( p.x(), p.y() ) ) );
+      }
+      else if ( z > minZ + 0.001 && z < towerBodyTopZ - 0.001 )
+      {
+        towerEaveTopZ = towerBodyTopZ;
+        towerBodyTopZ = z;
+      }
+      else if ( z > towerBodyTopZ + 0.001 && z < towerEaveTopZ - 0.001 )
+      {
+        towerEaveTopZ = z;
+      }
+    }
+  }
+
   lineVerts.reserve( edgeMap.size() * 6 );
   for ( const MeshEdgeRecord &record : edgeMap )
   {
-    // 圆形模型：圆环保持原始细分，顶面放射线/侧面竖向线只保留十字方向。
-    const bool keepSparseCircularGuide =
-      isRadialCircularGuideEdge( record.p0, record.p1, minZ )
-      || isVerticalCircularGuideEdge( record.p0, record.p1 );
+    // The tower's two inner eave rings add clutter without changing its outer silhouette.
+    if ( roundTower && ParamModelerWireframeGuides::towerInnerEaveRing(
+           record.p0, record.p1, towerBaseRadius, towerBodyTopZ, towerEaveTopZ ) )
+      continue;
 
-    if ( record.count > 1 && !record.crease && !keepSparseCircularGuide )
+    // Curved surfaces keep four meridians (including slopes and the apex),
+    // while the half-cylinder roof keeps its longitudinal ridge.
+    const bool keepGuide =
+      ( roundShape && ( ParamModelerWireframeGuides::circularCapGuide( record.p0, record.p1, minZ )
+                        || ParamModelerWireframeGuides::circularMeridianGuide( record.p0, record.p1, minZ ) ) )
+      || ( halfCylinderRoof && ParamModelerWireframeGuides::halfCylinderRidgeGuide(
+             record.p0, record.p1, ( minY + maxY ) * 0.5, maxZ ) );
+
+    if ( record.count > 1 && !record.crease && !keepGuide )
       continue;
 
     const QVector3D a = poseMat.map( record.p0 );
@@ -1098,6 +1101,7 @@ ParamModelerModelLoadResult ParamModelerScene3D::loadModelMesh( QgisInterface *i
 bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
                                                      const MeshData &mesh,
                                                      const ParamModelerPose &pose,
+                                                     const QString &primitiveType,
                                                      QString *errorMessage )
 {
   if ( !iface )
@@ -1300,7 +1304,7 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
 
   // ── 线框实体（一次性创建）──
   {
-    QVector<float> wireVerts = extractWireframeEdges( mesh, mat );
+    QVector<float> wireVerts = extractWireframeEdges( mesh, mat, primitiveType );
     const int wireVertCount = wireVerts.size() / 3;
 
     if ( !state.wireframe.entity )
