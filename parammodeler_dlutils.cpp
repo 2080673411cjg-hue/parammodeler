@@ -12,9 +12,11 @@
 #include "exportpointcloud.h"
 #include "parammodeler_config.h"
 #include "parammodeler_dock.h"
+#include "parammodeler_alignment_geometry.h"
 #include "parammodeler_pcdloader.h"
 #include "parammodeler_pcdtypes.h"
 #include "parammodeler_pick3d_math.h"
+#include "parammodeler_regression_axes.h"
 
 #include <QDir>
 #include <QFile>
@@ -41,11 +43,14 @@
 // ====================================================================
 
 QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
-                                                 const QMap<QString, double> &nn )
+                                                 const QMap<QString, double> &nn,
+                                                 bool swapCanonicalAxes )
 {
+  const QMap<QString, double> aligned = ParamModelerRegressionAxes::remapCanonicalParams(
+    primitiveType, nn, swapCanonicalAxes );
   QMap<QString, double> uiParams;
-  const auto has = [&]( const QString &key ) { return nn.contains( key ); };
-  const auto val = [&]( const QString &key, double fallback = 0.0 ) { return nn.value( key, fallback ); };
+  const auto has = [&]( const QString &key ) { return aligned.contains( key ); };
+  const auto val = [&]( const QString &key, double fallback = 0.0 ) { return aligned.value( key, fallback ); };
   const auto clamp01 = []( double x ) { return std::max( 0.0, std::min( 1.0, x ) ); };
   const auto clampMarginPair = []( double a, double b ) {
     a = std::max( 0.0, std::min( 1.0, a ) );
@@ -632,12 +637,15 @@ bool metadataPointCloudInfoForInput( const QString &filePath,
                                      QVector3D *bboxSize,
                                      QVector3D *center,
                                      double *scale,
-                                     double *rz )
+                                     double *rz,
+                                     QJsonObject *params )
 {
   // 只有 JSON metadata 记了 rz；PLY / 兜底路径取不到 → 保持 NaN。
   // 调用方以 NaN 作为"该记录没有 rz"的判据，所以必须先置位。
   if ( rz )
     *rz = qQNaN();
+  if ( params )
+    *params = QJsonObject();
 
   const MetadataLookup lookup = metadataLookupForPointCloud( filePath );
   if ( !lookup.relativePath.isEmpty() && !lookup.metadataPath.isEmpty() )
@@ -679,7 +687,11 @@ bool metadataPointCloudInfoForInput( const QString &filePath,
               *rz = rzValue.toDouble();
           }
           if ( ok )
+          {
+            if ( params )
+              *params = obj.value( QStringLiteral( "params" ) ).toObject();
             return true;
+          }
         }
       }
     }
@@ -781,7 +793,9 @@ bool usesSemanticUpperAlignment( const QString &primitiveType )
          primitiveType == QStringLiteral( "GabledRoof" ) ||
          primitiveType == QStringLiteral( "AsymmetricGableHouse" ) ||
          primitiveType == QStringLiteral( "IndentedCuboid" ) ||
-         primitiveType == QStringLiteral( "LHouse" );
+         primitiveType == QStringLiteral( "LHouse" ) ||
+         primitiveType == QStringLiteral( "HalfCylinderRoof" ) ||
+         primitiveType == QStringLiteral( "TwoGableHouses" );
 }
 
 QMatrix4x4 modelRotationMatrix( const ParamModelerDock *dock )
@@ -964,6 +978,66 @@ static bool footprintBBoxForGeometryCorrection( const QVector<QVector3D> &points
   return true;
 }
 
+bool shouldSwapCanonicalRegressionAxes( const QString &primitiveType,
+                                        const QMap<QString, double> &nn,
+                                        const QString &filePath,
+                                        double rzDeg )
+{
+  if ( !std::isfinite( rzDeg ) ||
+       !nn.contains( QStringLiteral( "geom_footprint_long" ) ) ||
+       !nn.contains( QStringLiteral( "geom_footprint_short" ) ) ||
+       ( primitiveType != QStringLiteral( "Cuboid" ) &&
+         primitiveType != QStringLiteral( "PyramidRoof" ) &&
+         primitiveType != QStringLiteral( "TruncatedPyramidRoof" ) &&
+         primitiveType != QStringLiteral( "IndentedCuboid" ) ) )
+    return false;
+
+  QString lengthKey = QStringLiteral( "length" );
+  QString widthKey = QStringLiteral( "width" );
+  if ( primitiveType == QStringLiteral( "TruncatedPyramidRoof" ) )
+  {
+    lengthKey = QStringLiteral( "bottomLength" );
+    widthKey = QStringLiteral( "bottomWidth" );
+  }
+  else if ( primitiveType == QStringLiteral( "IndentedCuboid" ) )
+  {
+    lengthKey = QStringLiteral( "outerLength" );
+    widthKey = QStringLiteral( "outerWidth" );
+  }
+  QJsonObject metadataParams;
+  if ( metadataPointCloudInfoForInput( filePath, nullptr, nullptr, nullptr, nullptr,
+                                      nullptr, &metadataParams ) &&
+       metadataParams.value( lengthKey ).isDouble() &&
+       metadataParams.value( widthKey ).isDouble() )
+    return metadataParams.value( widthKey ).toDouble() > metadataParams.value( lengthKey ).toDouble();
+
+  QVector<QVector3D> points;
+  if ( !loadRestoredPointsForGeometryCorrection( filePath, points ) )
+    return false;
+
+  const QVector<QVector3D> unrotated = unrotatePointsAroundZ( points, rzDeg );
+  QVector3D fpMin, fpMax;
+  QString source;
+  if ( !footprintBBoxForGeometryCorrection( unrotated, fpMin, fpMax, source ) )
+    return false;
+
+  const double xSpan = static_cast<double>( fpMax.x() - fpMin.x() );
+  const double ySpan = static_cast<double>( fpMax.y() - fpMin.y() );
+  if ( xSpan <= 1e-6 || ySpan <= 1e-6 )
+    return false;
+  // Near-square footprints cannot establish which original axis was longer.
+  const bool swap = ParamModelerRegressionAxes::shouldSwapFromSpans( xSpan, ySpan );
+  DEBUG_LOG( QString( "[RegressionAxes] %1 x=%2 y=%3 swap=%4 source=%5 rz=%6\n" )
+               .arg( primitiveType )
+               .arg( xSpan, 0, 'f', 3 )
+               .arg( ySpan, 0, 'f', 3 )
+               .arg( swap )
+               .arg( source )
+               .arg( rzDeg, 0, 'f', 2 )
+               .toStdWString().c_str() );
+  return swap;
+}
+
 static bool estimateGabledWallRatioFromProfile( const QVector<QVector3D> &points,
                                                 double baseWidth,
                                                 double zMin,
@@ -1138,6 +1212,22 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
   QString footprintSource;
   if ( !footprintBBoxForGeometryCorrection( canonicalPoints, fpMin, fpMax, footprintSource ) )
     return false;
+  const bool flatCornerModel = primitiveType == QStringLiteral( "Cuboid" ) ||
+                               primitiveType == QStringLiteral( "LHouse" );
+  if ( flatCornerModel && footprintSource == QStringLiteral( "bottom" ) )
+  {
+    QVector3D fullMin, fullMax;
+    robustBBoxFromPoints( canonicalPoints, fullMin, fullMax );
+    if ( !ParamModelerAlignmentGeometry::bottomFootprintAgreesWithFull(
+           fpMin, fpMax, fullMin, fullMax ) )
+    {
+      fpMin.setX( fullMin.x() );
+      fpMin.setY( fullMin.y() );
+      fpMax.setX( fullMax.x() );
+      fpMax.setY( fullMax.y() );
+      footprintSource = QStringLiteral( "full-verified" );
+    }
+  }
   const double length = static_cast<double>( fpMax.x() - fpMin.x() );
   const double width = static_cast<double>( fpMax.y() - fpMin.y() );
   if ( length <= 1e-6 || width <= 1e-6 )
@@ -1145,17 +1235,39 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
 
   double targetZ = static_cast<double>( hardMax.z() );
   detail = QStringLiteral( "top/%1" ).arg( footprintSource );
+  if ( flatCornerModel )
+  {
+    if ( ParamModelerAlignmentGeometry::supportedFlatRoofTop( canonicalPoints, targetZ ) )
+      detail = QStringLiteral( "supported-top/%1" ).arg( footprintSource );
+    else if ( std::isfinite( fallbackUpperOffset ) && fallbackUpperOffset > 0.0 &&
+              fallbackUpperOffset <= height * 1.5 )
+    {
+      targetZ = static_cast<double>( hardMin.z() ) + fallbackUpperOffset;
+      detail = QStringLiteral( "predicted-top/%1" ).arg( footprintSource );
+    }
+  }
 
   const bool gabled = primitiveType == QStringLiteral( "GabledRoof" ) ||
                       primitiveType == QStringLiteral( "AsymmetricGableHouse" );
+  const bool twoGableHouses = primitiveType == QStringLiteral( "TwoGableHouses" );
+  const bool halfCylinderRoof = primitiveType == QStringLiteral( "HalfCylinderRoof" );
   const bool shrinkingRoof = primitiveType == QStringLiteral( "PyramidRoof" ) ||
                              primitiveType == QStringLiteral( "TruncatedPyramidRoof" );
-  if ( gabled || shrinkingRoof )
+  if ( gabled || shrinkingRoof || twoGableHouses || halfCylinderRoof )
   {
-    if ( estimateRoofEaveFromOuterWalls( canonicalPoints, fpMin, fpMax, gabled,
-                                        static_cast<double>( hardMin.z() ), height, targetZ ) )
+    const bool eaveFound = twoGableHouses
+      ? ParamModelerAlignmentGeometry::firstGableEave( canonicalPoints, fpMin, fpMax,
+                                                       hardMin.z(), height, targetZ )
+      : halfCylinderRoof
+        ? ParamModelerAlignmentGeometry::halfCylinderEave( canonicalPoints, fpMin, fpMax,
+                                                           hardMin.z(), height, targetZ )
+        : estimateRoofEaveFromOuterWalls( canonicalPoints, fpMin, fpMax, gabled,
+                                          hardMin.z(), height, targetZ );
+    if ( eaveFound )
     {
-      detail = QStringLiteral( "wall-eave/%1" ).arg( footprintSource );
+      detail = QStringLiteral( "%1/%2" )
+                 .arg( halfCylinderRoof ? QStringLiteral( "arc-eave" ) : QStringLiteral( "wall-eave" ),
+                       footprintSource );
     }
     else
     {

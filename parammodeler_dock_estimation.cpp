@@ -302,7 +302,9 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       return false;
     }
 
-    QMap<QString, double> params = pointNetParamsToUiParams( prim, regression.params );
+    const bool swapCanonicalAxes = shouldSwapCanonicalRegressionAxes(
+      prim, regression.params, m_inputDataPath, m_hasMetadataRz ? m_metadataRz : qQNaN() );
+    QMap<QString, double> params = pointNetParamsToUiParams( prim, regression.params, swapCanonicalAxes );
     const auto rawParams = params;
     applyDataDrivenParamCorrections( prim, params );
     if ( params.isEmpty() )
@@ -502,7 +504,9 @@ void ParamModelerDock::onInverseParams()
     QMessageBox::warning( this, tr( "Parameter estimation failed" ), regression.errorMessage );
     return;
   }
-  QMap<QString, double> params = pointNetParamsToUiParams( prim, regression.params );
+  const bool swapCanonicalAxes = shouldSwapCanonicalRegressionAxes(
+    prim, regression.params, m_inputDataPath, m_hasMetadataRz ? m_metadataRz : qQNaN() );
+  QMap<QString, double> params = pointNetParamsToUiParams( prim, regression.params, swapCanonicalAxes );
   const auto rawParams = params;
   applyDataDrivenParamCorrections( prim, params );
 

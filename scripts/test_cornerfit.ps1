@@ -2,6 +2,7 @@ param(
     [string]$EigenInclude = 'E:/mambaforge/envs/qgis_dev/Library/include/eigen3',
     [switch]$WithPicking,
     [switch]$WithWireframe,
+    [switch]$WithAlignment,
     [string]$ScreenshotDirectory
 )
 $ErrorActionPreference = 'Stop'
@@ -25,7 +26,10 @@ if ($WithPicking) {
 if ($WithWireframe) {
     $targets += 'test_wireframe_guides'
 }
-if ($WithPicking -or $WithWireframe) {
+if ($WithAlignment) {
+    $targets += @('test_alignment_geometry', 'test_regression_axes')
+}
+if ($WithPicking -or $WithWireframe -or $WithAlignment) {
     $qt = 'E:/mambaforge/envs/qgis_dev/Library'
     $env:PATH = (Join-Path $qt 'bin') + ';' + $env:PATH
     $env:QT_QPA_PLATFORM_PLUGIN_PATH = Join-Path $qt 'plugins/platforms'

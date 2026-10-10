@@ -8,6 +8,7 @@
  ***************************************************************************/
 
 #include "parammodeler_config.h"
+#include <QDir>
 #include <QDialog>
 #include <QComboBox>
 #include <QFileDialog>
@@ -34,6 +35,32 @@ static QString ensureTrailingSlash( const QString &path )
   if ( path.endsWith( QLatin1Char( '/' ) ) || path.endsWith( QLatin1Char( '\\' ) ) )
     return path;
   return path + QLatin1Char( '/' );
+}
+
+static void migratePtv3ModelDefaults()
+{
+  QgsSettings settings;
+  const QString migrationKey = QStringLiteral( "parammodeler/ptv3ModelDefaultsV5V3" );
+  if ( settings.value( migrationKey, false ).toBool() )
+    return;
+
+  const QString clsKey = QStringLiteral( "parammodeler/ptv3ClassifyLogDir" );
+  const QString oldClsDir = ParamModelerConfig::pointnetBaseDir() +
+                            QStringLiteral( "ptv3_simple/logs/ptv3_cls_v2" );
+  const QString clsDir = settings.value( clsKey ).toString();
+  if ( clsDir.isEmpty() || QDir::cleanPath( clsDir ).compare( QDir::cleanPath( oldClsDir ), Qt::CaseInsensitive ) == 0 )
+  {
+    const QString newClsDir = ParamModelerConfig::pointnetBaseDir() +
+                              QStringLiteral( "ptv3_simple/logs/ptv3_cls_v5" );
+    settings.setValue( clsKey, newClsDir );
+  }
+
+  const QString suffixKey = QStringLiteral( "parammodeler/ptv3RegressionSuffix" );
+  const QString suffix = settings.value( suffixKey ).toString();
+  if ( suffix.isEmpty() || suffix == QStringLiteral( "_v2_normals" ) )
+    settings.setValue( suffixKey, QStringLiteral( "_v3_normals" ) );
+
+  settings.setValue( migrationKey, true );
 }
 
 // ------------------------------------------------------------------
@@ -76,7 +103,7 @@ QString ptv3LanServerUrl()
 QString ptv3TailscaleServerUrl()
 {
   return setting( QStringLiteral( "parammodeler/ptv3TailscaleServerUrl" ),
-                  QStringLiteral( "http://100.104.75.49:8008" ) ).trimmed();
+                  QStringLiteral( "http://100.70.215.84:8008" ) ).trimmed();
 }
 
 QString ptv3ServerProfile()
@@ -141,14 +168,16 @@ QString pctRegressionSuffix()
 
 QString ptv3ClassifyLogDir()
 {
+  migratePtv3ModelDefaults();
   return setting( QStringLiteral( "parammodeler/ptv3ClassifyLogDir" ),
-                  pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v2" ) );
+                  pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v5" ) );
 }
 
 QString ptv3RegressionSuffix()
 {
+  migratePtv3ModelDefaults();
   return setting( QStringLiteral( "parammodeler/ptv3RegressionSuffix" ),
-                  QStringLiteral( "_v2_normals" ) );
+                  QStringLiteral( "_v3_normals" ) );
 }
 
 // ------------------------------------------------------------------
@@ -333,7 +362,9 @@ void showSettingsDialog( QWidget *parent )
     form->addRow( QStringLiteral( "PTv3 分类模型目录:" ), hb );
     form->addRow( QStringLiteral( "PTv3 回归后缀:" ), edtPtv3Suffix );
     auto *ptv3Hint = new QLabel(
-      QStringLiteral( "  回归目录按 PointNet 根目录下的 ptv3_simple/logs/ptv3_reg_<类别短名><后缀> 查找。" ), &dlg );
+      QStringLiteral( "  本机回归目录按 ptv3_reg_<类别短名><后缀> 查找；远程推理使用服务端配置的模型。" ), &dlg );
+    ptv3Hint->setTextFormat( Qt::PlainText );
+    ptv3Hint->setWordWrap( true );
     ptv3Hint->setStyleSheet( QStringLiteral( "color: #888; font-size: 11px;" ) );
     form->addRow( QString(), ptv3Hint );
   }
@@ -348,13 +379,13 @@ void showSettingsDialog( QWidget *parent )
     edtPtv3Python->setText( QStringLiteral( "E:/mambaforge/envs/ptv3_cpu/python.exe" ) );
     comboPtv3ServerProfile->setCurrentIndex( 0 );
     edtPtv3LanServer->setText( QStringLiteral( "http://192.168.1.113:8008" ) );
-    edtPtv3TailscaleServer->setText( QStringLiteral( "http://100.104.75.49:8008" ) );
+    edtPtv3TailscaleServer->setText( QStringLiteral( "http://100.70.215.84:8008" ) );
     edtBase->setText(      QStringLiteral( "E:/pointnet" ) );
     edtDataset->setText(   QStringLiteral( "E:/pointnet/datasets_aug" ) );
     edtPctClsLog->setText( QStringLiteral( "E:/pointnet/pct_simple/logs/pct_cls_v4" ) );
     edtPctSuffix->setText( QStringLiteral( "_v4_normals" ) );
-    edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v2" ) );
-    edtPtv3Suffix->setText( QStringLiteral( "_v2_normals" ) );
+    edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v5" ) );
+    edtPtv3Suffix->setText( QStringLiteral( "_v3_normals" ) );
   } );
 
   auto *btnBox = new QHBoxLayout;

@@ -26,7 +26,13 @@ struct DLPointCloudInfo;
 // ---- DL parameter mapping ----
 
 QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
-                                                 const QMap<QString, double> &nn );
+                                                 const QMap<QString, double> &nn,
+                                                 bool swapCanonicalAxes = false );
+
+bool shouldSwapCanonicalRegressionAxes( const QString &primitiveType,
+                                        const QMap<QString, double> &nn,
+                                        const QString &filePath,
+                                        double rzDeg );
 
 QJsonObject currentPrimitiveParamsObject( const QString &prim,
                                           const ParamModelerDock *dock );
@@ -79,7 +85,8 @@ bool metadataPointCloudInfoForInput( const QString &filePath,
                                      QVector3D *bboxSize,
                                      QVector3D *center,
                                      double *scale,
-                                     double *rz = nullptr );
+                                     double *rz = nullptr,
+                                     QJsonObject *params = nullptr );
 
 // ---- dataset path helpers ----
 

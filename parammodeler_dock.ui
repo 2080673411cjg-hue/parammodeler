@@ -80,8 +80,9 @@
        </property>
        <addaction name="actLoadedDLPointCloud"/>
        <addaction name="separator"/>
-       <addaction name="actCurrentPrimitiveDLDataset"/>
-       <addaction name="actDLDataset"/>
+        <addaction name="actCurrentPrimitiveDLDataset"/>
+        <addaction name="actCompleteSelectedDLDatasets"/>
+        <addaction name="actDLDataset"/>
       </widget>
       <action name="actEvaluationCSV">
        <property name="text">
@@ -121,6 +122,11 @@
        <action name="actCurrentPrimitiveDLDataset">
         <property name="text">
           <string>Generate current primitive dataset...</string>
+        </property>
+       </action>
+       <action name="actCompleteSelectedDLDatasets">
+        <property name="text">
+          <string>Complete selected primitive datasets...</string>
         </property>
        </action>
        <action name="actMesh">

@@ -1,16 +1,28 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-10-07
+> 最后更新: 2026-10-10
 > **开发边界提醒**：原则上只修改自己的 ParamModeler 插件，不修改 QGIS 核心。2026-09-17 的近距离缩放核心实验已按用户要求撤回，当前源码不再包含本次 `qgis_3d` 修改。备份和回退记录见文末“QGIS 核心实验的备份与回退”。后续核心改动必须先说明影响、确认并提前备份。
 > 插件版本: **v2.3.15**（PTv3/PCT 推理入口、语义角自动对齐、面板代码拆分与曲面线框修复）
-> 最近更新: **2026-10-07**（补齐圆锥/穹顶/圆塔上部线框和半圆柱屋脊；精简圆塔底部檐口内圈）
-> ⚠️ **待办**：分类重训（`train_pct_cls_v4.sh`）**尚未执行**，下方分类指标仍是旧数据上 `pct_cls_v2` 的结果
+> 最近更新: **2026-10-10**（13 类数据扩至 1000 份并完成 PTv3 回归 v3、分类 v5；更新插件和服务端模型路径）
+> 注: 下文 PCT 分类实验指标仍是旧数据上 `pct_cls_v2` 的历史结果；PTv3 v5 测试准确率为 99.62%（1300 份）
 > 当前模型入口: **PTv3**（默认远程 Ubuntu/GPU 服务）与 **PCT**（本机兜底）
-> 分类模型: PTv3 `ptv3_cls_v2`；PCT 保留 `pct_cls_v4` 路径设置
-> 回归模型: PTv3 `ptv3_reg_<类别短名>_v2_normals`；Cuboid/PyramidRoof/TruncatedPyramidRoof/IndentedCuboid 使用稳定长短边目标，HalfCylinderRoof 保持轴向长度/直径/墙高原语义
+> 分类模型: PTv3 本机默认 `ptv3_cls_v5`；PCT 保留 `pct_cls_v4` 路径设置
+> 回归模型: PTv3 本机默认 `ptv3_reg_<类别短名>_v3_normals`；旧默认配置会迁移，其他自定义路径保留
+> 远程提醒: Windows 通过 Tailscale 已连通 Ubuntu 的 `/health`，服务返回 v5/v3；插件已改用 `100.70.215.84:8008`，实际分类/回归请求仍待 QGIS 现场验证
 > 法向量实验: 阶段 0/1/2 全部完成，bulge 转正（v4 corr=0.578）、middleBulge 仍≈0（详见第七章）
-> 数据集: **500 样本/类**（train 400 + val 50 + test 50），TwoGableHouses **1000 样本**（仅扩充数据量，无额外增强），14 类共 7500 样本；**v4 起用修复后的 `datasets_aug`**（离群点 extent 0.08 + 坐标系不漂移）
+> 数据集: 当前 PTv3 的 13 类均为 **1000 样本/类**（train 800 + val 100 + test 100），合计 13000 样本；下文旧实验的数据量和指标仅供历史对照
 > 后端: PTv3 远程优先；PCT 本机可选；PointNet/PointNet++/PointNeXt 不再作为估计窗口下拉选项
+
+---
+
+## 2026-10-10 更新：PTv3 分类 v5、回归 v3 与模型路径切换
+
+- QGIS 数据集补齐后，13 类均为 train/val/test = 800/100/100。用 `E:/pointnet/ptv3_simple/augment_dataset.py` 对全部类别重建增强集，参数为 `--overwrite --no-drop_bottom --noise_sigma 0.006 --outlier_ratio 0.003 --outlier_extent 0.03`；成功 13000、失败 0，bbox-min 漂移中位数 0.0179、p99 0.0332、最大 0.0465。孔洞沿用脚本默认设置。
+- 回归 v3 使用普通损失，未开启 IndentedCuboid 的 180° 对称损失。13 类各完成 100 轮并写出测试报告；在目标定义相同的 12 类里，按重合测试样本编号计算的加权标准化误差有 11 类下降，IndentedCuboid 从 v2.1 的 0.5580 变为 v3 的 0.5613。TruncatedPyramidRoof 的目标改为稳定长短边口径，不能直接与旧版总分比较。增强集整体重建过，同编号点云不保证逐点相同，因此这些比较是参考，不是严格控制变量实验。
+- 分类 v5 的最佳验证准确率为 99.77%，测试集为 99.62%（1300 份中误判 5 份）；两份 LHouse 误判为 Cuboid，其余误判各 1 份。分类暂不需要继续扩大数据量。
+- 后续优先检查 IndentedCuboid 四个凹陷边距的方向/标签可辨识性（v3 测试 R² 约 -0.08 至 0.01，预测明显向均值收缩），再检查 FourStageRoundTower 的 `middleBulge` 和 AsymmetricGableHouse 的 `ridgeRatio`。先抽样核对点云与标签、做针对性实验，再决定是否重训；不优先追加 epoch 或全类扩量。
+- 插件本机 PTv3 默认路径切到分类 `ptv3_cls_v5`、回归 `ptv3_reg_<类别短名>_v3_normals`；首次读取时仅迁移仍为旧 v2 默认值的 QgsSettings，其他自定义路径保留。“恢复默认值”和设置界面的远程说明同步更新。`plugin_parammodeler` RelWithDebInfo x64 编译通过，5 项翻译测试通过；尚未在 QGIS 中完成实际推理与对齐验收。
+- Windows 侧 `E:/pointnet/ptv3_simple/ptv3_server.py` 已将 `CLS_LOG` 改为 v5、`REG_SUFFIX` 改为 `_v3_normals`，只读语法检查通过且本地权重齐全。用户在 Windows CMD 中 `tailscale ping 100.70.215.84` 成功，并通过 `http://100.70.215.84:8008/health` 收到 Ubuntu 服务返回的 v5/v3 路径。插件默认值、恢复默认值和当前 QGIS profile 的 Tailscale URL 已改为 `http://100.70.215.84:8008`；分类/回归完整请求尚待 QGIS 现场验收。
 
 ---
 

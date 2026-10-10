@@ -1,0 +1,53 @@
+#include "../parammodeler_regression_axes.h"
+
+#include <cassert>
+
+using namespace ParamModelerRegressionAxes;
+
+int main()
+{
+  assert( shouldSwapFromSpans( 10.0, 14.0 ) );
+  assert( !shouldSwapFromSpans( 14.0, 10.0 ) );
+  assert( !shouldSwapFromSpans( 10.0, 10.7 ) );
+
+  const QMap<QString, double> base = {
+    { QStringLiteral( "geom_footprint_long" ), 14.0 },
+    { QStringLiteral( "geom_footprint_short" ), 10.0 },
+  };
+  QMap<QString, double> cuboid = base;
+  cuboid.insert( QStringLiteral( "length" ), 14.0 );
+  cuboid.insert( QStringLiteral( "width" ), 10.0 );
+  assert( remapCanonicalParams( QStringLiteral( "Cuboid" ), cuboid, true ).value( QStringLiteral( "length" ) ) == 10.0 );
+  assert( remapCanonicalParams( QStringLiteral( "PyramidRoof" ), cuboid, true ).value( QStringLiteral( "width" ) ) == 14.0 );
+  assert( remapCanonicalParams( QStringLiteral( "Cuboid" ), cuboid, false ) == cuboid );
+
+  QMap<QString, double> legacy = cuboid;
+  legacy.remove( QStringLiteral( "geom_footprint_long" ) );
+  assert( remapCanonicalParams( QStringLiteral( "Cuboid" ), legacy, true ) == legacy );
+
+  QMap<QString, double> truncated = base;
+  truncated.insert( QStringLiteral( "bottomLength" ), 14.0 );
+  truncated.insert( QStringLiteral( "bottomWidth" ), 10.0 );
+  truncated.insert( QStringLiteral( "topLengthRatio" ), 0.7 );
+  truncated.insert( QStringLiteral( "topWidthRatio" ), 0.4 );
+  const auto swappedTop = remapCanonicalParams( QStringLiteral( "TruncatedPyramidRoof" ), truncated, true );
+  assert( swappedTop.value( QStringLiteral( "bottomLength" ) ) == 10.0 );
+  assert( swappedTop.value( QStringLiteral( "bottomWidth" ) ) == 14.0 );
+  assert( swappedTop.value( QStringLiteral( "topLengthRatio" ) ) == 0.4 );
+  assert( swappedTop.value( QStringLiteral( "topWidthRatio" ) ) == 0.7 );
+
+  QMap<QString, double> indented = base;
+  indented.insert( QStringLiteral( "outerLength" ), 14.0 );
+  indented.insert( QStringLiteral( "outerWidth" ), 10.0 );
+  indented.insert( QStringLiteral( "leftMarginRatio" ), 0.1 );
+  indented.insert( QStringLiteral( "rightMarginRatio" ), 0.2 );
+  indented.insert( QStringLiteral( "frontMarginRatio" ), 0.3 );
+  indented.insert( QStringLiteral( "backMarginRatio" ), 0.4 );
+  const auto swappedIndent = remapCanonicalParams( QStringLiteral( "IndentedCuboid" ), indented, true );
+  assert( swappedIndent.value( QStringLiteral( "outerLength" ) ) == 10.0 );
+  assert( swappedIndent.value( QStringLiteral( "outerWidth" ) ) == 14.0 );
+  assert( swappedIndent.value( QStringLiteral( "leftMarginRatio" ) ) == 0.3 );
+  assert( swappedIndent.value( QStringLiteral( "rightMarginRatio" ) ) == 0.4 );
+  assert( swappedIndent.value( QStringLiteral( "frontMarginRatio" ) ) == 0.1 );
+  assert( swappedIndent.value( QStringLiteral( "backMarginRatio" ) ) == 0.2 );
+}

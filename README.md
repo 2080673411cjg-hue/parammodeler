@@ -10,9 +10,13 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 
 项目的核心目标不是只输出一个不可编辑的三角网格，而是把建筑点云转换为结构化、可解释、可编辑、可复现的参数化三维模型。
 
-## 最近更新（2026-10-07，v2.3.15）
+## 最近更新（2026-10-10，插件 v2.3.15）
 
 PTv3 远程推理和本地 PCT 现作为两个可选入口；首批角锚定模型可按点云左下墙顶/檐口语义角自动对齐。面板估计与对齐代码已拆分，圆锥、穹顶、圆塔和半圆柱屋顶的实时线框缺线已修复，并精简了圆塔底部檐口内圈。具体变更和验证范围见 `dl-pipeline-log.md`。
+
+当前 PTv3 分类使用 `ptv3_cls_v5`，13 类参数回归使用 `ptv3_reg_<类别短名>_v3_normals`。增强集每类 train/val/test 为 800/100/100，共 13000 份；分类 v5 在 1300 份测试集上的准确率为 99.62%。回归 v3 使用普通损失，凹陷长方体四个边距仍是主要误差来源。插件本机路径及服务端版本选择均已更新，实际 QGIS 分类、回归与对齐流程仍需现场验收。
+
+PTv3 服务可在插件“PointNet 路径设置”中切换实验室局域网 `http://192.168.1.113:8008` 与 Tailscale `http://100.70.215.84:8008`，两种模式共用 Ubuntu 上的同一套权重，无需重新训练。切换后下次推理生效；局域网需能访问实验室机器，Tailscale 需两机在线。先访问所选地址的 `/health`，确认 `cls_log` 指向 v5、`reg_suffix` 为 `_v3_normals`。仓库内的 `scripts/ptv3_server.py` 是服务端部署副本；Ubuntu 的 `uvicorn` 进程需持续运行。更完整的训练与部署命令见 `scripts/README.md`。
 
 ### 2026-09-21
 
@@ -49,9 +53,9 @@ PTv3 远程推理和本地 PCT 现作为两个可选入口；首批角锚定模�
 - 支持将当前模型加载到 QGIS 3D 场景。
 - 支持 Qt3D 实时预览实体，用于参数拖动时快速更新拟合模型。
 - 支持外部点云导入，包括 `.ply`、`.txt`、`.xyz`、`.pts`、`.las`、`.laz`。
-- 支持 PointNet、PointNet++、PointNeXt、PCT 四类后端进行点云分类（当前主力：PCT，98.92% F1，v4 分类待重训）
-- 支持调用外部 Python 参数回归模型，并将结果回填到插件 UI（当前默认回归后缀 `_v4_normals`）
-- 支持随机参数生成和批量深度学习数据集导出（500 样本/类，TwoGableHouses 1000 样本，14 类共 7500）
+- 当前估计窗口使用 PTv3 远程分类/回归，也保留本机 PCT 入口；旧 PointNet 系列代码仍在工程中，不作为当前主入口。
+- 支持将回归结果映射并回填插件 UI；PTv3 当前默认回归后缀为 `_v3_normals`，PCT 保留自己的模型配置。
+- 支持随机参数生成及按所选基元补齐数据集；当前 PTv3 训练覆盖 13 类、每类 1000 份。TriPrismPyramid 可建模，但未纳入这 13 类训练。
 - 支持 OBJ、STL、JSON、PLY、深度学习 TXT 点云等格式导出。
 - 支持 2D 地图画布点选目标点，将当前模型锚点平移到点云指定位置，便于 QGIS 3D 里人工微调。
 - 新增 `Align in 3D`（开发中，原按钮名 `Pick 3D target for model anchor`）：白描边红 X 表示模型上部对齐点，黄框表示点云候选点；长方体/L 型/凹槽体取原左下角正上方的顶角，屋顶类取同一墙角的檐口，圆柱取顶面中心，圆顶/锥顶/塔取顶点。左键将这个参考点平移到目标真实 XYZ，同时更新 TX/TY/TZ。红 X 固定屏幕大小、叠加显示；右键、Esc 或再次点击按钮取消。原有生长锚点、2D 点选、bbox 和底部截面对齐保留。屏幕标记已通过离屏绘制测试，仍需重新编译后验证 QGIS 实机效果。
@@ -110,23 +114,20 @@ x y z
 
 导出时会进行中心化和按最大半径归一化，同时记录 `pointCloudInfo`，包括包围盒、中心、尺度等信息，用于后续参数估计时恢复尺度。
 
-当前标准数据集规模为 **500 样本/类**（train 400 + val 50 + test 50），TwoGableHouses 为 **1000 样本**，14 类共 **7500 样本**。
+当前 PTv3 数据集规模为 **13 类各 1000 份**（train 800 + val 100 + test 100），合计 **13000 份**；TriPrismPyramid 不在训练类表中。
 
 ### 3. 点云分类
 
-插件加载外部点云后，通过 `PointNetRunner` 调用外部 Python 脚本进行分类。目前支持：
+插件加载外部点云后，通过 `PointNetRunner` 调用分类后端。当前估计窗口可选 PTv3（Ubuntu 远程服务）和 PCT（本机）；旧 PointNet 系列实现仍保留在源码中。
 
-- PointNet
-- PointNet++
-- PointNeXt
-- PCT (Point Cloud Transformer) — 当前主力
+PTv3 当前分类权重为 `ptv3_cls_v5`，PCT 有独立的本地权重路径。PTv3 的分类和回归请求由插件通过 HTTP 发送给所选服务；PCT 由本机 Python 进程执行。
 
 分类流程大致为：
 
 ```text
 点云文件
 -> 插件预处理为网络输入
--> QProcess 调用 Python predict
+-> PTv3 HTTP 服务或本机 PCT Python predict
 -> 解析 JSON 输出
 -> 得到 top1 / topK 类别
 -> 自动切换 UI 中的基元类型
@@ -260,16 +261,16 @@ MeshData BuildMesh::build( const QString &primitiveType, ParamModelerDock *dock 
 
 负责通过 `QProcess` 调用外部 Python 深度学习脚本。它不在 C++ 中实现神经网络，而是作为 QGIS 插件和 Python 推理工程之间的桥。
 
-目前 Python 可执行文件、脚本路径、日志目录和数据集路径仍以本机硬编码路径为主，例如：
+Python 解释器、PointNet 根目录、数据集目录、PTv3 服务地址与模型目录可在插件设置中配置；源码提供本机默认值，例如：
 
 ```text
 E:/mambaforge/envs/pointnet_train/python.exe
-E:/pointnet/pointnext_simple/main.py
-E:/pointnet/pointnext_simple/main_reg.py
+E:/pointnet/ptv3_simple/main.py
+E:/pointnet/ptv3_simple/logs/ptv3_cls_v5
 E:/pointnet/datasets_aug/metadata/sample_params.json
 ```
 
-这些路径后续建议改为插件设置项。
+PTv3 使用远程服务时，权重目录由 Ubuntu 服务端选择；本机模型目录设置只对本机推理路径生效。
 
 ## 当前技术路线
 
@@ -280,8 +281,8 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 -> 随机参数生成
 -> BuildMesh（锚点见下：长方体类左下角 / 圆形类底面中心）
 -> 网格表面采样点云 + 归一化
--> PCT 分类（98.92% F1）
--> PCT 回归（v4_normals：basic + PCA 法向量，修复数据集上重训）
+-> PTv3 分类 v5（Ubuntu 服务；PCT 可作本机备选）
+-> 对应基元的 PTv3 回归 v3（13 类各自选最佳验证轮次）
 -> 参数级数据驱动校正（实验：Cuboid / Cylinder / GabledRoof + v4-1 四类）
 -> pointNetParamsToUiParams 映射 + applyToUI 回填
 -> applyMetadataRz 回填朝向（metadata 的导出真值，不是 DL 预测）
@@ -295,8 +296,8 @@ E:/pointnet/datasets_aug/metadata/sample_params.json
 
 ## 当前已知问题
 
-- 🔴 **参数估计精度不足**：v4 重训后 9/13 类 avg R²>0.6，但仍有 7 个参数属"输入里没有信号"（`middleBulge`、旧 `wingRatio/wingWidthRatio`、旧 `offsetX/offsetY`、`ridgeRatio`、`middleTopRadius`，corr≈0、预测方差只有真值 1/3）。v2.3.10 起先把 LHouse / IndentedCuboid / TruncatedPyramidRoof / HalfCylinderRoof 的训练 target 改成更贴近 footprint 或物理约束的形式，待重训验证。
-- ⚠️ **分类尚未在新数据上重训**：`pct_cls_v2` 的 98.92% F1 是修复前的 `datasets_aug` 上的结果，`train_pct_cls_v4.sh` 已就绪但未执行。
+- **局部参数仍难估计**：回归 v3 的凹陷长方体四个边距测试 R² 约为 -0.08 至 0.01，预测偏向平均值；四段塔 `middleBulge` 和非对称人字房屋 `ridgeRatio` 也弱。优先检查标签方向与几何可辨识性，不优先继续全类扩量或增加轮次。
+- **PCT 备选模型仍是旧实验**：旧版 `pct_cls_v2` 的 98.92% F1 不等于当前 PTv3 v5 的测试结果；不要混用两者指标。
 - 位姿参数（rx/ry/rz/tx/ty/tz）尚未进入回归训练。auto-align 做平移对齐（v2.3.4 起改用点云 **bbox 极值** 而非采样质心，见下），**朝向 rz 从 v2.3.6 起由 metadata 真值回填**（见下）——但只对"有 metadata 记录的输入"有效，纯推理（无 metadata）时朝向仍是默认值 + 人工微调。
 - **rz 无法通过训练补**：它在当前数据形态下不可辨识（圆柱类无定义、矩形类只确定到 mod 180°），`_rot` 实验已因此弃用，详见 `scripts/README.md`。
 - 自动对齐仍是几何启发式：点云对齐目标优先取"底部截面 footprint + 1% 分位稳健 bbox"，比全点云硬 bbox 稳，但当回归尺寸本身偏了或可见点云缺角时，仍需要 2D 点选目标平移做最后校正。

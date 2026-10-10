@@ -20,6 +20,8 @@ void generateFullDataset( ParamModelerDock *dock );
 
 void generateSinglePrimitiveDataset( ParamModelerDock *dock );
 
+void completeSelectedPrimitiveDatasets( ParamModelerDock *dock );
+
 QJsonArray generateSplitSamples( const QString &prim,
                                  const QString &classDir,
                                  const QString &split,

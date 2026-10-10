@@ -798,7 +798,7 @@
     </message>
     <message>
         <location filename="../parammodeler_dock.cpp" line="1209"/>
-        <source>3D picking requires a local scene using the point cloud&apos;s CRS.</source>
+        <source>3D picking requires a local scene using the point cloud's CRS.</source>
         <translation>3D 拾取需要使用点云坐标参考系的局部场景。</translation>
     </message>
     <message>
@@ -1327,6 +1327,21 @@ You can view and adjust it in the 3D scene.</source>
         <source>Result: %1 (%2%)</source>
         <translation>结果：%1（%2%）</translation>
     </message>
+    <message>
+        <location filename="../parammodeler_dock.ui" line="129"/>
+        <source>Complete selected primitive datasets...</source>
+        <translation>补齐所选基元数据集...</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_dock_estimation.cpp" line="82"/>
+        <source>Experimental: after model regression, blend supported parameters with geometry measured from the current point cloud.</source>
+        <translation>实验功能：模型回归后，将支持的参数与当前点云测得的几何值混合。</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_dock_estimation.cpp" line="95"/>
+        <source>0% keeps the model prediction; 100% uses the measured point-cloud geometry. Intermediate values blend both.</source>
+        <translation>0% 保留模型预测值；100% 使用点云测得的几何值；中间值按比例混合。</translation>
+    </message>
 </context>
 <context>
     <name>ParamModelerHeightControl</name>
@@ -1594,12 +1609,8 @@ Output folder: %4</source>
     <message>
         <location filename="../parammodeler_datasetgen.cpp" line="419"/>
         <source>Primitive: %1
-Existing: train=%2  val=%3  test=%4  (total=%5)
-
 What would you like to do?</source>
         <translation>基元：%1
-已有样本：训练=%2  验证=%3  测试=%4（共 %5 个）
-
 请选择操作：</translation>
     </message>
     <message>
@@ -1614,8 +1625,24 @@ What would you like to do?</source>
     </message>
     <message>
         <location filename="../parammodeler_datasetgen.cpp" line="440"/>
-        <source>Additional samples for %1 (existing: %2):</source>
-        <translation>%1 新增样本数（已有 %2 个）：</translation>
+        <source>Additional samples for %1:</source>
+        <translation>%1 新增样本数：</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="657"/>
+        <source>Append %1 samples for %2 in %3?
+Existing: train=%4  val=%5  test=%6.</source>
+        <translation>确定在 %3 中为 %2 追加 %1 个样本吗？
+已有样本：训练=%4  验证=%5  测试=%6。</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="659"/>
+        <source>Replace %1 in %2? Existing files for this primitive will be deleted.
+Existing: train=%3  val=%4  test=%5.
+New samples: %6.</source>
+        <translation>确定替换 %2 中的 %1 吗？该基元的旧文件将被删除。
+已有样本：训练=%3  验证=%4  测试=%5。
+新样本数：%6。</translation>
     </message>
     <message>
         <location filename="../parammodeler_datasetgen.cpp" line="441"/>
@@ -1773,6 +1800,136 @@ Main metadata updated: %1 (total records: %2)</source>
         <location filename="../parammodeler.cpp" line="35"/>
         <source>Version 0.1</source>
         <translation>版本 0.1</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="407"/>
+        <source>Train</source>
+        <translation>训练</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="417"/>
+        <source>Select all trainable primitives</source>
+        <translation>全选可训练基元</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="409"/>
+        <source>Validation</source>
+        <translation>验证</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="410"/>
+        <source>Test</source>
+        <translation>测试</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="414"/>
+        <source>Select original PointNet dataset folder</source>
+        <translation>选择原始 PointNet 数据集文件夹</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="421"/>
+        <source>Original dataset required</source>
+        <translation>需要原始数据集</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="422"/>
+        <source>Select the original datasets folder, not datasets_aug.</source>
+        <translation>请选择原始 datasets 文件夹，而不是 datasets_aug。</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="429"/>
+        <source>Metadata missing</source>
+        <translation>缺少元数据</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="430"/>
+        <source>No valid metadata/sample_params.json was found in %1.</source>
+        <translation>在 %1 中未找到有效的 metadata/sample_params.json。</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="436"/>
+        <source>Complete primitive datasets</source>
+        <translation>补齐基元数据集</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="489"/>
+        <source>Invalid metadata</source>
+        <translation>元数据无效</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="490"/>
+        <source>Metadata contains an empty or duplicate sample path: %1</source>
+        <translation>元数据包含空的或重复的样本路径：%1</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="502"/>
+        <source>Primitive unavailable</source>
+        <translation>基元不可用</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="490"/>
+        <source>%1 has no records in the selected dataset. Select a dataset containing this primitive.</source>
+        <translation>所选数据集中没有 %1 的记录。请选择包含该基元的数据集。</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="513"/>
+        <source>Dataset mismatch</source>
+        <translation>数据集不一致</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="514"/>
+        <source>%1/%2 has %3 metadata records but %4 files. Resolve this before appending.</source>
+        <translation>%1/%2：元数据有 %3 条记录，但文件有 %4 个。请先核对，再追加。</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="527"/>
+        <source>Datasets complete</source>
+        <translation>数据集已补齐</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="528"/>
+        <source>Selected classes already meet the target counts.</source>
+        <translation>所选类别均已达到目标数量。</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="531"/>
+        <source>Append dataset samples</source>
+        <translation>追加数据集样本</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="532"/>
+        <source>Add %1 samples to %2? Existing samples will be kept.
+
+%3</source>
+        <translation>向 %2 追加 %1 个样本？现有样本将保留。
+
+%3</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="544"/>
+        <source>Appending selected datasets...</source>
+        <translation>正在追加所选数据集...</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="595"/>
+        <source>Class metadata export failed</source>
+        <translation>类别元数据导出失败</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="600"/>
+        <source>Dataset expansion finished</source>
+        <translation>数据集扩充完成</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_datasetgen.cpp" line="601"/>
+        <source>Generated: %1
+Failed: %2
+Original samples retained.
+Folder: %3</source>
+        <translation>成功生成：%1
+失败：%2
+原有样本已保留。
+文件夹：%3</translation>
     </message>
 </context>
 </TS>

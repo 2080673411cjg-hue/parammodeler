@@ -1,6 +1,7 @@
 #include "parammodeler_dock.h"
 #include "ui_parammodeler_dock.h"
 #include "buildmesh.h"
+#include "parammodeler_alignment_geometry.h"
 #include "parammodeler_dlutils.h"
 #include "parammodeler_pcdloader.h"
 #include "parammodeler_pick3d.h"
@@ -203,18 +204,16 @@ bool ParamModelerDock::pointCloudAlignTarget( QVector3D &out, bool *usesSemantic
   const bool corner = BuildMesh::usesCornerAnchor( primitiveType );
   const bool wantsSemanticUpper = usesSemanticUpperAlignment( primitiveType );
   const MeshData mesh = BuildMesh::build( primitiveType, this );
-  QVector3D rotatedUpper;
+  QVector3D rotatedUpperOffset;
   bool hasSemanticUpper = false;
   if ( wantsSemanticUpper )
   {
     QVector3D localUpper;
     if ( ParamModelerPicking::upperAnchor( mesh.vertices, localUpper ) )
     {
-      rotatedUpper = modelRotationMatrix( this ).map( localUpper );
-      hasSemanticUpper = std::isfinite( rotatedUpper.x() ) &&
-                         std::isfinite( rotatedUpper.y() ) &&
-                         std::isfinite( rotatedUpper.z() ) &&
-                         rotatedUpper.z() > 1e-6f;
+      hasSemanticUpper = ParamModelerAlignmentGeometry::upperOffsetFromRotatedMesh(
+        mesh.vertices, modelRotationMatrix( this ), localUpper, rotatedUpperOffset ) &&
+        rotatedUpperOffset.z() > 1e-6f;
     }
   }
 
@@ -226,12 +225,11 @@ bool ParamModelerDock::pointCloudAlignTarget( QVector3D &out, bool *usesSemantic
       return false;
 
     const double cloudHeight = static_cast<double>( bboxCenter.z() - bboxMin.z() ) * 2.0;
-    const double upperOffset = static_cast<double>( rotatedUpper.z() );
+    const double upperOffset = static_cast<double>( rotatedUpperOffset.z() );
     if ( cloudHeight > 1e-6 && upperOffset > cloudHeight * 1.5 )
       return false;
 
-    target = QVector3D( bboxMin.x(), bboxMin.y(),
-                        static_cast<float>( static_cast<double>( bboxMin.z() ) + upperOffset ) );
+    target = bboxMin + rotatedUpperOffset;
     return std::isfinite( target.x() ) &&
            std::isfinite( target.y() ) &&
            std::isfinite( target.z() );
@@ -247,7 +245,7 @@ bool ParamModelerDock::pointCloudAlignTarget( QVector3D &out, bool *usesSemantic
         QFileInfo( m_inputDataPath ).absoluteFilePath(), Qt::CaseInsensitive ) == 0;
     QString detail;
     if ( semanticUpperPointCloudTarget( m_inputDataPath, primitiveType, rz,
-                                        static_cast<double>( rotatedUpper.z() ),
+                                        static_cast<double>( rotatedUpperOffset.z() ),
                                         useDisplayCoordinates, m_displayCloudWasRestored,
                                         m_displayCloudRestoreCenter, m_displayCloudRestoreScale,
                                         out, detail ) )
@@ -283,7 +281,7 @@ bool ParamModelerDock::pointCloudAlignTarget( QVector3D &out, bool *usesSemantic
                    .arg( m_displayCloudBBoxMin.x(), 0, 'f', 3 )
                    .arg( m_displayCloudBBoxMin.y(), 0, 'f', 3 )
                    .arg( m_displayCloudBBoxMin.z(), 0, 'f', 3 )
-                   .arg( rotatedUpper.z(), 0, 'f', 3 )
+                   .arg( rotatedUpperOffset.z(), 0, 'f', 3 )
                    .toStdWString().c_str() );
       return true;
     }
@@ -316,7 +314,7 @@ bool ParamModelerDock::pointCloudAlignTarget( QVector3D &out, bool *usesSemantic
                    .arg( m_metadataBBoxMin.x(), 0, 'f', 3 )
                    .arg( m_metadataBBoxMin.y(), 0, 'f', 3 )
                    .arg( m_metadataBBoxMin.z(), 0, 'f', 3 )
-                   .arg( rotatedUpper.z(), 0, 'f', 3 )
+                   .arg( rotatedUpperOffset.z(), 0, 'f', 3 )
                    .toStdWString().c_str() );
       return true;
     }

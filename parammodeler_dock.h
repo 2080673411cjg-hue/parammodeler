@@ -62,6 +62,7 @@ class ParamModelerDock : public QDockWidget
 
   friend void generateFullDataset( ParamModelerDock *dock );
   friend void generateSinglePrimitiveDataset( ParamModelerDock *dock );
+  friend void completeSelectedPrimitiveDatasets( ParamModelerDock *dock );
   friend QJsonArray generateSplitSamples( const QString &prim, const QString &classDir,
                                           const QString &split, int startIdx, int count,
                                           const QString &rootPath, int pointCount,
@@ -161,6 +162,7 @@ private slots:
   void onExportLoadedDLPointCloudClicked();
   void onExportDLDatasetClicked();
   void onExportCurrentPrimitiveDLDatasetClicked();
+  void onCompleteSelectedDLDatasetsClicked();
 	void onExportMeshClicked();
 	void onLoadToQGIS3D(bool zoomToLayer = true); // 将模型加载/同步到QGIS 3D视图，增加默认参数，true 表示缩放相机          
 	void onLoadExternalPointCloud();

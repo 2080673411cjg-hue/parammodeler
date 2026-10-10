@@ -14,9 +14,14 @@
 #include "parammodeler_dock.h"
 #include "ui_parammodeler_dock.h"
 
+#include <QCheckBox>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QGridLayout>
+#include <QHBoxLayout>
 #include <QInputDialog>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -24,7 +29,11 @@
 #include <QJsonParseError>
 #include <QMessageBox>
 #include <QProgressDialog>
+#include <QSet>
+#include <QSignalBlocker>
+#include <QSpinBox>
 #include <QTextStream>
+#include <QVBoxLayout>
 
 // ============================================================================
 // helpers
@@ -389,6 +398,235 @@ void generateFullDataset( ParamModelerDock *dock )
       .arg( rootPath ) );
 }
 
+void completeSelectedPrimitiveDatasets( ParamModelerDock *dock )
+{
+  const QStringList splits = {
+    QStringLiteral( "train" ), QStringLiteral( "val" ), QStringLiteral( "test" )
+  };
+  const auto splitLabel = []( const QString &split ) {
+    if ( split == QStringLiteral( "train" ) )
+      return QObject::tr( "Train" );
+    if ( split == QStringLiteral( "val" ) )
+      return QObject::tr( "Validation" );
+    return QObject::tr( "Test" );
+  };
+
+  QDialog selection( dock );
+  selection.setWindowTitle( QObject::tr( "Complete primitive datasets" ) );
+  QVBoxLayout layout( &selection );
+  auto *selectAll = new QCheckBox( QObject::tr( "Select all trainable primitives" ), &selection );
+  layout.addWidget( selectAll );
+  auto *classGrid = new QGridLayout;
+  QMap<QString, QCheckBox *> checkboxes;
+  const QSet<QString> defaults = {
+    QStringLiteral( "LHouse" ), QStringLiteral( "TwoGableHouses" ),
+    QStringLiteral( "IndentedCuboid" ), QStringLiteral( "AsymmetricGableHouse" )
+  };
+  for ( int i = 0; i < dock->ui->comboPrimitive->count(); ++i )
+  {
+    const QString prim = dock->ui->comboPrimitive->itemText( i );
+    if ( prim.isEmpty() || prim == QStringLiteral( "CylinderHemisphere" ) ||
+         prim == QStringLiteral( "TriPrismPyramid" ) )
+      continue;
+    auto *check = new QCheckBox( prim, &selection );
+    check->setChecked( defaults.contains( prim ) );
+    classGrid->addWidget( check, checkboxes.size() / 2, checkboxes.size() % 2 );
+    checkboxes.insert( prim, check );
+  }
+  layout.addLayout( classGrid );
+  QObject::connect( selectAll, &QCheckBox::toggled, &selection, [checkboxes]( bool checked ) {
+    for ( QCheckBox *check : checkboxes )
+      check->setChecked( checked );
+  } );
+  for ( QCheckBox *check : checkboxes )
+    QObject::connect( check, &QCheckBox::toggled, &selection, [selectAll, checkboxes]( bool ) {
+      bool allChecked = true;
+      for ( QCheckBox *item : checkboxes )
+        allChecked = allChecked && item->isChecked();
+      const QSignalBlocker blocker( selectAll );
+      selectAll->setChecked( allChecked );
+    } );
+
+  auto *countsRow = new QHBoxLayout;
+  QMap<QString, QSpinBox *> countSpins;
+  for ( const QString &split : splits )
+  {
+    auto *count = new QSpinBox( &selection );
+    count->setRange( 0, 10000 );
+    count->setValue( split == QStringLiteral( "train" ) ? 800 : 100 );
+    count->setPrefix( splitLabel( split ) + QStringLiteral( ": " ) );
+    countsRow->addWidget( count );
+    countSpins.insert( split, count );
+  }
+  layout.addLayout( countsRow );
+  QDialogButtonBox buttons( QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &selection );
+  QObject::connect( &buttons, &QDialogButtonBox::accepted, &selection, &QDialog::accept );
+  QObject::connect( &buttons, &QDialogButtonBox::rejected, &selection, &QDialog::reject );
+  layout.addWidget( &buttons );
+  if ( selection.exec() != QDialog::Accepted )
+    return;
+
+  QStringList primitives;
+  for ( auto it = checkboxes.cbegin(); it != checkboxes.cend(); ++it )
+    if ( it.value()->isChecked() )
+      primitives << it.key();
+  if ( primitives.isEmpty() )
+    return;
+  const auto targetCount = [&]( const QString &split ) { return countSpins.value( split )->value(); };
+
+  const QString selectedPath = QFileDialog::getExistingDirectory(
+    dock, QObject::tr( "Select original PointNet dataset folder" ) );
+  if ( selectedPath.isEmpty() )
+    return;
+  const QString rootPath = datasetRootFromSelectedFolder( selectedPath );
+  const QDir rootDir( rootPath );
+  if ( rootDir.exists( QStringLiteral( "metadata/augment_config.json" ) ) )
+  {
+    QMessageBox::warning( dock, QObject::tr( "Original dataset required" ),
+                          QObject::tr( "Select the original datasets folder, not datasets_aug." ) );
+    return;
+  }
+
+  const QJsonArray existingMeta = loadExistingMetadata( rootPath );
+  if ( existingMeta.isEmpty() )
+  {
+    QMessageBox::warning( dock, QObject::tr( "Metadata missing" ),
+                          QObject::tr( "No valid metadata/sample_params.json was found in %1." ).arg( rootPath ) );
+    return;
+  }
+  const auto existingCounts = countSamplesFromMetadata( existingMeta );
+  for ( const QString &prim : primitives )
+  {
+    if ( !existingCounts.contains( prim ) )
+    {
+      QMessageBox::warning( dock, QObject::tr( "Primitive unavailable" ),
+                            QObject::tr( "%1 has no records in the selected dataset. Select a dataset containing this primitive." ).arg( prim ) );
+      return;
+    }
+  }
+
+  QSet<QString> paths;
+  for ( const QJsonValue &value : existingMeta )
+  {
+    const QString path = value.toObject().value( QStringLiteral( "file" ) ).toString();
+    if ( path.isEmpty() || paths.contains( path ) )
+    {
+      QMessageBox::warning( dock, QObject::tr( "Invalid metadata" ),
+                            QObject::tr( "Metadata contains an empty or duplicate sample path: %1" ).arg( path ) );
+      return;
+    }
+    paths.insert( path );
+  }
+
+  QStringList plan;
+  int totalMissing = 0;
+  for ( const QString &prim : primitives )
+  {
+    if ( dock->ui->comboPrimitive->findText( prim ) < 0 )
+    {
+      QMessageBox::warning( dock, QObject::tr( "Primitive unavailable" ), prim );
+      return;
+    }
+    QStringList additions;
+    for ( const QString &split : splits )
+    {
+      const QDir classDir( rootDir.filePath( split + QStringLiteral( "/" ) + safeClassDirName( prim ) ) );
+      const int recorded = existingCounts.value( prim ).value( split, 0 );
+      const int onDisk = classDir.entryList( { QStringLiteral( "sample_*.txt" ) }, QDir::Files ).size();
+      if ( recorded != onDisk )
+      {
+        QMessageBox::warning( dock, QObject::tr( "Dataset mismatch" ),
+                              QObject::tr( "%1/%2 has %3 metadata records but %4 files. Resolve this before appending." )
+                                .arg( split, prim ).arg( recorded ).arg( onDisk ) );
+        return;
+      }
+      const int missing = qMax( 0, targetCount( split ) - recorded );
+      totalMissing += missing;
+      additions << QStringLiteral( "%1 +%2" ).arg( splitLabel( split ) ).arg( missing );
+    }
+    plan << QStringLiteral( "%1: %2" ).arg( prim, additions.join( QStringLiteral( ", " ) ) );
+  }
+
+  if ( totalMissing == 0 )
+  {
+    QMessageBox::information( dock, QObject::tr( "Datasets complete" ),
+                              QObject::tr( "Selected classes already meet the target counts." ) );
+    return;
+  }
+  if ( QMessageBox::question( dock, QObject::tr( "Append dataset samples" ),
+                             QObject::tr( "Add %1 samples to %2? Existing samples will be kept.\n\n%3" )
+                               .arg( totalMissing ).arg( rootPath, plan.join( QStringLiteral( "\n" ) ) ) )
+       != QMessageBox::Yes )
+    return;
+
+  const QString originalPrimitive = dock->ui->comboPrimitive->currentText();
+  const bool previousUpdating = dock->m_isUpdating;
+  const QMap<QString, QVector<double>> savedPoses = dock->m_poseMap;
+  dock->m_isUpdating = true;
+  if ( dock->m_previewTimer )
+    dock->m_previewTimer->stop();
+
+  QProgressDialog progress( QObject::tr( "Appending selected datasets..." ),
+                            QObject::tr( "Cancel" ), 0, totalMissing, dock );
+  progress.setWindowModality( Qt::WindowModal );
+  QJsonArray finalMeta = existingMeta;
+  int generated = 0;
+  int failed = 0;
+  for ( const QString &prim : primitives )
+  {
+    if ( progress.wasCanceled() )
+      break;
+    dock->ui->comboPrimitive->setCurrentText( prim );
+    for ( const QString &split : splits )
+    {
+      if ( progress.wasCanceled() )
+        break;
+      const int missing = qMax( 0, targetCount( split ) - existingCounts.value( prim ).value( split, 0 ) );
+      if ( missing == 0 )
+        continue;
+      const QString classDir = safeClassDirName( prim );
+      const QString classPath = rootDir.filePath( split + QStringLiteral( "/" ) + classDir );
+      const int startIndex = maxSampleIndexInDir( classPath );
+      const QJsonArray records = generateSplitSamples( prim, classDir, split, startIndex, missing,
+                                                       rootPath, 2048, dock, progress, generated, failed );
+      for ( const QJsonValue &value : records )
+        finalMeta.append( value );
+    }
+  }
+
+  dock->m_poseMap = savedPoses;
+  dock->ui->comboPrimitive->setCurrentText( originalPrimitive );
+  dock->m_isUpdating = previousUpdating;
+  if ( dock->m_previewTimer )
+    dock->m_previewTimer->stop();
+  dock->onUpdatePreview();
+
+  QString error;
+  if ( !writeJsonDocumentChecked( rootDir.filePath( QStringLiteral( "metadata/sample_params.json" ) ),
+                                  QJsonDocument( finalMeta ), &error ) )
+  {
+    QMessageBox::critical( dock, QObject::tr( "Metadata export failed" ), error );
+    return;
+  }
+  for ( const QString &prim : primitives )
+  {
+    QJsonArray classMeta;
+    for ( const QJsonValue &value : finalMeta )
+      if ( value.toObject().value( QStringLiteral( "type" ) ).toString() == prim )
+        classMeta.append( value );
+    if ( !writeJsonDocumentChecked( rootDir.filePath( QStringLiteral( "metadata/sample_params_%1.json" ).arg( safeClassDirName( prim ) ) ),
+                                    QJsonDocument( classMeta ), &error ) )
+    {
+      QMessageBox::critical( dock, QObject::tr( "Class metadata export failed" ), error );
+      return;
+    }
+  }
+
+  QMessageBox::information( dock, QObject::tr( "Dataset expansion finished" ),
+                            QObject::tr( "Generated: %1\nFailed: %2\nOriginal samples retained.\nFolder: %3" )
+                              .arg( generated ).arg( failed ).arg( rootPath ) );
+}
+
 // ============================================================================
 // single-primitive (replace or append one class)
 // ============================================================================
@@ -399,50 +637,50 @@ void generateSinglePrimitiveDataset( ParamModelerDock *dock )
   if ( prim.isEmpty() )
     return;
 
-  // ---- 0. check existing ---------------------------------------------------
-  const QString selectedPath = QFileDialog::getExistingDirectory(
-    dock, QObject::tr( "Select PointNet Folder" ) );
-  if ( selectedPath.isEmpty() )
-    return;
-  const QString rootPath = datasetRootFromSelectedFolder( selectedPath );
-
-  const QJsonArray existingMeta = loadExistingMetadata( rootPath );
-  const QMap<QString, QMap<QString, int>> existingCounts = countSamplesFromMetadata( existingMeta );
-  const int existTrain = existingCounts.value( prim ).value( QStringLiteral( "train" ), 0 );
-  const int existVal   = existingCounts.value( prim ).value( QStringLiteral( "val" ), 0 );
-  const int existTest  = existingCounts.value( prim ).value( QStringLiteral( "test" ), 0 );
-  const int existTotal = existTrain + existVal + existTest;
-
-  // ---- 1. ask mode ---------------------------------------------------------
+  // ---- 1. choose mode and count --------------------------------------------
   QMessageBox modeDlg( dock );
   modeDlg.setWindowTitle( QObject::tr( "Generate %1 Dataset" ).arg( prim ) );
-  modeDlg.setText( QObject::tr(
-    "Primitive: %1\n"
-    "Existing: train=%2  val=%3  test=%4  (total=%5)\n\n"
-    "What would you like to do?" )
-    .arg( prim )
-    .arg( existTrain ).arg( existVal ).arg( existTest ).arg( existTotal ) );
+  modeDlg.setText( QObject::tr( "Primitive: %1\nWhat would you like to do?" ).arg( prim ) );
   QPushButton *btnReplace = modeDlg.addButton( QObject::tr( "Replace — delete old and regenerate" ), QMessageBox::ActionRole );
   QPushButton *btnAppend  = modeDlg.addButton( QObject::tr( "Append — keep old, add more samples" ), QMessageBox::ActionRole );
-  QPushButton *btnCancel  = modeDlg.addButton( QMessageBox::Cancel );
+  modeDlg.addButton( QMessageBox::Cancel );
   modeDlg.exec();
 
-  if ( modeDlg.clickedButton() == btnCancel )
+  if ( modeDlg.clickedButton() != btnReplace && modeDlg.clickedButton() != btnAppend )
     return;
   const bool appendMode = ( modeDlg.clickedButton() == btnAppend );
 
-  // ---- 2. ask count --------------------------------------------------------
   bool ok = false;
   const int samplesPerClass = QInputDialog::getInt(
     dock,
     QObject::tr( "Generate %1 Dataset" ).arg( prim ),
     appendMode
-      ? QObject::tr( "Additional samples for %1 (existing: %2):" ).arg( prim ).arg( existTotal )
+      ? QObject::tr( "Additional samples for %1:" ).arg( prim )
       : QObject::tr( "Samples for %1:" ).arg( prim ),
     appendMode ? 100 : 500,
     1, 10000, 1, &ok
   );
   if ( !ok )
+    return;
+
+  // ---- 2. choose folder and confirm against its current contents -----------
+  const QString selectedPath = QFileDialog::getExistingDirectory(
+    dock, QObject::tr( "Select PointNet Folder" ) );
+  if ( selectedPath.isEmpty() )
+    return;
+  const QString rootPath = datasetRootFromSelectedFolder( selectedPath );
+  const QJsonArray existingMeta = loadExistingMetadata( rootPath );
+  const QMap<QString, QMap<QString, int>> existingCounts = countSamplesFromMetadata( existingMeta );
+  const int existTrain = existingCounts.value( prim ).value( QStringLiteral( "train" ), 0 );
+  const int existVal   = existingCounts.value( prim ).value( QStringLiteral( "val" ), 0 );
+  const int existTest  = existingCounts.value( prim ).value( QStringLiteral( "test" ), 0 );
+  const QString confirmation = appendMode
+    ? QObject::tr( "Append %1 samples for %2 in %3?\nExisting: train=%4  val=%5  test=%6." )
+        .arg( samplesPerClass ).arg( prim, rootPath ).arg( existTrain ).arg( existVal ).arg( existTest )
+    : QObject::tr( "Replace %1 in %2? Existing files for this primitive will be deleted.\nExisting: train=%3  val=%4  test=%5.\nNew samples: %6." )
+        .arg( prim, rootPath ).arg( existTrain ).arg( existVal ).arg( existTest ).arg( samplesPerClass );
+  if ( QMessageBox::question( dock, QObject::tr( "Generate %1 Dataset" ).arg( prim ), confirmation,
+                              QMessageBox::Yes | QMessageBox::No, QMessageBox::No ) != QMessageBox::Yes )
     return;
 
   // ---- 3. prepare ----------------------------------------------------------
@@ -524,8 +762,6 @@ void generateSinglePrimitiveDataset( ParamModelerDock *dock )
   // ---- 5. merge metadata ---------------------------------------------------
   QString metadataError;
   const QString classMetadataPath = rootDir.filePath( QStringLiteral( "metadata/sample_params_" ) + classDir + QStringLiteral( ".json" ) );
-  const bool classMetadataOk = writeJsonDocumentChecked( classMetadataPath, QJsonDocument( newRecords ), &metadataError );
-
   bool mergedMetadata = false;
   QString mergeMessage;
   const QString metadataPath = rootDir.filePath( QStringLiteral( "metadata/sample_params.json" ) );
@@ -571,6 +807,16 @@ void generateSinglePrimitiveDataset( ParamModelerDock *dock )
   if ( !mergedMetadata )
     mergeMessage = QObject::tr( "sample_params.json write failed: %1" ).arg( mergeError );
 
+  bool classMetadataOk = false;
+  if ( mergedMetadata )
+  {
+    QJsonArray classMeta;
+    for ( const QJsonValue &value : finalMeta )
+      if ( value.toObject().value( QStringLiteral( "type" ) ).toString() == prim )
+        classMeta.append( value );
+    classMetadataOk = writeJsonDocumentChecked( classMetadataPath, QJsonDocument( classMeta ), &metadataError );
+  }
+
   // ---- 6. restore state ----------------------------------------------------
   dock->m_poseMap = savedPoses;
   dock->ui->comboPrimitive->setCurrentText( originalPrimitive );
@@ -579,6 +825,11 @@ void generateSinglePrimitiveDataset( ParamModelerDock *dock )
     dock->m_previewTimer->stop();
   dock->onUpdatePreview();
 
+  if ( !mergedMetadata )
+  {
+    QMessageBox::critical( dock, QObject::tr( "Metadata export failed" ), mergeMessage );
+    return;
+  }
   if ( !classMetadataOk )
   {
     QMessageBox::critical(

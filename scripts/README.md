@@ -1,6 +1,36 @@
 # ParamModeler 深度学习完整流程
 
-## 总览
+## v3：全部 13 类补齐到 800/100/100
+
+在 QGIS 的 **Dataset → Complete selected primitive datasets...** 中点 **Select all trainable primitives**，保持 Train 800、Validation 100、Test 100，再选择原始数据集文件夹 `E:/pointnet/datasets`。三棱柱未纳入这 13 类训练。确认后只生成九类各 500 个缺失样本，合计 4500 个，不覆盖旧点云。
+
+本次 v3 在 Windows CMD 中运行 `E:/pointnet/ptv3_simple/augment_dataset.py`，对全部 13 类重建增强集：
+
+```cmd
+python E:\pointnet\ptv3_simple\augment_dataset.py --input E:\pointnet\datasets --output E:\pointnet\datasets_aug --overwrite --no-drop_bottom --noise_sigma 0.006 --outlier_ratio 0.003 --outlier_extent 0.03
+```
+
+不写 `--classes` 即处理全部类别；`--overwrite` 会重建整个 `datasets_aug`，旧增强点云也会重新生成，孔洞沿用脚本默认设置。本次输出 success=13000、failed=0，bbox-min 漂移最大 0.0465。若以后只想增强新追加的样本，仓库另有 `scripts/augment_added_samples.py` 可先用 `--dry-run` 检查；它不是本次 v3 使用的命令。
+
+增强集补齐后同步到 Ubuntu，在 `ptv3_train` 环境下从 `ptv3_simple` 目录启动 v3（普通损失，不加 `--indented_symmetry_180`）：
+
+```bash
+nohup python -u train_ptv3_reg.py --data_root /home/xubo/pointnet/datasets_aug --run_tag v3 --expected_split_counts 800 100 100 > logs/ptv3_reg_v3_train.log 2>&1 &
+```
+
+回归完成后再训练分类 v5，避免两项任务在同一 GPU 上抢显存；分类成功后自动跑测试集：
+
+```bash
+nohup sh -c 'python -u main.py --mode train --data_root /home/xubo/pointnet/datasets_aug --log_dir logs/ptv3_cls_v5 --use_normals --seed 42 && python -u main.py --mode test --data_root /home/xubo/pointnet/datasets_aug --log_dir logs/ptv3_cls_v5 --split test' > logs/ptv3_cls_v5_train.log 2>&1 &
+```
+
+服务端副本在 `scripts/ptv3_server.py`，部署到 Ubuntu 的 `ptv3_simple/ptv3_server.py` 后，在 `ptv3_train` 环境中启动 `python -m uvicorn ptv3_server:app --host 0.0.0.0 --port 8008`。部署前先比较服务端文件，避免覆盖其未同步的改动。用 `curl -s http://127.0.0.1:8008/health` 核对 `cls_log` 为 v5、`reg_suffix` 为 `_v3_normals`；Windows 端再通过插件选定的 LAN/Tailscale 地址检查 `/health`。切换网络地址不需要重新训练，但实际分类/回归仍需在 QGIS 中验证。
+
+## 历史 PointNeXt 流程（归档）
+
+以下步骤保留旧实验记录，涉及 500 样本/类、`pointnext_simple` 和 `_aux`。它们不是当前 PTv3 v3/v5 的操作说明；当前命令以上一节为准。
+
+### 旧流程总览
 
 ```
 Windows (QGIS)                    Windows (Python)               Ubuntu (GPU)
@@ -17,7 +47,7 @@ datasets/  ─────────────────→  datasets_aug/
 ## 第 1 步：Windows — QGIS 插件生成数据集
 
 在 QGIS 中打开 ParamModeler 面板 → 点击 **"Export DL Dataset (All Classes)"**
-→ 选择输出目录 → 当前标准: 500 样本/类（train 400 + val 50 + test 50） → 等待完成
+→ 选择输出目录 → 当时标准: 500 样本/类（train 400 + val 50 + test 50） → 等待完成
 
 输出:
 ```
@@ -62,7 +92,7 @@ python augment_dataset.py \
 
 增强内容包括：底部点丢弃、侧面遮挡（模拟拍照盲区）、随机挖洞、高斯噪声、离群点。
 
-> **注意**：增强是在原始 500 样本/类基础上进一步增加变体，不是替换。如果原始数据已足够多样，可跳过此步直接训练。
+> **历史说明**：当时增强基于原始 500 样本/类；当前 PTv3 v3 使用顶部记录的 1000 样本/类和完整重建命令。
 
 ---
 
@@ -114,13 +144,13 @@ python main.py --mode test \
 
 ## 第 5 步：Ubuntu — 参数回归训练
 
-当前主力模型为 `_aux`（纯形状参数，不含 pose）。
+当时的 PointNeXt 主力模型为 `_aux`（纯形状参数，不含 pose）。
 
 ```bash
 # 先快速验证（可选）
 bash quick_sanity_check.sh
 
-# 全量训练 13 类（_aux 版本 — 当前主力）
+# 全量训练 13 类（历史 _aux 版本）
 bash train_reg_aux.sh
 
 # 如果需要含旋转标签版本（实验性，形状参数精度更低）：
@@ -141,7 +171,7 @@ logs/pointnext_reg_cuboid_aux/
 
 | 版本 | 后缀 | 回归目标 | 状态 |
 |------|------|---------|------|
-| `_aux` | 当前主力 | 纯形状参数（length, width, height, ratio, bulge, wallRatio...） | ✅ 使用中 |
+| `_aux` | 当时主力 | 纯形状参数（length, width, height, ratio, bulge, wallRatio...） | 历史对照 |
 | `_rot` | 已弃用 | 形状参数 + rz | ❌ 形状参数精度明显更差，不建议使用 |
 
 > `_rot` 版本虽然能预测旋转角，但形状参数精度下降严重。**根因不是数据量**：rz 这个标签在
@@ -221,7 +251,7 @@ scp -r xubo@<ubuntu-ip>:/home/xubo/pointnet/pointnext_simple/logs/pointnext_reg_
 | `main.py --mode test` | Ubuntu | 分类测试 |
 | `main_reg.py --mode train` | Ubuntu | 回归训练（每类单独） |
 | `main_reg.py --mode test` | Ubuntu | 回归测试 |
-| `train_reg_aux.sh` | Ubuntu | 13 类回归一键训练（`_aux`，当前主力） |
+| `train_reg_aux.sh` | Ubuntu | 13 类 PointNeXt 回归一键训练（`_aux`，历史） |
 | `train_reg_with_rot.sh` | Ubuntu | 13 类回归训练（`_rot`，已弃用） |
 | `test_all_reg.sh` | Ubuntu | 13 类回归批量测试 |
 | `quick_sanity_check.sh` | Ubuntu | 1 类 5 epoch 快速验证 |

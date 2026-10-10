@@ -62,6 +62,7 @@ class TranslationsTest(unittest.TestCase):
         try:
             self.assertEqual([a.text() for a in dock.menuBar.actions()], ["场景", "导出", "数据集"])
             self.assertEqual(dock.actEvaluationCSV.text(), "当前评估 CSV...")
+            self.assertEqual(dock.actCompleteSelectedDLDatasets.text(), "补齐所选基元数据集...")
             self.assertEqual([dock.comboPrimitive.itemText(i) for i in range(dock.comboPrimitive.count())], PRIMITIVES)
         finally:
             dock.close()
@@ -71,6 +72,7 @@ class TranslationsTest(unittest.TestCase):
         dock = uic.loadUi(str(ROOT / "parammodeler_dock.ui"))
         try:
             self.assertEqual([a.text() for a in dock.menuBar.actions()], ["Scene", "Export", "Dataset"])
+            self.assertEqual(dock.actCompleteSelectedDLDatasets.text(), "Complete selected primitive datasets...")
             self.assertEqual([dock.comboPrimitive.itemText(i) for i in range(dock.comboPrimitive.count())], PRIMITIVES)
         finally:
             dock.close()
@@ -82,6 +84,26 @@ class TranslationsTest(unittest.TestCase):
                          "鼠标 12 像素范围内没有点云点。请放大后直接点击可见点。")
         self.assertEqual(QtCore.QCoreApplication.translate("ParamModelerHeightControl", "Height unchanged: translation limit reached."),
                          "已达平移范围限制，高度未改变。")
+        for source, translated in (("Train", "训练"), ("Validation", "验证"), ("Test", "测试")):
+            self.assertEqual(QtCore.QCoreApplication.translate("QObject", source), translated)
+        self.assertEqual(
+            QtCore.QCoreApplication.translate(
+                "QObject", "%1 has no records in the selected dataset. Select a dataset containing this primitive."
+            ),
+            "所选数据集中没有 %1 的记录。请选择包含该基元的数据集。",
+        )
+        self.assertEqual(
+            QtCore.QCoreApplication.translate("QObject", "Additional samples for %1:"),
+            "%1 新增样本数：",
+        )
+        self.assertIn(
+            "旧文件将被删除",
+            QtCore.QCoreApplication.translate(
+                "QObject",
+                "Replace %1 in %2? Existing files for this primitive will be deleted.\n"
+                "Existing: train=%3  val=%4  test=%5.\nNew samples: %6.",
+            ),
+        )
 
     def test_internal_primitive_items_are_not_translatable(self):
         tree = ET.parse(ROOT / "parammodeler_dock.ui")

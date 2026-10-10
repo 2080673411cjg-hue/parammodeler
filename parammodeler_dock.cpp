@@ -671,6 +671,7 @@ void ParamModelerDock::initConnections()
   connect( ui->actLoadedDLPointCloud, &QAction::triggered, this, &ParamModelerDock::onExportLoadedDLPointCloudClicked );
   connect( ui->actDLDataset, &QAction::triggered, this, &ParamModelerDock::onExportDLDatasetClicked );
   connect( ui->actCurrentPrimitiveDLDataset, &QAction::triggered, this, &ParamModelerDock::onExportCurrentPrimitiveDLDatasetClicked );
+  connect( ui->actCompleteSelectedDLDatasets, &QAction::triggered, this, &ParamModelerDock::onCompleteSelectedDLDatasetsClicked );
   connect( ui->actMesh, &QAction::triggered, this, &ParamModelerDock::onExportMeshClicked );
   connect( ui->actTo3D, &QAction::triggered, this, [this]() { onLoadToQGIS3D( true ); } );
   connect( ui->actLoadPC, &QAction::triggered, this, &ParamModelerDock::onLoadExternalPointCloud );
@@ -1370,6 +1371,11 @@ void ParamModelerDock::onExportDLDatasetClicked()
 void ParamModelerDock::onExportCurrentPrimitiveDLDatasetClicked()
 {
   generateSinglePrimitiveDataset( this );
+}
+
+void ParamModelerDock::onCompleteSelectedDLDatasetsClicked()
+{
+  completeSelectedPrimitiveDatasets( this );
 }
 
 // ========================Export Mesh====================
