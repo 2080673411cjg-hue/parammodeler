@@ -201,6 +201,7 @@ private:
   void alignModelToPointCloud( const MeshData &mesh, const QVector3D &pcRef,
                                const QString &primitiveType, const QString &context,
                                bool semanticUpper = false );
+  void alignIndentedInteriorToPointCloud();
 
   // 把 metadata 里记录的导出朝向 rz 回填到 pose（spinBoxRKappa）。
   // 点云坐标导出时已经被 applyPose 转过 rz，模型补上同一个角才能对上朝向。

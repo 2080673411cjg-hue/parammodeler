@@ -59,6 +59,11 @@ bool usesSemanticUpperAlignment( const QString &primitiveType );
 QMatrix4x4 modelRotationMatrix( const ParamModelerDock *dock );
 void hardBBoxFromPoints( const QVector<QVector3D> &points, QVector3D &outMin, QVector3D &outMax );
 void robustBBoxFromPoints( const QVector<QVector3D> &points, QVector3D &outMin, QVector3D &outMax );
+bool estimateIndentedInnerBox( const QVector<QVector3D> &points,
+                               const QVector3D &fpMin, const QVector3D &fpMax,
+                               double zMin, double height,
+                               QVector3D &innerMin, QVector3D &innerMax,
+                               double &innerHeight );
 bool semanticUpperPointCloudTarget( const QString &filePath, const QString &primitiveType,
                                     double rzDeg, double fallbackUpperOffset,
                                     bool useDisplayCoordinates, bool displayWasRestored,

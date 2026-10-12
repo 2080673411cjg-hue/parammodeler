@@ -4,9 +4,9 @@ import hashlib
 import json
 import subprocess
 
-PLUGIN = Path(__file__).resolve().parents[1]
+PLUGIN = Path(__file__).resolve().parents[2]
 ROOT = PLUGIN.parents[2]
-DEST = PLUGIN / 'backups' / '2026-09-17-before-qgis-close-zoom'
+DEST = PLUGIN / 'archive' / '2026-09-17-before-qgis-close-zoom'
 
 
 def normalize(data):
@@ -22,7 +22,7 @@ def replace_once(text, old, new):
 def main():
     if DEST.exists():
         raise RuntimeError('Backup already exists; refusing to overwrite')
-    patch = (PLUGIN / 'patches/qgis-close-zoom.applypatch').read_text(encoding='utf-8')
+    patch = (PLUGIN / 'archive/patches/qgis-close-zoom.applypatch').read_text(encoding='utf-8')
     sections = patch.split('*** Update File: ')[1:]
     pairs = {}
     for section in sections:

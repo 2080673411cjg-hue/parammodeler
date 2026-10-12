@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 plugin = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('restore', plugin / 'patches/restore_close_zoom_backup.py')
+spec = importlib.util.spec_from_file_location('restore', plugin / 'archive/patches/restore_close_zoom_backup.py')
 restore = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(restore)
 manifest = json.loads((restore.BACKUP / 'manifest.json').read_text(encoding='utf-8'))

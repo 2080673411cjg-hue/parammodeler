@@ -1040,24 +1040,38 @@ Parameters applied to main panel.</source>
         <source>Basic workflow:
 1. Load an input point cloud.
 2. Use Classify and estimate parameters... or Complete all.
-3. Enable geometry correction when the visible footprint is reliable.
+3. Complete all loads the model and point cloud into 3D and applies automatic alignment.
 4. Use Align in 3D for point picking, or Fit corner from three faces... for missing-corner cases.
 5. Fine-tune parameters, position and rotation in the main panel.
 6. Export model files or Current evaluation CSV from the Export menu.
 
+Fine tuning:
+- IndentedCuboid automatically aligns the inner top-left corner after outer alignment; inner length, width and depth keep their estimated values.
+- Adjusting inner length or width keeps this corner fixed and moves the opposite edge, up to the outer boundary.
+- Height arrows select the fixed end; the inner recess depth defaults to keeping its top rim fixed.
+
 Notes:
+- Geometry correction is optional parameter refinement, disabled by default; automatic alignment works with it disabled.
+- FourStageRoundTower uses the full point-cloud extent to estimate its horizontal center.
 - Wireframe helps compare the model with the point cloud.
 - Reset prediction restores the last deep-learning parameter result.
 - Three-face fitting moves the model only; it does not resize or rotate it.</source>
         <translation>基本流程：
 1. 加载输入点云。
 2. 使用“分类并估计参数...”或“一键完成”。
-3. 当可见底面轮廓可靠时，启用几何校正。
+3. “一键完成”会将模型与点云加载到 3D 场景，并执行自动对齐。
 4. 使用“3D 对齐”点选目标点；角点缺失时使用“三面拟合角点...”。
 5. 在主面板中微调参数、位置和旋转。
 6. 从“导出”菜单导出模型文件或当前评估 CSV。
 
+微调：
+- 凹陷长方体在外框对齐后，独立对齐内槽顶面左下角；内槽长宽和深度保留估计结果。
+- 调整内槽长度或宽度时，左下角固定，只移动另一端；增长到外框边界时停止。
+- 高度行的箭头选择固定端；内槽深度默认固定顶面开口边缘。
+
 说明：
+- 几何校正是可选的参数修正，默认关闭；自动对齐无需开启它。
+- 四段式圆塔使用点云完整轮廓估计水平中心。
 - 线框模式便于对比模型和点云。
 - 恢复预测会还原最近一次深度学习参数结果。
 - 三面拟合只移动模型，不会缩放或旋转模型。</translation>

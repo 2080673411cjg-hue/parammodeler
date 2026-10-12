@@ -9,7 +9,7 @@
 这是根据已记录改动事后重建并核验的源码备份，不是事前快照或 DLL 备份。
 核心文件已反向重建并正向重放验证，dock 保留之前未提交的功能。
 
-在插件目录执行 `python patches/restore_close_zoom_backup.py` 仅校验。
+在插件目录执行 `python archive/patches/restore_close_zoom_backup.py` 仅校验。
 用户决定回退后，关闭 QGIS，在有核心目录写权限的环境中加 `--apply` 执行，
 再重新编译并部署 `qgis_3d` 和 `plugin_parammodeler`。
 

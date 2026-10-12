@@ -4,9 +4,9 @@ import argparse
 import hashlib
 import json
 
-PLUGIN = Path(__file__).resolve().parents[1]
+PLUGIN = Path(__file__).resolve().parents[2]
 ROOT = PLUGIN.parents[2]
-BACKUP = PLUGIN / 'backups/2026-09-17-before-qgis-close-zoom'
+BACKUP = PLUGIN / 'archive/2026-09-17-before-qgis-close-zoom'
 
 
 def digest(data):

@@ -8,14 +8,14 @@ and a backup before editing.
 git-apply diff. The experiment has now been REVERTED at the user's request.
 The patch is an archive only and must not be reapplied without approval.
 
-Source backups: `../backups/2026-09-17-before-qgis-close-zoom/`.
+Source backups: `../2026-09-17-before-qgis-close-zoom/`.
 These were reconstructed after editing, with core reverse/forward round-trip
 verification and SHA-256 checksums. No previous DLL backup is available.
 
 From the plugin directory:
 
 ```text
-python patches/restore_close_zoom_backup.py
+python archive/patches/restore_close_zoom_backup.py
 ```
 
 This checks all backup and live source hashes without changing live sources.

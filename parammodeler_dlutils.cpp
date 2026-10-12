@@ -1335,14 +1335,14 @@ static bool estimateLHouseCutoutRatios( const QVector<QVector3D> &points,
   return true;
 }
 
-static bool estimateIndentedInnerBox( const QVector<QVector3D> &points,
-                                      const QVector3D &fpMin,
-                                      const QVector3D &fpMax,
-                                      double zMin,
-                                      double height,
-                                      QVector3D &innerMin,
-                                      QVector3D &innerMax,
-                                      double &innerHeight )
+bool estimateIndentedInnerBox( const QVector<QVector3D> &points,
+                               const QVector3D &fpMin,
+                               const QVector3D &fpMax,
+                               double zMin,
+                               double height,
+                               QVector3D &innerMin,
+                               QVector3D &innerMax,
+                               double &innerHeight )
 {
   const double length = static_cast<double>( fpMax.x() - fpMin.x() );
   const double width = static_cast<double>( fpMax.y() - fpMin.y() );
@@ -1351,18 +1351,71 @@ static bool estimateIndentedInnerBox( const QVector<QVector3D> &points,
 
   const double marginX = length * 0.08;
   const double marginY = width * 0.08;
+  QVector<QVector3D> interior;
+  QVector<float> interiorHeights;
+  for ( const QVector3D &p : points )
+  {
+    if ( p.x() > fpMin.x() + marginX && p.x() < fpMax.x() - marginX &&
+         p.y() > fpMin.y() + marginY && p.y() < fpMax.y() - marginY &&
+         p.z() > zMin + height * 0.20 && p.z() < zMin + height * 0.95 )
+    {
+      interior.append( p );
+      interiorHeights.append( p.z() );
+    }
+  }
+  if ( interior.size() < std::max( 40, static_cast<int>( points.size() * 0.04 ) ) )
+    return false;
+
+  std::sort( interiorHeights.begin(), interiorHeights.end() );
+  const double floorZ = interiorHeights[static_cast<int>( interiorHeights.size() * 0.10 )];
+  const double floorBand = std::max( 0.04, height * 0.025 );
   QVector3D recessMin, recessMax;
-  if ( !robustSliceBBox( points, [&]( const QVector3D &p ) {
-         const double x = static_cast<double>( p.x() );
-         const double y = static_cast<double>( p.y() );
-         const double z = static_cast<double>( p.z() );
-         return x > static_cast<double>( fpMin.x() ) + marginX &&
-                x < static_cast<double>( fpMax.x() ) - marginX &&
-                y > static_cast<double>( fpMin.y() ) + marginY &&
-                y < static_cast<double>( fpMax.y() ) - marginY &&
-                z > zMin + height * 0.20;
+  if ( !robustSliceBBox( interior, [&]( const QVector3D &p ) {
+         return std::abs( static_cast<double>( p.z() ) - floorZ ) <= floorBand;
        }, recessMin, recessMax, std::max( 20, static_cast<int>( points.size() * 0.02 ) ) ) )
     return false;
+
+  // Use the floor only to locate the recess. The final XY edges are the
+  // top rim, so the anchor is the upper left/front corner of the opening.
+  const double rimZ = zMin + height * 0.96;
+  const double insetX = ( recessMax.x() - recessMin.x() ) * 0.10;
+  const double insetY = ( recessMax.y() - recessMin.y() ) * 0.10;
+  const auto rimEdge = [&]( bool xAxis, double estimate, double tolerance,
+                            double otherMin, double otherMax, double &value ) -> bool
+  {
+    QVector<float> coordinates;
+    for ( const QVector3D &p : points )
+    {
+      if ( p.z() < rimZ )
+        continue;
+      const double axisValue = xAxis ? p.x() : p.y();
+      const double otherValue = xAxis ? p.y() : p.x();
+      if ( std::abs( axisValue - estimate ) <= tolerance &&
+           otherValue > otherMin && otherValue < otherMax )
+        coordinates.append( static_cast<float>( axisValue ) );
+    }
+    if ( coordinates.size() < 5 )
+      return false;
+    std::sort( coordinates.begin(), coordinates.end() );
+    value = coordinates[coordinates.size() / 2];
+    return true;
+  };
+
+  double left, right, front, back;
+  if ( rimEdge( true, recessMin.x(), length * 0.04,
+                recessMin.y() + insetY, recessMax.y() - insetY, left ) &&
+       rimEdge( true, recessMax.x(), length * 0.04,
+                recessMin.y() + insetY, recessMax.y() - insetY, right ) &&
+       rimEdge( false, recessMin.y(), width * 0.04,
+                recessMin.x() + insetX, recessMax.x() - insetX, front ) &&
+       rimEdge( false, recessMax.y(), width * 0.04,
+                recessMin.x() + insetX, recessMax.x() - insetX, back ) )
+  {
+    recessMin.setX( static_cast<float>( left ) );
+    recessMin.setY( static_cast<float>( front ) );
+    recessMax.setX( static_cast<float>( right ) );
+    recessMax.setY( static_cast<float>( back ) );
+  }
 
   const double innerLength = static_cast<double>( recessMax.x() - recessMin.x() );
   const double innerWidth = static_cast<double>( recessMax.y() - recessMin.y() );
@@ -1370,25 +1423,9 @@ static bool estimateIndentedInnerBox( const QVector<QVector3D> &points,
        innerWidth < width * 0.08 || innerWidth > width * 0.92 )
     return false;
 
-  double recessFloor = std::numeric_limits<double>::infinity();
-  int floorCount = 0;
-  for ( const QVector3D &p : points )
-  {
-    const double x = static_cast<double>( p.x() );
-    const double y = static_cast<double>( p.y() );
-    if ( x >= static_cast<double>( recessMin.x() ) && x <= static_cast<double>( recessMax.x() ) &&
-         y >= static_cast<double>( recessMin.y() ) && y <= static_cast<double>( recessMax.y() ) )
-    {
-      recessFloor = std::min( recessFloor, static_cast<double>( p.z() ) );
-      ++floorCount;
-    }
-  }
-  if ( floorCount < 12 || !std::isfinite( recessFloor ) )
-    return false;
-
-  innerMin = recessMin;
-  innerMax = recessMax;
-  innerHeight = std::max( 0.0, zMin + height - recessFloor );
+  innerMin = QVector3D( recessMin.x(), recessMin.y(), static_cast<float>( zMin + height ) );
+  innerMax = QVector3D( recessMax.x(), recessMax.y(), static_cast<float>( zMin + height ) );
+  innerHeight = std::max( 0.0, zMin + height - floorZ );
   return innerHeight > 1e-6;
 }
 
@@ -1690,8 +1727,9 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
       innerLength = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icInnerL" ), static_cast<double>( innerMax.x() - innerMin.x() ), strength );
       innerWidth = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icInnerW" ), static_cast<double>( innerMax.y() - innerMin.y() ), strength );
       innerHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icInnerH" ), innerHeightGeo, strength );
-      offsetX = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOffsetX" ), static_cast<double>( innerMin.x() - fpMin.x() ), strength );
-      offsetY = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOffsetY" ), static_cast<double>( innerMin.y() - fpMin.y() ), strength );
+      const double anchorStrength = strength > 0.0 ? 1.0 : 0.0;
+      offsetX = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOffsetX" ), static_cast<double>( innerMin.x() - fpMin.x() ), anchorStrength );
+      offsetY = applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOffsetY" ), static_cast<double>( innerMin.y() - fpMin.y() ), anchorStrength );
     }
     DEBUG_LOG( QString( "[ParamCorrection] IndentedCuboid source=%1 strength=%2 geoOuter=(%3,%4,%5) geoInner=%6 corrected=(%7,%8,%9,%10,%11,%12,%13,%14) rz=%15\n" )
                  .arg( fpSource )

@@ -112,6 +112,9 @@ void ParamModelerDock::alignModelToPointCloud( const MeshData &mesh, const QVect
     const double tz = static_cast<double>( pcRef.z() ) - static_cast<double>( mRef.z() );
     setPoseTranslate( tx, ty, tz );
 
+    if ( primitiveType == QLatin1String( "IndentedCuboid" ) )
+      alignIndentedInteriorToPointCloud();
+
     DEBUG_LOG( QString( "[Align] %1 anchor=%2 rz=%3 pcRef=(%4,%5,%6) modelRef=(%7,%8,%9) → tx=%10 ty=%11 tz=%12\n" )
                  .arg( context )
                  .arg( semanticUpper ? QStringLiteral( "upper-origin" )
@@ -121,6 +124,70 @@ void ParamModelerDock::alignModelToPointCloud( const MeshData &mesh, const QVect
                  .arg( mRef.x(), 0, 'f', 2 ).arg( mRef.y(), 0, 'f', 2 ).arg( mRef.z(), 0, 'f', 2 )
                  .arg( tx, 0, 'f', 2 ).arg( ty, 0, 'f', 2 ).arg( tz, 0, 'f', 2 )
                  .toStdWString().c_str() );
+}
+
+void ParamModelerDock::alignIndentedInteriorToPointCloud()
+{
+  if ( m_inputDataPath.isEmpty() )
+    return;
+
+  const PointCloud cloud = PointCloudLoader::load( m_inputDataPath );
+  if ( cloud.points.size() < 100 )
+    return;
+
+  const bool normalized = pointCloudLooksNormalizedForDisplay( cloud );
+  const bool matchesDisplay = m_hasDisplayCloudBBox &&
+    QFileInfo( m_displayCloudSourcePath ).absoluteFilePath().compare(
+      QFileInfo( m_inputDataPath ).absoluteFilePath(), Qt::CaseInsensitive ) == 0;
+  if ( normalized && !( matchesDisplay && m_displayCloudWasRestored ) &&
+       ( !m_hasMetadata || pointCloudMetadataLooksBuggy( m_metadataCenter, m_metadataScale ) ) )
+    return;
+
+  const QVector3D restoreCenter = matchesDisplay && m_displayCloudWasRestored
+    ? m_displayCloudRestoreCenter : m_metadataCenter;
+  const double restoreScale = matchesDisplay && m_displayCloudWasRestored
+    ? m_displayCloudRestoreScale : m_metadataScale;
+  const QVector3D translation( static_cast<float>( poseTranslateX() ),
+                               static_cast<float>( poseTranslateY() ),
+                               static_cast<float>( poseTranslateZ() ) );
+  bool invertible = false;
+  const QMatrix4x4 inverseRotation = modelRotationMatrix( this ).inverted( &invertible );
+  if ( !invertible )
+    return;
+
+  QVector<QVector3D> localPoints;
+  localPoints.reserve( cloud.points.size() );
+  for ( const QVector3D &p : cloud.points )
+  {
+    QVector3D world = normalized ? p * static_cast<float>( restoreScale ) + restoreCenter : p;
+    if ( normalized && world.z() < 0.0f )
+      world.setZ( 0.0f );
+    localPoints.append( inverseRotation.map( world - translation ) );
+  }
+
+  QVector3D outerMin, outerMax, hardMin, hardMax;
+  robustBBoxFromPoints( localPoints, outerMin, outerMax );
+  hardBBoxFromPoints( localPoints, hardMin, hardMax );
+  QVector3D innerMin, innerMax;
+  double innerHeight = 0.0;
+  if ( !estimateIndentedInnerBox( localPoints, outerMin, outerMax, hardMin.z(),
+                                  hardMax.z() - hardMin.z(), innerMin, innerMax, innerHeight ) )
+    return;
+
+  const double outerLength = icOuterLength();
+  const double outerWidth = icOuterWidth();
+  const double movableX = std::max( 0.0, outerLength - icInnerLength() );
+  const double movableY = std::max( 0.0, outerWidth - icInnerWidth() );
+  if ( movableX < 1e-6 || movableY < 1e-6 )
+    return;
+  const double offsetX = qBound( 0.0, static_cast<double>( innerMin.x() ), movableX );
+  const double offsetY = qBound( 0.0, static_cast<double>( innerMin.y() ), movableY );
+  ui->spinBoxICOffsetX->setValue( offsetX / movableX );
+  ui->spinBoxICOffsetY->setValue( offsetY / movableY );
+
+  DEBUG_LOG( QString( "[AlignInner] top-left=(%1,%2); outer pose and inner size unchanged\n" )
+               .arg( offsetX, 0, 'f', 2 ).arg( offsetY, 0, 'f', 2 )
+               .toStdWString().c_str() );
 }
 
 // ============================================================
@@ -706,8 +773,13 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
 
     QVector3D sliceMin, sliceMax;
     const int minSlicePoints = std::max( 50, static_cast<int>( std::ceil( points.size() * 0.05 ) ) );
-    bool useBottomSlice = bottomSlice.size() >= minSlicePoints;
-    QString sliceReason = useBottomSlice ? QStringLiteral( "ok" ) : QStringLiteral( "too-few-points" );
+    // The tower's short lower cylinder is partly occluded, while its wider
+    // eave supplies a nearly complete circle. A bottom-slice bbox shifts its
+    // apparent center toward the visible wall arc.
+    const bool tower = ui->comboPrimitive->currentText() == QLatin1String( "FourStageRoundTower" );
+    bool useBottomSlice = !tower && bottomSlice.size() >= minSlicePoints;
+    QString sliceReason = tower ? QStringLiteral( "tower-full-extent" )
+                                : ( useBottomSlice ? QStringLiteral( "ok" ) : QStringLiteral( "too-few-points" ) );
     if ( useBottomSlice )
     {
       robustBBoxFromPoints( bottomSlice, sliceMin, sliceMax );

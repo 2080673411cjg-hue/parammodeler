@@ -452,6 +452,8 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderICInnerHeight, ui->spinBoxICInnerHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderICOffsetX, ui->spinBoxICOffsetX, 100.0, 1.0, 0.0 );
   bindSliderSpin( ui->sliderICOffsetY, ui->spinBoxICOffsetY, 100.0, 1.0, 0.0 );
+  ui->spinBoxICOffsetX->setDecimals( 6 );
+  ui->spinBoxICOffsetY->setDecimals( 6 );
   bindSliderSpin( ui->sliderAGHLength, ui->spinBoxAGHLength, 100, 50 );
   bindSliderSpin( ui->sliderAGHWidth, ui->spinBoxAGHWidth, 100, 50 );
   bindSliderSpin( ui->sliderAGHHeightWall, ui->spinBoxAGHHeightWall, 100, 50 );
@@ -617,6 +619,38 @@ void ParamModelerDock::initHeightDirectionControls()
 
 void ParamModelerDock::initConnections()
 {
+  const auto bindFixedInnerCorner = [this]( QDoubleSpinBox *inner, QSlider *slider,
+                                           QDoubleSpinBox *outer, QDoubleSpinBox *offset ) {
+    inner->setKeyboardTracking( false );
+    connect( inner, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this,
+      [this, inner, slider, outer, offset, previous = inner->value()]( double value ) mutable {
+        const double oldSize = previous;
+        previous = value;
+        if ( m_suspendHeightCompensation || m_isUpdating ||
+             !ui->stackedWidgetParams->currentWidget()->isAncestorOf( inner ) )
+          return;
+
+        // Ratios encode position; resize about the existing physical corner.
+        const double fixedOffset = offset->value() * std::max( 0.0, outer->value() - oldSize );
+        const double maxSize = std::max( 0.0, outer->value() - fixedOffset );
+        if ( value > maxSize )
+        {
+          const double units = std::pow( 10.0, inner->decimals() );
+          value = std::floor( maxSize * units + 1e-8 ) / units;
+          const QSignalBlocker spinBlocker( inner ), sliderBlocker( slider );
+          inner->setValue( value );
+          slider->setValue( qRound( inner->value() * 100.0 ) );
+          previous = inner->value();
+        }
+        const double movable = std::max( 0.0, outer->value() - inner->value() );
+        offset->setValue( movable > 1e-6 ? qBound( 0.0, fixedOffset / movable, 1.0 ) : 0.0 );
+      } );
+  };
+  bindFixedInnerCorner( ui->spinBoxICInnerLength, ui->sliderICInnerLength,
+                       ui->spinBoxICLength, ui->spinBoxICOffsetX );
+  bindFixedInnerCorner( ui->spinBoxICInnerWidth, ui->sliderICInnerWidth,
+                       ui->spinBoxICWidth, ui->spinBoxICOffsetY );
+
   auto syncHCRRadius = [this]() {
     ui->spinBoxHCRRadius->setValue( ui->spinBoxHCRWidth->value() / 2.0 );
   };
@@ -656,11 +690,17 @@ void ParamModelerDock::initConnections()
       tr( "Basic workflow:\n"
           "1. Load an input point cloud.\n"
           "2. Use Classify and estimate parameters... or Complete all.\n"
-          "3. Enable geometry correction when the visible footprint is reliable.\n"
+          "3. Complete all loads the model and point cloud into 3D and applies automatic alignment.\n"
           "4. Use Align in 3D for point picking, or Fit corner from three faces... for missing-corner cases.\n"
           "5. Fine-tune parameters, position and rotation in the main panel.\n"
           "6. Export model files or Current evaluation CSV from the Export menu.\n\n"
+          "Fine tuning:\n"
+          "- IndentedCuboid automatically aligns the inner top-left corner after outer alignment; inner length, width and depth keep their estimated values.\n"
+          "- Adjusting inner length or width keeps this corner fixed and moves the opposite edge, up to the outer boundary.\n"
+          "- Height arrows select the fixed end; the inner recess depth defaults to keeping its top rim fixed.\n\n"
           "Notes:\n"
+          "- Geometry correction is optional parameter refinement, disabled by default; automatic alignment works with it disabled.\n"
+          "- FourStageRoundTower uses the full point-cloud extent to estimate its horizontal center.\n"
           "- Wireframe helps compare the model with the point cloud.\n"
           "- Reset prediction restores the last deep-learning parameter result.\n"
           "- Three-face fitting moves the model only; it does not resize or rotate it." )
