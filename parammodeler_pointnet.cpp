@@ -252,6 +252,14 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
   if ( !stemNames.contains( prim ) )
     return { modelName, prim, script, QString() };
 
+  if ( isPTv3 && prim == QStringLiteral( "FourStageRoundTower" ) )
+  {
+    const QString towerLog = qEnvironmentVariable( "PTV3_TOWER_LOG" ).trimmed();
+    if ( !towerLog.isEmpty() )
+      return { modelName, prim, script,
+               QDir( QFileInfo( script ).absolutePath() ).absoluteFilePath( towerLog ) };
+  }
+
   // PCT variant selection: recent experiments showed that no single suffix is
   // best for all primitives.  Prefer the per-class test winner when it exists,
   // then fall back to the user-configured default suffix.
@@ -794,6 +802,7 @@ void PointNetRunner::applyToUI( ParamModelerDock *dock,
     setTotalAndCylinderRatio( "ccCylHeight", "ccConeHeight", dock->ui->spinBoxConeCylCylHeight, dock->ui->sliderConeCylCylHeight, dock->ui->spinBoxConeCylConeHeight, dock->ui->sliderConeCylConeHeight );
     set( "grLength",       dock->ui->spinBoxGRLength,      dock->ui->sliderGRLength );
     set( "grWidth",       dock->ui->spinBoxGRWidth,      dock->ui->sliderGRWidth );
+    set( "grRidgeRatio",   dock->ui->spinBoxGRRidgeRatio, dock->ui->sliderGRRidgeRatio );
     setTotalAndWallRatio( "grWallHeight", "grRoofHeight", dock->ui->spinBoxGRHeightWall, dock->ui->sliderGRHeightWall, dock->ui->spinBoxGRHeightRoof, dock->ui->sliderGRHeightRoof );
     set( "prLength",       dock->ui->spinBoxPRLength,      dock->ui->sliderPRLength );
     set( "prWidth",       dock->ui->spinBoxPRWidth,      dock->ui->sliderPRWidth );
@@ -834,6 +843,8 @@ void PointNetRunner::applyToUI( ParamModelerDock *dock,
     set( "aghRidgeRatio",  dock->ui->spinBoxAGHRidgeOffset, dock->ui->sliderAGHRidgeOffset );
     set( "ftBaseR",       dock->ui->spinBoxFTBaseRadius,     dock->ui->sliderFTBaseRadius );
     set( "ftBaseH",       dock->ui->spinBoxFTBaseHeight,     dock->ui->sliderFTBaseHeight );
+    set( "ftEaveRadius", dock->ui->spinBoxFTEaveRadius, dock->ui->sliderFTEaveRadius );
+    set( "ftEaveHeight", dock->ui->spinBoxFTEaveThickness, dock->ui->sliderFTEaveThickness );
     set( "ftMidH",        dock->ui->spinBoxFTMiddleHeight,   dock->ui->sliderFTMiddleHeight );
     set( "ftMidTopR",     dock->ui->spinBoxFTMiddleTopRadius,dock->ui->sliderFTMiddleTopRadius );
     set( "ftMidBulge",    dock->ui->spinBoxFTMiddleBulge,    dock->ui->sliderFTMiddleBulge );

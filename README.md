@@ -10,6 +10,20 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 
 项目的核心目标不是只输出一个不可编辑的三角网格，而是把建筑点云转换为结构化、可解释、可编辑、可复现的参数化三维模型。
 
+### 2026-10-13：输入目录与屋脊实验
+
+下一轮普通人字形与非对称人字形回归实验约定保存为 **v3.3**，分别对应 `ptv3_reg_gabledroof_v3.3_normals` 与 `ptv3_reg_asymgable_v3.3_normals`。这是模型实验版本，插件版本仍为 v2.3.15；v3.3 尚未在本机验证完成，不自动替换现有服务权重。
+
+参数估计窗口的“加载点云”优先打开路径设置中的数据集根目录；目录不存在时沿用文件对话框默认位置。
+
+非对称屋顶随机生成不再排除中间位置。屋脊比例在0.20–0.80之间连续采样，采用以0.50为峰值的三角分布，让居中及附近位置更常见；屋脊长度仍约为房屋长度的45%–75%，保留短屋脊形状。此改动仅影响编译后新生成的样本。
+
+普通人字形已加入 `ridgeRatio`（0.20–0.80，默认0.50），屋脊仍贯穿整栋房屋，随机生成同样以中间位置更常见。界面、网格、点云特征采样、JSON/数据标签、预测回填和五参数训练配方已贯通；旧四参数权重回填为居中。新增参数需要重新生成并增强 GabledRoof 数据，训练入口拒绝缺少该标签的旧数据。可选 `--gabled_ridge_symmetry_180` 实验仍需部署时处理朝向；服务允许通过 `PTV3_GABLED_LOG` 单独指定人字形权重。
+
+非对称屋顶 `ridge180_trial` 的验证/测试100个标签均与v3一致：等价屋脊MAE分别从0.1250/0.1275降至0.0377/0.0407，测试有方向MAE仍约0.2167，45/100份测试预测更接近反向表示。该结果支持偏移幅度改善，尚不支持直接替换线上权重。
+
+非对称人字屋新增默认关闭的 `--asym_ridge_symmetry_180` 训练实验，仅允许该类的 `ridgeRatio` 在 `q` 和 `1-q` 两种180°等价表示之间选损失。普通参数误差继续输出，实验权重仍需要部署端处理方向选择，当前插件不会自动切换权重。现有 v3 的屋脊诊断见 `ridge-review-20261013.json`，运行方法见 `scripts/README.md`。本轮不编译插件，QGIS 文件选择交互需用户编译后验证。
+
 ## 最近更新（2026-10-12，插件 v2.3.15 后续改进）
 
 菜单“帮助 → 插件使用说明”已补充当前工作流程。凹陷长方体在外框自动对齐后单独对齐内槽顶面左下角，仅调整内槽偏移；随后手动改变内槽长宽时，该角点保持固定，只移动另一端，增长到外框边界时停止。几何校正仍是默认关闭的可选参数修正，内槽对齐和固定角点伸缩均不依赖此开关。四段式圆塔改用完整点云轮廓估计水平中心，减少底部遮挡导致的偏心。历史备份与补丁合并至 `archive/`，翻译、脚本和测试目录保留。插件 DLL 已编译，最终 QGIS 画面交互仍需实际点云验证。
@@ -72,14 +86,14 @@ PTv3 服务可在插件“PointNet 路径设置”中切换实验室局域网 `h
 | `Cylinder` | 圆柱体 | `radius`, `height` |
 | `LHouse` | L 型房屋 | `outerLength`, `outerWidth`, `cutoutLengthRatio`, `cutoutWidthRatio`, `height` |
 | `ConeCylinder` | 圆柱 + 圆锥 | `radius`, `totalHeight`, `cylinderRatio` |
-| `GabledRoof` | 人字形屋顶房屋 | `length`, `width`, `totalHeight`, `wallRatio` |
+| `GabledRoof` | 人字形屋顶房屋 | `length`, `width`, `totalHeight`, `wallRatio`, `ridgeRatio`（旧四参数权重默认屋脊居中） |
 | `PyramidRoof` | 金字塔屋顶房屋 | `length`, `width`, `totalHeight`, `wallRatio` |
 | `TruncatedPyramidRoof` | 截顶金字塔屋顶 | `bottomLength`, `bottomWidth`, `topLengthRatio`, `topWidthRatio`, `totalHeight`, `wallRatio` |
 | `HalfCylinderRoof` | 半圆柱拱顶房屋 | `length`, `width`, `wallHeight`（`roofRadius = width/2` 派生） |
 | `CylinderDome` | 圆柱穹顶 | `radius`, `totalHeight`, `cylinderRatio`, `bulge` |
 | `IndentedCuboid` | 凹陷长方体 | `outerLength`, `outerWidth`, `outerHeight`, `innerLengthRatio`, `innerWidthRatio`, `innerHeight`, `innerMinXRatio`, `innerMinYRatio` |
 | `AsymmetricGableHouse` | 非对称人字形房屋 | `length`, `width`, `totalHeight`, `wallRatio`, `ridgeLength`, `ridgeRatio` |
-| `FourStageRoundTower` | 四段式圆塔 | `baseRadius`, `baseHeight`, `middleHeight`, `middleTopRadius`, `middleBulge`, `coneHeight` |
+| `FourStageRoundTower` | 四段式圆塔 | `baseRadius`, `baseHeight`, `middleHeight`, `middleTopRadius`, `middleBulge`, `coneHeight`, `eaveRadius`, `eaveHeight`（后两项为实际尺寸，现有 v3 权重仍输出前六项） |
 | `TwoGableHouses` | 双人字形房屋 | `length1`, `length2`, `width`, `totalHeight`, `wallRatio`, `angle`, `ridgeRatio` |
 | `TriPrismPyramid` | 三棱柱 + 三棱锥 | `leg`, `baseSide`, `totalHeight`, `pyramidRatio` |
 
@@ -181,7 +195,8 @@ PTv3 当前分类权重为 `ptv3_cls_v5`，PCT 有独立的本地权重路径。
     "length": 12.0,
     "width": 8.0,
     "totalHeight": 6.0,
-    "wallRatio": 0.65
+    "wallRatio": 0.65,
+    "ridgeRatio": 0.5
   }
 }
 ```

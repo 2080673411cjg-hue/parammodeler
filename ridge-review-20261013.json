@@ -1,0 +1,38 @@
+{
+  "AsymmetricGableHouse/val": {
+    "samples": 100,
+    "direct_mae": 0.19856172576546668,
+    "magnitude_mae": 0.12503304198384285,
+    "true_offset_mean": 0.2035999982059002,
+    "pred_offset_mean": 0.08155950695276261,
+    "pred_near_center_count": 65,
+    "equivalent_mae": 0.12503304198384285,
+    "pose_disambiguation_required": true
+  },
+  "AsymmetricGableHouse/test": {
+    "samples": 100,
+    "direct_mae": 0.2168337033689022,
+    "magnitude_mae": 0.12747811302542686,
+    "true_offset_mean": 0.21739999905228616,
+    "pred_offset_mean": 0.09493794471025467,
+    "pred_near_center_count": 57,
+    "equivalent_mae": 0.12747811302542686,
+    "pose_disambiguation_required": true
+  },
+  "TwoGableHouses/val": {
+    "samples": 100,
+    "direct_mae": 0.07059341073036193,
+    "magnitude_mae": 0.061702687740325925,
+    "true_offset_mean": 0.09890000224113464,
+    "pred_offset_mean": 0.04709682166576386,
+    "pred_near_center_count": 87
+  },
+  "TwoGableHouses/test": {
+    "samples": 100,
+    "direct_mae": 0.0684879693388939,
+    "magnitude_mae": 0.05614566415548325,
+    "true_offset_mean": 0.09680000305175782,
+    "pred_offset_mean": 0.0521681734919548,
+    "pred_near_center_count": 88
+  }
+}

@@ -3,6 +3,7 @@ param(
     [switch]$WithPicking,
     [switch]$WithWireframe,
     [switch]$WithAlignment,
+    [switch]$WithHeightControl,
     [string]$ScreenshotDirectory
 )
 $ErrorActionPreference = 'Stop'
@@ -29,7 +30,10 @@ if ($WithWireframe) {
 if ($WithAlignment) {
     $targets += @('test_alignment_geometry', 'test_regression_axes')
 }
-if ($WithPicking -or $WithWireframe -or $WithAlignment) {
+if ($WithHeightControl) {
+    $targets += 'test_heightcontrol'
+}
+if ($WithPicking -or $WithWireframe -or $WithAlignment -or $WithHeightControl) {
     $qt = 'E:/mambaforge/envs/qgis_dev/Library'
     $env:PATH = (Join-Path $qt 'bin') + ';' + $env:PATH
     $env:QT_QPA_PLATFORM_PLUGIN_PATH = Join-Path $qt 'plugins/platforms'
@@ -39,6 +43,10 @@ if ($WithPicking -or $WithWireframe -or $WithAlignment) {
         $link += Join-Path $qt ('lib/Qt5' + $module + '_conda.lib')
     }
     $link += 'opengl32.lib'
+    if ($WithHeightControl) {
+        $arguments += '/I' + (Join-Path $qt 'include/qt/QtWidgets')
+        $link += Join-Path $qt 'lib/Qt5Widgets_conda.lib'
+    }
 }
 try {
     foreach ($target in $targets) {

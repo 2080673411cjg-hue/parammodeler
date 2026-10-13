@@ -217,6 +217,7 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
     {
         p["length"] = dock->gabledRoofLength();
         p["width"] = dock->gabledRoofWidth();
+        p["ridgeRatio"] = dock->gabledRoofRidgeRatio();
         const double wallH = dock->gabledRoofWallHeight();
         const double roofH = dock->gabledRoofRoofHeight();
         const double totalH = wallH + roofH;
@@ -294,6 +295,8 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
       p["middleTopRadius"]= dock->ftMiddleTopRadius();
       p["middleBulge"]    = dock->ftMiddleBulge();
       p["coneHeight"]     = dock->ftConeHeight();
+      p["eaveRadius"] = dock->ftEaveRadius();
+      p["eaveHeight"] = dock->ftEaveHeight();
     }
     else if ( type == "TwoGableHouses" )
     {

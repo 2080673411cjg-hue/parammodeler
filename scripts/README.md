@@ -1,5 +1,45 @@
 # ParamModeler 深度学习完整流程
 
+## 2026-10-13 屋脊偏移诊断与独立实验
+
+### v3.3 两类屋顶实验约定
+
+普通人字形与非对称人字形下一轮统一使用模型实验版本 `v3.3`，结果目录为 `logs/ptv3_reg_gabledroof_v3.3_normals` 和 `logs/ptv3_reg_asymgable_v3.3_normals`。两类各重新生成800/100/100，增强时只处理这两类，并同步三个split目录、对应metadata及新版训练脚本。普通人字形新增第五个目标 `ridgeRatio`；非对称屋顶保留六目标，随机生成不再排除中线，采用中心偏重分布。
+
+训练分别启用对应屋顶的180°等价损失，并同时保留普通误差和等价误差。v3.3 是后续实验命名，尚未获得训练结果。已完成的 `ridge180_trial` 只证明偏移幅度改善；推理阶段依据实际点云选择 `q`/`1-q` 候选的方向判别仍待实现，当前服务权重保持原配置。
+
+### 普通人字形五参数训练
+
+GabledRoof 已增加 `ridgeRatio`，旧权重在插件中按0.50回填。新训练前须用编译后的插件重新生成该类原始数据（800/100/100），仅“补齐”已有1000份数据不会更新旧标签。再次增强该类，然后将增强后的 GabledRoof 三个split及元数据、`main_reg.py`、`train_ptv3_reg.py` 同步到Ubuntu。
+
+```cmd
+python E:\pointnet\ptv3_simple\augment_dataset.py --input E:\pointnet\datasets --output E:\pointnet\datasets_aug --classes GabledRoof --overwrite --no-drop_bottom --noise_sigma 0.006 --outlier_ratio 0.003 --outlier_extent 0.03
+```
+
+```bash
+nohup python -u train_ptv3_reg.py --classes GabledRoof --data_root /home/xubo/pointnet/datasets_aug --run_tag gabled_ridge_trial --gabled_ridge_symmetry_180 --expected_split_counts 800 100 100 > logs/ptv3_reg_gabledroof_gabled_ridge_trial_train.log 2>&1 &
+```
+
+新对称模型仍需选定朝向才可安全部署。服务脚本已支持 `PTV3_GABLED_LOG=logs/ptv3_reg_gabledroof_gabled_ridge_trial_normals` 单独选择该类，`/health` 返回 `gabled_reg_log`；默认继续使用旧v3权重。若重新生成非对称屋顶的新分布数据，也必须重新增强并保持元数据和点云一致。分类v5仍能运行，但其真实分类表现需要在新分布上重新评估，再决定是否更新分类权重。
+
+以下是已完成的非对称屋顶 `ridge180_trial` 实验的复现说明，使用当时的旧增强数据，区别于需要重生成两类数据的下一轮v3.3。仓库 `main_reg.py` 和 `train_ptv3_reg.py` 是 PTv3 训练部署副本。
+
+```bash
+nohup python -u train_ptv3_reg.py --classes AsymmetricGableHouse --data_root /home/xubo/pointnet/datasets_aug --run_tag ridge180_trial --asym_ridge_symmetry_180 --expected_split_counts 800 100 100 > logs/ptv3_reg_asymgable_ridge180_trial_train.log 2>&1 &
+```
+
+该开关默认关闭，批量运行时只作用于 AsymmetricGableHouse，不改变双人字屋的损失。实验保持六个原参数与普通误差 CSV，选模使用带权标准化的180°等价误差，测试另存 `ridge_symmetry_test.json`。在两种损失相等时选择确定的分支，避免预测0.5时梯度抵消。
+
+这项实验用于检验方向标签冲突能否解释偏移收缩；等价误差降低不代表原方向已经预测正确。权重部署前必须结合朝向确定 `q` 或 `1-q`。当前权重和服务配置不自动切换。双人字屋包含分支身份及角度，不能直接套用该变换。
+
+已有权重的 CPU 诊断不需要 CUDA：
+
+```cmd
+python review_ridge_predictions.py --log_root E:\pointnet\ptv3_simple\logs --run_tag v3 --output ridge-review.json
+```
+
+脚本分别报告有方向误差、偏离中线幅度和预测靠近中线的数量；为普通及非对称人字形报告180°等价误差，不把双人字屋套用为同一种对称规则。旧四参数人字形输出会跳过屋脊诊断。可用 `--run_tag ridge180_trial` 检查已完成实验的结果，或在v3.3完成后检查该版本。本机基准和实验报告分别为插件根目录的 `ridge-review-20261013.json` 与 `ridge-review-trial-20261013.json`。
+
 ## v3：全部 13 类补齐到 800/100/100
 
 在 QGIS 的 **Dataset → Complete selected primitive datasets...** 中点 **Select all trainable primitives**，保持 Train 800、Validation 100、Test 100，再选择原始数据集文件夹 `E:/pointnet/datasets`。三棱柱未纳入这 13 类训练。确认后只生成九类各 500 个缺失样本，合计 4500 个，不覆盖旧点云。
@@ -26,9 +66,49 @@ nohup sh -c 'python -u main.py --mode train --data_root /home/xubo/pointnet/data
 
 服务端副本在 `scripts/ptv3_server.py`，部署到 Ubuntu 的 `ptv3_simple/ptv3_server.py` 后，在 `ptv3_train` 环境中启动 `python -m uvicorn ptv3_server:app --host 0.0.0.0 --port 8008`。部署前先比较服务端文件，避免覆盖其未同步的改动。用 `curl -s http://127.0.0.1:8008/health` 核对 `cls_log` 为 v5、`reg_suffix` 为 `_v3_normals`；Windows 端再通过插件选定的 LAN/Tailscale 地址检查 `/health`。切换网络地址不需要重新训练，但实际分类/回归仍需在 QGIS 中验证。
 
+## 圆塔檐口独立参数（2026-10-12）
+
+新生成的圆塔标签和训练目标均为实际尺寸：`eaveRadius` 是檐口外半径，`eaveHeight` 是檐口厚度。只在随机生成时采用温和的造型先验：外挑量为底座半径的 5%–20%，厚度在实际尺寸 0.1 到 `min(底座高度×0.25, 0.9)` 内采样；生成底座高度仍为 1.2–3.5。手动输入、网格和训练检查只要求外半径大于底座半径、厚度为正且小于底座高度，不再硬性施加随机采样范围。底座高度保留原 0–50 输入范围；手动尺寸输入保留技术上限（外半径 60、厚度 50），同时按几何关系更新有效边界。
+
+初次有效底座默认采用 1.12 倍外半径和 `min(底座高度×0.20, 0.9)` 厚度；之后手改底座时保留仍合法的实际檐口尺寸。底座为零时清零并禁用对应控件。应单独生成并增强新版圆塔数据，避免把缺少尺寸标签的旧样本或过渡比例标签直接混入新训练。
+
+`train_ptv3_reg.py` 的圆塔配方已更新为八个实际尺寸目标，并在启动 GPU 前检查新标签及檐口尺寸范围；其他类别的配方不变。当前 v3 权重仍是六输出。仓库内 `scripts/train_ptv3_reg.py` 与 `scripts/ptv3_server.py` 是部署副本，已同步至 Windows 的 `E:/pointnet/ptv3_simple`；Ubuntu 训练前需同步这两个脚本。
+
+数据必须重新生成：按用户要求沿用旧目录。在主面板选 FourStageRoundTower，再选“数据集 → 生成当前基元数据集... → 替换”，数量填 1000，目录选择 `E:/pointnet/datasets`。仅重建圆塔的 train/val/test = 800/100/100 并更新 metadata，其他类别保留。不要使用“生成全部基元”或在旧圆塔目录里“补齐到 1000”。
+
+生成后在 Windows CMD 中增强新圆塔数据（尚未执行）：
+
+```cmd
+python E:\pointnet\ptv3_simple\augment_dataset.py --input E:\pointnet\datasets --output E:\pointnet\datasets_aug --classes FourStageRoundTower --overwrite --no-drop_bottom --noise_sigma 0.006 --outlier_ratio 0.003 --outlier_extent 0.03
+```
+
+向 Ubuntu 的现有 datasets_aug 复制并替换三个圆塔子目录 `train/FourStageRoundTower`、`val/FourStageRoundTower`、`test/FourStageRoundTower` 以及整个 `metadata/`，Windows 副本保留。同步 ptv3_simple 下的 `train_ptv3_reg.py`、`ptv3_server.py`。其他类别已经在 Ubuntu 时无需再次传输；`main.py`、`main_reg.py`、`ptv3_model.py`、`check_ptv3.py` 等现有依赖保持原样。
+
+在 Ubuntu 的 ptv3_train 环境、ptv3_simple 目录只训练圆塔回归；自动跑 test，权重保存到独立的 `ptv3_reg_fourstage_v4_eaves_normals`，不会覆盖 v3（尚未执行）：
+
+```bash
+nohup python -u train_ptv3_reg.py --classes FourStageRoundTower --data_root /home/xubo/pointnet/datasets_aug --run_tag v4_eaves --expected_split_counts 800 100 100 > logs/ptv3_reg_fourstage_v4_eaves_train.log 2>&1 &
+```
+
+回归结束后再训练分类，避免同一 GPU 同时跑两项。分类是统一的 13 类模型，仍使用全部类别的数据，只有圆塔数据被更新；不应只用圆塔一个类别训练分类。新分类保存为 v6 并自动跑 test（尚未执行）：
+
+```bash
+nohup sh -c 'python -u main.py --mode train --data_root /home/xubo/pointnet/datasets_aug --log_dir logs/ptv3_cls_v6 --use_normals --seed 42 && python -u main.py --mode test --data_root /home/xubo/pointnet/datasets_aug --log_dir logs/ptv3_cls_v6 --split test' > logs/ptv3_cls_v6_train.log 2>&1 &
+```
+
+确认训练和测试完成后，关闭旧服务并通过专用环境变量选择分类 v6 与圆塔新目录：
+
+```bash
+PTV3_CLS_LOG=logs/ptv3_cls_v6 PTV3_TOWER_LOG=logs/ptv3_reg_fourstage_v4_eaves_normals python -m uvicorn ptv3_server:app --host 0.0.0.0 --port 8008
+```
+
+`/health` 的 `cls_log` 与 `tower_reg_log` 会显示实际路径；`reg_suffix` 仍为 `_v3_normals`，其他类别回归保持原权重。不设置变量则分类继续使用 v5、圆塔继续使用 v3；显式设置的圆塔目录缺少 checkpoint 时会报错，不静默回退。
+
+插件本地 PTv3 推理也识别 `PTV3_TOWER_LOG`。Windows CMD 可设置 `set PTV3_TOWER_LOG=E:\pointnet\ptv3_simple\logs\ptv3_reg_fourstage_v4_eaves_normals`，再从该终端启动 QGIS；本地必须已有新权重目录。此变量只影响圆塔。使用远程推理时，以 Ubuntu 服务的环境变量为准。
+
 ## 历史 PointNeXt 流程（归档）
 
-以下步骤保留旧实验记录，涉及 500 样本/类、`pointnext_simple` 和 `_aux`。它们不是当前 PTv3 v3/v5 的操作说明；当前命令以上一节为准。
+以下步骤保留旧实验记录，涉及 500 样本/类、`pointnext_simple` 和 `_aux`。它们不是当前 PTv3 v3/v5 的操作说明；当前命令见上文。
 
 ### 旧流程总览
 

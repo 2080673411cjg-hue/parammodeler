@@ -137,6 +137,7 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
     put( QStringLiteral( "length" ), QStringLiteral( "grLength" ) );
     put( QStringLiteral( "width" ), QStringLiteral( "grWidth" ) );
     putWallRatio( QStringLiteral( "grWallHeight" ), QStringLiteral( "grRoofHeight" ) );
+    uiParams.insert( QStringLiteral( "grRidgeRatio" ), val( QStringLiteral( "ridgeRatio" ), 0.5 ) );
   }
   else if ( prim == QStringLiteral( "PyramidRoof" ) )
   {
@@ -239,6 +240,13 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
     put( QStringLiteral( "middleTopRadius" ), QStringLiteral( "ftMidTopR" ) );
     put( QStringLiteral( "middleBulge" ), QStringLiteral( "ftMidBulge" ) );
     put( QStringLiteral( "coneHeight" ), QStringLiteral( "ftConeH" ) );
+    const double baseRadius = val( QStringLiteral( "baseRadius" ), 0.0 );
+    const double baseHeight = val( QStringLiteral( "baseHeight" ), 0.0 );
+    const double fallbackRadius = baseRadius * ( 1.0 + val( QStringLiteral( "eaveOverhangRatio" ), 0.12 ) );
+    const double fallbackHeight = has( QStringLiteral( "eaveThicknessRatio" ) )
+      ? baseHeight * val( QStringLiteral( "eaveThicknessRatio" ) ) : qBound( 0.25, baseHeight * 0.20, 0.9 );
+    uiParams.insert( QStringLiteral( "ftEaveRadius" ), val( QStringLiteral( "eaveRadius" ), fallbackRadius ) );
+    uiParams.insert( QStringLiteral( "ftEaveHeight" ), val( QStringLiteral( "eaveHeight" ), fallbackHeight ) );
   }
   else if ( prim == QStringLiteral( "TwoGableHouses" ) )
   {
@@ -293,6 +301,7 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
   {
     params["length"] = dock->gabledRoofLength();
     params["width"] = dock->gabledRoofWidth();
+    params["ridgeRatio"] = dock->gabledRoofRidgeRatio();
     const double wallH = dock->gabledRoofWallHeight();
     const double roofH = dock->gabledRoofRoofHeight();
     const double totalH = wallH + roofH;
@@ -376,6 +385,8 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["middleTopRadius"] = dock->ftMiddleTopRadius();
     params["middleBulge"] = dock->ftMiddleBulge();
     params["coneHeight"] = dock->ftConeHeight();
+    params["eaveRadius"] = dock->ftEaveRadius();
+    params["eaveHeight"] = dock->ftEaveHeight();
   }
   else if ( prim == "TwoGableHouses" )
   {

@@ -17,6 +17,9 @@
 </context>
 <context>
     <name>ParamModelerDock</name>
+    <message><source>Eave</source><translation>檐口</translation></message>
+    <message><source>Eave outer radius:</source><translation>檐口外半径：</translation></message>
+    <message><source>Eave thickness:</source><translation>檐口厚度：</translation></message>
     <message>
         <location filename="../parammodeler_dock.ui" line="14"/>
         <location filename="../parammodeler_dock.cpp" line="477"/>

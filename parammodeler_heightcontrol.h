@@ -5,12 +5,58 @@
 #include <QCoreApplication>
 #include <QHBoxLayout>
 #include <QSignalBlocker>
+#include <QScopedValueRollback>
 #include <QSlider>
 #include <QToolButton>
 #include <QToolTip>
 #include <functional>
 #include <utility>
 #include <cmath>
+#include <algorithm>
+
+inline void bindRecessDepthLimit( QDoubleSpinBox *outerHeight, QDoubleSpinBox *depth,
+                                  QSlider *slider, bool &suspended )
+{
+  const auto sync = [outerHeight, depth, slider, &suspended]() {
+    const QScopedValueRollback<bool> guard( suspended, true );
+    const QSignalBlocker sliderBlocker( slider );
+    const double units = std::pow( 10.0, depth->decimals() );
+    const double maximum = std::max( 0.0, std::floor( outerHeight->value() * units + 1e-8 ) - 1.0 ) / units;
+    depth->setMaximum( maximum );
+    slider->setMaximum( static_cast<int>( std::floor( maximum * 100.0 + 1e-8 ) ) );
+    slider->setValue( qRound( depth->value() * 100.0 ) );
+    depth->setEnabled( maximum > 0.0 );
+    slider->setEnabled( maximum > 0.0 );
+  };
+  QObject::connect( outerHeight, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), depth,
+                    [sync]( double ) { sync(); } );
+  sync();
+}
+
+inline void bindEaveDimension( QDoubleSpinBox *base, QDoubleSpinBox *size, QSlider *slider,
+                               bool outerRadius, double absoluteMax )
+{
+  size->setKeyboardTracking( false );
+  const auto sync = [base, size, slider, outerRadius, absoluteMax]() {
+    const QSignalBlocker sliderBlocker( slider );
+    const double units = std::pow( 10.0, size->decimals() );
+    const double step = 1.0 / units;
+    const double minimum = outerRadius ? std::ceil( ( base->value() + step ) * units - 1e-8 ) / units : step;
+    const double maximum = std::floor( ( outerRadius ? absoluteMax : std::min( base->value() - step, absoluteMax ) ) * units + 1e-8 ) / units;
+    const bool enabled = base->value() > 0.0 && minimum <= maximum;
+    const bool needsDefault = size->value() <= 0.0;
+    size->setEnabled( enabled );
+    slider->setEnabled( enabled );
+    size->setRange( enabled ? minimum : 0.0, enabled ? maximum : 0.0 );
+    if ( enabled && needsDefault )
+      size->setValue( outerRadius ? base->value() * 1.12 : std::min( base->value() * 0.20, 0.9 ) );
+    slider->setRange( qRound( size->minimum() * units ), qRound( size->maximum() * units ) );
+    slider->setValue( qRound( size->value() * units ) );
+  };
+  QObject::connect( base, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), size,
+                    [sync]( double ) { sync(); } );
+  sync();
+}
 
 // Endpoint derivatives describe ordinary heights (0,1) and recess depths (-1,0).
 class ParamModelerHeightControl : public QObject

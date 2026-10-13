@@ -376,6 +376,9 @@ static QVector<float> extractWireframeEdges( const MeshData &mesh,
                           || primitiveType == QLatin1String( "FourStageRoundTower" );
   const bool halfCylinderRoof = primitiveType == QLatin1String( "HalfCylinderRoof" );
   const bool roundTower = primitiveType == QLatin1String( "FourStageRoundTower" );
+  const bool dome = primitiveType == QLatin1String( "CylinderDome" )
+                    || primitiveType == QLatin1String( "CylinderHemisphere" );
+  const bool joinedGables = primitiveType == QLatin1String( "TwoGableHouses" );
 
   for ( int i = 0; i < triCount; ++i )
   {
@@ -386,7 +389,7 @@ static QVector<float> extractWireframeEdges( const MeshData &mesh,
     const QVector3D local1 = mesh.vertices[idx1];
     const QVector3D local2 = mesh.vertices[idx2];
     minZ = std::min( minZ, static_cast<double>( std::min( local0.z(), std::min( local1.z(), local2.z() ) ) ) );
-    if ( halfCylinderRoof )
+    if ( halfCylinderRoof || joinedGables )
     {
       for ( const QVector3D &p : { local0, local1, local2 } )
       {
@@ -421,6 +424,7 @@ static QVector<float> extractWireframeEdges( const MeshData &mesh,
   }
 
   double towerBaseRadius = 0.0;
+  double towerOuterRadius = 0.0;
   double towerBodyTopZ = std::numeric_limits<double>::max();
   double towerEaveTopZ = std::numeric_limits<double>::max();
   if ( roundTower )
@@ -444,6 +448,23 @@ static QVector<float> extractWireframeEdges( const MeshData &mesh,
     }
   }
 
+  double domeRadius = 0.0;
+  if ( roundTower )
+    for ( const QVector3D &p : mesh.vertices )
+      if ( std::abs( p.z() - towerBodyTopZ ) < 0.001 )
+        towerOuterRadius = std::max( towerOuterRadius, static_cast<double>( std::hypot( p.x(), p.y() ) ) );
+  double domeBaseZ = std::numeric_limits<double>::max();
+  if ( dome )
+  {
+    for ( const QVector3D &p : mesh.vertices )
+    {
+      if ( std::abs( p.z() - minZ ) < 0.001 )
+        domeRadius = std::max( domeRadius, static_cast<double>( std::hypot( p.x(), p.y() ) ) );
+      else if ( p.z() > minZ + 0.001 )
+        domeBaseZ = std::min( domeBaseZ, static_cast<double>( p.z() ) );
+    }
+  }
+
   lineVerts.reserve( edgeMap.size() * 6 );
   for ( const MeshEdgeRecord &record : edgeMap )
   {
@@ -452,13 +473,22 @@ static QVector<float> extractWireframeEdges( const MeshData &mesh,
            record.p0, record.p1, towerBaseRadius, towerBodyTopZ, towerEaveTopZ ) )
       continue;
 
-    // Curved surfaces keep four meridians (including slopes and the apex),
-    // while the half-cylinder roof keeps its longitudinal ridge.
+    if ( dome && ParamModelerWireframeGuides::domeInteriorRing( record.p0, record.p1, domeBaseZ ) )
+      continue;
+
+    // Curved surfaces keep eight meridians (including slopes and the apex),
+    // The half-cylinder keeps five arc directions; tower guides cross the eave underside.
     const bool keepGuide =
       ( roundShape && ( ParamModelerWireframeGuides::circularCapGuide( record.p0, record.p1, minZ )
                         || ParamModelerWireframeGuides::circularMeridianGuide( record.p0, record.p1, minZ ) ) )
-      || ( halfCylinderRoof && ParamModelerWireframeGuides::halfCylinderRidgeGuide(
-             record.p0, record.p1, ( minY + maxY ) * 0.5, maxZ ) );
+      || ( dome && ParamModelerWireframeGuides::circularRingGuide(
+             record.p0, record.p1, domeRadius, domeBaseZ ) )
+      || ( roundTower && ParamModelerWireframeGuides::towerEaveConnector(
+             record.p0, record.p1, towerBaseRadius, towerBodyTopZ, towerOuterRadius ) )
+      || ( joinedGables && ParamModelerWireframeGuides::joinedGableRoofGuide(
+             record.p0, record.p1, minZ, maxZ ) )
+      || ( halfCylinderRoof && ParamModelerWireframeGuides::halfCylinderArcGuide(
+             record.p0, record.p1, minY, maxY, maxZ ) );
 
     if ( record.count > 1 && !record.crease && !keepGuide )
       continue;

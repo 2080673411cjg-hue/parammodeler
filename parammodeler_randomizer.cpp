@@ -16,6 +16,7 @@
 #include <QDoubleSpinBox>
 #include <QScopedValueRollback>
 #include <cmath>
+#include <algorithm>
 
 void randomizePrimitiveParams( ParamModelerDock *dock,
                                bool refreshPreview,
@@ -25,11 +26,6 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
   auto rnd = []( double minVal, double maxVal, double step = 0.1 ) {
     const double raw = minVal + QRandomGenerator::global()->generateDouble() * ( maxVal - minVal );
     return std::round( raw / step ) * step;
-  };
-  auto rndAwayFromCenter = [&rnd]( double lowMin, double lowMax, double highMin, double highMax, double step = 0.01 ) {
-    if ( QRandomGenerator::global()->bounded( 2 ) == 0 )
-      return rnd( lowMin, lowMax, step );
-    return rnd( highMin, highMax, step );
   };
   auto set = []( QDoubleSpinBox *spin, double value ) {
     if ( spin )
@@ -83,6 +79,9 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
     set( dock->ui->spinBoxGRWidth, rnd( 5.0, 14.0 ) );
     set( dock->ui->spinBoxGRHeightWall, rnd( 4.5, 12.0 ) );
     set( dock->ui->spinBoxGRHeightRoof, rnd( 0.55, 0.82, 0.01 ) );
+    const double ridgeRatio = 0.2 + 0.3 * ( QRandomGenerator::global()->generateDouble()
+                                        + QRandomGenerator::global()->generateDouble() );
+    set( dock->ui->spinBoxGRRidgeRatio, std::round( ridgeRatio * 100.0 ) / 100.0 );
   }
   else if ( prim == "PyramidRoof" )
   {
@@ -153,12 +152,17 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
     set( dock->ui->spinBoxAGHHeightWall, rnd( 4.5, 12.0 ) );
     set( dock->ui->spinBoxAGHRoofHeight, rnd( 0.55, 0.82, 0.01 ) );
     set( dock->ui->spinBoxAGHRidgeLength, rnd( length * 0.45, length * 0.75 ) );
-    set( dock->ui->spinBoxAGHRidgeOffset, rndAwayFromCenter( 0.2, 0.38, 0.62, 0.8, 0.01 ) );
+    // Continuous triangular distribution: near-center roofs are more common.
+    const double ridgeRatio = 0.2 + 0.3 * ( QRandomGenerator::global()->generateDouble()
+                                        + QRandomGenerator::global()->generateDouble() );
+    set( dock->ui->spinBoxAGHRidgeOffset, std::round( ridgeRatio * 100.0 ) / 100.0 );
   }
   else if ( prim == "FourStageRoundTower" )
   {
     set( dock->ui->spinBoxFTBaseRadius, rnd( 5.0, 12.0 ) );
     set( dock->ui->spinBoxFTBaseHeight, rnd( 1.2, 3.5 ) );
+    set( dock->ui->spinBoxFTEaveRadius, dock->ftBaseRadius() * ( 1.0 + rnd( 0.05, 0.20, 0.001 ) ) );
+    set( dock->ui->spinBoxFTEaveThickness, rnd( 0.1, std::min( dock->ftBaseHeight() * 0.25, 0.9 ), 0.001 ) );
     set( dock->ui->spinBoxFTMiddleHeight, rnd( 1.0, 3.0 ) );
     set( dock->ui->spinBoxFTMiddleTopRadius, rnd( 0.5, 1.6 ) );
     set( dock->ui->spinBoxFTMiddleBulge, rnd( 0.15, 0.45, 0.01 ) );

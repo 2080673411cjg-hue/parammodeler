@@ -63,6 +63,10 @@ class TranslationsTest(unittest.TestCase):
             self.assertEqual([a.text() for a in dock.menuBar.actions()], ["场景", "导出", "数据集"])
             self.assertEqual(dock.actEvaluationCSV.text(), "当前评估 CSV...")
             self.assertEqual(dock.actCompleteSelectedDLDatasets.text(), "补齐所选基元数据集...")
+            self.assertEqual(dock.labelGRRidgeRatio.text(), "屋脊比例：")
+            self.assertEqual(dock.spinBoxGRRidgeRatio.value(), .5)
+            self.assertEqual(dock.spinBoxGRRidgeRatio.minimum(), .2)
+            self.assertEqual(dock.spinBoxGRRidgeRatio.maximum(), .8)
             self.assertEqual([dock.comboPrimitive.itemText(i) for i in range(dock.comboPrimitive.count())], PRIMITIVES)
         finally:
             dock.close()

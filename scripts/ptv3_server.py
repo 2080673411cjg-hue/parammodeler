@@ -8,8 +8,10 @@ import os
 import sys
 
 PTV3_DIR = Path(__file__).resolve().parent
-CLS_LOG = PTV3_DIR / "logs" / "ptv3_cls_v5"
+CLS_LOG = PTV3_DIR / os.environ.get("PTV3_CLS_LOG", "logs/ptv3_cls_v5")
 REG_SUFFIX = "_v3_normals"
+TOWER_LOG = os.environ.get("PTV3_TOWER_LOG", "").strip()
+GABLED_LOG = os.environ.get("PTV3_GABLED_LOG", "").strip()
 
 STEM_NAMES = {
     "Cuboid": "cuboid",
@@ -29,6 +31,14 @@ STEM_NAMES = {
 }
 
 app = FastAPI()
+
+
+def regression_log_dir( primitive_type ):
+    override = TOWER_LOG if primitive_type == "FourStageRoundTower" else GABLED_LOG if primitive_type == "GabledRoof" else ""
+    if override:
+        path = Path(override).expanduser()
+        return path if path.is_absolute() else PTV3_DIR / path
+    return PTV3_DIR / "logs" / f"ptv3_reg_{STEM_NAMES[primitive_type]}{REG_SUFFIX}"
 
 class ClassifyReq(BaseModel):
     points_text: str
@@ -51,6 +61,8 @@ def health():
         "ptv3_dir": str(PTV3_DIR),
         "cls_log": str(CLS_LOG),
         "reg_suffix": REG_SUFFIX,
+        "tower_reg_log": str(regression_log_dir("FourStageRoundTower")),
+        "gabled_reg_log": str(regression_log_dir("GabledRoof")),
     }
 
 def run_json_command(cmd, timeout=180):
@@ -99,7 +111,7 @@ def regress(req: RegressReq):
     if not stem:
         return {"ok": False, "error": f"Unsupported primitive_type: {req.primitive_type}"}
 
-    log_dir = PTV3_DIR / "logs" / f"ptv3_reg_{stem}{REG_SUFFIX}"
+    log_dir = regression_log_dir(prim)
     if not (log_dir / "best_model.pth").is_file():
         return {"ok": False, "error": f"Missing regression checkpoint: {log_dir}/best_model.pth"}
 

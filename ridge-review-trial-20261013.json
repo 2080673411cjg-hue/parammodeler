@@ -1,0 +1,22 @@
+{
+  "AsymmetricGableHouse/val": {
+    "samples": 100,
+    "direct_mae": 0.24598520681262015,
+    "magnitude_mae": 0.037717413157224655,
+    "true_offset_mean": 0.2035999982059002,
+    "pred_offset_mean": 0.2105371367931366,
+    "pred_near_center_count": 0,
+    "equivalent_mae": 0.037717413157224655,
+    "pose_disambiguation_required": true
+  },
+  "AsymmetricGableHouse/test": {
+    "samples": 100,
+    "direct_mae": 0.21673409655690193,
+    "magnitude_mae": 0.04065750077366829,
+    "true_offset_mean": 0.21739999905228616,
+    "pred_offset_mean": 0.21151756793260573,
+    "pred_near_center_count": 0,
+    "equivalent_mae": 0.04065750077366829,
+    "pose_disambiguation_required": true
+  }
+}

@@ -307,7 +307,8 @@ MeshData BuildMesh::buildGabledRoof( const GabledRoofParams &p )
     QVector3D v0(0,0,0), v1(W,0,0), v2(W,D,0), v3(0,D,0);
     QVector3D v4(0,0,HW), v5(W,0,HW), v6(W,D,HW), v7(0,D,HW);
     double Z = HW+HR;
-    QVector3D r0(0, D/2, Z), r1(W, D/2, Z);
+    const double ridgeY = D * qBound( 0.2, p.ridgeRatio, 0.8 );
+    QVector3D r0(0, ridgeY, Z), r1(W, ridgeY, Z);
 
     m.addQuad( v0, v3, v2, v1 );   // 底面
     m.addQuad( v0, v1, v5, v4 );   // 前墙
@@ -328,6 +329,7 @@ MeshData BuildMesh::buildGabledRoof( ParamModelerDock *dock )
     p.width      = dock->gabledRoofWidth();
     p.wallHeight = dock->gabledRoofWallHeight();
     p.roofHeight = dock->gabledRoofRoofHeight();
+    p.ridgeRatio = dock->gabledRoofRidgeRatio();
     return buildGabledRoof( p );
 }
 
@@ -565,7 +567,7 @@ MeshData BuildMesh::buildIndentedCuboid( const IndentedCuboidParams &p )
     double W  = p.outerLength,  D  = p.outerWidth,  H  = p.outerHeight;
     double w  = p.innerLength,  d  = p.innerWidth,  h  = p.innerHeight;
     double ox = p.offsetX,     oy = p.offsetY;
-    if ( W<=0||D<=0||H<=0 ) return m;
+    if ( W<=0||D<=0||H<=0||h<=0||h>=H ) return m;
 
     QVector3D v0(0,0,0), v1(W,0,0), v2(W,D,0), v3(0,D,0);
     QVector3D v4(0,0,H), v5(W,0,H), v6(W,D,H), v7(0,D,H);
@@ -691,8 +693,11 @@ MeshData BuildMesh::buildFourStageRoundTower( const FourStageRoundTowerParams &p
     double coneH   = p.coneHeight;
     if ( baseR<=0||baseH<=0||roofH<=0||capR<=0||coneH<=0 ) return m;
 
-    double roofR = baseR * 1.12;
-    double eaveH = qBound( 0.25, baseH * 0.20, 0.9 );
+    double roofR = p.eaveRadius < 0.0 ? baseR * 1.12 : p.eaveRadius;
+    double eaveH = p.eaveHeight < 0.0
+      ? qBound( 0.25, baseH * 0.20, 0.9 )
+      : p.eaveHeight;
+    if ( roofR <= baseR || eaveH <= 0.0 || eaveH >= baseH ) return m;
     double bodyTopZ = baseH - eaveH;
     capR = qBound( roofR * 0.02, capR, roofR * 0.35 );
     bulge = qBound( 0.0, bulge, 0.6 );
@@ -771,6 +776,8 @@ MeshData BuildMesh::buildFourStageRoundTower( ParamModelerDock *dock )
     FourStageRoundTowerParams p;
     p.baseRadius      = dock->ftBaseRadius();
     p.baseHeight      = dock->ftBaseHeight();
+    p.eaveRadius = dock->ftEaveRadius();
+    p.eaveHeight = dock->ftEaveHeight();
     p.middleHeight    = dock->ftMiddleHeight();
     p.middleTopRadius = dock->ftMiddleTopRadius();
     p.middleBulge     = dock->ftMiddleBulge();

@@ -867,18 +867,18 @@ static void classifyTruncatedPyramidRoofTriangles( const MeshData &mesh,
   }
 }
 
-static QVector<QVector3D> sampleAsymmetricGableHouseEdgePoints( ParamModelerDock *dock, int n )
+static QVector<QVector3D> sampleGableHouseEdgePoints( ParamModelerDock *dock, int n, bool fullRidge )
 {
   QVector<QVector3D> pts;
   if ( !dock || n <= 0 )
     return pts;
 
-  const double length = dock->aghLength();
-  const double width = dock->aghWidth();
-  const double wallHeight = dock->aghWallHeight();
-  const double roofZ = wallHeight + dock->aghRoofHeight();
-  const double ridgeLength = dock->aghRidgeLength();
-  double ridgeRatio = dock->aghRidgeRatio();
+  const double length = fullRidge ? dock->gabledRoofLength() : dock->aghLength();
+  const double width = fullRidge ? dock->gabledRoofWidth() : dock->aghWidth();
+  const double wallHeight = fullRidge ? dock->gabledRoofWallHeight() : dock->aghWallHeight();
+  const double roofZ = wallHeight + ( fullRidge ? dock->gabledRoofRoofHeight() : dock->aghRoofHeight() );
+  const double ridgeLength = fullRidge ? length : dock->aghRidgeLength();
+  double ridgeRatio = fullRidge ? dock->gabledRoofRidgeRatio() : dock->aghRidgeRatio();
   ridgeRatio = std::max( 0.2, std::min( 0.8, ridgeRatio ) );
   if ( length <= 0.0 || width <= 0.0 || wallHeight <= 0.0 ||
        roofZ <= wallHeight || ridgeLength <= 0.0 )
@@ -916,10 +916,13 @@ static QVector<QVector3D> sampleAsymmetricGableHouseEdgePoints( ParamModelerDock
   addEdge( v7, r0 );
   addEdge( v5, r1 );   // right gable roof edges
   addEdge( v6, r1 );
-  addEdge( e0, r0 );   // ridge-end cross sections
-  addEdge( e1, r0 );
-  addEdge( e2, r1 );
-  addEdge( e3, r1 );
+  if ( !fullRidge )
+  {
+    addEdge( e0, r0 );   // ridge-end cross sections
+    addEdge( e1, r0 );
+    addEdge( e2, r1 );
+    addEdge( e3, r1 );
+  }
   if ( total <= 0.0 )
     return pts;
 
@@ -1125,17 +1128,19 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
     roofPts << sampleTruncatedPyramidRoofEdgePoints( dock, edgeCount );
     wallPts << sampleGroup( mesh, wallTris, wallCount );
   }
-  else if ( primitiveType == QStringLiteral( "AsymmetricGableHouse" ) )
+  else if ( primitiveType == QStringLiteral( "AsymmetricGableHouse" ) ||
+            primitiveType == QStringLiteral( "GabledRoof" ) )
   {
     QVector<int> roofTris, wallTris;
-    classifyWallAndRoofByHeight( mesh, dock->aghWallHeight(), roofTris, wallTris );
+    const bool fullRidge = primitiveType == QStringLiteral( "GabledRoof" );
+    classifyWallAndRoofByHeight( mesh, fullRidge ? dock->gabledRoofWallHeight() : dock->aghWallHeight(), roofTris, wallTris );
 
     const int edgeCount = qMax( 32, int( pointCount * 0.14 ) );
     const int roofCount = int( pointCount * 0.46 );
     const int wallCount = qMax( 0, pointCount - edgeCount - roofCount );
 
     roofPts << sampleGroup( mesh, roofTris, roofCount );
-    roofPts << sampleAsymmetricGableHouseEdgePoints( dock, edgeCount );
+    roofPts << sampleGableHouseEdgePoints( dock, edgeCount, fullRidge );
     wallPts << sampleGroup( mesh, wallTris, wallCount );
   }
   else if ( primitiveType == QStringLiteral( "TwoGableHouses" ) )

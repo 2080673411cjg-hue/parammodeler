@@ -335,7 +335,7 @@ static void applyParameterGroups( Ui::ParamModelerDock *ui )
 
     // 插入顺序：从底部到顶部（避免索引偏移）
 
-    // GabledRoof (4 rows): Body(L,W) → Roof(Total height, Wall ratio)
+    // GabledRoof: Body(L,W), Roof(Total height, Wall ratio, Ridge ratio).
     if ( QFormLayout *f = fmt( ui->pageGabledRoof ) )
     {
         insertSectionHeader( f, 2, ParamModelerDock::tr( "Roof / Height" ) );
@@ -381,9 +381,10 @@ static void applyParameterGroups( Ui::ParamModelerDock *ui )
         insertSectionHeader( f, 0, ParamModelerDock::tr( "Body" ) );
     }
 
-    // FourStageRoundTower (6 rows): Base(R,H) → Middle → Top
+    // FourStageRoundTower: Base -> Middle -> Top -> Eave
     if ( QFormLayout *f = fmt( ui->pageFourStageRoundTower ) )
     {
+        insertSectionHeader( f, 6, ParamModelerDock::tr( "Eave" ) );
         insertSectionHeader( f, 5, ParamModelerDock::tr( "Top" ) );
         insertSectionHeader( f, 2, ParamModelerDock::tr( "Middle" ) );
         insertSectionHeader( f, 0, ParamModelerDock::tr( "Base" ) );
@@ -425,6 +426,7 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderGRWidth, ui->spinBoxGRWidth, 100, 50 );
   bindSliderSpin( ui->sliderGRHeightWall, ui->spinBoxGRHeightWall, 100.0, 50.0 );
   bindSliderSpin( ui->sliderGRHeightRoof, ui->spinBoxGRHeightRoof, 100.0, 0.90, 0.20 );
+  bindSliderSpin( ui->sliderGRRidgeRatio, ui->spinBoxGRRidgeRatio, 100.0, 0.80, 0.20 );
   bindSliderSpin( ui->sliderPRLength, ui->spinBoxPRLength, 100, 50 );
   bindSliderSpin( ui->sliderPRWidth, ui->spinBoxPRWidth, 100, 50 );
   bindSliderSpin( ui->sliderPRHeightWall, ui->spinBoxPRHeightWall, 100.0, 50.0 );
@@ -466,6 +468,8 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderCylHemiBulge, ui->spinBoxCylHemiBulge, 100.0, 1.0 );
   bindSliderSpin( ui->sliderFTBaseRadius, ui->spinBoxFTBaseRadius, 100.0, 50.0 );
   bindSliderSpin( ui->sliderFTBaseHeight, ui->spinBoxFTBaseHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderFTEaveRadius, ui->spinBoxFTEaveRadius, 1000.0, 60.0 );
+  bindSliderSpin( ui->sliderFTEaveThickness, ui->spinBoxFTEaveThickness, 1000.0, 50.0 );
   bindSliderSpin( ui->sliderFTMiddleHeight, ui->spinBoxFTMiddleHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderFTMiddleTopRadius, ui->spinBoxFTMiddleTopRadius, 100.0, 50.0 );
   bindSliderSpin( ui->sliderFTMiddleBulge, ui->spinBoxFTMiddleBulge, 100.0, 0.6 );
@@ -518,6 +522,7 @@ void ParamModelerDock::initUiControls()
   ui->labelGRWidth->setText( tr( "Width:" ) );
   ui->labelGRHeightWall->setText( tr( "Total height:" ) );
   ui->labelGRHeightRoof->setText( tr( "Wall ratio:" ) );
+  ui->labelGRRidgeRatio->setText( tr( "Ridge ratio:" ) );
   ui->labelPRLength->setText( tr( "Length:" ) );
   ui->labelPRWidth->setText( tr( "Width:" ) );
   ui->labelPRHeightWall->setText( tr( "Total height:" ) );
@@ -619,6 +624,10 @@ void ParamModelerDock::initHeightDirectionControls()
 
 void ParamModelerDock::initConnections()
 {
+  bindEaveDimension( ui->spinBoxFTBaseRadius, ui->spinBoxFTEaveRadius, ui->sliderFTEaveRadius, true, 60.0 );
+  bindEaveDimension( ui->spinBoxFTBaseHeight, ui->spinBoxFTEaveThickness, ui->sliderFTEaveThickness, false, 50.0 );
+  bindRecessDepthLimit( ui->spinBoxICHeight, ui->spinBoxICInnerHeight,
+                        ui->sliderICInnerHeight, m_suspendHeightCompensation );
   const auto bindFixedInnerCorner = [this]( QDoubleSpinBox *inner, QSlider *slider,
                                            QDoubleSpinBox *outer, QDoubleSpinBox *offset ) {
     inner->setKeyboardTracking( false );
@@ -789,6 +798,7 @@ void ParamModelerDock::initConnections()
   connect( ui->sliderGRWidth, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderGRHeightWall, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderGRHeightRoof, &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderGRRidgeRatio, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderPRLength, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderPRWidth, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderPRHeightWall, &QSlider::valueChanged, this, schedulePreview );

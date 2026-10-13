@@ -101,6 +101,7 @@ public:
   double gabledRoofWidth() const;
   double gabledRoofWallHeight() const;
   double gabledRoofRoofHeight() const;
+  double gabledRoofRidgeRatio() const;
   double pyramidLength() const;
   double pyramidWidth() const;
   double pyramidWallHeight() const;
@@ -136,6 +137,8 @@ public:
   double cylHemiBulge() const;
   double ftBaseRadius() const;
   double ftBaseHeight() const;
+  double ftEaveRadius() const;
+  double ftEaveHeight() const;
   double ftMiddleHeight() const;
   double ftMiddleTopRadius() const;
   double ftMiddleBulge() const;

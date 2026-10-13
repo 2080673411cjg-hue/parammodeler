@@ -12,6 +12,7 @@
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDialog>
+#include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
@@ -222,8 +223,10 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   };
 
   connect( btnLoad, &QPushButton::clicked, &dialog, [&]() {
+    const QString dataRoot = ParamModelerConfig::dataRootPath();
+    const QString initialDirectory = QDir( dataRoot ).exists() ? dataRoot : QString();
     const QString filePath = QFileDialog::getOpenFileName(
-      &dialog, tr( "Load point cloud" ), "",
+      &dialog, tr( "Load point cloud" ), initialDirectory,
       tr( "Point cloud files (*.ply *.las *.laz *.xyz *.txt)" )
     );
     if ( filePath.isEmpty() )

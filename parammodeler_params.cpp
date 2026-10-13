@@ -68,6 +68,7 @@ double ParamModelerDock::coneCylConeHeight() const
 
 double ParamModelerDock::gabledRoofLength() const { return ui->spinBoxGRLength->value(); }
 double ParamModelerDock::gabledRoofWidth() const { return ui->spinBoxGRWidth->value(); }
+double ParamModelerDock::gabledRoofRidgeRatio() const { return ui->spinBoxGRRidgeRatio->value(); }
 double ParamModelerDock::gabledRoofWallHeight() const
 {
   const double totalH = ui->spinBoxGRHeightWall->value();
@@ -186,6 +187,8 @@ double ParamModelerDock::cylHemiBulge() const { return ui->spinBoxCylHemiBulge->
 
 double ParamModelerDock::ftBaseRadius() const { return ui->spinBoxFTBaseRadius->value(); }
 double ParamModelerDock::ftBaseHeight() const { return ui->spinBoxFTBaseHeight->value(); }
+double ParamModelerDock::ftEaveRadius() const { return ui->spinBoxFTEaveRadius->value(); }
+double ParamModelerDock::ftEaveHeight() const { return ui->spinBoxFTEaveThickness->value(); }
 double ParamModelerDock::ftMiddleHeight() const { return ui->spinBoxFTMiddleHeight->value(); }
 double ParamModelerDock::ftMiddleTopRadius() const { return ui->spinBoxFTMiddleTopRadius->value(); }
 double ParamModelerDock::ftMiddleBulge() const { return ui->spinBoxFTMiddleBulge->value(); }
