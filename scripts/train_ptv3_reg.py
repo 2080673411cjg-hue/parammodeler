@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 
 # Stable-footprint targets avoid length/width swaps for rectangular primitives.
@@ -110,6 +111,8 @@ def commands(args, recipe):
               "--batch_size", str(args.batch_size), "--seed", str(args.seed)]
     if args.ptv3_repo:
         common += ["--ptv3_repo", args.ptv3_repo]
+    if getattr(args, "canonical_align", False):
+        common += ["--canonical_align"]
     target_names = targets.split()
     uses_stable_geometry_targets = any(t.startswith("geom_") for t in target_names)
     relative_loss_weight = "0.0" if uses_stable_geometry_targets else "0.05"
@@ -137,6 +140,14 @@ def commands(args, recipe):
     return log, train, common + ["--mode", "test", "--split", "test"]
 
 
+def format_duration(seconds):
+    total_tenths = max(0, round(seconds * 10))
+    whole_seconds, tenths = divmod(total_tenths, 10)
+    hours, remainder = divmod(whole_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{tenths:01d}"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--classes", nargs="+", choices=[r[0] for r in RECIPES])
@@ -150,6 +161,8 @@ def main():
     parser.add_argument("--patch_size", type=int, default=128)
     parser.add_argument("--ptv3_repo", default=None)
     parser.add_argument("--flash", action="store_true")
+    parser.add_argument("--canonical_align", action=argparse.BooleanOptionalAction, default=True,
+                        help="Train with the metadata-derived canonical frame and save inference settings (default: enabled).")
     parser.add_argument("--indented_symmetry_180", action="store_true",
                         help="Use an experimental 180-degree symmetry-aware loss for IndentedCuboid only.")
     parser.add_argument("--asym_ridge_symmetry_180", action="store_true",
@@ -166,6 +179,10 @@ def main():
         parser.error("--asym_ridge_symmetry_180 requires AsymmetricGableHouse in --classes")
     if args.gabled_ridge_symmetry_180 and not any(r[0] == "GabledRoof" for r in selected):
         parser.error("--gabled_ridge_symmetry_180 requires GabledRoof in --classes")
+    if args.canonical_align and (args.indented_symmetry_180
+                                 or args.asym_ridge_symmetry_180
+                                 or args.gabled_ridge_symmetry_180):
+        parser.error("Canonical training transforms directional labels; do not combine it with 180-degree symmetry losses.")
     if args.epochs < 1 or args.batch_size < 1 or args.grid_size <= 0 or args.patch_size < 1:
         parser.error("epochs/batch_size/grid_size/patch_size must be positive")
     if args.expected_split_counts and any(value < 1 for value in args.expected_split_counts):
@@ -196,12 +213,21 @@ def main():
     for recipe in selected:
         log, train, test = commands(args, recipe)
         print(f"\n{recipe[0]} -> {log}", flush=True)
-        for command in (train, test):
-            if args.dry_run:
-                import shlex
-                print(shlex.join(command))
-            else:
-                subprocess.run(command, check=True)
+        if args.dry_run:
+            import shlex
+            print(shlex.join(train))
+            print(shlex.join(test))
+            continue
+
+        train_started = time.perf_counter()
+        print(f"{recipe[0]} training started (includes data/normal preparation, validation, and checkpoint save).", flush=True)
+        try:
+            subprocess.run(train, check=True)
+        finally:
+            train_elapsed = time.perf_counter() - train_started
+            print(f"{recipe[0]} training duration: {format_duration(train_elapsed)} (HH:MM:SS.s)", flush=True)
+
+        subprocess.run(test, check=True)
 
 
 if __name__ == "__main__":

@@ -2,11 +2,17 @@
 
 ## 2026-10-13 屋脊偏移诊断与独立实验
 
-### v3.3 两类屋顶实验约定
+## 2026-10-14：canonical 方向规范训练
 
-普通人字形与非对称人字形下一轮统一使用模型实验版本 `v3.3`，结果目录为 `logs/ptv3_reg_gabledroof_v3.3_normals` 和 `logs/ptv3_reg_asymgable_v3.3_normals`。两类各重新生成800/100/100，增强时只处理这两类，并同步三个split目录、对应metadata及新版训练脚本。普通人字形新增第五个目标 `ridgeRatio`；非对称屋顶保留六目标，随机生成不再排除中线，采用中心偏重分布。
+`train_ptv3_reg.py` 默认开启 canonical frame。训练/验证/测试根据增强 metadata 的 `params.rz` 反旋点云，并在旋转后的点云上重算 bbox 辅助特征；GabledRoof 与 AsymmetricGableHouse 同步把 `ridgeRatio` 映射到规范方向。推理时按 checkpoint 中的 `canonical_align` 标记自动应用几何方向估计和同一 bbox 重算。新权重需要与 `canonical_orientation.py`、`main_reg.py` 一起同步到服务端；旧权重不受影响。
 
-训练分别启用对应屋顶的180°等价损失，并同时保留普通误差和等价误差。v3.3 是后续实验命名，尚未获得训练结果。已完成的 `ridge180_trial` 只证明偏移幅度改善；推理阶段依据实际点云选择 `q`/`1-q` 候选的方向判别仍待实现，当前服务权重保持原配置。
+当前规范轴支持 Cuboid、IndentedCuboid、GabledRoof、PyramidRoof、TruncatedPyramidRoof、AsymmetricGableHouse、HalfCylinderRoof。LHouse 与 TwoGableHouses 保留原坐标，避免把缺角位置或双房关系错误地旋转成另一组参数；轴向对称基元也不需要旋转规范化。规范训练不与 `*_ridge_symmetry_180` / `--indented_symmetry_180` 同时使用，因为新标签保留明确方向。
+
+### v3.3 两类屋顶实验结果
+
+普通人字形与非对称人字形按800/100/100训练，实验权重位于 `ptv3_reg_gabledroof_ridge180_center_trial_normals` 和 `ptv3_reg_asymgable_ridge180_center_trial_normals`。普通人字形新增第五个目标 `ridgeRatio`；非对称屋顶保留六目标，生成数据采用中心偏重分布。
+
+两类都启用了180°等价损失。测试屋脊等价 MAE 分别为0.0334和0.0301，直接方向 MAE 为0.1123和0.1200；测试集上镜像方向更接近标签的比例约为46%和52%。这证明偏移幅度改善，但方向仍未确定。测试集与旧v3标签基本不同，不能把差值视作严格的同样本对照；模型尚未部署。
 
 ### 普通人字形五参数训练
 
@@ -64,7 +70,7 @@ nohup python -u train_ptv3_reg.py --data_root /home/xubo/pointnet/datasets_aug -
 nohup sh -c 'python -u main.py --mode train --data_root /home/xubo/pointnet/datasets_aug --log_dir logs/ptv3_cls_v5 --use_normals --seed 42 && python -u main.py --mode test --data_root /home/xubo/pointnet/datasets_aug --log_dir logs/ptv3_cls_v5 --split test' > logs/ptv3_cls_v5_train.log 2>&1 &
 ```
 
-服务端副本在 `scripts/ptv3_server.py`，部署到 Ubuntu 的 `ptv3_simple/ptv3_server.py` 后，在 `ptv3_train` 环境中启动 `python -m uvicorn ptv3_server:app --host 0.0.0.0 --port 8008`。部署前先比较服务端文件，避免覆盖其未同步的改动。用 `curl -s http://127.0.0.1:8008/health` 核对 `cls_log` 为 v5、`reg_suffix` 为 `_v3_normals`；Windows 端再通过插件选定的 LAN/Tailscale 地址检查 `/health`。切换网络地址不需要重新训练，但实际分类/回归仍需在 QGIS 中验证。
+服务端副本在 `scripts/ptv3_server.py`，canonical v4 部署还需同步 `scripts/main_reg.py` 与 `scripts/canonical_orientation.py` 到 Ubuntu 的 `ptv3_simple/`。部署前先比较文件，避免覆盖其未同步的改动；重启 `ptv3_train` 环境中的 uvicorn 后，用 `curl -s http://127.0.0.1:8008/health` 核对 `cls_log` 为 v5、`reg_suffix` 为 `_v4_canonical_normals`。此前线上服务仍报告 v3，故只有完成同步和重启后才算切换成功。Windows 端再通过插件选定的 LAN/Tailscale 地址检查 `/health`；实际分类/回归仍需在 QGIS 中验证。
 
 ## 圆塔檐口独立参数（2026-10-12）
 

@@ -10,11 +10,19 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 
 项目的核心目标不是只输出一个不可编辑的三角网格，而是把建筑点云转换为结构化、可解释、可编辑、可复现的参数化三维模型。
 
+### 2026-10-14：canonical 方向规范训练
+
+参数回归训练入口默认使用 metadata 中的 `rz` 规范化训练、验证和测试点云，并基于规范点云重新计算 bbox 辅助特征。GabledRoof、AsymmetricGableHouse 的屋脊比例标签会同步变换；推理按 checkpoint 标记自动执行相应的几何对齐。v4 canonical 全类训练已完成，结果摘要见下文及 `dl-pipeline-log.md`。插件默认请求 `_v4_canonical_normals`；Ubuntu 服务端仍须部署新版 `ptv3_server.py`、`main_reg.py`、`canonical_orientation.py` 并重启，线上才会按请求选择 v4 权重。LHouse、TwoGableHouses 与轴向对称基元暂不旋转规范化，避免改变缺角、房体关系或无意义地处理圆形朝向。QGIS 实际推理与对齐仍待现场验证，旧 checkpoint 推理行为保持不变。
+
+参数估计窗口的“加载点云”首次从配置的数据集目录打开；同一窗口再次加载时，从上一个成功加载文件所在目录打开，并保留 Windows 原生文件选择器样式。
+
+v4 测试集（各类100份）显示：屋脊方向规范化后，GabledRoof `ridgeRatio` MAE=0.0120、R²=0.977，AsymmetricGableHouse MAE=0.0119、R²=0.975；凹陷长方体 `innerHeight` MAE=0.1629、R²=0.981。主要弱项为 FourStageRoundTower `middleBulge`（R²=-0.593）、TwoGableHouses `ridgeRatio`（R²=0.219）及 `length1/length2`、LHouse `cutoutWidthRatio`（R²=0.383）；CylinderDome `bulge` 仍有约16.6% MAPE。分类 v5 测试准确率为99.62%（1300份）。以上是合成测试集指标，不等同于真实点云表现。
+
 ### 2026-10-13：输入目录与屋脊实验
 
-下一轮普通人字形与非对称人字形回归实验约定保存为 **v3.3**，分别对应 `ptv3_reg_gabledroof_v3.3_normals` 与 `ptv3_reg_asymgable_v3.3_normals`。这是模型实验版本，插件版本仍为 v2.3.15；v3.3 尚未在本机验证完成，不自动替换现有服务权重。
+普通人字形与非对称人字形完成了 v3.3 屋脊对称损失实验，结果文件位于 `ptv3_reg_gabledroof_ridge180_center_trial_normals` 与 `ptv3_reg_asymgable_ridge180_center_trial_normals`。屋脊等价误差较低，但镜像方向仍有歧义，因此不直接替换现有服务权重。
 
-参数估计窗口的“加载点云”优先打开路径设置中的数据集根目录；目录不存在时沿用文件对话框默认位置。
+参数估计窗口的“加载点云”优先打开路径设置中的数据集根目录；目录不存在时回退到用户主目录。
 
 非对称屋顶随机生成不再排除中间位置。屋脊比例在0.20–0.80之间连续采样，采用以0.50为峰值的三角分布，让居中及附近位置更常见；屋脊长度仍约为房屋长度的45%–75%，保留短屋脊形状。此改动仅影响编译后新生成的样本。
 
@@ -30,9 +38,9 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 
 PTv3 远程推理和本地 PCT 现作为两个可选入口；首批角锚定模型可按点云左下墙顶/檐口语义角自动对齐。面板估计与对齐代码已拆分，圆锥、穹顶、圆塔和半圆柱屋顶的实时线框缺线已修复，并精简了圆塔底部檐口内圈。具体变更和验证范围见 `dl-pipeline-log.md`。
 
-当前 PTv3 分类使用 `ptv3_cls_v5`，13 类参数回归使用 `ptv3_reg_<类别短名>_v3_normals`。增强集每类 train/val/test 为 800/100/100，共 13000 份；分类 v5 在 1300 份测试集上的准确率为 99.62%。回归 v3 使用普通损失，凹陷长方体四个边距仍是主要误差来源。插件本机路径及服务端版本选择均已更新，实际 QGIS 分类、回归与对齐流程仍需现场验收。
+PTv3 分类使用 `ptv3_cls_v5`；插件与仓库服务脚本的回归默认值为 `ptv3_reg_<类别短名>_v4_canonical_normals`。增强集每类 train/val/test 为 800/100/100，共 13000 份；分类 v5 在 1300 份测试集上的准确率为 99.62%。Ubuntu 线上服务尚需部署新版脚本并重启后，才能切换到 v4；实际 QGIS 分类、回归与对齐流程仍需现场验收。
 
-PTv3 服务可在插件“PointNet 路径设置”中切换实验室局域网 `http://192.168.1.113:8008` 与 Tailscale `http://100.70.215.84:8008`，两种模式共用 Ubuntu 上的同一套权重，无需重新训练。切换后下次推理生效；局域网需能访问实验室机器，Tailscale 需两机在线。先访问所选地址的 `/health`，确认 `cls_log` 指向 v5、`reg_suffix` 为 `_v3_normals`。仓库内的 `scripts/ptv3_server.py` 是服务端部署副本；Ubuntu 的 `uvicorn` 进程需持续运行。更完整的训练与部署命令见 `scripts/README.md`。
+PTv3 服务可在插件“PointNet 路径设置”中切换实验室局域网 `http://192.168.1.113:8008` 与 Tailscale `http://100.70.215.84:8008`，两种模式共用 Ubuntu 上的权重，无需重新训练。切换后下次推理生效；局域网需能访问实验室机器，Tailscale 需两机在线。部署新版服务后，`/health` 默认应显示 `reg_suffix` 为 `_v4_canonical_normals`，单次回归响应中的 `model_log_dir` 用于确认该请求实际加载的目录。仓库内的 `scripts/ptv3_server.py` 是服务端部署副本；Ubuntu 的 `uvicorn` 进程需持续运行。更完整的训练与部署命令见 `scripts/README.md`。
 
 ### 2026-09-21
 
@@ -70,7 +78,7 @@ PTv3 服务可在插件“PointNet 路径设置”中切换实验室局域网 `h
 - 支持 Qt3D 实时预览实体，用于参数拖动时快速更新拟合模型。
 - 支持外部点云导入，包括 `.ply`、`.txt`、`.xyz`、`.pts`、`.las`、`.laz`。
 - 当前估计窗口使用 PTv3 远程分类/回归，也保留本机 PCT 入口；旧 PointNet 系列代码仍在工程中，不作为当前主入口。
-- 支持将回归结果映射并回填插件 UI；PTv3 当前默认回归后缀为 `_v3_normals`，PCT 保留自己的模型配置。
+- 支持将回归结果映射并回填插件 UI；PTv3 默认回归后缀为 `_v4_canonical_normals`，远程服务需支持 `model_suffix`，PCT 保留自己的模型配置。
 - 支持随机参数生成及按所选基元补齐数据集；当前 PTv3 训练覆盖 13 类、每类 1000 份。TriPrismPyramid 可建模，但未纳入这 13 类训练。
 - 支持 OBJ、STL、JSON、PLY、深度学习 TXT 点云等格式导出。
 - 支持 2D 地图画布点选目标点，将当前模型锚点平移到点云指定位置，便于 QGIS 3D 里人工微调。

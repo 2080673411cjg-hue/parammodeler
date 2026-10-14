@@ -5,11 +5,14 @@ import subprocess
 import tempfile
 import json
 import os
+import re
 import sys
 
 PTV3_DIR = Path(__file__).resolve().parent
 CLS_LOG = PTV3_DIR / os.environ.get("PTV3_CLS_LOG", "logs/ptv3_cls_v5")
-REG_SUFFIX = "_v3_normals"
+REG_SUFFIX = os.environ.get("PTV3_REG_SUFFIX", "_v4_canonical_normals").strip()
+if not REG_SUFFIX:
+    REG_SUFFIX = "_v4_canonical_normals"
 TOWER_LOG = os.environ.get("PTV3_TOWER_LOG", "").strip()
 GABLED_LOG = os.environ.get("PTV3_GABLED_LOG", "").strip()
 
@@ -33,12 +36,15 @@ STEM_NAMES = {
 app = FastAPI()
 
 
-def regression_log_dir( primitive_type ):
+def regression_log_dir( primitive_type, model_suffix=None ):
     override = TOWER_LOG if primitive_type == "FourStageRoundTower" else GABLED_LOG if primitive_type == "GabledRoof" else ""
     if override:
         path = Path(override).expanduser()
         return path if path.is_absolute() else PTV3_DIR / path
-    return PTV3_DIR / "logs" / f"ptv3_reg_{STEM_NAMES[primitive_type]}{REG_SUFFIX}"
+    suffix = model_suffix or REG_SUFFIX
+    if not re.fullmatch(r"_[A-Za-z0-9_.-]+", suffix):
+        raise ValueError("Invalid model_suffix")
+    return PTV3_DIR / "logs" / f"ptv3_reg_{STEM_NAMES[primitive_type]}{suffix}"
 
 class ClassifyReq(BaseModel):
     points_text: str
@@ -53,6 +59,7 @@ class RegressReq(BaseModel):
     bbox_z: float
     scale: float
     num_points: int = 2048
+    model_suffix: str = ""
 
 @app.get("/health")
 def health():
@@ -111,7 +118,10 @@ def regress(req: RegressReq):
     if not stem:
         return {"ok": False, "error": f"Unsupported primitive_type: {req.primitive_type}"}
 
-    log_dir = regression_log_dir(prim)
+    try:
+        log_dir = regression_log_dir(prim, req.model_suffix.strip())
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
     if not (log_dir / "best_model.pth").is_file():
         return {"ok": False, "error": f"Missing regression checkpoint: {log_dir}/best_model.pth"}
 
@@ -128,6 +138,9 @@ def regress(req: RegressReq):
             "--bbox_z", str(req.bbox_z),
             "--scale", str(req.scale),
         ]
-        return run_json_command(cmd)
+        response = run_json_command(cmd)
+        if response.get("ok"):
+            response["model_log_dir"] = str(log_dir)
+        return response
     finally:
         os.remove(input_path)

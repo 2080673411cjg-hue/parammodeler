@@ -1,6 +1,13 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-10-13
+> 最后更新: 2026-10-14
+
+### 2026-10-14：canonical 方向规范训练实现
+
+- 回归训练入口默认按 metadata `params.rz` 旋转规范化 train/val/test 点云，并用规范点云重算 bbox aux；GabledRoof、AsymmetricGableHouse 的 `ridgeRatio` 与 IndentedCuboid 四向边距按同一变换同步改标签。180°等价损失与 canonical 模式互斥。
+- 推理通过 checkpoint 的 `canonical_align` 自动调用几何朝向估计，重算规范 bbox aux 并返回 `poseRotateZ`；旧 checkpoint 没有该标记，仍按旧流程。需一并同步 `canonical_orientation.py`、`main_reg.py`、`train_ptv3_reg.py`。
+- 当前规范轴覆盖 Cuboid、IndentedCuboid、GabledRoof、PyramidRoof、TruncatedPyramidRoof、AsymmetricGableHouse、HalfCylinderRoof。LHouse、TwoGableHouses 和旋转对称基元跳过，避免改变缺角/房体方向语义或引入无意义旋转。
+- v4 训练已完成，结果见上方 2026-10-14 条目；尚未编译或在 QGIS 中实测，线上服务也尚未确认部署 v4 权重。
 
 ### 2026-10-13：文档同步与v3.3实验命名
 
@@ -23,15 +30,24 @@
 - 验证：5项屋脊损失测试、3项人字形训练/服务测试、11项圆塔兼容测试、15项原有回归检查及5项离屏翻译/UI测试通过，共39项。Python/UI语法与差异空白检查通过；未编译DLL或运行真实QGIS场景。训练/服务脚本已同步至 `E:/pointnet/ptv3_simple`。
 > **开发边界提醒**：原则上只修改自己的 ParamModeler 插件，不修改 QGIS 核心。2026-09-17 的近距离缩放核心实验已按用户要求撤回，当前源码不再包含本次 `qgis_3d` 修改。备份和回退记录见文末“QGIS 核心实验的备份与回退”。后续核心改动必须先说明影响、确认并提前备份。
 > 插件版本: **v2.3.15**（PTv3/PCT 推理入口、语义角自动对齐、面板代码拆分与曲面线框修复）
-> 最近更新: **2026-10-13**（人字形屋脊偏移、非对称屋顶等价损失结果与中心偏重采样、数据目录选择、v3.3实验命名）
+> 最近更新: **2026-10-14**（v4 canonical 全类训练结果、推理后缀接入、参数估计窗口目录记忆）
 > 注: 下文 PCT 分类实验指标仍是旧数据上 `pct_cls_v2` 的历史结果；PTv3 v5 测试准确率为 99.62%（1300 份）
 > 当前模型入口: **PTv3**（默认远程 Ubuntu/GPU 服务）与 **PCT**（本机兜底）
 > 分类模型: PTv3 本机默认 `ptv3_cls_v5`；PCT 保留 `pct_cls_v4` 路径设置
-> 回归模型: PTv3 本机默认 `ptv3_reg_<类别短名>_v3_normals`；旧默认配置会迁移，其他自定义路径保留
-> 远程提醒: Windows 通过 Tailscale 已连通 Ubuntu 的 `/health`，服务返回 v5/v3；插件已改用 `100.70.215.84:8008`，实际分类/回归请求仍待 QGIS 现场验证
+> 回归模型: PTv3 插件默认 `ptv3_reg_<类别短名>_v4_canonical_normals`；远程 Ubuntu 服务需同步新版并重启后生效，其他自定义路径保留
+> 远程提醒: Ubuntu 线上服务此前返回 v5/v3；插件已改为传递模型后缀，部署服务端新版并重启后再通过 `/health` 与响应 `model_log_dir` 确认 v4
 > 法向量实验: 阶段 0/1/2 全部完成，bulge 转正（v4 corr=0.578）、middleBulge 仍≈0（详见第七章）
 > 数据集: 当前 PTv3 的 13 类均为 **1000 样本/类**（train 800 + val 100 + test 100），合计 13000 样本；下文旧实验的数据量和指标仅供历史对照
 > 后端: PTv3 远程优先；PCT 本机可选；PointNet/PointNet++/PointNeXt 不再作为估计窗口下拉选项
+
+### 2026-10-14：v4 canonical 训练结果与插件接入
+
+- 13类 v4 canonical 模型完成 800/100/100 训练与测试；分类 v5 的1300份测试准确率为99.62%。插件回归后缀默认改为 `_v4_canonical_normals`，远程请求携带 `model_suffix`，响应解析并记录实际 `model_log_dir`。
+- 测试集薄弱项：FourStageRoundTower 的 `middleBulge` MAE=0.081、R²=-0.593，`coneHeight` MAE=0.164、R²=0.608；TwoGableHouses 的 `ridgeRatio` MAE=0.079、R²=0.219，`length1/length2` MAE=1.742/1.484；LHouse 的 `cutoutWidthRatio` MAE=0.039、R²=0.383。CylinderDome `bulge` MAE=0.051、MAPE=16.6%、R²=0.817，仍值得改进。
+- 屋脊规范化后 GabledRoof / AsymmetricGableHouse 的 `ridgeRatio` MAE 分别为0.0120/0.0119、R²为0.977/0.975；IndentedCuboid `innerHeight` MAE=0.163、R²=0.981。仍需在 QGIS 里检查规范旋转及参数回填方向。
+- 分类混淆主要为 LHouse→Cuboid 2例，其余误分各1例（AsymmetricGableHouse、PyramidRoof、TruncatedPyramidRoof）；共5/1300例。回归误差来自合成测试集，不能直接代表真实点云泛化。
+- 参数估计窗口的文件选择器保留 Windows 原生样式；同一窗口连续加载点云时，下一次从上个成功加载文件的父目录开始。每次新开估计窗口仍优先使用配置的数据集根目录。
+- 远程服务代码支持 `model_suffix`，但 Ubuntu 当前运行版本尚未确认部署新版。部署 `ptv3_server.py`、`main_reg.py`、`canonical_orientation.py` 并重启后，再用 `/health` 和回归响应 `model_log_dir` 验证。插件未编译，QGIS现场流程未验证。
 
 ---
 

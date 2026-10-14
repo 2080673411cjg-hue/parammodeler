@@ -77,31 +77,50 @@ class TowerTrainingTest(unittest.TestCase):
     def test_manual_sizes_outside_sampling_range_are_valid(self):
         self.validate({**self.params, "eaveRadius": 12, "eaveHeight": 1})
 
-    def test_unconfigured_server_keeps_v3(self):
+    def test_unconfigured_server_uses_canonical_default(self):
         with patch.object(server, "TOWER_LOG", ""):
             self.assertEqual(server.regression_log_dir("FourStageRoundTower").name,
-                             "ptv3_reg_fourstage_v3_normals")
+                             "ptv3_reg_fourstage_v4_canonical_normals")
 
     def test_only_tower_uses_override(self):
         with patch.object(server, "TOWER_LOG", "logs/ptv3_reg_fourstage_v4_eaves_normals"):
             self.assertEqual(server.regression_log_dir("FourStageRoundTower"),
                              server.PTV3_DIR / "logs/ptv3_reg_fourstage_v4_eaves_normals")
-            self.assertEqual(server.regression_log_dir("Cuboid").name, "ptv3_reg_cuboid_v3_normals")
+            self.assertEqual(server.regression_log_dir("FourStageRoundTower", "_v3_normals"),
+                             server.PTV3_DIR / "logs/ptv3_reg_fourstage_v4_eaves_normals")
+            self.assertEqual(server.regression_log_dir("Cuboid").name,
+                             "ptv3_reg_cuboid_v4_canonical_normals")
             self.assertEqual(server.health()["tower_reg_log"], str(server.regression_log_dir("FourStageRoundTower")))
 
     def test_explicit_missing_override_does_not_fall_back(self):
         with patch.object(server, "TOWER_LOG", str(self.root / "missing")):
-            response = server.regress(SimpleNamespace(primitive_type="FourStageRoundTower"))
+            response = server.regress(SimpleNamespace(primitive_type="FourStageRoundTower", model_suffix=""))
             self.assertFalse(response["ok"])
             self.assertIn("missing", response["error"])
 
     def test_classifier_override_keeps_regression_default(self):
         with patch.dict(sys.modules, {"fastapi": SimpleNamespace(FastAPI=AppStub),
                                       "pydantic": SimpleNamespace(BaseModel=object)}), \
-             patch.dict("os.environ", {"PTV3_CLS_LOG": "logs/ptv3_cls_v6", "PTV3_TOWER_LOG": ""}):
+             patch.dict("os.environ", {"PTV3_CLS_LOG": "logs/ptv3_cls_v6", "PTV3_TOWER_LOG": "",
+                                       "PTV3_REG_SUFFIX": "_v3_normals"}):
             configured = load_script("ptv3_server")
         self.assertEqual(configured.CLS_LOG, configured.PTV3_DIR / "logs/ptv3_cls_v6")
         self.assertEqual(configured.regression_log_dir("Cuboid").name, "ptv3_reg_cuboid_v3_normals")
+
+    def test_regression_suffix_can_select_canonical_models(self):
+        with patch.dict(sys.modules, {"fastapi": SimpleNamespace(FastAPI=AppStub),
+                                      "pydantic": SimpleNamespace(BaseModel=object)}), \
+             patch.dict("os.environ", {"PTV3_REG_SUFFIX": "_v4_canonical_normals"}):
+            configured = load_script("ptv3_server")
+        self.assertEqual(configured.health()["reg_suffix"], "_v4_canonical_normals")
+        self.assertEqual(configured.regression_log_dir("GabledRoof").name,
+                         "ptv3_reg_gabledroof_v4_canonical_normals")
+
+    def test_request_suffix_is_used_and_cannot_escape_model_root(self):
+        self.assertEqual(server.regression_log_dir("GabledRoof", "_v3_normals").name,
+                         "ptv3_reg_gabledroof_v3_normals")
+        with self.assertRaisesRegex(ValueError, "Invalid model_suffix"):
+            server.regression_log_dir("GabledRoof", "../../outside")
 
 
 if __name__ == "__main__":

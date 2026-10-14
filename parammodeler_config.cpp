@@ -41,26 +41,36 @@ static void migratePtv3ModelDefaults()
 {
   QgsSettings settings;
   const QString migrationKey = QStringLiteral( "parammodeler/ptv3ModelDefaultsV5V3" );
-  if ( settings.value( migrationKey, false ).toBool() )
-    return;
-
-  const QString clsKey = QStringLiteral( "parammodeler/ptv3ClassifyLogDir" );
-  const QString oldClsDir = ParamModelerConfig::pointnetBaseDir() +
-                            QStringLiteral( "ptv3_simple/logs/ptv3_cls_v2" );
-  const QString clsDir = settings.value( clsKey ).toString();
-  if ( clsDir.isEmpty() || QDir::cleanPath( clsDir ).compare( QDir::cleanPath( oldClsDir ), Qt::CaseInsensitive ) == 0 )
+  if ( !settings.value( migrationKey, false ).toBool() )
   {
-    const QString newClsDir = ParamModelerConfig::pointnetBaseDir() +
-                              QStringLiteral( "ptv3_simple/logs/ptv3_cls_v5" );
-    settings.setValue( clsKey, newClsDir );
+    const QString clsKey = QStringLiteral( "parammodeler/ptv3ClassifyLogDir" );
+    const QString oldClsDir = ParamModelerConfig::pointnetBaseDir() +
+                              QStringLiteral( "ptv3_simple/logs/ptv3_cls_v2" );
+    const QString clsDir = settings.value( clsKey ).toString();
+    if ( clsDir.isEmpty() || QDir::cleanPath( clsDir ).compare( QDir::cleanPath( oldClsDir ), Qt::CaseInsensitive ) == 0 )
+    {
+      const QString newClsDir = ParamModelerConfig::pointnetBaseDir() +
+                                QStringLiteral( "ptv3_simple/logs/ptv3_cls_v5" );
+      settings.setValue( clsKey, newClsDir );
+    }
+
+    const QString suffixKey = QStringLiteral( "parammodeler/ptv3RegressionSuffix" );
+    const QString suffix = settings.value( suffixKey ).toString();
+    if ( suffix.isEmpty() || suffix == QStringLiteral( "_v2_normals" ) )
+      settings.setValue( suffixKey, QStringLiteral( "_v3_normals" ) );
+
+    settings.setValue( migrationKey, true );
   }
+
+  const QString canonicalMigrationKey = QStringLiteral( "parammodeler/ptv3ModelDefaultsV4Canonical" );
+  if ( settings.value( canonicalMigrationKey, false ).toBool() )
+    return;
 
   const QString suffixKey = QStringLiteral( "parammodeler/ptv3RegressionSuffix" );
   const QString suffix = settings.value( suffixKey ).toString();
-  if ( suffix.isEmpty() || suffix == QStringLiteral( "_v2_normals" ) )
-    settings.setValue( suffixKey, QStringLiteral( "_v3_normals" ) );
-
-  settings.setValue( migrationKey, true );
+  if ( suffix.isEmpty() || suffix == QStringLiteral( "_v2_normals" ) || suffix == QStringLiteral( "_v3_normals" ) )
+    settings.setValue( suffixKey, QStringLiteral( "_v4_canonical_normals" ) );
+  settings.setValue( canonicalMigrationKey, true );
 }
 
 // ------------------------------------------------------------------
@@ -177,7 +187,7 @@ QString ptv3RegressionSuffix()
 {
   migratePtv3ModelDefaults();
   return setting( QStringLiteral( "parammodeler/ptv3RegressionSuffix" ),
-                  QStringLiteral( "_v3_normals" ) );
+                  QStringLiteral( "_v4_canonical_normals" ) );
 }
 
 // ------------------------------------------------------------------
@@ -362,7 +372,7 @@ void showSettingsDialog( QWidget *parent )
     form->addRow( QStringLiteral( "PTv3 分类模型目录:" ), hb );
     form->addRow( QStringLiteral( "PTv3 回归后缀:" ), edtPtv3Suffix );
     auto *ptv3Hint = new QLabel(
-      QStringLiteral( "  本机回归目录按 ptv3_reg_<类别短名><后缀> 查找；远程推理使用服务端配置的模型。" ), &dlg );
+      QStringLiteral( "  本机和远程回归均按 ptv3_reg_<类别短名><后缀> 选择模型；远程服务需支持 model_suffix。" ), &dlg );
     ptv3Hint->setTextFormat( Qt::PlainText );
     ptv3Hint->setWordWrap( true );
     ptv3Hint->setStyleSheet( QStringLiteral( "color: #888; font-size: 11px;" ) );
@@ -385,7 +395,7 @@ void showSettingsDialog( QWidget *parent )
     edtPctClsLog->setText( QStringLiteral( "E:/pointnet/pct_simple/logs/pct_cls_v4" ) );
     edtPctSuffix->setText( QStringLiteral( "_v4_normals" ) );
     edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v5" ) );
-    edtPtv3Suffix->setText( QStringLiteral( "_v3_normals" ) );
+    edtPtv3Suffix->setText( QStringLiteral( "_v4_canonical_normals" ) );
   } );
 
   auto *btnBox = new QHBoxLayout;

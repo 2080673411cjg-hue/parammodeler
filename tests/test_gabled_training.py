@@ -46,7 +46,8 @@ class GabledTrainingTests(unittest.TestCase):
     def test_server_override_does_not_change_other_classes(self):
         with patch.object(server, "GABLED_LOG", "logs/ptv3_reg_gabledroof_trial_normals"):
             self.assertEqual(server.regression_log_dir("GabledRoof").name, "ptv3_reg_gabledroof_trial_normals")
-            self.assertEqual(server.regression_log_dir("Cuboid").name, "ptv3_reg_cuboid_v3_normals")
+            self.assertEqual(server.regression_log_dir("Cuboid").name,
+                             "ptv3_reg_cuboid_v4_canonical_normals")
             self.assertEqual(server.health()["gabled_reg_log"], str(server.regression_log_dir("GabledRoof")))
 
 

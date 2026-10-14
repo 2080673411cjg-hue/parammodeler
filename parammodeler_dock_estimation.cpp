@@ -222,17 +222,23 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     parametersApplied = false;
   };
 
+  const QString dataRoot = ParamModelerConfig::dataRootPath();
+  QString lastInputDirectory = QDir( dataRoot ).exists() ? dataRoot : QDir::homePath();
+  QFileDialog pointCloudDialog( &dialog, tr( "Load point cloud" ) );
+  pointCloudDialog.setNameFilter( tr( "Point cloud files (*.ply *.las *.laz *.xyz *.txt)" ) );
+  pointCloudDialog.setFileMode( QFileDialog::ExistingFile );
+  pointCloudDialog.setAcceptMode( QFileDialog::AcceptOpen );
   connect( btnLoad, &QPushButton::clicked, &dialog, [&]() {
-    const QString dataRoot = ParamModelerConfig::dataRootPath();
-    const QString initialDirectory = QDir( dataRoot ).exists() ? dataRoot : QString();
-    const QString filePath = QFileDialog::getOpenFileName(
-      &dialog, tr( "Load point cloud" ), initialDirectory,
-      tr( "Point cloud files (*.ply *.las *.laz *.xyz *.txt)" )
-    );
-    if ( filePath.isEmpty() )
+    pointCloudDialog.setDirectory( lastInputDirectory );
+    if ( pointCloudDialog.exec() != QDialog::Accepted )
       return;
+    const QStringList selectedFiles = pointCloudDialog.selectedFiles();
+    if ( selectedFiles.isEmpty() )
+      return;
+    const QString filePath = selectedFiles.constFirst();
 
     m_inputDataPath = filePath;
+    lastInputDirectory = QFileInfo( filePath ).absolutePath();
     clearEstimate();
     cacheInputMetadata( filePath );   // 对话框流程也要缓存，否则对齐没有退化备选
     updateInputInfo();

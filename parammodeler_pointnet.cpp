@@ -653,13 +653,20 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
     payload.insert( QStringLiteral( "bbox_z" ), bboxSize.z() );
     payload.insert( QStringLiteral( "scale" ), scale );
     payload.insert( QStringLiteral( "num_points" ), numPoints );
+    if ( backend == PointNetBackend::PTv3 )
+      payload.insert( QStringLiteral( "model_suffix" ), ParamModelerConfig::ptv3RegressionSuffix() );
 
     QJsonDocument responseDoc;
     if ( !postJson( remoteUrl, payload, config.modelName + QStringLiteral( " parameter regression" ), responseDoc, result.errorMessage ) )
       return result;
 
     result.rawOutput = QString::fromUtf8( responseDoc.toJson( QJsonDocument::Compact ) );
-    const QJsonObject obj = responseDoc.object().value( QStringLiteral( "result" ) ).toObject();
+    const QJsonObject responseObj = responseDoc.object();
+    const QString remoteModelDir = responseObj.value( QStringLiteral( "model_log_dir" ) ).toString();
+    if ( !remoteModelDir.isEmpty() )
+      result.checkpointPath = remoteModelDir + QStringLiteral( "/best_model.pth" );
+
+    const QJsonObject obj = responseObj.value( QStringLiteral( "result" ) ).toObject();
     result.className = obj.value( QStringLiteral( "class" ) ).toString( config.className );
     const QJsonObject paramsObj = obj.value( QStringLiteral( "params" ) ).toObject();
     for ( auto it = paramsObj.constBegin(); it != paramsObj.constEnd(); ++it )
@@ -701,13 +708,8 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
        << QStringLiteral( "--bbox_y" ) << QString::number( bboxSize.y(), 'g', 12 )
        << QStringLiteral( "--bbox_z" ) << QString::number( bboxSize.z(), 'g', 12 )
        << QStringLiteral( "--scale" ) << QString::number( scale, 'g', 12 )
-       // 注意：这里刻意不传 --canonical_align。
-       // main_reg.py 会把点云旋到 canonical 姿态再推理，但训练侧从未做同样处理
-       // （--random_rotate 默认 False），且 aux 特征用的仍是旋转前的 metadata
-       // bboxSize —— 属训练/推理输入语义不一致。
-       // 8 类 A/B 实测（ab_canonical_align.py，n=2900 配对）：净效果为零
-       // （Δ=+0.0013, t=+0.86），6 类无差别 / 2 类略差 / 0 类显著变好，
-       // 且多数类有一半以上样本对齐根本没触发。故移除。
+       // 新 checkpoint 在 best_model.pth 中声明 canonical_align；Python 侧按权重配置
+       // 同步旋转点云并重算 bbox aux。旧 checkpoint 没有该标记，仍走原始坐标。
        << QStringLiteral( "--cpu" );
 
   QString stdoutText;

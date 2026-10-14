@@ -23,7 +23,12 @@ from model_ptv3 import PTv3Regressor
 
 # ── Canonical orientation (geometric prior) ─────────────────────────────
 try:
-    from canonical_orientation import canonical_orientation
+    from canonical_orientation import (
+        canonical_angle_from_metadata,
+        canonical_orientation,
+        canonical_target_values,
+        rotate_points_z,
+    )
     _HAS_CANONICAL = True
 except ImportError:
     _HAS_CANONICAL = False
@@ -370,6 +375,15 @@ def aux_vector_from_args(args, aux_names: List[str]):
         return None
     record = {"pointCloudInfo": {"bboxSize": [args.bbox_x, args.bbox_y, args.bbox_z], "scale": args.scale}}
     return aux_vector(record, aux_names)
+
+
+def aux_vector_for_bbox(aux_values: np.ndarray, aux_names: List[str], bbox_size: np.ndarray) -> np.ndarray:
+    if not aux_names:
+        return np.zeros((0,), dtype=np.float32)
+    scale = float(aux_values[aux_names.index("scale")]) if "scale" in aux_names else 1.0
+    record = {"pointCloudInfo": {"bboxSize": np.asarray(bbox_size, dtype=np.float32).tolist(),
+                                 "scale": scale}}
+    return aux_vector(record, aux_names)
 def primitive_geometry_summary(record: dict) -> Dict[str, float]:
     """Geometry labels used only as auxiliary supervision for regression training."""
     params = record.get("params", {})
@@ -482,7 +496,8 @@ class ParamRegressionDataset(Dataset):
     def __init__(self, data_root, metadata_path, class_name, split,
                  targets, num_points, train=False, normalize=True,
                  jitter_sigma=0.0, random_rotate=False, aux_names=None,
-                 use_normals=False, geom_aux_targets=None, target_mode="raw"):
+                 use_normals=False, geom_aux_targets=None, target_mode="raw",
+                 canonical_align=False):
         self.data_root = Path(data_root)
         self.metadata_path = Path(metadata_path)
         self.class_name = class_name
@@ -497,10 +512,16 @@ class ParamRegressionDataset(Dataset):
         self.use_normals = use_normals
         self.geom_aux_targets = geom_aux_targets or []
         self.target_mode = target_mode
+        self.canonical_align = bool(canonical_align)
         self.geom_values: List[np.ndarray] = []
 
+        if self.canonical_align and not _HAS_CANONICAL:
+            raise RuntimeError("Canonical training requires canonical_orientation.py beside main_reg.py")
+        if self.canonical_align and self.random_rotate:
+            raise ValueError("--random_rotate cannot be combined with --canonical_align")
+
         records = load_metadata(self.metadata_path)
-        self.samples: List[Tuple[Path, np.ndarray, np.ndarray, dict]] = []
+        self.samples: List[Tuple[Path, np.ndarray, np.ndarray, dict, float]] = []
         for rec in records:
             if rec.get("type") != class_name or rec.get("split") != split:
                 continue
@@ -508,12 +529,25 @@ class ParamRegressionDataset(Dataset):
             path = self.data_root / rel
             if not path.exists():
                 raise FileNotFoundError(f"Metadata points to missing point cloud: {path}")
-            aux = aux_vector(rec, self.aux_names)
+            theta = 0.0
+            canonical_rec = rec
+            if self.canonical_align:
+                theta_value = canonical_angle_from_metadata(rec, class_name)
+                if theta_value is not None:
+                    theta = float(theta_value)
+                    points = rotate_points_z(load_txt_points(path), -theta)
+                    info = dict(rec.get("pointCloudInfo", {}))
+                    info["bboxSize"] = np.ptp(points, axis=0).astype(float).tolist()
+                    canonical_rec = dict(rec)
+                    canonical_rec["pointCloudInfo"] = info
+            aux = aux_vector(canonical_rec, self.aux_names)
             raw_target = target_vector(rec, targets)
+            if self.canonical_align and canonical_angle_from_metadata(rec, class_name) is not None:
+                raw_target = canonical_target_values(raw_target, targets, rec, class_name, theta)
             baseline = target_baseline_from_aux_values(targets, self.aux_names, aux, self.target_mode)
             target = apply_target_transform(raw_target, baseline, self.target_mode)
-            self.samples.append((path, target, aux, rec))
-            self.geom_values.append(geometry_aux_vector(rec, self.geom_aux_targets))
+            self.samples.append((path, target, aux, canonical_rec, theta))
+            self.geom_values.append(geometry_aux_vector(canonical_rec, self.geom_aux_targets))
         if not self.samples:
             raise RuntimeError(f"No samples for class={class_name}, split={split} in {metadata_path}")
 
@@ -521,8 +555,10 @@ class ParamRegressionDataset(Dataset):
         # keeps every epoch fast instead of re-estimating per sample).
         self._normals_cache: Dict[str, np.ndarray] = {}
         if self.use_normals:
-            for index, (path, _, _, _) in enumerate(self.samples, start=1):
+            for index, (path, _, _, _, theta) in enumerate(self.samples, start=1):
                 pts = load_txt_points(path)
+                if self.canonical_align and theta:
+                    pts = rotate_points_z(pts, -theta)
                 if self.normalize:
                     pts = normalize_points(pts)
                 self._normals_cache[str(path)] = estimate_normals(pts)
@@ -533,8 +569,10 @@ class ParamRegressionDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, index):
-        path, target, aux, _ = self.samples[index]
+        path, target, aux, _, theta = self.samples[index]
         points = load_txt_points(path)
+        if self.canonical_align and theta:
+            points = rotate_points_z(points, -theta)
         if self.normalize:
             points = normalize_points(points)
         normals = self._normals_cache.get(str(path)) if self.use_normals else None
@@ -549,7 +587,7 @@ class ParamRegressionDataset(Dataset):
 # ============================================================================
 
 def compute_target_stats(dataset):
-    y = np.stack([target for _, target, _, _ in dataset.samples], axis=0).astype(np.float32)
+    y = np.stack([target for _, target, _, _, _ in dataset.samples], axis=0).astype(np.float32)
     mean = y.mean(axis=0)
     std = y.std(axis=0)
     std = np.maximum(std, 1e-6)
@@ -559,7 +597,7 @@ def compute_target_stats(dataset):
 def compute_aux_stats(dataset, aux_dim):
     if aux_dim == 0:
         return np.zeros((0,), dtype=np.float32), np.ones((0,), dtype=np.float32)
-    aux = np.stack([a for _, _, a, _ in dataset.samples], axis=0).astype(np.float32)
+    aux = np.stack([a for _, _, a, _, _ in dataset.samples], axis=0).astype(np.float32)
     mean = aux.mean(axis=0)
     std = aux.std(axis=0)
     std = np.maximum(std, 1e-6)
@@ -858,6 +896,8 @@ def save_config(log_dir, args, targets, mean, std, aux_names, aux_mean, aux_std,
         "target_std": std.tolist(),
         "num_points": args.num_points,
         "normalize_points": args.normalize_points,
+        "canonical_align": getattr(args, "canonical_align", False),
+        "canonical_frame_version": "metadata_yaw_v1" if getattr(args, "canonical_align", False) else None,
         "aux_names": aux_names,
         "aux_mean": aux_mean.tolist(),
         "aux_std": aux_std.tolist(),
@@ -938,6 +978,7 @@ def train(args):
         aux_names=aux_names, use_normals=args.use_normals,
         geom_aux_targets=args.geom_aux_targets,
         target_mode=target_mode,
+        canonical_align=args.canonical_align,
     )
     val_split = "val"
     val_ds = ParamRegressionDataset(
@@ -946,6 +987,7 @@ def train(args):
         aux_names=aux_names, use_normals=args.use_normals,
         geom_aux_targets=args.geom_aux_targets,
         target_mode=target_mode,
+        canonical_align=args.canonical_align,
     )
 
     mean_np, std_np = compute_target_stats(train_ds)
@@ -1059,6 +1101,8 @@ def train(args):
                     "geom_aux_targets": args.geom_aux_targets,
                     "geom_aux_mean": geom_mean_np.tolist(), "geom_aux_std": geom_std_np.tolist(),
                     "num_points": args.num_points, "normalize_points": args.normalize_points,
+                    "canonical_align": args.canonical_align,
+                    "canonical_frame_version": "metadata_yaw_v1" if args.canonical_align else None,
                     "aux_names": aux_names,
                     "aux_mean": aux_mean_np.tolist(), "aux_std": aux_std_np.tolist(),
                     "circular_targets": args.circular_targets,
@@ -1138,7 +1182,8 @@ def test(args):
                                 targets, num_points, train=False, normalize=normalize,
                                 aux_names=aux_names, use_normals=use_normals,
                                 geom_aux_targets=list(ckpt.get("geom_aux_targets", [])),
-                                target_mode=target_mode)
+                                target_mode=target_mode,
+                                canonical_align=bool(ckpt.get("canonical_align", False)))
     loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
     circ_indices = [i for i, t in enumerate(targets) if t in set(args.circular_targets)]
     metrics = evaluate(model, loader, device, mean, std, aux_mean, aux_std, targets, aux_names, target_mode, circ_indices)
@@ -1204,15 +1249,24 @@ def predict(args):
     # ---- Canonical orientation alignment ----
     pose_rz_deg = None
     orientation_info = None
-    if getattr(args, "canonical_align", False):
+    canonical_requested = bool(getattr(args, "canonical_align", False)
+                               or ckpt.get("canonical_align", False))
+    canonical_applied = False
+    if canonical_requested:
         if not _HAS_CANONICAL:
-            print("WARNING: canonical_orientation module not found, skipping alignment",
-                  file=sys.stderr)
+            raise SystemExit("Canonical checkpoint requires canonical_orientation.py beside main_reg.py")
         else:
             orientation_info = canonical_orientation(points, class_name=ckpt.get("class_name"))
             if orientation_info["reliable"]:
                 points = orientation_info["aligned_points"]
                 pose_rz_deg = orientation_info["canonical_angle_deg"]
+                canonical_applied = True
+            elif orientation_info.get("status") != "SKIPPED_CLASS" and ckpt.get("canonical_align", False):
+                raise SystemExit("Canonical orientation is uncertain for this cloud: "
+                                 + orientation_info.get("reason", "unknown geometry"))
+
+    if canonical_applied:
+        aux = aux_vector_for_bbox(aux, aux_names, np.ptp(points, axis=0))
 
     if normalize:
         points = normalize_points(points)
@@ -1231,6 +1285,13 @@ def predict(args):
         "params": prediction_params_for_plugin(ckpt["class_name"], targets, pred),
         "aux_features": {name: float(value) for name, value in zip(aux_names, aux)} if aux_names else {},
     }
+
+    if canonical_requested:
+        result["canonical_alignment"] = {
+            "applied": canonical_applied,
+            "status": orientation_info.get("status") if orientation_info else "UNAVAILABLE",
+            "reason": orientation_info.get("reason") if orientation_info else "",
+        }
 
     if pose_rz_deg is not None:
         result["poseRotateZ"] = pose_rz_deg
@@ -1305,7 +1366,7 @@ def parse_args():
     parser.add_argument("--scale", type=float, default=None)
     parser.add_argument("--normalize_points", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--canonical_align", action="store_true",
-                        help="Apply geometric canonical orientation alignment before inference")
+                        help="Canonicalize training/test samples from metadata rz and apply the checkpoint frame at inference")
     parser.add_argument("--cpu", action="store_true")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--backbone", choices=["ptv3"], default="ptv3")
@@ -1329,6 +1390,12 @@ def parse_args():
             raise SystemExit("--targets is required for train mode")
         if not args.metadata:
             args.metadata = str(Path(args.data_root) / "metadata" / "sample_params.json")
+        if args.canonical_align and args.random_rotate:
+            raise SystemExit("--canonical_align cannot be combined with --random_rotate")
+        if args.canonical_align and (args.indented_symmetry_180
+                                     or args.asym_ridge_symmetry_180
+                                     or args.gabled_ridge_symmetry_180):
+            raise SystemExit("Canonical targets are direction-aware; disable the 180-degree symmetry losses")
         if args.indented_symmetry_180:
             if args.circular_targets:
                 raise SystemExit("--indented_symmetry_180 does not support circular targets")
