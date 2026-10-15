@@ -27,6 +27,7 @@ try:
         canonical_angle_from_metadata,
         canonical_orientation,
         canonical_target_values,
+        fold_axis_degrees,
         rotate_points_z,
     )
     _HAS_CANONICAL = True
@@ -497,7 +498,7 @@ class ParamRegressionDataset(Dataset):
                  targets, num_points, train=False, normalize=True,
                  jitter_sigma=0.0, random_rotate=False, aux_names=None,
                  use_normals=False, geom_aux_targets=None, target_mode="raw",
-                 canonical_align=False):
+                 canonical_align=False, orientation_source="metadata"):
         self.data_root = Path(data_root)
         self.metadata_path = Path(metadata_path)
         self.class_name = class_name
@@ -513,6 +514,7 @@ class ParamRegressionDataset(Dataset):
         self.geom_aux_targets = geom_aux_targets or []
         self.target_mode = target_mode
         self.canonical_align = bool(canonical_align)
+        self.orientation_diagnostics = []
         self.geom_values: List[np.ndarray] = []
 
         if self.canonical_align and not _HAS_CANONICAL:
@@ -535,7 +537,18 @@ class ParamRegressionDataset(Dataset):
                 theta_value = canonical_angle_from_metadata(rec, class_name)
                 if theta_value is not None:
                     theta = float(theta_value)
-                    points = rotate_points_z(load_txt_points(path), -theta)
+                    original_points = load_txt_points(path)
+                    if orientation_source == "geometry":
+                        orientation = canonical_orientation(original_points, class_name)
+                        diagnostic = {"file": rel, "applied": orientation["reliable"],
+                                      "reason": orientation["reason"]}
+                        if not orientation["reliable"]:
+                            self.orientation_diagnostics.append(diagnostic)
+                            continue
+                        theta = float(orientation["canonical_angle_deg"])
+                        diagnostic["axis_error_deg"] = abs(fold_axis_degrees(theta - theta_value))
+                        self.orientation_diagnostics.append(diagnostic)
+                    points = rotate_points_z(original_points, -theta)
                     info = dict(rec.get("pointCloudInfo", {}))
                     info["bboxSize"] = np.ptp(points, axis=0).astype(float).tolist()
                     canonical_rec = dict(rec)
@@ -548,7 +561,7 @@ class ParamRegressionDataset(Dataset):
             target = apply_target_transform(raw_target, baseline, self.target_mode)
             self.samples.append((path, target, aux, canonical_rec, theta))
             self.geom_values.append(geometry_aux_vector(canonical_rec, self.geom_aux_targets))
-        if not self.samples:
+        if not self.samples and not self.orientation_diagnostics:
             raise RuntimeError(f"No samples for class={class_name}, split={split} in {metadata_path}")
 
         # Precompute per-point normals once (kNN PCA is the bottleneck; caching
@@ -1166,6 +1179,57 @@ def load_checkpoint(log_dir, device, args):
     return model, ckpt, targets, mean, std, aux_mean, aux_std
 
 
+def centered_geometry_errors(dataset, targets, metrics):
+    """Measure shape/pose together, after aligning footprint centers (not translations)."""
+    class_name = dataset.class_name
+    keys = {
+        "Cuboid": ("length", "width"), "PyramidRoof": ("length", "width"),
+        "TruncatedPyramidRoof": ("bottomLength", "bottomWidth"),
+        "IndentedCuboid": ("outerLength", "outerWidth"),
+        "GabledRoof": ("length", "width"), "AsymmetricGableHouse": ("length", "width"),
+        "HalfCylinderRoof": ("length", "width"),
+    }
+    if class_name not in keys:
+        return {}
+
+    def rotate_xy(points, yaw):
+        a = np.deg2rad(yaw)
+        c, s = np.cos(a), np.sin(a)
+        return np.asarray(points) @ np.array([[c, s], [-s, c]])
+
+    corners = np.array([[-0.5, -0.5], [-0.5, 0.5], [0.5, -0.5], [0.5, 0.5]])
+    rows = []
+    for sample, prediction in zip(dataset.samples, metrics["pred"]):
+        path, _, _, record, yaw = sample
+        true = record["params"]
+        predicted = prediction_params_for_plugin(class_name, targets, prediction)
+        length_key, width_key = keys[class_name]
+        true_size = [float(true[length_key]), float(true[width_key])]
+        pred_size = [predicted[length_key], predicted[width_key]]
+        true_xy = rotate_xy(corners * true_size, float(true["rz"]))
+        pred_xy = rotate_xy(corners * pred_size, yaw)
+        distances = np.linalg.norm(pred_xy[:, None, :] - true_xy[None, :, :], axis=2)
+        row = {"file": str(path), "footprint_corner_error": float(
+            (distances.min(axis=0).mean() + distances.min(axis=1).mean()) / 2)}
+        if class_name in ("GabledRoof", "AsymmetricGableHouse"):
+            length_name = "ridgeLength" if class_name == "AsymmetricGableHouse" else "length"
+            true_ridge = rotate_xy([[-true[length_name] / 2, (true["ridgeRatio"] - 0.5) * true_size[1]],
+                                    [true[length_name] / 2, (true["ridgeRatio"] - 0.5) * true_size[1]]], true["rz"])
+            pred_ridge = rotate_xy([[-predicted[length_name] / 2, (predicted["ridgeRatio"] - 0.5) * pred_size[1]],
+                                    [predicted[length_name] / 2, (predicted["ridgeRatio"] - 0.5) * pred_size[1]]], yaw)
+            row["ridge_endpoint_error"] = float(min(
+                np.linalg.norm(pred_ridge - true_ridge, axis=1).mean(),
+                np.linalg.norm(pred_ridge - true_ridge[::-1], axis=1).mean()))
+        rows.append(row)
+    result = {"centered_geometry_samples": rows}
+    for key in ("footprint_corner_error", "ridge_endpoint_error"):
+        values = [row[key] for row in rows if key in row]
+        if values:
+            result[key + "_mean"] = float(np.mean(values))
+            result[key + "_p95"] = float(np.percentile(values, 95))
+    return result
+
+
 def test(args):
     log_dir = Path(args.log_dir)
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
@@ -1177,20 +1241,39 @@ def test(args):
     use_normals = bool(ckpt.get("use_normals", False))
     aux_names = list(ckpt.get("aux_names", []))
     target_mode = ckpt.get("target_mode", "raw")
+    geometry_test = args.test_orientation == "geometry"
+    if geometry_test and not ckpt.get("canonical_align", False):
+        raise ValueError("Geometry-frame testing requires a canonical checkpoint")
 
     ds = ParamRegressionDataset(args.data_root, metadata, class_name, args.split,
                                 targets, num_points, train=False, normalize=normalize,
                                 aux_names=aux_names, use_normals=use_normals,
                                 geom_aux_targets=list(ckpt.get("geom_aux_targets", [])),
                                 target_mode=target_mode,
-                                canonical_align=bool(ckpt.get("canonical_align", False)))
+                                canonical_align=bool(ckpt.get("canonical_align", False)),
+                                orientation_source=args.test_orientation)
+    output_split = args.split + "_geometry" if geometry_test else args.split
+    orientation_report = {"orientation_source": args.test_orientation,
+                          "alignment_attempted": len(ds.orientation_diagnostics),
+                          "accepted": len(ds),
+                          "failed": sum(not row["applied"] for row in ds.orientation_diagnostics),
+                          "samples": ds.orientation_diagnostics}
+    if geometry_test:
+        (log_dir / f"orientation_{output_split}.json").write_text(
+            json.dumps(orientation_report, indent=2), encoding="utf-8")
+    if not len(ds):
+        raise RuntimeError("No usable test samples; inspect the orientation report")
     loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
     circ_indices = [i for i, t in enumerate(targets) if t in set(args.circular_targets)]
     metrics = evaluate(model, loader, device, mean, std, aux_mean, aux_std, targets, aux_names, target_mode, circ_indices)
-    save_metrics(log_dir, args.split, targets, metrics)
-    save_predictions(log_dir, args.split, targets, metrics)
-    save_regression_report(log_dir, args.split, class_name, targets, metrics)
-    save_regression_errors(log_dir, args.split, class_name, targets, metrics)
+    save_metrics(log_dir, output_split, targets, metrics)
+    save_predictions(log_dir, output_split, targets, metrics)
+    save_regression_report(log_dir, output_split, class_name, targets, metrics)
+    save_regression_errors(log_dir, output_split, class_name, targets, metrics)
+    if geometry_test:
+        orientation_report.update(centered_geometry_errors(ds, targets, metrics))
+        (log_dir / f"orientation_{output_split}.json").write_text(
+            json.dumps(orientation_report, indent=2), encoding="utf-8")
     print(f"Test samples: {len(ds)}")
     for i, name in enumerate(targets):
         print(f"  {name:20s}  MAE={metrics['mae'][i]:.4f}  RMSE={metrics['rmse'][i]:.4f}  "
@@ -1215,7 +1298,7 @@ def test(args):
                    "ridge_direct_mae": float(direct.mean()),
                    "ridge_equivalent_mae": float(np.minimum(direct, alternate).mean()),
                    "pose_disambiguation_required": True}
-        (log_dir / f"ridge_symmetry_{args.split}.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        (log_dir / f"ridge_symmetry_{output_split}.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
         print(f"Ridge symmetry diagnostics: {summary}")
 
 
@@ -1326,6 +1409,8 @@ def parse_args():
     parser.add_argument("--target_mode", choices=["raw", "bbox_residual"], default="raw",
                         help="raw predicts target values directly; bbox_residual predicts target - bbox baseline.")
     parser.add_argument("--split", default="test")
+    parser.add_argument("--test_orientation", choices=["metadata", "geometry"], default="metadata",
+                        help="Test using metadata yaw or deployment geometry; geometry results use a separate file suffix.")
     parser.add_argument("--input", help="Input txt for predict mode")
 
     # ── Logging ──

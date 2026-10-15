@@ -25,6 +25,7 @@ struct PointNetRegressionResult
   QString className;
   QMap<QString, double> params;
   QString rawOutput;
+  QString warningMessage;
   QString errorMessage;
 };
 

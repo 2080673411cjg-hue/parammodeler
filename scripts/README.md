@@ -1,5 +1,21 @@
 # ParamModeler 深度学习完整流程
 
+## 2026-10-15：v4 推理修复与实际方向测试
+
+无需重新生成数据或重新训练。将 Windows `E:/pointnet/ptv3_simple/` 下的 `canonical_orientation.py`、`main_reg.py` 和 `ptv3_server.py` 同步到 Ubuntu `/home/xubo/pointnet/ptv3_simple/`，保留现有 v4 checkpoint；激活 `ptv3_train`，在该目录停止旧 uvicorn 进程后重新启动服务。插件需要用户重新编译。
+
+几何方向使用稳健外接矩形，顶部点云用于判断屋脊对应的轴。插件有 metadata 时把规范参数一同变回原始坐标，而不是仅覆盖姿态角；无 metadata 则保留配套的规范参数和几何角度。近正方形方向标记 WEAK，无法读取有效二维轮廓时明确报错；LHouse、TwoGableHouses 与旋转对称类仍跳过。
+
+在 Ubuntu 已激活的环境中检查两类人字屋和凹陷长方体的实际推理方向表现（只测试，不训练）：
+
+```bash
+for stem in gabledroof asymgable indentedcuboid; do python -u main_reg.py --mode test --data_root /home/xubo/pointnet/datasets_aug --log_dir logs/ptv3_reg_${stem}_v4_canonical_normals --test_orientation geometry --seed 42 || break; done
+```
+
+测试使用和推理相同的几何方向函数。新报告为 `regression_*_test_geometry.csv` 与 `orientation_test_geometry.json`，不会覆盖原来的 `*_test.csv`。JSON 包含方向处理失败数、成功样本的角度误差、中心对齐后的水平轮廓角点误差和屋脊端点误差；这些几何误差不含插件的全局平移/自动角点对齐误差。原有默认测试仍使用 metadata 真值方向，两种结果需分别报告。
+
+插件验证建议先关闭几何校正，用 `test/GabledRoof/sample_00003.txt`、`test/AsymmetricGableHouse/sample_00005.txt` 检查屋脊侧，再检查凹陷长方体内槽；随后用没有 metadata 的点云核对方向。连续加载文件和完成后重新打开估计窗口，都应从上次文件夹开始。
+
 ## 2026-10-13 屋脊偏移诊断与独立实验
 
 ## 2026-10-14：canonical 方向规范训练

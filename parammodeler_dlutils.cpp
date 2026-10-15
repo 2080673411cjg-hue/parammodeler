@@ -994,7 +994,7 @@ bool shouldSwapCanonicalRegressionAxes( const QString &primitiveType,
                                         const QString &filePath,
                                         double rzDeg )
 {
-  if ( !std::isfinite( rzDeg ) ||
+  if ( nn.contains( QStringLiteral( "poseRotateZ" ) ) || !std::isfinite( rzDeg ) ||
        !nn.contains( QStringLiteral( "geom_footprint_long" ) ) ||
        !nn.contains( QStringLiteral( "geom_footprint_short" ) ) ||
        ( primitiveType != QStringLiteral( "Cuboid" ) &&

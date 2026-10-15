@@ -1,6 +1,7 @@
 #include "../parammodeler_regression_axes.h"
 
 #include <cassert>
+#include <limits>
 
 using namespace ParamModelerRegressionAxes;
 
@@ -50,4 +51,35 @@ int main()
   assert( swappedIndent.value( QStringLiteral( "rightMarginRatio" ) ) == 0.4 );
   assert( swappedIndent.value( QStringLiteral( "frontMarginRatio" ) ) == 0.1 );
   assert( swappedIndent.value( QStringLiteral( "backMarginRatio" ) ) == 0.2 );
+
+  for ( const auto &primitive : { QStringLiteral( "GabledRoof" ), QStringLiteral( "AsymmetricGableHouse" ) } )
+  {
+    for ( const double yaw : { 0.0, 90.0, 120.0, 180.0 } )
+    {
+      const double canonicalYaw = yaw >= 90.0 ? yaw - 180.0 : yaw;
+      QMap<QString, double> roof = { { QStringLiteral( "poseRotateZ" ), canonicalYaw },
+                                    { QStringLiteral( "ridgeRatio" ), yaw >= 90.0 ? 0.7 : 0.3 } };
+      const auto original = paramsInMetadataFrame( primitive, roof, yaw );
+      assert( std::abs( original.value( QStringLiteral( "ridgeRatio" ) ) - 0.3 ) < 1e-9 );
+      assert( original.value( QStringLiteral( "poseRotateZ" ) ) == yaw );
+      assert( paramsInMetadataFrame( primitive, roof, std::numeric_limits<double>::quiet_NaN() ) == roof );
+    }
+  }
+
+  indented[QStringLiteral( "poseRotateZ" )] = -60.0;
+  const auto halfTurn = paramsInMetadataFrame( QStringLiteral( "IndentedCuboid" ), indented, 120.0 );
+  assert( halfTurn.value( QStringLiteral( "leftMarginRatio" ) ) == 0.2 );
+  assert( halfTurn.value( QStringLiteral( "rightMarginRatio" ) ) == 0.1 );
+  assert( halfTurn.value( QStringLiteral( "frontMarginRatio" ) ) == 0.4 );
+  assert( halfTurn.value( QStringLiteral( "backMarginRatio" ) ) == 0.3 );
+  for ( const double angle : { -90.0, 90.0 } )
+  {
+    indented[QStringLiteral( "poseRotateZ" )] = angle;
+    const auto quarterTurn = paramsInMetadataFrame( QStringLiteral( "IndentedCuboid" ), indented, 0.0 );
+    assert( quarterTurn.value( QStringLiteral( "outerLength" ) ) == 10.0 );
+    assert( quarterTurn.value( QStringLiteral( "outerWidth" ) ) == 14.0 );
+    assert( quarterTurn.value( QStringLiteral( "leftMarginRatio" ) ) == ( angle > 0 ? 0.4 : 0.3 ) );
+    assert( quarterTurn.value( QStringLiteral( "frontMarginRatio" ) ) == ( angle > 0 ? 0.1 : 0.2 ) );
+  }
+  assert( paramsInMetadataFrame( QStringLiteral( "Cuboid" ), legacy, 120.0 ) == legacy );
 }

@@ -1,6 +1,17 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新: 2026-10-14
+> 最后更新: 2026-10-15
+
+### 2026-10-15：规范坐标与插件姿态修复
+
+- 插件两条参数估计入口统一将 v4 规范参数转换回 metadata 原始坐标：同步处理屋脊比例、矩形长宽、截顶屋顶上下底比例、凹陷长方体四向边距；无 metadata 时保留几何角度和规范参数。旧权重无姿态字段时沿用旧映射，避免二次交换长宽。
+- 几何方向改用去除极端离群点后的候选外接矩形，以分位数包络面积选轴；屋顶以顶部点云选择与屋脊对应的矩形轴。近正方形返回 WEAK，不再因 PCA 比值低直接失败；不支持的类别仍跳过。移除了本次替代后不再使用的旧 RANSAC/直方图处理。
+- CPU方向检查覆盖7类各100份增强测试点云，均成功；GabledRoof/AsymmetricGableHouse 最大轴误差均0.5°，HalfCylinderRoof/IndentedCuboid 最大2.5°，Cuboid/PyramidRoof 最大1.5°，TruncatedPyramidRoof 最大0.5°。这些不是重新计算的网络回归指标。
+- 新增 `main_reg.py --mode test --test_orientation geometry`：按实际几何估计方向进行测试，单独保存 `*_test_geometry.csv` 和 `orientation_test_geometry.json`，记录失败数、角误差、中心对齐后的水平轮廓角点误差及两类人字屋的屋脊端点误差；原始 metadata 方向测试报告保留。
+- 文件选择器跨估计窗口持久化上次目录，显式排除空目录记录；无有效历史记录时优先数据集目录，保留 Windows 原生对话框。
+- 旧服务没有返回 `model_log_dir` 时清空未确认的 checkpoint 路径并在界面提示版本未确认，不再将本机 v4 路径当作远程权重来源。
+- 尚未编译插件 DLL、部署 Ubuntu 服务或重新运行 GPU 参数回归；现有 v4 checkpoint 和数据集不变。
+- 验证：12项规范方向/测试流程检查、5项原有屋脊损失检查、16项训练/服务入口检查通过；独立C++坐标转换测试通过，未构建插件DLL。差异空白检查通过。
 
 ### 2026-10-14：canonical 方向规范训练实现
 

@@ -10,11 +10,17 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 
 项目的核心目标不是只输出一个不可编辑的三角网格，而是把建筑点云转换为结构化、可解释、可编辑、可复现的参数化三维模型。
 
+### 2026-10-15：方向回填与几何推理修复
+
+v4 推理结果回填时，有 metadata 的输入会把长宽、屋脊比例和内槽四向边距一起转换回 metadata 的原始朝向，避免只覆盖角度导致屋脊或内槽翻到另一侧；没有 metadata 时保留规范参数与估计角度的配套关系。几何朝向改为稳健外接矩形与顶部屋脊轴联合判断，近正方形不再直接拒绝。700份现有增强测试点云的方向检查全部返回结果，最大轴向误差2.5°；这只是方向检查，尚未重新运行 GPU 回归或 QGIS 实机验证。
+
+参数估计文件选择器保留 Windows 原生样式，跨窗口记住上次文件夹。没有有效历史记录时先使用数据集目录，再回退用户主目录。远程服务不返回实际模型目录时显示“版本未确认”，评估记录不再冒用本机权重路径。无需重新生成数据或重训 v4；部署和几何方向测试命令见 `scripts/README.md`。
+
 ### 2026-10-14：canonical 方向规范训练
 
 参数回归训练入口默认使用 metadata 中的 `rz` 规范化训练、验证和测试点云，并基于规范点云重新计算 bbox 辅助特征。GabledRoof、AsymmetricGableHouse 的屋脊比例标签会同步变换；推理按 checkpoint 标记自动执行相应的几何对齐。v4 canonical 全类训练已完成，结果摘要见下文及 `dl-pipeline-log.md`。插件默认请求 `_v4_canonical_normals`；Ubuntu 服务端仍须部署新版 `ptv3_server.py`、`main_reg.py`、`canonical_orientation.py` 并重启，线上才会按请求选择 v4 权重。LHouse、TwoGableHouses 与轴向对称基元暂不旋转规范化，避免改变缺角、房体关系或无意义地处理圆形朝向。QGIS 实际推理与对齐仍待现场验证，旧 checkpoint 推理行为保持不变。
 
-参数估计窗口的“加载点云”首次从配置的数据集目录打开；同一窗口再次加载时，从上一个成功加载文件所在目录打开，并保留 Windows 原生文件选择器样式。
+参数估计窗口的“加载点云”在没有历史目录时从配置的数据集目录打开；后续从上一个成功加载文件所在目录打开，关闭窗口后仍会记忆，并保留 Windows 原生文件选择器样式。
 
 v4 测试集（各类100份）显示：屋脊方向规范化后，GabledRoof `ridgeRatio` MAE=0.0120、R²=0.977，AsymmetricGableHouse MAE=0.0119、R²=0.975；凹陷长方体 `innerHeight` MAE=0.1629、R²=0.981。主要弱项为 FourStageRoundTower `middleBulge`（R²=-0.593）、TwoGableHouses `ridgeRatio`（R²=0.219）及 `length1/length2`、LHouse `cutoutWidthRatio`（R²=0.383）；CylinderDome `bulge` 仍有约16.6% MAPE。分类 v5 测试准确率为99.62%（1300份）。以上是合成测试集指标，不等同于真实点云表现。
 

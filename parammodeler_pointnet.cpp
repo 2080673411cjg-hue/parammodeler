@@ -641,6 +641,7 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
     : QString();
   if ( !remoteUrl.isEmpty() )
   {
+    result.checkpointPath.clear();
     QString pointsText;
     if ( !readPointText( prepared.pythonInputPath, pointsText, result.errorMessage ) )
       return result;
@@ -665,6 +666,8 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
     const QString remoteModelDir = responseObj.value( QStringLiteral( "model_log_dir" ) ).toString();
     if ( !remoteModelDir.isEmpty() )
       result.checkpointPath = remoteModelDir + QStringLiteral( "/best_model.pth" );
+    else
+      result.warningMessage = QStringLiteral( "远程模型版本未确认，请更新推理服务并重启。" );
 
     const QJsonObject obj = responseObj.value( QStringLiteral( "result" ) ).toObject();
     result.className = obj.value( QStringLiteral( "class" ) ).toString( config.className );

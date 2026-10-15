@@ -5,6 +5,8 @@
 #include "parammodeler_pcdloader.h"
 #include "parammodeler_config.h"
 #include "parammodeler_pointnet.h"
+#include "parammodeler_regression_axes.h"
+#include "qgssettings.h"
 
 #include <QAbstractItemView>
 #include <QApplication>
@@ -223,7 +225,10 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   };
 
   const QString dataRoot = ParamModelerConfig::dataRootPath();
-  QString lastInputDirectory = QDir( dataRoot ).exists() ? dataRoot : QDir::homePath();
+  QgsSettings settings;
+  QString lastInputDirectory = settings.value( QStringLiteral( "parammodeler/parameterEstimateLastInputDirectory" ) ).toString();
+  if ( lastInputDirectory.isEmpty() || !QFileInfo( lastInputDirectory ).isDir() )
+    lastInputDirectory = !dataRoot.isEmpty() && QFileInfo( dataRoot ).isDir() ? dataRoot : QDir::homePath();
   QFileDialog pointCloudDialog( &dialog, tr( "Load point cloud" ) );
   pointCloudDialog.setNameFilter( tr( "Point cloud files (*.ply *.las *.laz *.xyz *.txt)" ) );
   pointCloudDialog.setFileMode( QFileDialog::ExistingFile );
@@ -239,6 +244,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
 
     m_inputDataPath = filePath;
     lastInputDirectory = QFileInfo( filePath ).absolutePath();
+    settings.setValue( QStringLiteral( "parammodeler/parameterEstimateLastInputDirectory" ), lastInputDirectory );
     clearEstimate();
     cacheInputMetadata( filePath );   // 对话框流程也要缓存，否则对齐没有退化备选
     updateInputInfo();
@@ -311,9 +317,11 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       return false;
     }
 
+    const auto frameParams = ParamModelerRegressionAxes::paramsInMetadataFrame(
+      prim, regression.params, m_hasMetadataRz ? m_metadataRz : qQNaN() );
     const bool swapCanonicalAxes = shouldSwapCanonicalRegressionAxes(
-      prim, regression.params, m_inputDataPath, m_hasMetadataRz ? m_metadataRz : qQNaN() );
-    QMap<QString, double> params = pointNetParamsToUiParams( prim, regression.params, swapCanonicalAxes );
+      prim, frameParams, m_inputDataPath, m_hasMetadataRz ? m_metadataRz : qQNaN() );
+    QMap<QString, double> params = pointNetParamsToUiParams( prim, frameParams, swapCanonicalAxes );
     const auto rawParams = params;
     applyDataDrivenParamCorrections( prim, params );
     if ( params.isEmpty() )
@@ -349,6 +357,11 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     }
     onUpdatePreview();
     resultLabel->setText( classificationSummary + tr( "\nParameters applied to main panel." ) );
+    if ( !regression.warningMessage.isEmpty() )
+    {
+      resultLabel->setText( resultLabel->text() + QLatin1Char( '\n' ) + regression.warningMessage );
+      QMessageBox::warning( &dialog, QStringLiteral( "参数估计" ), regression.warningMessage );
+    }
     return true;
   };
 
@@ -513,11 +526,16 @@ void ParamModelerDock::onInverseParams()
     QMessageBox::warning( this, tr( "Parameter estimation failed" ), regression.errorMessage );
     return;
   }
+  const auto frameParams = ParamModelerRegressionAxes::paramsInMetadataFrame(
+    prim, regression.params, m_hasMetadataRz ? m_metadataRz : qQNaN() );
   const bool swapCanonicalAxes = shouldSwapCanonicalRegressionAxes(
-    prim, regression.params, m_inputDataPath, m_hasMetadataRz ? m_metadataRz : qQNaN() );
-  QMap<QString, double> params = pointNetParamsToUiParams( prim, regression.params, swapCanonicalAxes );
+    prim, frameParams, m_inputDataPath, m_hasMetadataRz ? m_metadataRz : qQNaN() );
+  QMap<QString, double> params = pointNetParamsToUiParams( prim, frameParams, swapCanonicalAxes );
   const auto rawParams = params;
   applyDataDrivenParamCorrections( prim, params );
+
+  if ( !regression.warningMessage.isEmpty() )
+    QMessageBox::warning( this, QStringLiteral( "参数估计" ), regression.warningMessage );
 
   if ( !params.isEmpty() )
   {
