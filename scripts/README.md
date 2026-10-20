@@ -1,5 +1,39 @@
 # ParamModeler 深度学习完整流程
 
+## v2.4.0：对齐评测基线（2026-10-20）
+
+本版不重新训练。圆塔 v5 和其他十二类 v4 canonical 的测试日志已用于固定真实类别、metadata 朝向的四组评测，结果保存在 `evaluations/2026-10-20-alignment/`；这是下一轮对齐修改前的基线，不是线上服务或未知朝向完整推理验收。
+
+PowerShell 运行 `scripts/evaluate_alignment.ps1` 可复现：校验当前标签与 CSV 真值，构建独立评测程序，计算真值形状/预测形状与真值位姿/自动平移的四组残差，再用未增强点云核验真值网格还原。原始回建不通过时拒绝生成汇总结论。不会构建插件 DLL、重训、改动数据或上传权重；临时独立编译文件在成功完成后清除。脚本默认读取 `E:/pointnet/datasets`、`E:/pointnet/datasets_aug` 和 `E:/pointnet/ptv3_simple/logs`。
+
+## 2026-10-19：圆塔 middleRise 新曲线
+
+本节优先于下方历史圆塔命令。仅修改 FourStageRoundTower，穹顶和其他十二类回归配方不变。输入/导出/训练统一使用 `middleRise`（米），替换旧系数 `middleBulge`；不能通过给旧标签改名来转换数据。隆起高度范围 `0～middleHeight/4`，随机生成采用 `0.03～0.20` 倍中段高度。
+
+顶部半径取消原有 2%～35% 比例截断，仅要求大于零且小于檐口外半径；输入端联动边界，训练入口检查同一关系。随机生成先采样原有造型，再将八个尺寸共同乘以 `0.5～2.0` 的随机倍率：底座半径理论覆盖约 2.5～24、中段高约 0.5～6、顶部半径约 0.25～3.2 米。倍率均匀抽样不等于最终各尺寸均匀分布；造型比例不刻意改变，控件会按原精度舍入。
+
+扩大尺度后仍需用户编译并替换生成圆塔数据，再增强和同步；已有数据不会自动放大。参数字段、增强和 v5 训练命令不变，无须为缩放修改训练/推理脚本。
+
+用户编译并重启插件后，选中 FourStageRoundTower，使用“生成当前基元数据集”的替换模式，在原 `E:/pointnet/datasets` 目录重新生成 1000 份（800/100/100）。不要追加或补齐旧塔样本；其他类别保留。仍用 `E:/pointnet/ptv3_simple/augment_dataset.py`，按下方圆塔 CMD 增强命令只覆盖该类。
+
+Ubuntu 需要替换增强集三个 `FourStageRoundTower` 子目录及更新后的 metadata，并同步新版 `train_ptv3_reg.py` 和 `ptv3_server.py`。Windows 实际使用目录 `E:/pointnet/ptv3_simple` 的这两个脚本已同步；`main_reg.py` 已支持按目标名透传实际尺寸，无须改动，增强脚本和既有权重未修改。训练入口会在启动 GPU 前拒绝旧/混合标签及隆起越界数据。使用新的 run_tag，仅训练圆塔回归；尚未生成数据或启动训练。
+
+新版插件与服务明确拒绝缺少 `middleRise` 或仍含 `middleBulge` 的圆塔预测。圆塔新权重训练验证后再用 `PTV3_TOWER_LOG` 单独指定，分类/其他类别回归默认目录不变；部署前的旧塔推理暂不可用，不会静默套用新定义。分类先复测新塔数据，再决定是否重训，不能只用单类训练分类模型。
+
+本地剖面候选预览：`tower_bulge_profile.html`。实际网格使用相同公式，仍以三次贝塞尔控制点构造。界面值为米数，不要求手工换算比例。
+
+## 2026-10-16：分类 v6 部署
+
+分类 v6 已训练并取回 Windows，测试集 1298/1300 正确（99.85%）。插件本机默认值和旧默认配置迁移均指向 `logs/ptv3_cls_v6`；服务脚本默认分类也改为 v6，回归后缀保持 `_v4_canonical_normals`。
+
+将新版 `ptv3_server.py` 同步到 Ubuntu `/home/xubo/pointnet/ptv3_simple/`。确认该机 `logs/ptv3_cls_v6/best_model.pth` 和 `classification_config.json` 存在；训练就在该机完成时不必重新传权重。停止旧推理服务后，在已激活 `ptv3_train` 的环境中运行：
+
+```bash
+PTV3_CLS_LOG=logs/ptv3_cls_v6 python -m uvicorn ptv3_server:app --host 0.0.0.0 --port 8008
+```
+
+显式指定分类目录可避免已有 v5 环境变量覆盖新默认值；不改变已有回归环境变量。用 `curl -s http://127.0.0.1:8008/health` 确认 `cls_log` 结尾为 `/logs/ptv3_cls_v6`，再从插件复测 `test/GabledRoof/sample_00007.txt`。只换远程分类不要求重编译插件；要启用本机默认目录及其迁移，则需用户编译新插件。尚未在远程 GPU 或 QGIS 中执行此轮验证。
+
 ## 2026-10-15：v4 推理修复与实际方向测试
 
 无需重新生成数据或重新训练。将 Windows `E:/pointnet/ptv3_simple/` 下的 `canonical_orientation.py`、`main_reg.py` 和 `ptv3_server.py` 同步到 Ubuntu `/home/xubo/pointnet/ptv3_simple/`，保留现有 v4 checkpoint；激活 `ptv3_train`，在该目录停止旧 uvicorn 进程后重新启动服务。插件需要用户重新编译。

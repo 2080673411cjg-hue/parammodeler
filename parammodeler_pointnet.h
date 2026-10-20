@@ -4,6 +4,18 @@
 #include <QString>
 #include <QMap>
 #include <QVector>
+#include <QCoreApplication>
+#include <cmath>
+
+inline QString towerRegressionSchemaError( const QString &primitiveType, const QMap<QString, double> &params )
+{
+  if ( primitiveType != QStringLiteral( "FourStageRoundTower" ) ) return QString();
+  if ( !params.contains( QStringLiteral( "middleRise" ) ) || params.contains( QStringLiteral( "middleBulge" ) ) )
+    return QCoreApplication::translate( "PointNetRunner", "This tower checkpoint uses the old bulge definition. Retrain with middleRise (metres) before using it." );
+  if ( !std::isfinite( params.value( QStringLiteral( "middleRise" ) ) ) )
+    return QCoreApplication::translate( "PointNetRunner", "The tower model returned an invalid middleRise value." );
+  return QString();
+}
 
 struct PointNetPrediction
 {

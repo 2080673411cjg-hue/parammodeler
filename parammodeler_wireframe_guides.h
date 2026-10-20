@@ -151,6 +151,14 @@ inline bool towerInnerEaveRing( const QVector3D &a, const QVector3D &b,
   return std::abs( std::hypot( a.x(), a.y() ) - baseRadius ) < radiusTolerance
          && std::abs( std::hypot( b.x(), b.y() ) - baseRadius ) < radiusTolerance;
 }
+
+inline bool towerInteriorRoofRing( const QVector3D &a, const QVector3D &b,
+                                   double eaveTopZ, double roofTopZ )
+{
+  return std::abs( a.z() - b.z() ) < 0.001
+         && std::min( a.z(), b.z() ) > eaveTopZ + 0.001
+         && std::max( a.z(), b.z() ) < roofTopZ - 0.001;
+}
 }
 
 #endif // PARAMMODELER_WIREFRAME_GUIDES_H

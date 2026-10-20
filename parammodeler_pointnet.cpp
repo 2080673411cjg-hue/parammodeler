@@ -679,6 +679,8 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
 
     if ( result.params.isEmpty() )
       result.errorMessage = QStringLiteral( "%1 remote regression returned no parameters." ).arg( config.modelName );
+    else
+      result.errorMessage = towerRegressionSchemaError( config.className, result.params );
     return result;
   }
 
@@ -742,6 +744,8 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
 
   if ( result.params.isEmpty() )
     result.errorMessage = QStringLiteral( "%1 regression returned no parameters." ).arg( config.modelName );
+  else
+    result.errorMessage = towerRegressionSchemaError( config.className, result.params );
 
   return result;
 }
@@ -852,7 +856,7 @@ void PointNetRunner::applyToUI( ParamModelerDock *dock,
     set( "ftEaveHeight", dock->ui->spinBoxFTEaveThickness, dock->ui->sliderFTEaveThickness );
     set( "ftMidH",        dock->ui->spinBoxFTMiddleHeight,   dock->ui->sliderFTMiddleHeight );
     set( "ftMidTopR",     dock->ui->spinBoxFTMiddleTopRadius,dock->ui->sliderFTMiddleTopRadius );
-    set( "ftMidBulge",    dock->ui->spinBoxFTMiddleBulge,    dock->ui->sliderFTMiddleBulge );
+    set( "ftMidRise",     dock->ui->spinBoxFTMiddleRise,     dock->ui->sliderFTMiddleRise );
     set( "ftConeH",       dock->ui->spinBoxFTConeHeight,     dock->ui->sliderFTConeHeight );
     set( "tgLength1",      dock->ui->spinBoxTGLength1,     dock->ui->sliderTGLength1 );
     set( "tgLength2",      dock->ui->spinBoxTGLength2,     dock->ui->sliderTGLength2 );

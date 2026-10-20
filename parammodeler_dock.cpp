@@ -281,6 +281,7 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
 
 ParamModelerDock::~ParamModelerDock()
 {
+  resetFitEvaluation();
   stopManualTranslate3D();
   QgsMapCanvas *canvas = mIface ? mIface->mapCanvas() : nullptr;
   if ( canvas && m_manualTranslateTool && canvas->mapTool() == m_manualTranslateTool )
@@ -471,8 +472,8 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderFTEaveRadius, ui->spinBoxFTEaveRadius, 1000.0, 60.0 );
   bindSliderSpin( ui->sliderFTEaveThickness, ui->spinBoxFTEaveThickness, 1000.0, 50.0 );
   bindSliderSpin( ui->sliderFTMiddleHeight, ui->spinBoxFTMiddleHeight, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderFTMiddleTopRadius, ui->spinBoxFTMiddleTopRadius, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderFTMiddleBulge, ui->spinBoxFTMiddleBulge, 100.0, 0.6 );
+  bindSliderSpin( ui->sliderFTMiddleTopRadius, ui->spinBoxFTMiddleTopRadius, 100.0, 60.0 );
+  bindSliderSpin( ui->sliderFTMiddleRise, ui->spinBoxFTMiddleRise, 1000.0, 12.5 );
   bindSliderSpin( ui->sliderFTConeHeight, ui->spinBoxFTConeHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGLength1, ui->spinBoxTGLength1, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGLength2, ui->spinBoxTGLength2, 100.0, 50.0 );
@@ -504,6 +505,26 @@ void ParamModelerDock::initUiControls()
   allowWorldTranslation( ui->sliderTX, ui->spinBoxTX );
   allowWorldTranslation( ui->sliderTY, ui->spinBoxTY );
   allowWorldTranslation( ui->sliderTZ, ui->spinBoxTZ );
+
+  // Apply dimension limits before height-direction compensation reads the final edit.
+  const auto manualRecessEdit = [this]() {
+    return !m_suspendHeightCompensation && !m_isUpdating &&
+           ui->stackedWidgetParams->currentWidget() == ui->pageIndentedCuboid;
+  };
+  bindRecessDepthLimit( ui->spinBoxICHeight, ui->spinBoxICInnerHeight,
+                        ui->sliderICInnerHeight, ui->sliderICHeight, m_suspendHeightCompensation, manualRecessEdit );
+  const auto manualTowerEdit = [this]() {
+    return !m_suspendHeightCompensation && !m_isUpdating &&
+           ui->stackedWidgetParams->currentWidget() == ui->pageFourStageRoundTower;
+  };
+  bindEaveDimension( ui->spinBoxFTBaseRadius, ui->spinBoxFTEaveRadius, ui->sliderFTEaveRadius,
+                     true, 60.0, ui->sliderFTBaseRadius, manualTowerEdit );
+  bindEaveDimension( ui->spinBoxFTBaseHeight, ui->spinBoxFTEaveThickness, ui->sliderFTEaveThickness,
+                     false, 50.0, ui->sliderFTBaseHeight, manualTowerEdit );
+  bindTowerTopRadius( ui->spinBoxFTEaveRadius, ui->spinBoxFTMiddleTopRadius, ui->sliderFTMiddleTopRadius,
+                      ui->sliderFTEaveRadius, manualTowerEdit );
+  bindTowerRise( ui->spinBoxFTMiddleHeight, ui->spinBoxFTMiddleRise, ui->sliderFTMiddleRise,
+                 ui->sliderFTMiddleHeight, manualTowerEdit );
 
   ui->labelWidth->setText( tr( "Width:" ) );
   ui->labelHeight->setText( tr( "Height:" ) );
@@ -559,7 +580,7 @@ void ParamModelerDock::initUiControls()
   ui->labelFTBaseHeight->setText( tr( "Base height:" ) );
   ui->labelFTMiddleHeight->setText( tr( "Middle height:" ) );
   ui->labelFTMiddleTopRadius->setText( tr( "Middle top radius:" ) );
-  ui->labelFTMiddleBulge->setText( tr( "Middle bulge:" ) );
+  ui->labelFTMiddleRise->setText( tr( "Middle rise (m):" ) );
   ui->labelFTConeHeight->setText( tr( "Cone height:" ) );
   ui->labelTGLength1->setText( tr( "House 1 length:" ) );
   ui->labelTGLength2->setText( tr( "House 2 length:" ) );
@@ -624,41 +645,14 @@ void ParamModelerDock::initHeightDirectionControls()
 
 void ParamModelerDock::initConnections()
 {
-  bindEaveDimension( ui->spinBoxFTBaseRadius, ui->spinBoxFTEaveRadius, ui->sliderFTEaveRadius, true, 60.0 );
-  bindEaveDimension( ui->spinBoxFTBaseHeight, ui->spinBoxFTEaveThickness, ui->sliderFTEaveThickness, false, 50.0 );
-  bindRecessDepthLimit( ui->spinBoxICHeight, ui->spinBoxICInnerHeight,
-                        ui->sliderICInnerHeight, m_suspendHeightCompensation );
-  const auto bindFixedInnerCorner = [this]( QDoubleSpinBox *inner, QSlider *slider,
-                                           QDoubleSpinBox *outer, QDoubleSpinBox *offset ) {
-    inner->setKeyboardTracking( false );
-    connect( inner, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), this,
-      [this, inner, slider, outer, offset, previous = inner->value()]( double value ) mutable {
-        const double oldSize = previous;
-        previous = value;
-        if ( m_suspendHeightCompensation || m_isUpdating ||
-             !ui->stackedWidgetParams->currentWidget()->isAncestorOf( inner ) )
-          return;
-
-        // Ratios encode position; resize about the existing physical corner.
-        const double fixedOffset = offset->value() * std::max( 0.0, outer->value() - oldSize );
-        const double maxSize = std::max( 0.0, outer->value() - fixedOffset );
-        if ( value > maxSize )
-        {
-          const double units = std::pow( 10.0, inner->decimals() );
-          value = std::floor( maxSize * units + 1e-8 ) / units;
-          const QSignalBlocker spinBlocker( inner ), sliderBlocker( slider );
-          inner->setValue( value );
-          slider->setValue( qRound( inner->value() * 100.0 ) );
-          previous = inner->value();
-        }
-        const double movable = std::max( 0.0, outer->value() - inner->value() );
-        offset->setValue( movable > 1e-6 ? qBound( 0.0, fixedOffset / movable, 1.0 ) : 0.0 );
-      } );
+  const auto manualRecessEdit = [this]() {
+    return !m_suspendHeightCompensation && !m_isUpdating &&
+           ui->stackedWidgetParams->currentWidget() == ui->pageIndentedCuboid;
   };
-  bindFixedInnerCorner( ui->spinBoxICInnerLength, ui->sliderICInnerLength,
-                       ui->spinBoxICLength, ui->spinBoxICOffsetX );
-  bindFixedInnerCorner( ui->spinBoxICInnerWidth, ui->sliderICInnerWidth,
-                       ui->spinBoxICWidth, ui->spinBoxICOffsetY );
+  bindRecessFootprint( ui->spinBoxICInnerLength, ui->sliderICInnerLength,
+                       ui->spinBoxICLength, ui->sliderICLength, ui->spinBoxICOffsetX, manualRecessEdit );
+  bindRecessFootprint( ui->spinBoxICInnerWidth, ui->sliderICInnerWidth,
+                       ui->spinBoxICWidth, ui->sliderICWidth, ui->spinBoxICOffsetY, manualRecessEdit );
 
   auto syncHCRRadius = [this]() {
     ui->spinBoxHCRRadius->setValue( ui->spinBoxHCRWidth->value() / 2.0 );
@@ -710,6 +704,7 @@ void ParamModelerDock::initConnections()
           "Notes:\n"
           "- Geometry correction is optional parameter refinement, disabled by default; automatic alignment works with it disabled.\n"
           "- FourStageRoundTower uses the full point-cloud extent to estimate its horizontal center.\n"
+          "- Tower middle rise is measured in metres above the straight slope at the radial midpoint, up to one quarter of middle height; old bulge checkpoints require retraining.\n"
           "- Wireframe helps compare the model with the point cloud.\n"
           "- Reset prediction restores the last deep-learning parameter result.\n"
           "- Three-face fitting moves the model only; it does not resize or rotate it." )
@@ -762,6 +757,7 @@ void ParamModelerDock::initConnections()
 
     m_realtimeModelLoaded = false;
     m_modelLayer = nullptr;
+    resetFitEvaluation();
   } );
 
   auto schedulePreview = [this]( int ) { schedulePreviewUpdate(); };
@@ -834,7 +830,7 @@ void ParamModelerDock::initConnections()
   connect( ui->sliderFTBaseHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderFTMiddleHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderFTMiddleTopRadius, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderFTMiddleBulge, &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderFTMiddleRise, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderFTConeHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTGLength1, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTGLength2, &QSlider::valueChanged, this, schedulePreview );
@@ -876,6 +872,11 @@ void ParamModelerDock::initPreview()
 
 void ParamModelerDock::initPointNet()
 {
+  m_fitTimer = new QTimer( this );
+  m_fitTimer->setSingleShot( true );
+  m_fitTimer->setInterval( 200 );
+  connect( m_fitTimer, &QTimer::timeout, this, &ParamModelerDock::updateFitEvaluation );
+
   ui->widgetInversionPanel->setVisible( false );
   ui->widgetInversionPanel->setMinimumWidth( 0 );
   ui->widgetInversionPanel->setMaximumWidth( 0 );
@@ -1536,11 +1537,13 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
     if ( zoomToLayer )
       QMessageBox::warning( this, tr( "Load failed" ), errorMessage );
     m_realtimeModelLoaded = false;
+    scheduleFitEvaluation();
     m_isUpdating = false;
     return;
   }
 
   m_realtimeModelLoaded = true;
+  scheduleFitEvaluation();
 
   if ( zoomToLayer )
     QMessageBox::information( this, tr( "Loaded to QGIS 3D" ), tr( "Realtime model loaded successfully.\nTriangles: %1" ).arg( mesh.indices.size() / 3 ) );
@@ -1592,6 +1595,7 @@ void ParamModelerDock::onUpdatePreview()
   }
 
   m_previewUpdateInProgress = false;
+  scheduleFitEvaluation();
   if ( m_previewUpdatePending && m_previewTimer && !m_previewTimer->isActive() )
     m_previewTimer->start();
 }

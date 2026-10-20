@@ -2101,16 +2101,16 @@ QCheckBox#checkBoxWireframe {
                  </layout>
                 </item>
                 <item row="4" column="0">
-                 <widget class="QLabel" name="labelFTMiddleBulge">
+                 <widget class="QLabel" name="labelFTMiddleRise">
                   <property name="text">
-                   <string>Middle bulge:</string>
+                   <string>Middle rise (m):</string>
                   </property>
                  </widget>
                 </item>
                 <item row="4" column="1">
-                 <layout class="QHBoxLayout" name="layoutFTMiddleBulge">
+                 <layout class="QHBoxLayout" name="layoutFTMiddleRise">
                   <item>
-                   <widget class="QSlider" name="sliderFTMiddleBulge">
+                   <widget class="QSlider" name="sliderFTMiddleRise">
                     <property name="maximum">
                      <number>1</number>
                     </property>
@@ -2120,12 +2120,13 @@ QCheckBox#checkBoxWireframe {
                    </widget>
                   </item>
                   <item>
-                   <widget class="QDoubleSpinBox" name="spinBoxFTMiddleBulge">
+                   <widget class="QDoubleSpinBox" name="spinBoxFTMiddleRise">
+                    <property name="decimals"><number>3</number></property>
                     <property name="maximum">
-                     <double>0.600000000000000</double>
+                     <double>12.500000000000000</double>
                     </property>
                     <property name="singleStep">
-                     <double>0.010000000000000</double>
+                     <double>0.001000000000000</double>
                     </property>
                    </widget>
                   </item>

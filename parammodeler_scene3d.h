@@ -47,6 +47,7 @@ public:
                                          QString *errorMessage = nullptr );
 
   static void clearRealtimePreviewMesh( QgisInterface *iface );
+  static void setFitMetricText( QgisInterface *iface, const QString &text );
 
   static void clearAll3DEntities( QgisInterface *iface );
 

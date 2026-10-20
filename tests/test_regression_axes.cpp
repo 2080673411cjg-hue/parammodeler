@@ -1,4 +1,5 @@
 #include "../parammodeler_regression_axes.h"
+#include "../parammodeler_pointnet.h"
 
 #include <cassert>
 #include <limits>
@@ -7,6 +8,13 @@ using namespace ParamModelerRegressionAxes;
 
 int main()
 {
+  const QString tower = QStringLiteral( "FourStageRoundTower" );
+  assert( !towerRegressionSchemaError( tower, { { QStringLiteral( "middleBulge" ), .3 } } ).isEmpty() );
+  assert( !towerRegressionSchemaError( tower, {} ).isEmpty() );
+  assert( towerRegressionSchemaError( tower, { { QStringLiteral( "middleRise" ), .2 } } ).isEmpty() );
+  assert( towerRegressionSchemaError( tower, { { QStringLiteral( "middleRise" ), 0 } } ).isEmpty() );
+  assert( !towerRegressionSchemaError( tower, { { QStringLiteral( "middleRise" ), std::numeric_limits<double>::quiet_NaN() } } ).isEmpty() );
+  assert( towerRegressionSchemaError( QStringLiteral( "CylinderDome" ), { { QStringLiteral( "bulge" ), .3 } } ).isEmpty() );
   assert( shouldSwapFromSpans( 10.0, 14.0 ) );
   assert( !shouldSwapFromSpans( 14.0, 10.0 ) );
   assert( !shouldSwapFromSpans( 10.0, 10.7 ) );

@@ -84,5 +84,16 @@ int main()
   assert( towerInnerEaveRing( pointOnRing( 8, 0, 2 ), pointOnRing( 8, pi / 32, 2 ), 8, 1.6, 2 ) );
   assert( !towerInnerEaveRing( pointOnRing( 8.96f, 0, 1.6f ), pointOnRing( 8.96f, pi / 32, 1.6f ), 8, 1.6, 2 ) );
   assert( !towerInnerEaveRing( pointOnRing( 8, 0, 0 ), pointOnRing( 8, pi / 32, 0 ), 8, 1.6, 2 ) );
+  // A roof tessellation ring must stay hidden even when it exceeds the crease angle.
+  assert( towerInteriorRoofRing( pointOnRing( 8.88f, 0, 2.0587f ),
+                                 pointOnRing( 8.88f, pi / 32, 2.0587f ), 2, 4 ) );
+  assert( !towerInteriorRoofRing( pointOnRing( 8.96f, 0, 1.6f ),
+                                  pointOnRing( 8.96f, pi / 32, 1.6f ), 2, 4 ) );
+  assert( !towerInteriorRoofRing( pointOnRing( 8.96f, 0, 2 ),
+                                  pointOnRing( 8.96f, pi / 32, 2 ), 2, 4 ) );
+  assert( !towerInteriorRoofRing( pointOnRing( 1, 0, 4 ),
+                                  pointOnRing( 1, pi / 32, 4 ), 2, 4 ) );
+  assert( !towerInteriorRoofRing( pointOnRing( 8.96f, 0, 2 ),
+                                  pointOnRing( 8.88f, 0, 2.0587f ), 2, 4 ) );
   return 0;
 }

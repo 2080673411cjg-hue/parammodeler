@@ -67,10 +67,28 @@ class TranslationsTest(unittest.TestCase):
             self.assertEqual(dock.spinBoxGRRidgeRatio.value(), .5)
             self.assertEqual(dock.spinBoxGRRidgeRatio.minimum(), .2)
             self.assertEqual(dock.spinBoxGRRidgeRatio.maximum(), .8)
+            self.assertEqual(dock.labelFTMiddleRise.text(), "中段隆起高度（米）：")
+            self.assertEqual(dock.spinBoxFTMiddleRise.decimals(), 3)
             self.assertEqual([dock.comboPrimitive.itemText(i) for i in range(dock.comboPrimitive.count())], PRIMITIVES)
         finally:
             dock.close()
             dock.deleteLater()
+
+    def test_fit_residual_label_fits_three_lines(self):
+        source = "Fit RMSE: %1\nP95: %2\nScene units"
+        for chinese in (False, True):
+            if chinese:
+                self.app.installTranslator(self.translator)
+            text = QtCore.QCoreApplication.translate("ParamModelerDock", source)
+            label = QtWidgets.QLabel(text.replace("%1", "123.456").replace("%2", "234.567"))
+            label.setWordWrap(True)
+            label.setContentsMargins(6, 2, 6, 2)
+            height = label.fontMetrics().lineSpacing() * 3 + 8
+            label.setFixedHeight(height)
+            for width in (320, 640):
+                self.assertLessEqual(label.heightForWidth(width), height)
+            if chinese:
+                self.app.removeTranslator(self.translator)
 
     def test_english_fallback(self):
         dock = uic.loadUi(str(ROOT / "parammodeler_dock.ui"))

@@ -4,6 +4,8 @@ param(
     [switch]$WithWireframe,
     [switch]$WithAlignment,
     [switch]$WithHeightControl,
+    [switch]$WithSurfaces,
+    [string[]]$SurfaceClouds = @(),
     [string]$ScreenshotDirectory
 )
 $ErrorActionPreference = 'Stop'
@@ -33,7 +35,10 @@ if ($WithAlignment) {
 if ($WithHeightControl) {
     $targets += 'test_heightcontrol'
 }
-if ($WithPicking -or $WithWireframe -or $WithAlignment -or $WithHeightControl) {
+if ($WithSurfaces) {
+    $targets += 'test_surface_classification'
+}
+if ($WithPicking -or $WithWireframe -or $WithAlignment -or $WithHeightControl -or $WithSurfaces) {
     $qt = 'E:/mambaforge/envs/qgis_dev/Library'
     $env:PATH = (Join-Path $qt 'bin') + ';' + $env:PATH
     $env:QT_QPA_PLATFORM_PLUGIN_PATH = Join-Path $qt 'plugins/platforms'
@@ -55,7 +60,9 @@ try {
         $compileArgs = $arguments + @((Join-Path $root ('tests/' + $target + '.cpp')), ('/Fe:' + $exe), ('/Fo:' + $obj)) + $link
         & (Join-Path $msvc.FullName 'bin/Hostx64/x64/cl.exe') @compileArgs
         if ($LASTEXITCODE -ne 0) { throw ($target + ' compilation failed') }
-        if ($target -eq 'test_pick3d_overlay' -and $ScreenshotDirectory) { & $exe $ScreenshotDirectory } else { & $exe }
+        if ($target -eq 'test_surface_classification') { & $exe @SurfaceClouds }
+        elseif ($target -eq 'test_pick3d_overlay' -and $ScreenshotDirectory) { & $exe $ScreenshotDirectory }
+        else { & $exe }
         if ($LASTEXITCODE -ne 0) { throw ($target + ' failed') }
     }
 } finally {

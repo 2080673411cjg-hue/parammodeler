@@ -1,6 +1,10 @@
 #include "parammodeler_scene3d.h"
 #include "parammodeler_pcdloader.h"
+#include "parammodeler_surface_classification.h"
 #include "parammodeler_wireframe_guides.h"
+#include "parammodeler_fit_overlay.h"
+#include "qgsframegraph.h"
+#include "qgswindow3dengine.h"
 
 #include <QDateTime>
 #include <QDir>
@@ -23,9 +27,8 @@
 #include <cstring>
 #include <functional>
 #include <limits>
+#include <memory>
 #include <windows.h>
-
-#include <Eigen/Eigenvalues>
 
 #define DEBUG_LOG( msg ) OutputDebugStringW( msg )
 
@@ -108,6 +111,8 @@ struct RealtimePreviewState
   RealtimePreviewPart roof;
   RealtimePreviewPart wireframe;   // 线框模式：只显示边线
   QPointer<Qgs3DMapSettings> mapSettings;  // for origin tracking
+  std::shared_ptr<ParamModelerFitOverlay> fitOverlay;
+  QString fitText;
 };
 
 struct ClassifiedPointCloud
@@ -427,11 +432,14 @@ static QVector<float> extractWireframeEdges( const MeshData &mesh,
   double towerOuterRadius = 0.0;
   double towerBodyTopZ = std::numeric_limits<double>::max();
   double towerEaveTopZ = std::numeric_limits<double>::max();
+  double towerRoofTopZ = std::numeric_limits<double>::lowest();
   if ( roundTower )
   {
     for ( const QVector3D &p : mesh.vertices )
     {
       const double z = p.z();
+      if ( std::hypot( p.x(), p.y() ) > 0.0 )
+        towerRoofTopZ = std::max( towerRoofTopZ, z );
       if ( std::abs( z - minZ ) < 0.001 )
       {
         towerBaseRadius = std::max( towerBaseRadius, static_cast<double>( std::hypot( p.x(), p.y() ) ) );
@@ -471,6 +479,10 @@ static QVector<float> extractWireframeEdges( const MeshData &mesh,
     // The tower's two inner eave rings add clutter without changing its outer silhouette.
     if ( roundTower && ParamModelerWireframeGuides::towerInnerEaveRing(
            record.p0, record.p1, towerBaseRadius, towerBodyTopZ, towerEaveTopZ ) )
+      continue;
+
+    if ( roundTower && ParamModelerWireframeGuides::towerInteriorRoofRing(
+           record.p0, record.p1, towerEaveTopZ, towerRoofTopZ ) )
       continue;
 
     if ( dome && ParamModelerWireframeGuides::domeInteriorRing( record.p0, record.p1, domeBaseZ ) )
@@ -839,104 +851,16 @@ QgsVectorLayer *makePointCloudLayer( const QString &layerName,
   return vl;
 }
 
-QVector3D estimatePointNormal( const QVector<QVector3D> &points, int index, int k )
-{
-  struct Neighbor
-  {
-    double d2 = std::numeric_limits<double>::max();
-    int index = -1;
-  };
-
-  const QVector3D &p = points[index];
-  QVector<Neighbor> neighbors;
-  neighbors.reserve( k );
-  for ( int i = 0; i < points.size(); ++i )
-  {
-    if ( i == index )
-      continue;
-    const QVector3D delta = points[i] - p;
-    const double d2 = static_cast<double>( delta.lengthSquared() );
-    if ( neighbors.size() < k )
-    {
-      neighbors.push_back( { d2, i } );
-      if ( neighbors.size() == k )
-        std::sort( neighbors.begin(), neighbors.end(), []( const Neighbor &a, const Neighbor &b ) { return a.d2 < b.d2; } );
-      continue;
-    }
-    if ( d2 >= neighbors.back().d2 )
-      continue;
-    neighbors.back() = { d2, i };
-    std::sort( neighbors.begin(), neighbors.end(), []( const Neighbor &a, const Neighbor &b ) { return a.d2 < b.d2; } );
-  }
-
-  if ( neighbors.size() < 3 )
-    return QVector3D( 0.0f, 0.0f, 1.0f );
-
-  Eigen::Vector3d centroid( p.x(), p.y(), p.z() );
-  for ( const Neighbor &n : neighbors )
-  {
-    const QVector3D &q = points[n.index];
-    centroid += Eigen::Vector3d( q.x(), q.y(), q.z() );
-  }
-  centroid /= static_cast<double>( neighbors.size() + 1 );
-
-  Eigen::Matrix3d covariance = Eigen::Matrix3d::Zero();
-  auto accumulatePoint = [&]( const QVector3D &q ) {
-    const Eigen::Vector3d v( q.x(), q.y(), q.z() );
-    const Eigen::Vector3d centered = v - centroid;
-    covariance += centered * centered.transpose();
-  };
-  accumulatePoint( p );
-  for ( const Neighbor &n : neighbors )
-    accumulatePoint( points[n.index] );
-
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver( covariance );
-  if ( solver.info() != Eigen::Success )
-    return QVector3D( 0.0f, 0.0f, 1.0f );
-
-  const Eigen::Vector3d normal = solver.eigenvectors().col( 0 ).normalized();
-  return QVector3D( static_cast<float>( normal.x() ),
-                    static_cast<float>( normal.y() ),
-                    static_cast<float>( normal.z() ) );
-}
-
 ClassifiedPointCloud classifyPointCloudSurfaces( const PointCloud &pc )
 {
   ClassifiedPointCloud classified;
-  const QVector<QVector3D> &points = pc.points;
-  const double minZ = pc.bboxMin.z();
-  const double maxZ = pc.bboxMax.z();
-  const double height = std::max( 0.0, maxZ - minZ );
-  const double bottomGuard = minZ + height * 0.08;
-
-  if ( points.size() <= 6000 )
+  const QVector<ParamModelerSurfaces::Surface> labels = ParamModelerSurfaces::classify( pc.points );
+  for ( int i = 0; i < pc.points.size(); ++i )
   {
-    const int k = std::min( 18, std::max( 6, points.size() - 1 ) );
-    for ( int i = 0; i < points.size(); ++i )
-    {
-      const QVector3D normal = estimatePointNormal( points, i, k );
-      const double nz = std::abs( static_cast<double>( normal.z() ) );
-      const bool aboveBottom = height <= 0.0001 || points[i].z() > bottomGuard;
-      if ( nz >= 0.25 && aboveBottom )
-        classified.top.push_back( points[i] );
-      else if ( nz <= 0.20 )
-        classified.side.push_back( points[i] );
-      else
-        classified.other.push_back( points[i] );
-    }
+    if ( labels[i] == ParamModelerSurfaces::Surface::Top ) classified.top.push_back( pc.points[i] );
+    else if ( labels[i] == ParamModelerSurfaces::Surface::Side ) classified.side.push_back( pc.points[i] );
+    else classified.other.push_back( pc.points[i] );
   }
-  else
-  {
-    const double topThreshold = maxZ - std::max( height * 0.12, 0.05 );
-    for ( const QVector3D &p : points )
-    {
-      if ( p.z() >= topThreshold )
-        classified.top.push_back( p );
-      else
-        classified.side.push_back( p );
-    }
-  }
-
   return classified;
 }
 }
@@ -1455,6 +1379,31 @@ bool ParamModelerScene3D::updateRealtimePreviewMesh( QgisInterface *iface,
     canvas->setViewFrom2DExtent( previewExtent );
 
   return true;
+}
+
+void ParamModelerScene3D::setFitMetricText( QgisInterface *iface, const QString &text )
+{
+  if ( !iface ) return;
+  for ( Qgs3DMapCanvas *canvas : iface->mapCanvases3D() )
+  {
+    if ( !canvas || !canvas->scene() || !canvas->engine() ) continue;
+    auto it = sRealtimePreviewMeshes.find( canvas->scene() );
+    if ( it == sRealtimePreviewMeshes.end() ) continue;
+    it->fitText = text;
+    if ( !it->fitOverlay && !text.isEmpty() )
+    {
+      auto *root = canvas->engine()->frameGraph()->rubberBandsRootEntity();
+      it->fitOverlay = std::make_shared<ParamModelerFitOverlay>( root );
+      const auto resize = [canvas]() {
+        auto state = sRealtimePreviewMeshes.find( canvas->scene() );
+        if ( state != sRealtimePreviewMeshes.end() && state->fitOverlay )
+          state->fitOverlay->update( canvas->size(), state->fitText, canvas->devicePixelRatio() );
+      };
+      QObject::connect( canvas, &QWindow::widthChanged, it->root.data(), resize );
+      QObject::connect( canvas, &QWindow::heightChanged, it->root.data(), resize );
+    }
+    if ( it->fitOverlay ) it->fitOverlay->update( canvas->size(), text, canvas->devicePixelRatio() );
+  }
 }
 
 void ParamModelerScene3D::clearRealtimePreviewMesh( QgisInterface *iface )

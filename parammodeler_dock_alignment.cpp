@@ -7,6 +7,7 @@
 #include "parammodeler_pick3d.h"
 #include "parammodeler_pick3d_math.h"
 #include "parammodeler_scene3d.h"
+#include "parammodeler_fit_metrics.h"
 #include "qgsmessagelog.h"
 
 #include <qgisinterface.h>
@@ -716,6 +717,7 @@ void ParamModelerDock::handleManualTranslateClick( const QgsPointXY &point, Qt::
 
 bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool showMessage )
 {
+  resetFitEvaluation();
   m_evaluationCloudAvailable = false;
   m_hasDisplayCloudBBox = false;
   m_displayCloudSourcePath.clear();
@@ -747,11 +749,19 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
   // 注意用 robustBBoxFromPoints（分位数）而不是硬 min/max：离群点会把
   // 包围盒极值整个拉走，对齐就落不到建筑上（见该函数注释）。
   QVector3D displayMin, displayMax;
+  // Replacing the old layer emits destroyed(); publish the new sample afterwards.
+  QVector<QVector3D> fitCloudPoints;
   bool hasDisplayBBox = false;
   auto setDisplayBBoxFromPoints = [&]( const QVector<QVector3D> &points, const QString &source )
   {
     if ( points.isEmpty() )
       return;
+
+    const int count = std::min( points.size(), 2048 );
+    fitCloudPoints.clear();
+    fitCloudPoints.reserve( count );
+    for ( int i = 0; i < count; ++i )
+      fitCloudPoints.append( points[static_cast<qint64>( i ) * points.size() / count] );
 
     QVector3D hardMin, hardMax;
     hardBBoxFromPoints( points, hardMin, hardMax );
@@ -933,6 +943,7 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
   );
   if ( !loadedLayer )
   {
+    resetFitEvaluation();
     m_hasDisplayCloudBBox = false;
     m_displayCloudSourcePath.clear();
     m_displayCloudWasRestored = false;
@@ -942,7 +953,13 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
   }
 
   m_pointCloudLayer = loadedLayer;
+  m_fitCloudPoints.swap( fitCloudPoints );
   m_evaluationCloudAvailable = hasDisplayBBox;
+  connect( loadedLayer, &QObject::destroyed, this, [this] {
+    if ( !m_pointCloudLayer )
+      resetFitEvaluation();
+  } );
+  scheduleFitEvaluation();
 
   if ( showMessage )
     QMessageBox::information( this, tr( "Load succeeded" ), tr( "Point cloud loaded successfully.\nLayer: %1\n\nYou can view and adjust it in the 3D scene." ).arg( layerName ) );
@@ -950,6 +967,47 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
   return true;
 }
 
+
+void ParamModelerDock::resetFitEvaluation()
+{
+  m_fitCloudPoints.clear();
+  if ( m_fitTimer )
+    m_fitTimer->stop();
+  ParamModelerScene3D::setFitMetricText( mIface, QString() );
+}
+
+void ParamModelerDock::scheduleFitEvaluation()
+{
+  if ( !m_fitTimer )
+    return;
+  if ( !m_realtimeModelLoaded || !m_pointCloudLayer || m_fitCloudPoints.isEmpty() )
+  {
+    m_fitTimer->stop();
+    ParamModelerScene3D::setFitMetricText( mIface, QString() );
+    return;
+  }
+  if ( !m_fitTimer->isActive() )
+    m_fitTimer->start();
+}
+
+void ParamModelerDock::updateFitEvaluation()
+{
+  if ( !m_realtimeModelLoaded || !m_pointCloudLayer || m_fitCloudPoints.isEmpty() )
+  {
+    scheduleFitEvaluation();
+    return;
+  }
+  const MeshData mesh = BuildMesh::build( ui->comboPrimitive->currentText(), this );
+  QMatrix4x4 pose;
+  pose.translate( poseTranslateX(), poseTranslateY(), poseTranslateZ() );
+  pose.rotate( poseRotateX(), 1, 0, 0 );
+  pose.rotate( poseRotateY(), 0, 1, 0 );
+  pose.rotate( poseRotateZ(), 0, 0, 1 );
+  const auto metrics = ParamModelerFit::evaluate( mesh, m_fitCloudPoints, pose );
+  ParamModelerScene3D::setFitMetricText( mIface, metrics.count
+    ? tr( "Fit RMSE: %1\nP95: %2\nScene units" ).arg( metrics.rmse, 0, 'f', 3 ).arg( metrics.p95, 0, 'f', 3 )
+    : QString() );
+}
 
 void ParamModelerDock::onLoadExternalPointCloud()
 {

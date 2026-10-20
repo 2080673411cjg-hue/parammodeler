@@ -689,7 +689,7 @@ MeshData BuildMesh::buildFourStageRoundTower( const FourStageRoundTowerParams &p
     double baseH   = p.baseHeight;
     double roofH   = p.middleHeight;
     double capR    = p.middleTopRadius;
-    double bulge   = p.middleBulge;
+    double rise    = p.middleRise;
     double coneH   = p.coneHeight;
     if ( baseR<=0||baseH<=0||roofH<=0||capR<=0||coneH<=0 ) return m;
 
@@ -699,8 +699,8 @@ MeshData BuildMesh::buildFourStageRoundTower( const FourStageRoundTowerParams &p
       : p.eaveHeight;
     if ( roofR <= baseR || eaveH <= 0.0 || eaveH >= baseH ) return m;
     double bodyTopZ = baseH - eaveH;
-    capR = qBound( roofR * 0.02, capR, roofR * 0.35 );
-    bulge = qBound( 0.0, bulge, 0.6 );
+    if ( !std::isfinite( capR ) || capR >= roofR ) return m;
+    if ( !std::isfinite( rise ) || rise < 0.0 || rise > roofH * 0.25 ) return m;
     if ( bodyTopZ <= 0.0 ) return m;
 
     const int seg=64, layers=16;
@@ -716,8 +716,9 @@ MeshData BuildMesh::buildFourStageRoundTower( const FourStageRoundTowerParams &p
 
     auto evalBezier = [&]( double t, double &r, double &z ) {
         double P0x=roofR, P0y=baseH;
-        double P1x=roofR*(1.0-0.08*bulge), P1y=baseH+roofH*0.12;
-        double P2x=capR+(roofR-capR)*(0.35+0.25*bulge), P2y=baseH+roofH*0.85;
+        // Cubic representation of z(t) = baseH + roofH*t + 4*rise*t*(1-t).
+        double P1x=roofR-(roofR-capR)/3.0, P1y=baseH+roofH/3.0+4.0*rise/3.0;
+        double P2x=roofR-2.0*(roofR-capR)/3.0, P2y=baseH+2.0*roofH/3.0+4.0*rise/3.0;
         double P3x=capR, P3y=baseH+roofH;
         double u=1.0-t;
         r=u*u*u*P0x+3*u*u*t*P1x+3*u*t*t*P2x+t*t*t*P3x;
@@ -780,7 +781,7 @@ MeshData BuildMesh::buildFourStageRoundTower( ParamModelerDock *dock )
     p.eaveHeight = dock->ftEaveHeight();
     p.middleHeight    = dock->ftMiddleHeight();
     p.middleTopRadius = dock->ftMiddleTopRadius();
-    p.middleBulge     = dock->ftMiddleBulge();
+    p.middleRise      = dock->ftMiddleRise();
     p.coneHeight      = dock->ftConeHeight();
     return buildFourStageRoundTower( p );
 }

@@ -11,6 +11,7 @@
 
 #include "exportpointcloud.h"
 #include "parammodeler_config.h"
+#include "parammodeler_pointnet.h"
 #include "parammodeler_dock.h"
 #include "parammodeler_alignment_geometry.h"
 #include "parammodeler_pcdloader.h"
@@ -46,6 +47,7 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
                                                  const QMap<QString, double> &nn,
                                                  bool swapCanonicalAxes )
 {
+  if ( !towerRegressionSchemaError( primitiveType, nn ).isEmpty() ) return {};
   const QMap<QString, double> aligned = ParamModelerRegressionAxes::remapCanonicalParams(
     primitiveType, nn, swapCanonicalAxes );
   QMap<QString, double> uiParams;
@@ -238,7 +240,7 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
     put( QStringLiteral( "baseHeight" ), QStringLiteral( "ftBaseH" ) );
     put( QStringLiteral( "middleHeight" ), QStringLiteral( "ftMidH" ) );
     put( QStringLiteral( "middleTopRadius" ), QStringLiteral( "ftMidTopR" ) );
-    put( QStringLiteral( "middleBulge" ), QStringLiteral( "ftMidBulge" ) );
+    put( QStringLiteral( "middleRise" ), QStringLiteral( "ftMidRise" ) );
     put( QStringLiteral( "coneHeight" ), QStringLiteral( "ftConeH" ) );
     const double baseRadius = val( QStringLiteral( "baseRadius" ), 0.0 );
     const double baseHeight = val( QStringLiteral( "baseHeight" ), 0.0 );
@@ -383,7 +385,7 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["baseHeight"] = dock->ftBaseHeight();
     params["middleHeight"] = dock->ftMiddleHeight();
     params["middleTopRadius"] = dock->ftMiddleTopRadius();
-    params["middleBulge"] = dock->ftMiddleBulge();
+    params["middleRise"] = dock->ftMiddleRise();
     params["coneHeight"] = dock->ftConeHeight();
     params["eaveRadius"] = dock->ftEaveRadius();
     params["eaveHeight"] = dock->ftEaveHeight();

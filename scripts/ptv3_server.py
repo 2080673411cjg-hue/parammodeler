@@ -4,12 +4,13 @@ from pathlib import Path
 import subprocess
 import tempfile
 import json
+import math
 import os
 import re
 import sys
 
 PTV3_DIR = Path(__file__).resolve().parent
-CLS_LOG = PTV3_DIR / os.environ.get("PTV3_CLS_LOG", "logs/ptv3_cls_v5")
+CLS_LOG = PTV3_DIR / os.environ.get("PTV3_CLS_LOG", "logs/ptv3_cls_v6")
 REG_SUFFIX = os.environ.get("PTV3_REG_SUFFIX", "_v4_canonical_normals").strip()
 if not REG_SUFFIX:
     REG_SUFFIX = "_v4_canonical_normals"
@@ -140,6 +141,11 @@ def regress(req: RegressReq):
         ]
         response = run_json_command(cmd)
         if response.get("ok"):
+            if prim == "FourStageRoundTower":
+                params = response.get("result", {}).get("params", {})
+                rise = params.get("middleRise")
+                if "middleBulge" in params or isinstance(rise, bool) or not isinstance(rise, (int, float)) or not math.isfinite(rise):
+                    return {"ok": False, "error": "Incompatible tower checkpoint: middleRise in metres is required. Regenerate tower data and retrain; middleBulge is not a physical height.", "model_log_dir": str(log_dir)}
             response["model_log_dir"] = str(log_dir)
         return response
     finally:

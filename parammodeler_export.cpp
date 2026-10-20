@@ -293,7 +293,7 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
       p["baseHeight"]     = dock->ftBaseHeight();
       p["middleHeight"]   = dock->ftMiddleHeight();
       p["middleTopRadius"]= dock->ftMiddleTopRadius();
-      p["middleBulge"]    = dock->ftMiddleBulge();
+      p["middleRise"]     = dock->ftMiddleRise();
       p["coneHeight"]     = dock->ftConeHeight();
       p["eaveRadius"] = dock->ftEaveRadius();
       p["eaveHeight"] = dock->ftEaveHeight();

@@ -37,7 +37,7 @@ namespace ParamModelerConfig
   QString regressionModelSuffix();      // e.g.  _v2              (PointNeXt legacy)
   QString pctClassifyLogDir();          // e.g.  E:/pointnet/pct_simple/logs/pct_cls_v4
   QString pctRegressionSuffix();        // e.g.  _v4_normals      (PCT default variant)
-  QString ptv3ClassifyLogDir();         // e.g.  E:/pointnet/ptv3_simple/logs/ptv3_cls_v5
+  QString ptv3ClassifyLogDir();         // e.g.  E:/pointnet/ptv3_simple/logs/ptv3_cls_v6
   QString ptv3RegressionSuffix();       // e.g.  _v3_normals
 
   // ---- derived paths (built from the base paths + model selectors) ----

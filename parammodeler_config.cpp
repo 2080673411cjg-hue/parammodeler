@@ -62,6 +62,20 @@ static void migratePtv3ModelDefaults()
     settings.setValue( migrationKey, true );
   }
 
+  const QString clsMigrationKey = QStringLiteral( "parammodeler/ptv3ClassifyDefaultsV6" );
+  if ( !settings.value( clsMigrationKey, false ).toBool() )
+  {
+    const QString clsKey = QStringLiteral( "parammodeler/ptv3ClassifyLogDir" );
+    const QString clsDir = QDir::cleanPath( QDir::fromNativeSeparators( settings.value( clsKey ).toString() ) );
+    const QString logRoot = ParamModelerConfig::pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/" );
+    const QString newClsDir = logRoot + QStringLiteral( "ptv3_cls_v6" );
+    if ( settings.value( clsKey ).toString().isEmpty()
+         || clsDir.compare( QDir::cleanPath( logRoot + QStringLiteral( "ptv3_cls_v2" ) ), Qt::CaseInsensitive ) == 0
+         || clsDir.compare( QDir::cleanPath( logRoot + QStringLiteral( "ptv3_cls_v5" ) ), Qt::CaseInsensitive ) == 0 )
+      settings.setValue( clsKey, newClsDir );
+    settings.setValue( clsMigrationKey, true );
+  }
+
   const QString canonicalMigrationKey = QStringLiteral( "parammodeler/ptv3ModelDefaultsV4Canonical" );
   if ( settings.value( canonicalMigrationKey, false ).toBool() )
     return;
@@ -180,7 +194,7 @@ QString ptv3ClassifyLogDir()
 {
   migratePtv3ModelDefaults();
   return setting( QStringLiteral( "parammodeler/ptv3ClassifyLogDir" ),
-                  pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v5" ) );
+                  pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v6" ) );
 }
 
 QString ptv3RegressionSuffix()
@@ -394,7 +408,7 @@ void showSettingsDialog( QWidget *parent )
     edtDataset->setText(   QStringLiteral( "E:/pointnet/datasets_aug" ) );
     edtPctClsLog->setText( QStringLiteral( "E:/pointnet/pct_simple/logs/pct_cls_v4" ) );
     edtPctSuffix->setText( QStringLiteral( "_v4_normals" ) );
-    edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v5" ) );
+    edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v6" ) );
     edtPtv3Suffix->setText( QStringLiteral( "_v4_canonical_normals" ) );
   } );
 

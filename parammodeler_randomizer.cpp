@@ -159,14 +159,24 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
   }
   else if ( prim == "FourStageRoundTower" )
   {
-    set( dock->ui->spinBoxFTBaseRadius, rnd( 5.0, 12.0 ) );
-    set( dock->ui->spinBoxFTBaseHeight, rnd( 1.2, 3.5 ) );
-    set( dock->ui->spinBoxFTEaveRadius, dock->ftBaseRadius() * ( 1.0 + rnd( 0.05, 0.20, 0.001 ) ) );
-    set( dock->ui->spinBoxFTEaveThickness, rnd( 0.1, std::min( dock->ftBaseHeight() * 0.25, 0.9 ), 0.001 ) );
-    set( dock->ui->spinBoxFTMiddleHeight, rnd( 1.0, 3.0 ) );
-    set( dock->ui->spinBoxFTMiddleTopRadius, rnd( 0.5, 1.6 ) );
-    set( dock->ui->spinBoxFTMiddleBulge, rnd( 0.15, 0.45, 0.01 ) );
-    set( dock->ui->spinBoxFTConeHeight, rnd( 0.8, 2.0 ) );
+    const double baseRadius = rnd( 5.0, 12.0 );
+    const double baseHeight = rnd( 1.2, 3.5 );
+    const double eaveRadius = baseRadius * ( 1.0 + rnd( 0.05, 0.20, 0.001 ) );
+    const double eaveHeight = rnd( 0.1, std::min( baseHeight * 0.25, 0.9 ), 0.001 );
+    const double middleHeight = rnd( 1.0, 3.0 );
+    const double middleTopRadius = rnd( 0.5, 1.6 );
+    const double middleRise = rnd( middleHeight * 0.03, middleHeight * 0.20, 0.001 );
+    const double coneHeight = rnd( 0.8, 2.0 );
+    // Apply one scale to all physical dimensions before spin-box rounding.
+    const double scale = 0.5 + QRandomGenerator::global()->generateDouble() * 1.5;
+    set( dock->ui->spinBoxFTBaseRadius, baseRadius * scale );
+    set( dock->ui->spinBoxFTBaseHeight, baseHeight * scale );
+    set( dock->ui->spinBoxFTEaveRadius, eaveRadius * scale );
+    set( dock->ui->spinBoxFTEaveThickness, eaveHeight * scale );
+    set( dock->ui->spinBoxFTMiddleHeight, middleHeight * scale );
+    set( dock->ui->spinBoxFTMiddleTopRadius, middleTopRadius * scale );
+    set( dock->ui->spinBoxFTMiddleRise, middleRise * scale );
+    set( dock->ui->spinBoxFTConeHeight, coneHeight * scale );
   }
   else if ( prim == "TwoGableHouses" )
   {

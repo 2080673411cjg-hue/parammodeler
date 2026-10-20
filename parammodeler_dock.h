@@ -141,7 +141,7 @@ public:
   double ftEaveHeight() const;
   double ftMiddleHeight() const;
   double ftMiddleTopRadius() const;
-  double ftMiddleBulge() const;
+  double ftMiddleRise() const;
   double ftConeHeight() const;
   double tgLength1() const;
   double tgLength2() const;
@@ -191,6 +191,9 @@ private:
   void initPointNet();
 
   void schedulePreviewUpdate();
+  void scheduleFitEvaluation();
+  void updateFitEvaluation();
+  void resetFitEvaluation();
   void randomizeCurrentPrimitiveParams( bool refreshPreview, bool randomizePose = false );
   bool loadPointCloudToQGIS3D( const QString &filePath, bool showMessage );
 
@@ -250,6 +253,8 @@ private:
   QTimer          *m_previewTimer  = nullptr;
   bool             m_previewUpdatePending = false;
   bool             m_previewUpdateInProgress = false;
+  QTimer *m_fitTimer = nullptr;
+  QVector<QVector3D> m_fitCloudPoints;
 		
   QgsVectorLayer *m_modelLayer = nullptr;//新增一个成员变量，缓存图层指针
   QPointer<QgsMapLayer> m_pointCloudLayer;    // 缓存外部点云图层，用于清除

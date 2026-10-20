@@ -10,6 +10,42 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 
 项目的核心目标不是只输出一个不可编辑的三角网格，而是把建筑点云转换为结构化、可解释、可编辑、可复现的参数化三维模型。
 
+## v2.4.0（2026-10-20）
+
+本版保存下一轮对齐优化之前的基线，汇总近期分类 v6 接入、圆塔八个实际尺寸参数、曲面线框修复、实时 RMSE/P95 叠加与点云表面着色改进。圆塔的 `middleRise` 为实际隆起高度，不兼容旧 `middleBulge` 系数；v5 圆塔训练结果已取回并参加离线评测，线上实际权重仍需通过服务响应确认，不随插件版本自动切换。
+
+圆塔手动调整基础尺寸时，不再自动改变已设置的檐口尺寸、顶部半径或隆起高度；触及几何边界时限制本次正在调整的参数，相关滑块刻度保持固定。凹陷长方体同样保留当前槽深：例如槽深 6 米时，手动缩小外高最低到 6.01 米，不再偷偷缩短槽深。内槽左下角固定伸缩、预测回填与随机生成的批量更新逻辑保留。
+
+点云上部/侧面着色改用局部平面、法向与上下层支撑判断，不依赖预测模型参数；颜色仅辅助查看，不代表经过真值验证的语义分割。实时拟合残差在既有 Qt3D 叠加层显示，不创建额外原生浮窗。
+
+新增 13 类各 100 份点云的四组离线对照，共 5200 条结果，分开检查真值形状自动对齐、预测形状真值位姿以及两者组合；额外 1300 份未增强点云的真值回建残差均低于 0.000001 米。固定真实类别和 metadata 朝向，复用 v4 canonical 测试预测（圆塔使用 v5），不等同于未知朝向推理或 QGIS 实机验收。结果确认半圆柱/穹顶水平定位、凹陷/截顶屋顶高度参考仍有偏差，下一版再改对齐，本版不声称已解决。
+
+完整结论见 [对齐与形状评测](evaluations/2026-10-20-alignment/analysis.md)，明细与复现工具位于 `evaluations/2026-10-20-alignment/` 和 `scripts/evaluate_alignment.ps1`。本次不重训、不改现有数据或权重，不构建插件 DLL，由用户自行编译部署。下方按日期保留历史记录，当前状态以本节和最新更新日志为准。
+
+### 2026-10-19：圆塔隆起高度新定义
+
+圆塔将旧 `middleBulge` 控制系数替换为实际尺寸 `middleRise`（米），参数总数仍为八个。中段剖面仍用三次贝塞尔表示：径向从下圈半径 R 线性变到上圈半径 r，高度为 `baseHeight + H*t + 4*middleRise*t*(1-t)`。最大隆起位于径向中点，指高出上下连接点直线坡面的高度，不是屋面最高点；上下圈、檐口及尖锥定义不变，穹顶不改。
+
+取消顶部半径相对檐口外半径的 2%～35% 隐藏截断，只要求 `0 < middleTopRadius < eaveRadius`。输入框和滑块随檐口半径更新有效边界，建模直接使用输入值，不再静默替换半径；训练标签检查采用相同几何关系。
+
+随机生成先按原范围采样一座塔，再将八个实际尺寸统一乘以均匀抽取的 `0.5～2.0` 倍率，最后写入输入控件。底座半径理论覆盖约 2.5～24 米、中段高度约 0.5～6 米；尺寸分布不是在这些最终区间内均匀抽样。保留原有高宽比、檐口外挑比例和隆起比例，仅有输入精度带来的舍入偏差。只影响重新生成的数据，不改已有文件或权重。
+
+界面范围随中段高度 H 联动为 `0～H/4`，首次有效高度默认 `0.10H`；之后改变 H 保留合法的实际隆起高度，超限才截到可表示的上限。随机生成在 `0.03H～0.20H` 内采样，输入与新训练目标均为米制尺寸。零隆起是直线坡面，`H/4` 为该曲线保持单调升高的上限，不是建筑规范。
+
+新圆塔必须替换生成原始数据、增强并单独重训回归，不能给旧点云直接改标签或混入旧 `middleBulge` 样本。插件本地/远程入口与新版服务均拒绝把旧鼓包系数解释成隆起高度。现有分类 v6 和其他回归路径不自动切换；圆塔新权重验证后再用 `PTV3_TOWER_LOG` 指定。旧塔权重在新版插件中暂不可用于参数估计，手动建模可用。
+
+已完成实际网格、参数联动、旧标签/权重拒绝及中文界面检查；未构建插件 DLL、生成新数据或运行 GPU 训练。流程见 `scripts/README.md`，独立剖面预览为 `scripts/tower_bulge_profile.html`。
+
+### 2026-10-16：分类 v6 接入
+
+同日新增三维视图左上角的拟合残差叠加显示，显示RMSE、P95与场景单位。初版原生浮窗收到模型/点云不可见反馈后已撤换，当前直接在既有Qt3D叠加层绘制文字纹理，不创建额外窗口、不监听全局窗口事件或更改相机/图层；仅随视口尺寸更新小块屏幕空间几何。加载模型与点云后，形状、平移或旋转调整触发约200毫秒节流更新；固定采样最多2048点，以Eigen BVH计算点到三角形表面的无符号距离，不自动配准或修改参数。保留离群点，因此RMSE会受其影响；无有效模型/点云或清空场景时隐藏指标。单向表面残差不代表完整性或参数准确率；独立GPU合成检查通过，完整QGIS实机仍待验证。
+
+凹陷长方体手动改变外框长宽时，保持内槽实际XY位置和尺寸，自动重新换算偏移比例；外框缩至内槽远端边界后停止。内槽自身长宽仍固定左下角伸缩。预测回填、恢复预测和随机生成继续采用原批量参数，不受手动固定角点约束影响；不改变训练目标。
+
+插件本机分类默认目录与“恢复默认值”改为 `ptv3_cls_v6`，已有默认 v2/v5 配置自动迁移，自定义目录保留。服务脚本默认分类同步为 v6，回归仍为 `_v4_canonical_normals`。v6 测试报告为 1298/1300 正确（99.85%）：两份普通人字形分别误分为双人字形和长方体，两类人字形互相误分均为0；此前的 `GabledRoof/sample_00007.txt` 分类正确。新旧数据有更新，不将与 v5 的准确率差值视为严格对照提升。
+
+远程分类由 Ubuntu 服务的 `PTV3_CLS_LOG`/默认目录决定，不由插件本机目录决定。同步新版 `ptv3_server.py` 并重启服务后，用 `/health` 确认 `cls_log` 指向 v6；显式设置旧环境变量会覆盖默认值。插件未编译，远程 GPU 请求尚待部署验证。
+
 ### 2026-10-15：方向回填与几何推理修复
 
 v4 推理结果回填时，有 metadata 的输入会把长宽、屋脊比例和内槽四向边距一起转换回 metadata 的原始朝向，避免只覆盖角度导致屋脊或内槽翻到另一侧；没有 metadata 时保留规范参数与估计角度的配套关系。几何朝向改为稳健外接矩形与顶部屋脊轴联合判断，近正方形不再直接拒绝。700份现有增强测试点云的方向检查全部返回结果，最大轴向误差2.5°；这只是方向检查，尚未重新运行 GPU 回归或 QGIS 实机验证。
@@ -44,7 +80,7 @@ v4 测试集（各类100份）显示：屋脊方向规范化后，GabledRoof `ri
 
 PTv3 远程推理和本地 PCT 现作为两个可选入口；首批角锚定模型可按点云左下墙顶/檐口语义角自动对齐。面板估计与对齐代码已拆分，圆锥、穹顶、圆塔和半圆柱屋顶的实时线框缺线已修复，并精简了圆塔底部檐口内圈。具体变更和验证范围见 `dl-pipeline-log.md`。
 
-PTv3 分类使用 `ptv3_cls_v5`；插件与仓库服务脚本的回归默认值为 `ptv3_reg_<类别短名>_v4_canonical_normals`。增强集每类 train/val/test 为 800/100/100，共 13000 份；分类 v5 在 1300 份测试集上的准确率为 99.62%。Ubuntu 线上服务尚需部署新版脚本并重启后，才能切换到 v4；实际 QGIS 分类、回归与对齐流程仍需现场验收。
+PTv3 分类默认使用 `ptv3_cls_v6`；插件与仓库服务脚本的回归默认值为 `ptv3_reg_<类别短名>_v4_canonical_normals`。增强集每类 train/val/test 为 800/100/100，共 13000 份；分类 v6 测试准确率为 99.85%（1298/1300）。Ubuntu 线上服务需同步脚本并重启，实际分类版本以 `/health` 的 `cls_log` 为准；QGIS 分类、回归与对齐流程仍需现场验收。
 
 PTv3 服务可在插件“PointNet 路径设置”中切换实验室局域网 `http://192.168.1.113:8008` 与 Tailscale `http://100.70.215.84:8008`，两种模式共用 Ubuntu 上的权重，无需重新训练。切换后下次推理生效；局域网需能访问实验室机器，Tailscale 需两机在线。部署新版服务后，`/health` 默认应显示 `reg_suffix` 为 `_v4_canonical_normals`，单次回归响应中的 `model_log_dir` 用于确认该请求实际加载的目录。仓库内的 `scripts/ptv3_server.py` 是服务端部署副本；Ubuntu 的 `uvicorn` 进程需持续运行。更完整的训练与部署命令见 `scripts/README.md`。
 
@@ -107,7 +143,7 @@ PTv3 服务可在插件“PointNet 路径设置”中切换实验室局域网 `h
 | `CylinderDome` | 圆柱穹顶 | `radius`, `totalHeight`, `cylinderRatio`, `bulge` |
 | `IndentedCuboid` | 凹陷长方体 | `outerLength`, `outerWidth`, `outerHeight`, `innerLengthRatio`, `innerWidthRatio`, `innerHeight`, `innerMinXRatio`, `innerMinYRatio` |
 | `AsymmetricGableHouse` | 非对称人字形房屋 | `length`, `width`, `totalHeight`, `wallRatio`, `ridgeLength`, `ridgeRatio` |
-| `FourStageRoundTower` | 四段式圆塔 | `baseRadius`, `baseHeight`, `middleHeight`, `middleTopRadius`, `middleBulge`, `coneHeight`, `eaveRadius`, `eaveHeight`（后两项为实际尺寸，现有 v3 权重仍输出前六项） |
+| `FourStageRoundTower` | 四段式圆塔 | `baseRadius`, `baseHeight`, `middleHeight`, `middleTopRadius`, `middleRise`, `coneHeight`, `eaveRadius`, `eaveHeight`（八个实际尺寸；旧 `middleBulge` 权重不兼容） |
 | `TwoGableHouses` | 双人字形房屋 | `length1`, `length2`, `width`, `totalHeight`, `wallRatio`, `angle`, `ridgeRatio` |
 | `TriPrismPyramid` | 三棱柱 + 三棱锥 | `leg`, `baseSide`, `totalHeight`, `pyramidRatio` |
 
@@ -150,7 +186,7 @@ x y z
 
 插件加载外部点云后，通过 `PointNetRunner` 调用分类后端。当前估计窗口可选 PTv3（Ubuntu 远程服务）和 PCT（本机）；旧 PointNet 系列实现仍保留在源码中。
 
-PTv3 当前分类权重为 `ptv3_cls_v5`，PCT 有独立的本地权重路径。PTv3 的分类和回归请求由插件通过 HTTP 发送给所选服务；PCT 由本机 Python 进程执行。
+PTv3 默认分类权重为 `ptv3_cls_v6`（远程服务须同步并重启），PCT 有独立的本地权重路径。PTv3 的分类和回归请求由插件通过 HTTP 发送给所选服务；PCT 由本机 Python 进程执行。
 
 分类流程大致为：
 
@@ -297,7 +333,7 @@ Python 解释器、PointNet 根目录、数据集目录、PTv3 服务地址与�
 ```text
 E:/mambaforge/envs/pointnet_train/python.exe
 E:/pointnet/ptv3_simple/main.py
-E:/pointnet/ptv3_simple/logs/ptv3_cls_v5
+E:/pointnet/ptv3_simple/logs/ptv3_cls_v6
 E:/pointnet/datasets_aug/metadata/sample_params.json
 ```
 

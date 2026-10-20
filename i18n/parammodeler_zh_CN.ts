@@ -17,6 +17,11 @@
 </context>
 <context>
     <name>ParamModelerDock</name>
+    <message><source>Fit RMSE: %1
+P95: %2
+Scene units</source><translation>拟合残差 RMSE：%1
+P95：%2
+单位：场景坐标单位</translation></message>
     <message><source>Eave</source><translation>檐口</translation></message>
     <message><source>Eave outer radius:</source><translation>檐口外半径：</translation></message>
     <message><source>Eave thickness:</source><translation>檐口厚度：</translation></message>
@@ -431,8 +436,8 @@
     <message>
         <location filename="../parammodeler_dock.ui" line="2057"/>
         <location filename="../parammodeler_dock.cpp" line="765"/>
-        <source>Middle bulge:</source>
-        <translation>中段鼓出系数：</translation>
+        <source>Middle rise (m):</source>
+        <translation>中段隆起高度（米）：</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.ui" line="2088"/>
@@ -1056,6 +1061,7 @@ Fine tuning:
 Notes:
 - Geometry correction is optional parameter refinement, disabled by default; automatic alignment works with it disabled.
 - FourStageRoundTower uses the full point-cloud extent to estimate its horizontal center.
+- Tower middle rise is measured in metres above the straight slope at the radial midpoint, up to one quarter of middle height; old bulge checkpoints require retraining.
 - Wireframe helps compare the model with the point cloud.
 - Reset prediction restores the last deep-learning parameter result.
 - Three-face fitting moves the model only; it does not resize or rotate it.</source>
@@ -1075,6 +1081,7 @@ Notes:
 说明：
 - 几何校正是可选的参数修正，默认关闭；自动对齐无需开启它。
 - 四段式圆塔使用点云完整轮廓估计水平中心。
+- 圆塔中段隆起高度以米计，指径向中点处高出直线坡面的高度，上限为中段高度的四分之一；旧鼓包权重需要重新训练。
 - 线框模式便于对比模型和点云。
 - 恢复预测会还原最近一次深度学习参数结果。
 - 三面拟合只移动模型，不会缩放或旋转模型。</translation>
@@ -1947,6 +1954,17 @@ Folder: %3</source>
 失败：%2
 原有样本已保留。
 文件夹：%3</translation>
+    </message>
+</context>
+<context>
+    <name>PointNetRunner</name>
+    <message>
+        <source>This tower checkpoint uses the old bulge definition. Retrain with middleRise (metres) before using it.</source>
+        <translation>当前圆塔权重使用旧鼓包定义，请用隆起高度 middleRise（米）重新训练后再使用。</translation>
+    </message>
+    <message>
+        <source>The tower model returned an invalid middleRise value.</source>
+        <translation>圆塔模型返回了无效的隆起高度 middleRise。</translation>
     </message>
 </context>
 </TS>

@@ -113,7 +113,7 @@ struct AsymmetricGableHouseParams {
 
 struct FourStageRoundTowerParams {
     double baseRadius = 8.0, baseHeight = 2.0, middleHeight = 2.0,
-           middleTopRadius = 1.0, middleBulge = 0.3, coneHeight = 1.5;
+           middleTopRadius = 1.0, middleRise = 0.2, coneHeight = 1.5;
     double eaveRadius = -1.0, eaveHeight = -1.0; // Negative keeps legacy dimensions.
 };
 

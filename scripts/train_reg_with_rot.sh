@@ -64,7 +64,7 @@ run_reg HalfCylinderRoof     logs/pointnext_reg_halfcylinder_rot         length 
 run_reg CylinderDome         logs/pointnext_reg_cylinderdome_rot         radius totalHeight cylinderRatio bulge rx ry rz
 run_reg IndentedCuboid       logs/pointnext_reg_indentedcuboid_rot       outerLength outerWidth outerHeight innerLengthRatio innerWidthRatio innerHeight innerMinXRatio innerMinYRatio rx ry rz
 run_reg AsymmetricGableHouse logs/pointnext_reg_asymgable_rot            length width totalHeight wallRatio ridgeLength ridgeRatio rx ry rz
-run_reg FourStageRoundTower  logs/pointnext_reg_fourstage_rot            baseRadius baseHeight middleHeight middleTopRadius middleBulge coneHeight rx ry rz
+run_reg FourStageRoundTower  logs/pointnext_reg_fourstage_rot            baseRadius baseHeight middleHeight middleTopRadius middleRise coneHeight eaveRadius eaveHeight rx ry rz
 run_reg TwoGableHouses       logs/pointnext_reg_twogable_rot             length1 length2 width totalHeight wallRatio angle ridgeRatio rx ry rz
 
 echo ""

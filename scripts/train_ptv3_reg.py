@@ -23,7 +23,7 @@ RECIPES = [
     ("CylinderDome", "cylinderdome", "radius totalHeight cylinderRatio bulge", "1.5 1.4 1 0.8"),
     ("IndentedCuboid", "indentedcuboid", "geom_footprint_long geom_footprint_short geom_total_height innerHeight geom_long_start_margin_ratio geom_long_end_margin_ratio geom_short_start_margin_ratio geom_short_end_margin_ratio", "1.5 1.5 1.4 1.2 0.9 0.9 0.9 0.9"),
     ("AsymmetricGableHouse", "asymgable", "length width totalHeight wallRatio ridgeLength ridgeRatio", "1.5 1.5 1.4 0.9 1 0.9"),
-    ("FourStageRoundTower", "fourstage", "baseRadius baseHeight middleHeight middleTopRadius middleBulge coneHeight eaveRadius eaveHeight", "1.5 1.3 1.2 1.1 0.8 1.2 1.0 1.0"),
+    ("FourStageRoundTower", "fourstage", "baseRadius baseHeight middleHeight middleTopRadius middleRise coneHeight eaveRadius eaveHeight", "1.5 1.3 1.2 1.1 0.8 1.2 1.0 1.0"),
     ("TwoGableHouses", "twogable", "length1 length2 width totalHeight wallRatio angle ridgeRatio", "1.4 1.4 1.5 1.4 0.9 0.8 0.9"),
 ]
 
@@ -70,17 +70,21 @@ def validate_tower_targets(data_root, recipes):
         found += 1
         params = record.get("params", {})
         missing = [name for name in required if name not in params]
-        if missing:
-            raise ValueError(f"{record.get('file')}: missing {missing}. Regenerate the tower dataset with physical eave dimensions; old labels are not sufficient.")
-        if any(not isinstance(params[name], (int, float)) or not math.isfinite(params[name]) for name in required):
+        if missing or "middleBulge" in params:
+            raise ValueError(f"{record.get('file')}: missing {missing} or legacy middleBulge label. Regenerate the tower dataset with middleRise in metres and physical eave dimensions; old labels cannot be converted directly.")
+        if any(isinstance(params[name], bool) or not isinstance(params[name], (int, float)) or not math.isfinite(params[name]) for name in required):
             raise ValueError(f"{record.get('file')}: non-finite tower parameters")
         radius, height = params["baseRadius"], params["baseHeight"]
         if radius <= 0 or height <= 0:
             raise ValueError(f"{record.get('file')}: invalid tower base dimensions")
         if params["eaveRadius"] <= radius:
             raise ValueError(f"{record.get('file')}: eaveRadius must exceed baseRadius")
+        if not 0 < params["middleTopRadius"] < params["eaveRadius"]:
+            raise ValueError(f"{record.get('file')}: middleTopRadius must be positive and below eaveRadius")
         if not 0 < params["eaveHeight"] < height:
             raise ValueError(f"{record.get('file')}: eaveHeight must be positive and below baseHeight")
+        if params["middleHeight"] <= 0 or not 0 <= params["middleRise"] <= params["middleHeight"] * 0.25:
+            raise ValueError(f"{record.get('file')}: middleRise must be between zero and middleHeight/4")
     if not found:
         raise ValueError("No FourStageRoundTower samples found in metadata")
 

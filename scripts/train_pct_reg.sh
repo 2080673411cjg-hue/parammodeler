@@ -111,7 +111,7 @@ run_pct_reg HalfCylinderRoof     logs/pct_reg_halfcylinder_v1         length wid
 run_pct_reg CylinderDome         logs/pct_reg_cylinderdome_v1         radius totalHeight cylinderRatio bulge
 run_pct_reg IndentedCuboid       logs/pct_reg_indentedcuboid_v1       outerLength outerWidth outerHeight innerLengthRatio innerWidthRatio innerHeight innerMinXRatio innerMinYRatio
 run_pct_reg AsymmetricGableHouse logs/pct_reg_asymgable_v1            length width totalHeight wallRatio ridgeLength ridgeRatio
-run_pct_reg FourStageRoundTower  logs/pct_reg_fourstage_v1            baseRadius baseHeight middleHeight middleTopRadius middleBulge coneHeight
+run_pct_reg FourStageRoundTower  logs/pct_reg_fourstage_v1            baseRadius baseHeight middleHeight middleTopRadius middleRise coneHeight eaveRadius eaveHeight
 run_pct_reg TwoGableHouses       logs/pct_reg_twogable_v1             length1 length2 width totalHeight wallRatio angle ridgeRatio
 
 echo ""

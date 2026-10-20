@@ -191,7 +191,7 @@ double ParamModelerDock::ftEaveRadius() const { return ui->spinBoxFTEaveRadius->
 double ParamModelerDock::ftEaveHeight() const { return ui->spinBoxFTEaveThickness->value(); }
 double ParamModelerDock::ftMiddleHeight() const { return ui->spinBoxFTMiddleHeight->value(); }
 double ParamModelerDock::ftMiddleTopRadius() const { return ui->spinBoxFTMiddleTopRadius->value(); }
-double ParamModelerDock::ftMiddleBulge() const { return ui->spinBoxFTMiddleBulge->value(); }
+double ParamModelerDock::ftMiddleRise() const { return ui->spinBoxFTMiddleRise->value(); }
 double ParamModelerDock::ftConeHeight() const { return ui->spinBoxFTConeHeight->value(); }
 
 // ===== TwoGableHouses =====
