@@ -1,0 +1,56 @@
+{
+  "file": "test/GabledRoof/sample_01011.txt",
+  "class": "GabledRoof",
+  "band": 2,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "GabledRoof",
+      "params": {
+        "length": 35.137664794921875,
+        "width": 19.753795623779297,
+        "totalHeight": 9.875089645385742,
+        "wallRatio": 0.5772975087165833,
+        "ridgeRatio": 0.4936802387237549
+      },
+      "aux_features": {
+        "bbox_x": 1.7668609619140625,
+        "bbox_y": 1.1112655401229858,
+        "bbox_z": 0.4969330430030823,
+        "scale": 21.812158584594727,
+        "bbox_volume": 0.9757040143013,
+        "aspect_ratio_xy": 0.6289490461349487
+      },
+      "canonical_alignment": {
+        "applied": true,
+        "status": "RIDGE_AXIS_OK",
+        "reason": "Robust outer rectangle aspect=1.789; upper-surface axis disagreement=0.51 deg"
+      },
+      "poseRotateZ": 8.171010693642813,
+      "orientation": {
+        "verdict": "PASS",
+        "pca_ratio": 3.9213123610137273,
+        "peak_concentration": 0.0,
+        "n_segments": 0,
+        "reason": "Robust outer rectangle aspect=1.789; upper-surface axis disagreement=0.51 deg"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_gabledroof_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "length": 35.5,
+    "width": 19.799999237060547,
+    "totalHeight": 10.100000381469727,
+    "wallRatio": 0.5699999928474426,
+    "ridgeRatio": 0.49000000953674316
+  },
+  "prediction": {
+    "length": 35.137664794921875,
+    "width": 19.753795623779297,
+    "totalHeight": 9.875089645385742,
+    "wallRatio": 0.5772975087165833,
+    "ridgeRatio": 0.4936802387237549
+  },
+  "seconds": 5.816519399988465
+}

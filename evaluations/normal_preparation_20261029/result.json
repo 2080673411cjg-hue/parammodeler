@@ -1,0 +1,1320 @@
+{
+  "scope": "Windows local CPU; includes reads, normalization, spawn and result collection",
+  "cloud_count": 130,
+  "same_results": true,
+  "source_sha256": "4bc886594343f27f2944e0e8c159b96f3b6e5fdfc5d0c583ad6fc7f5b4cf54a8",
+  "runs": [
+    {
+      "workers": 0,
+      "elapsed_seconds": 36.09099289999722,
+      "fingerprints": [
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "95807dda5004f713bd22a34b8d9282c06ce3a4e10797091769f56b00e55c0b1b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "ed516d7553c60fd159802262bcaaa6e5bc10c069a9b3c9a23ae8d592bbf9fe75"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "7f5584eddc41fcbb034c13ce534cf78bebc5ef353a7dba3cf6b8e00a5fc9a640"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "dd2dbfd09160c4e938e42e9e1b9eb6ada11b097a273c14f837f8aa5f5b5dcb09"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "38006d7fac35bbecf4afbd98bb531b301167d5fa57abe19ee087022421267319"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "4ae11b2f52328dd3ce94ac94e2f712110e8087433907d9a58e98f5222826d61e"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "1d9bff775c0ca242e7331d9c26ddd43df561395a54fa10772612d75dec3e9671"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "bb7d40145e2da0f339d35f39dfd50777ede713eed4c00a3741361886956650c5"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "fa66cceb59eb258a56fc438add66e5f84562e2bb9de08a954438aeb07e094d04"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "0ecf37928b1811a5b58b8845d6bb6b244c2d7542bd63c50f26129456aa657988"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "6b5f8acc0510d77035c8fb3875fec7ff4bebd1024b4d957dd036c1a930516d38"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "5d7ea9035727a859425abe44edec7807eb8246ee0807d77c8368bd9f9ad282fa"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "e0b1077e10ecb4958fd1c9ea30648d5312bf64b2436da493824150a0478db460"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "1f7929bea4dfdb4374d2236bf272cfd1ebedb7c6bf886109941b4b40bd908e80"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "967813d0ebc6bb3b61cd135c41295e17352df0a5cecb000f7cab96d8518ef83b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "8b17f2d17ab2ed219af56a88c8904bad95e375ddde70ce65e04b1dfd08c0fc09"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "9fc8fe61dc9f54b145f4cf8492fbc1a4e10b1ed9acecf9e5e9c67c19f47f66a8"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "b63cd510d4791f2b23cf6b49ebd6aaa79090613381cc66ac71f69f5c17ff8752"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "c11c8a6ee4d035dc65190860b61d57d4b3cb15b78ded0c43d39eb0f868bf12d1"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "bdb30b753d6f0fd862503d371b95857c8c5216f4fc6fa181acdc27550fcb7641"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "36a21e77566be862eeac54e712a7289f5454041d0b6315e39482fe9625eb0b0a"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "8cb0bf501e09b4623f6a9a14ba3bbace30c3ddb5aebbdcf6e34fe6a4d1dbafa1"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "54c5412a8dafee3fac4d635f3129a628ef9bf8efad45dd477483a6ae12ba4a0b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "2f71f51b7a43819ceb7d315f8536d43417d5d36137748c36fb1fedded16683a3"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "886debfc7f394bc9a9a741738ff87496ce02b32368b5d94d0c6b4dcae09a025d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "7e288238a62ef8bc894076fd05c064f16610ace10d9f2a18f6467fb2ee1bfb39"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "b01df772dedaedbdfe4461fdf89e4d074b105ed7c22a33376ad57da7ff379398"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "0da9c8a1b661b10503875434a22e91e118c1be3d42beea80b5eb86fbbb32b647"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "3c28b07b55771b8e0814197e0d3551a07279fb2a5738cfc5447a35242e33f7c6"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "0ee382eccf67c956fdf3d88d085ca518e85c458a112b8131b4ff8a74e96a42eb"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "86392048a5722760347646878dc6f9a7b9dc429d345739c4cead498fbd966593"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "21d2e2882711c80d181e27f8b214d256cac8d5208feebb112551508532b452cf"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "5f31ddc13bece034cd38121bf3133ff9fbc4a7917162403257c0957d583ca5c1"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "f29a0175b4fb691bffcccd50f2ea9c76d6f04b94c9ef686fc2be12b48534a9e8"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "7089db239161811974a558a08b38b809f71054dd09cbdc9a343904331e58d23f"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "3e24ea755a7480a8eb57e3b1b3fe900868d5fbdab94a1408070e7697abadb8dc"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "64e3f8224300b85ea2533218f960c55e806fa92674a347ed2cc54c822f52ba41"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "2d95da3eaa67109a19b86fc695fbd6a78f4d88a36f2673d08057d6959f17c7f5"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "7e7cb25c549574f25244fe656894146b70c25c85823ba932208a51369957635d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "120af068db12bdfe506756deee4496a86795aaff2a2d5550eaae57000e64422a"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "e5f683142e185dba0774c85aa152387d98b54b1759be76498fbf13fa457735e8"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "05257e741a3290540b1659902e255a48350e594bd5c0869f1c8bdac083450117"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "139bfa185cf724bebfbde9a7cc8912e468cc50f41f1998329fff6b3b165577b0"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "da33569924124f364725ea5c3041b048bc1e1e7917a9765fa7fb2a82e252fb01"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "2384b86f56867cf1f3f98717a44bf2269e7cbc11569b7db90427447c65f7bdc8"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "08b07a211b72419a376bf281a88a17ee19c2b04525c4dce2357d30881a8b4dfb"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "2ecdd6a363c41faaa486810a1c6a58d208d3c6368f9816c50c9744797fe97d89"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "312daee1ec3effc55b23bf0fef4f79ebb0d1ca1781929606517c7321996a78d6"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "c09276aa8fce620e7fb462fbe5c167311fe64e41f3e5c34df9030500d5162414"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "7ec358f3a78b47feca9a766186c813a3e991f543fbda5a7a8e90242f90a786d9"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "eedec5f2c6062aa054743e3577e444cc3aca919cbf2a71360eba72748b799e9d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "4ecde1880c99fb925a95d8dee692c918d0b09c5e5a57e9e1e3bf5594a3c6b25d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "501885d6a77d60217732605dbbd630e6bdbb0afdf79776772a829f560582d7f0"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "1e180b26ee4e3e4f1859be19e42028984bd3649e6f9f01d160753594f142d08d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "62b345d8531a034beb006ef09d989bb66570b3b62fe8dd528d706e6e8617006a"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "47a567393e1ed06214d3bf314671c030fd6b770f1cdb9f2546f51e57e4184271"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "53b3a6c2b0accf3cee60fc3750e21a9c36ef6a6047a8d7d5e6c53fb205c1ea62"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "0207886eb76aacb8453861892702cfc79f40ce6d167c7ec4ca88eb7c024ce29b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "a88529921f4ba498e96a0374f75e4c5a63ec6047bf23c8b53a07ebe93bd35b7a"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "c2c513869fcc65deaa46022243c613cfad3a2986abcd94aa8f80df3eaaa108cd"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "c8a7718fa70841bb6d438dd07a02ce6cb02141ab49cbcbb7876a840f22156aba"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "a485c6d9214798b968b9aa38d6b3fe7f6d2cfde0bc3999f6d9b58b1281dbf200"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "a5defd60583f586eb62416541bb5c9d52c8cc1232e7f4f93a2b4b6b022a38e02"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "520d5d6394b3305ff9f601a60699fdb6054f8c4759dd8d740891e427a5a4bbd9"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "c2b9741fd0b7df03e3174b4dd4f7c1290a1f8aae2ebb63ee7a93d3658159b4a9"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "697a4db2479a16c965d397429f538667eb006595906a82117a066d772c84d694"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "ebde2d3c1d0bf0089814b44bcb5b35e8bd1278f68a7084e5089c8784bd8aebaa"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "313bc28ed5bff41a5d98e002dc3e627f38cee0b9df1dcd73b2178615dec43f87"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "d35a83995b945133fa61d9b5aaf8269177a324d564cf5f7266b031d55564756d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "a18a5788b9eb7ee923fef8706194714e18e12e3469a90069cb51eb5216d4bedc"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "bf90bd930c5f932c41e11872574d4cc89d5eb9e005b405775d8a6b8a2dfa76bc"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "f6a86841cffd345ed70f394d1a581c86b6f9783c7c2744ff4188875021daf86b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "00b5a6585b63e019c23e504a1764d30030f0a30b05901bef8594a457f111e98b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "dcbd54472798f3180182e745e7dc22dc243c47f233e28086ff40c62604fe3cfd"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "bf14c5de1918357dac90793b3111a4ff4ff33cba7856ad3f2d2fe3da3177ab35"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "e899dd45fded569b2ddcec15a66777395ad115ed705637486ddd8cb8afb5b546"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "6b4fa77e052b0576205eee6025f9afbbbfca49f6d81c8e02d4f17f2057fbadbf"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "739606d3e52b78bf2cdfe796793d5c0217f36683551c365fe299546849b0ffd2"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "aaaf2296bba00cec0a578bc6b7c61ae890b35c584775dc879da60aa6c8ba467d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "275d9796b16809b3eb236c69f7d92c23da9987489e32e8b42c04a96609a82767"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "24a31d78f0cd45876e28c7e50050ca46bcf5d8fab741b948d082b6435a396252"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "0d14db185a4db4974344ca2e8c781e4efdbdffd8e2200c36f2208ff7c7f1502e"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "919bd040a4125d177a292279909f14a7bb00bc23486a058e11b4bb29000d560e"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "957ea46da56a886ddaa145bbaedea652034a6508f259fe01de6e69ad10cf8594"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "19e3f901566bddb9a60220ce21f7fdc8e75ac14bc6661c40ccfa33d1bae76145"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "74c0078c1d6f52a062539c01b07332b0278207c21d6bef2cffe811254711641a"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "c89f8320c36643fa0fae02183d7d8f449a46f1e6d137818db52f5a0953183ad4"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "915012b651977e30a41c43e7876d5aa5e8c92bc0acc8579966fd90f7b3eab0b4"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "c398a4e19c5d5f99fb960bdb2c6f42fcddd8d3a4e4875c84a42e774d116d5a86"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "4d422f58e0768998c50b38bc34513e08be5fe607aa76638fc5c876c250f21794"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "57e83135b3f1f5d2a7af6d1141b820fa5ac5a41a342f84d6df66ccd1a12719b9"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "39409287dd1247806f492aeb8f60bf9ca245bce7605633d51bd92bf49af8c54d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "eb291a679421fd37aee10c8f823fd1feddfc46b3ab97ff4b38d19e04acdfa6e7"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "8e6caca84978f6e8c4bab2e9d6dd6607d439e861eec73793775c1a05343806b8"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "b6d15c24ec0f6a63fcd04cad86e3661b298f0c92a158168e2792e530c3a3225c"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "74b3e51886ed59c356f0ef051497e07688335dced82ea9a1b4d1a5956fe15fb3"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "8bf32707859527aac90c1fbbea6b8a7cacbc15cbbab2fd68eadb327c7157a9f7"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "e45f364b09afb08a1c85283c803027bf09db431e5d076e2207ce26e89f54fb48"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "dcd40f37fe5db379d74a0578a00530255845d4cf9323d2fdafa4301a781786aa"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "33430dd3cfff11cbdb43cde4045c88f18d0a636d4d880ff60ace31a468cf9a4c"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "842e62101bfabd52eed8d70688c275e1410044c75806610ef92fe611a590601c"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "bbc3a3fb4d760a920eae64cd5d2432c76794baed46de9daea31da4beffaef2dd"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "ac8c1167ae399d1a016215f6fb7c6507df70fb5d4413c5718d604e6d1137ec2b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "a717c834029ca703dfb546b2eb1ef88ae1a78d8442d957818df69d18fa5117ca"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "a34ce0d3cf252ea1f03600d40537ea8ff119e83b0604d7985334a28c2f85dac2"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "a73a0dd072eba0bb825a0b3f453f72e2a2c97668477890e707bccd84ec4356dc"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "e352a9b0068a249b9956336ffe2016212c8406463a94d6b152316d4d9ecd49b3"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "d704216b678c9fd537e734abb788b9d82652b5bf69c3432748d7c03911955325"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "1c56f781e3eb460390b1f1851df3ac96da6742e384ad68be761918f7e2303919"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "da5a02e204c95519c4549f2f6d84875bf13d072fe5c83daf9ac798382c4414c4"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "bb94b39c08f14771962f7e69688d1466e6fe9c91185472ca275a4bb0685ffe76"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "7db2f5f143efb757d9bedba33037ae09e92fa7f3664ea8172fcd9ef36dedab0d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "0928537b2ebb9acf7b959f66d56e316af057344676878b90347904247e528ec1"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "b28deead26ac38d0c0057f54e275c331413e68c4b67157e5bce84a5d694e23ce"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "9f34ef08e595608716d886c574720d1ee73d564c5c15daaeda648ddd46adb7a8"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "45e7529b90661feb7b091c806bbd94d353a212018c969b2060b92c78e7c8ab78"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "952527d0b3da0814c32677fb23fbab61b7a2953b940acd6c476b07689fdbc6db"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "d629e9bf58ac24a462729214a2827b30cb6b62da2f7076fb7d5d7de2915f01cc"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "0d1764981f9df911ad178211e1b040d94b69c4781edf09aee1119ed1b70ca7ca"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "524247d2a68a4052302f8c299cde06ce5ae085aec58e68f30499e0276d95d22b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "179ea1db643f3b550bcafc801be46b9d1d4d91f6b8aa012b875eca9d9c5a2f6d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "84aa6bb75e63a505c191ec686d4bbb5439fbbe847159edfde141b8625d769f6c"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "ae07576cf1756769a8c2e046f428a5bccfb1ade962d6b53cc30b3b6b1864ed43"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "9f7f52553cd520e0786e489c9d7e74c7f08a1fd2286eef648858f9514e391ec7"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "6b99c7694cbcba549fc2d121aca33ea219123b12312a4ff7fa816fc54f40bbc7"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "14f888d874cb4ea24c96dc9d253b12724b5f7f495067db39293ebc9c19c2510e"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "e9ef82e8846e5a41ebfcd3a13cb87625540f2e9e630422346aa31d8c49a51213"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "abd504afa254084c4ad80841ff5c9b281d2f15f2d67d0629b260e1a52485742c"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "d384cabb92abf9b6f28672a9b397b712c94a867b6ce8c35ade53c4eec47660f7"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "a6929fa36b941a167c579f049a43585ab26f94a90911236120e5d1a514977d73"
+        }
+      ]
+    },
+    {
+      "workers": 2,
+      "elapsed_seconds": 32.11542239999835,
+      "fingerprints": [
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "95807dda5004f713bd22a34b8d9282c06ce3a4e10797091769f56b00e55c0b1b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "ed516d7553c60fd159802262bcaaa6e5bc10c069a9b3c9a23ae8d592bbf9fe75"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "7f5584eddc41fcbb034c13ce534cf78bebc5ef353a7dba3cf6b8e00a5fc9a640"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "dd2dbfd09160c4e938e42e9e1b9eb6ada11b097a273c14f837f8aa5f5b5dcb09"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "38006d7fac35bbecf4afbd98bb531b301167d5fa57abe19ee087022421267319"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "4ae11b2f52328dd3ce94ac94e2f712110e8087433907d9a58e98f5222826d61e"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "1d9bff775c0ca242e7331d9c26ddd43df561395a54fa10772612d75dec3e9671"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "bb7d40145e2da0f339d35f39dfd50777ede713eed4c00a3741361886956650c5"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "fa66cceb59eb258a56fc438add66e5f84562e2bb9de08a954438aeb07e094d04"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\AsymmetricGableHouse\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "0ecf37928b1811a5b58b8845d6bb6b244c2d7542bd63c50f26129456aa657988"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "6b5f8acc0510d77035c8fb3875fec7ff4bebd1024b4d957dd036c1a930516d38"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "5d7ea9035727a859425abe44edec7807eb8246ee0807d77c8368bd9f9ad282fa"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "e0b1077e10ecb4958fd1c9ea30648d5312bf64b2436da493824150a0478db460"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "1f7929bea4dfdb4374d2236bf272cfd1ebedb7c6bf886109941b4b40bd908e80"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "967813d0ebc6bb3b61cd135c41295e17352df0a5cecb000f7cab96d8518ef83b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "8b17f2d17ab2ed219af56a88c8904bad95e375ddde70ce65e04b1dfd08c0fc09"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "9fc8fe61dc9f54b145f4cf8492fbc1a4e10b1ed9acecf9e5e9c67c19f47f66a8"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "b63cd510d4791f2b23cf6b49ebd6aaa79090613381cc66ac71f69f5c17ff8752"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "c11c8a6ee4d035dc65190860b61d57d4b3cb15b78ded0c43d39eb0f868bf12d1"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\ConeCylinder\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "bdb30b753d6f0fd862503d371b95857c8c5216f4fc6fa181acdc27550fcb7641"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "36a21e77566be862eeac54e712a7289f5454041d0b6315e39482fe9625eb0b0a"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "8cb0bf501e09b4623f6a9a14ba3bbace30c3ddb5aebbdcf6e34fe6a4d1dbafa1"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "54c5412a8dafee3fac4d635f3129a628ef9bf8efad45dd477483a6ae12ba4a0b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "2f71f51b7a43819ceb7d315f8536d43417d5d36137748c36fb1fedded16683a3"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "886debfc7f394bc9a9a741738ff87496ce02b32368b5d94d0c6b4dcae09a025d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "7e288238a62ef8bc894076fd05c064f16610ace10d9f2a18f6467fb2ee1bfb39"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "b01df772dedaedbdfe4461fdf89e4d074b105ed7c22a33376ad57da7ff379398"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "0da9c8a1b661b10503875434a22e91e118c1be3d42beea80b5eb86fbbb32b647"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "3c28b07b55771b8e0814197e0d3551a07279fb2a5738cfc5447a35242e33f7c6"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cuboid\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "0ee382eccf67c956fdf3d88d085ca518e85c458a112b8131b4ff8a74e96a42eb"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "86392048a5722760347646878dc6f9a7b9dc429d345739c4cead498fbd966593"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "21d2e2882711c80d181e27f8b214d256cac8d5208feebb112551508532b452cf"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "5f31ddc13bece034cd38121bf3133ff9fbc4a7917162403257c0957d583ca5c1"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "f29a0175b4fb691bffcccd50f2ea9c76d6f04b94c9ef686fc2be12b48534a9e8"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "7089db239161811974a558a08b38b809f71054dd09cbdc9a343904331e58d23f"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "3e24ea755a7480a8eb57e3b1b3fe900868d5fbdab94a1408070e7697abadb8dc"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "64e3f8224300b85ea2533218f960c55e806fa92674a347ed2cc54c822f52ba41"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "2d95da3eaa67109a19b86fc695fbd6a78f4d88a36f2673d08057d6959f17c7f5"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "7e7cb25c549574f25244fe656894146b70c25c85823ba932208a51369957635d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\Cylinder\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "120af068db12bdfe506756deee4496a86795aaff2a2d5550eaae57000e64422a"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "e5f683142e185dba0774c85aa152387d98b54b1759be76498fbf13fa457735e8"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "05257e741a3290540b1659902e255a48350e594bd5c0869f1c8bdac083450117"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "139bfa185cf724bebfbde9a7cc8912e468cc50f41f1998329fff6b3b165577b0"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "da33569924124f364725ea5c3041b048bc1e1e7917a9765fa7fb2a82e252fb01"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "2384b86f56867cf1f3f98717a44bf2269e7cbc11569b7db90427447c65f7bdc8"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "08b07a211b72419a376bf281a88a17ee19c2b04525c4dce2357d30881a8b4dfb"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "2ecdd6a363c41faaa486810a1c6a58d208d3c6368f9816c50c9744797fe97d89"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "312daee1ec3effc55b23bf0fef4f79ebb0d1ca1781929606517c7321996a78d6"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "c09276aa8fce620e7fb462fbe5c167311fe64e41f3e5c34df9030500d5162414"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\CylinderDome\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "7ec358f3a78b47feca9a766186c813a3e991f543fbda5a7a8e90242f90a786d9"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "eedec5f2c6062aa054743e3577e444cc3aca919cbf2a71360eba72748b799e9d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "4ecde1880c99fb925a95d8dee692c918d0b09c5e5a57e9e1e3bf5594a3c6b25d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "501885d6a77d60217732605dbbd630e6bdbb0afdf79776772a829f560582d7f0"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "1e180b26ee4e3e4f1859be19e42028984bd3649e6f9f01d160753594f142d08d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "62b345d8531a034beb006ef09d989bb66570b3b62fe8dd528d706e6e8617006a"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "47a567393e1ed06214d3bf314671c030fd6b770f1cdb9f2546f51e57e4184271"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "53b3a6c2b0accf3cee60fc3750e21a9c36ef6a6047a8d7d5e6c53fb205c1ea62"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "0207886eb76aacb8453861892702cfc79f40ce6d167c7ec4ca88eb7c024ce29b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "a88529921f4ba498e96a0374f75e4c5a63ec6047bf23c8b53a07ebe93bd35b7a"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\FourStageRoundTower\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "c2c513869fcc65deaa46022243c613cfad3a2986abcd94aa8f80df3eaaa108cd"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "c8a7718fa70841bb6d438dd07a02ce6cb02141ab49cbcbb7876a840f22156aba"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "a485c6d9214798b968b9aa38d6b3fe7f6d2cfde0bc3999f6d9b58b1281dbf200"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "a5defd60583f586eb62416541bb5c9d52c8cc1232e7f4f93a2b4b6b022a38e02"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "520d5d6394b3305ff9f601a60699fdb6054f8c4759dd8d740891e427a5a4bbd9"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "c2b9741fd0b7df03e3174b4dd4f7c1290a1f8aae2ebb63ee7a93d3658159b4a9"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "697a4db2479a16c965d397429f538667eb006595906a82117a066d772c84d694"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "ebde2d3c1d0bf0089814b44bcb5b35e8bd1278f68a7084e5089c8784bd8aebaa"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "313bc28ed5bff41a5d98e002dc3e627f38cee0b9df1dcd73b2178615dec43f87"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "d35a83995b945133fa61d9b5aaf8269177a324d564cf5f7266b031d55564756d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\GabledRoof\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "a18a5788b9eb7ee923fef8706194714e18e12e3469a90069cb51eb5216d4bedc"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "bf90bd930c5f932c41e11872574d4cc89d5eb9e005b405775d8a6b8a2dfa76bc"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "f6a86841cffd345ed70f394d1a581c86b6f9783c7c2744ff4188875021daf86b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "00b5a6585b63e019c23e504a1764d30030f0a30b05901bef8594a457f111e98b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "dcbd54472798f3180182e745e7dc22dc243c47f233e28086ff40c62604fe3cfd"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "bf14c5de1918357dac90793b3111a4ff4ff33cba7856ad3f2d2fe3da3177ab35"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "e899dd45fded569b2ddcec15a66777395ad115ed705637486ddd8cb8afb5b546"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "6b4fa77e052b0576205eee6025f9afbbbfca49f6d81c8e02d4f17f2057fbadbf"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "739606d3e52b78bf2cdfe796793d5c0217f36683551c365fe299546849b0ffd2"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "aaaf2296bba00cec0a578bc6b7c61ae890b35c584775dc879da60aa6c8ba467d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\HalfCylinderRoof\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "275d9796b16809b3eb236c69f7d92c23da9987489e32e8b42c04a96609a82767"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "24a31d78f0cd45876e28c7e50050ca46bcf5d8fab741b948d082b6435a396252"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "0d14db185a4db4974344ca2e8c781e4efdbdffd8e2200c36f2208ff7c7f1502e"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "919bd040a4125d177a292279909f14a7bb00bc23486a058e11b4bb29000d560e"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "957ea46da56a886ddaa145bbaedea652034a6508f259fe01de6e69ad10cf8594"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "19e3f901566bddb9a60220ce21f7fdc8e75ac14bc6661c40ccfa33d1bae76145"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "74c0078c1d6f52a062539c01b07332b0278207c21d6bef2cffe811254711641a"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "c89f8320c36643fa0fae02183d7d8f449a46f1e6d137818db52f5a0953183ad4"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "915012b651977e30a41c43e7876d5aa5e8c92bc0acc8579966fd90f7b3eab0b4"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "c398a4e19c5d5f99fb960bdb2c6f42fcddd8d3a4e4875c84a42e774d116d5a86"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\IndentedCuboid\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "4d422f58e0768998c50b38bc34513e08be5fe607aa76638fc5c876c250f21794"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "57e83135b3f1f5d2a7af6d1141b820fa5ac5a41a342f84d6df66ccd1a12719b9"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "39409287dd1247806f492aeb8f60bf9ca245bce7605633d51bd92bf49af8c54d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "eb291a679421fd37aee10c8f823fd1feddfc46b3ab97ff4b38d19e04acdfa6e7"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "8e6caca84978f6e8c4bab2e9d6dd6607d439e861eec73793775c1a05343806b8"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "b6d15c24ec0f6a63fcd04cad86e3661b298f0c92a158168e2792e530c3a3225c"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "74b3e51886ed59c356f0ef051497e07688335dced82ea9a1b4d1a5956fe15fb3"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "8bf32707859527aac90c1fbbea6b8a7cacbc15cbbab2fd68eadb327c7157a9f7"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "e45f364b09afb08a1c85283c803027bf09db431e5d076e2207ce26e89f54fb48"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "dcd40f37fe5db379d74a0578a00530255845d4cf9323d2fdafa4301a781786aa"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\LHouse\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "33430dd3cfff11cbdb43cde4045c88f18d0a636d4d880ff60ace31a468cf9a4c"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "842e62101bfabd52eed8d70688c275e1410044c75806610ef92fe611a590601c"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "bbc3a3fb4d760a920eae64cd5d2432c76794baed46de9daea31da4beffaef2dd"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "ac8c1167ae399d1a016215f6fb7c6507df70fb5d4413c5718d604e6d1137ec2b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "a717c834029ca703dfb546b2eb1ef88ae1a78d8442d957818df69d18fa5117ca"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "a34ce0d3cf252ea1f03600d40537ea8ff119e83b0604d7985334a28c2f85dac2"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "a73a0dd072eba0bb825a0b3f453f72e2a2c97668477890e707bccd84ec4356dc"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "e352a9b0068a249b9956336ffe2016212c8406463a94d6b152316d4d9ecd49b3"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "d704216b678c9fd537e734abb788b9d82652b5bf69c3432748d7c03911955325"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "1c56f781e3eb460390b1f1851df3ac96da6742e384ad68be761918f7e2303919"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\PyramidRoof\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "da5a02e204c95519c4549f2f6d84875bf13d072fe5c83daf9ac798382c4414c4"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "bb94b39c08f14771962f7e69688d1466e6fe9c91185472ca275a4bb0685ffe76"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "7db2f5f143efb757d9bedba33037ae09e92fa7f3664ea8172fcd9ef36dedab0d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "0928537b2ebb9acf7b959f66d56e316af057344676878b90347904247e528ec1"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "b28deead26ac38d0c0057f54e275c331413e68c4b67157e5bce84a5d694e23ce"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "9f34ef08e595608716d886c574720d1ee73d564c5c15daaeda648ddd46adb7a8"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "45e7529b90661feb7b091c806bbd94d353a212018c969b2060b92c78e7c8ab78"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "952527d0b3da0814c32677fb23fbab61b7a2953b940acd6c476b07689fdbc6db"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "d629e9bf58ac24a462729214a2827b30cb6b62da2f7076fb7d5d7de2915f01cc"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "0d1764981f9df911ad178211e1b040d94b69c4781edf09aee1119ed1b70ca7ca"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TruncatedPyramidRoof\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "524247d2a68a4052302f8c299cde06ce5ae085aec58e68f30499e0276d95d22b"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00901.txt",
+          "points": 2048,
+          "normal_sha256": "179ea1db643f3b550bcafc801be46b9d1d4d91f6b8aa012b875eca9d9c5a2f6d"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00902.txt",
+          "points": 2048,
+          "normal_sha256": "84aa6bb75e63a505c191ec686d4bbb5439fbbe847159edfde141b8625d769f6c"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00903.txt",
+          "points": 2048,
+          "normal_sha256": "ae07576cf1756769a8c2e046f428a5bccfb1ade962d6b53cc30b3b6b1864ed43"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00904.txt",
+          "points": 2048,
+          "normal_sha256": "9f7f52553cd520e0786e489c9d7e74c7f08a1fd2286eef648858f9514e391ec7"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00905.txt",
+          "points": 2048,
+          "normal_sha256": "6b99c7694cbcba549fc2d121aca33ea219123b12312a4ff7fa816fc54f40bbc7"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00906.txt",
+          "points": 2048,
+          "normal_sha256": "14f888d874cb4ea24c96dc9d253b12724b5f7f495067db39293ebc9c19c2510e"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00907.txt",
+          "points": 2048,
+          "normal_sha256": "e9ef82e8846e5a41ebfcd3a13cb87625540f2e9e630422346aa31d8c49a51213"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00908.txt",
+          "points": 2048,
+          "normal_sha256": "abd504afa254084c4ad80841ff5c9b281d2f15f2d67d0629b260e1a52485742c"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00909.txt",
+          "points": 2048,
+          "normal_sha256": "d384cabb92abf9b6f28672a9b397b712c94a867b6ce8c35ade53c4eec47660f7"
+        },
+        {
+          "file": "E:\\pointnet\\datasets_aug\\test\\TwoGableHouses\\sample_00910.txt",
+          "points": 2048,
+          "normal_sha256": "a6929fa36b941a167c579f049a43585ab26f94a90911236120e5d1a514977d73"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+﻿class_name,count,before_mean_deg,before_p95_deg,before_max_deg,before_failed,before_wrong_axis_gt45,before_weak,after_mean_deg,after_p95_deg,after_max_deg,after_failed,after_wrong_axis_gt45,after_weak,regressed_gt_1e-6_deg
+GabledRoof,200,0.05426267488976855,0.2886979980455818,0.5,0,0,5,0.05426267488976855,0.2886979980455818,0.5,0,0,0,0
+AsymmetricGableHouse,200,0.9975879429657865,0.5,90.0,0,2,12,0.09758794296578635,0.5,0.5,0,0,0,0
+HalfCylinderRoof,200,0.4691948510161895,1.5,2.745107672108446,0,0,2,0.4691948510161895,1.5,2.745107672108446,0,0,0,0

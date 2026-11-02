@@ -1,10 +1,18 @@
 param(
     [string]$Python = 'E:/mambaforge/envs/ptv3_cpu/python.exe',
-    [string]$Output = (Join-Path (Split-Path $PSScriptRoot -Parent) 'evaluations/2026-10-20-alignment'),
+    [string]$Output = (Join-Path (Split-Path $PSScriptRoot -Parent) 'evaluations/2026-10-21-alignment-lhouse'),
     [switch]$ValidateOnly
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+if ([IO.Path]::GetFullPath($Output).TrimEnd('\','/') -in @(
+    (Join-Path $root 'evaluations/2026-10-20-alignment'),
+    (Join-Path $root 'evaluations/2026-10-20-alignment-refined'),
+    (Join-Path $root 'evaluations/2026-10-20-alignment-horizontal'),
+    (Join-Path $root 'evaluations/2026-10-20-alignment-first-gable'),
+    (Join-Path $root 'evaluations/2026-10-20-alignment-indented-outer'))) {
+    throw 'Saved alignment baselines are preserved; choose a different output directory'
+}
 New-Item -ItemType Directory -Path $Output -Force | Out-Null
 $Output = (Resolve-Path -LiteralPath $Output).Path
 & $Python (Join-Path $PSScriptRoot 'evaluate_alignment.py') prepare --output $Output
@@ -56,6 +64,8 @@ try {
 } finally { $env:PATH = $oldPath }
 & $Python (Join-Path $PSScriptRoot 'evaluate_alignment.py') summarize --output $Output
 if ($LASTEXITCODE -ne 0) { throw 'Evaluation summary failed' }
+& $Python (Join-Path $PSScriptRoot 'evaluate_alignment.py') compare --output $Output
+if ($LASTEXITCODE -ne 0) { throw 'Comparison with the v2.4.0 baseline failed' }
 foreach ($source in $sources) {
     $object = Join-Path $work ([IO.Path]::GetFileNameWithoutExtension($source) + '.obj')
     if (Test-Path -LiteralPath $object) { Remove-Item -LiteralPath $object }

@@ -1,0 +1,50 @@
+{
+  "file": "test/HalfCylinderRoof/sample_01054.txt",
+  "class": "HalfCylinderRoof",
+  "band": 0,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "HalfCylinderRoof",
+      "params": {
+        "length": 10.481691360473633,
+        "width": 6.791512489318848,
+        "wallHeight": 4.944762229919434
+      },
+      "aux_features": {
+        "bbox_x": 1.345398187637329,
+        "bbox_y": 0.8661918044090271,
+        "bbox_z": 0.923744797706604,
+        "scale": 9.399956703186035,
+        "bbox_volume": 1.0765070915222168,
+        "aspect_ratio_xy": 0.643818199634552
+      },
+      "canonical_alignment": {
+        "applied": true,
+        "status": "RIDGE_AXIS_OK",
+        "reason": "Robust outer rectangle aspect=1.810; upper-surface axis disagreement=0.90 deg"
+      },
+      "poseRotateZ": 8.0,
+      "orientation": {
+        "verdict": "PASS",
+        "pca_ratio": 2.798126794959214,
+        "peak_concentration": 0.0,
+        "n_segments": 0,
+        "reason": "Robust outer rectangle aspect=1.810; upper-surface axis disagreement=0.90 deg"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_halfcylinder_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "length": 11.100000381469727,
+    "width": 7.0,
+    "wallHeight": 4.900000095367432
+  },
+  "prediction": {
+    "length": 10.481691360473633,
+    "width": 6.791512489318848,
+    "wallHeight": 4.944762229919434
+  },
+  "seconds": 5.864137299999129
+}

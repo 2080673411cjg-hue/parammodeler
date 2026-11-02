@@ -1,0 +1,137 @@
+[
+  {
+    "class_name": "AsymmetricGableHouse",
+    "file": "test/AsymmetricGableHouse/sample_00907.txt",
+    "axis_error_deg": 90.0,
+    "estimated_angle_deg": -68.0,
+    "reference_angle_deg": 22.0,
+    "verdict": "WEAK",
+    "reason": "Robust outer rectangle aspect=1.205; upper-surface axis disagreement=26.25 deg",
+    "params": {
+      "length": 13.3,
+      "ridgeLength": 9.7,
+      "ridgeRatio": 0.74,
+      "rz": -158,
+      "totalHeight": 8.2,
+      "wallRatio": 0.77,
+      "width": 10.87
+    }
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "file": "test/AsymmetricGableHouse/sample_00972.txt",
+    "axis_error_deg": 89.54328841313509,
+    "estimated_angle_deg": -67.45671158686491,
+    "reference_angle_deg": 23.0,
+    "verdict": "WEAK",
+    "reason": "Robust outer rectangle aspect=1.941; upper-surface axis disagreement=20.23 deg",
+    "params": {
+      "length": 29.9,
+      "ridgeLength": 14.26,
+      "ridgeRatio": 0.62,
+      "rz": -157,
+      "totalHeight": 11.3,
+      "wallRatio": 0.63,
+      "width": 15.09
+    }
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "file": "test/AsymmetricGableHouse/sample_01086.txt",
+    "axis_error_deg": 90.0,
+    "estimated_angle_deg": 63.0,
+    "reference_angle_deg": -27.0,
+    "verdict": "WEAK",
+    "reason": "Robust outer rectangle aspect=1.010; near-square footprint, interchangeable axes; upper-surface axis disagreement=16.30 deg",
+    "params": {
+      "length": 29.3,
+      "ridgeLength": 21.46,
+      "ridgeRatio": 0.29,
+      "rz": -27,
+      "totalHeight": 9.1,
+      "wallRatio": 0.8,
+      "width": 28.61
+    }
+  },
+  {
+    "class_name": "Cuboid",
+    "file": "test/Cuboid/sample_01015.txt",
+    "axis_error_deg": 89.85302584024885,
+    "estimated_angle_deg": -60.14697415975115,
+    "reference_angle_deg": 30.0,
+    "verdict": "WEAK",
+    "reason": "Robust outer rectangle aspect=1.018; near-square footprint, interchangeable axes",
+    "params": {
+      "height": 4.9,
+      "length": 7.2,
+      "rz": 30,
+      "width": 7.2
+    }
+  },
+  {
+    "class_name": "Cuboid",
+    "file": "test/Cuboid/sample_01061.txt",
+    "axis_error_deg": 89.3777795094166,
+    "estimated_angle_deg": 71.3777795094166,
+    "reference_angle_deg": -18.0,
+    "verdict": "WEAK",
+    "reason": "Robust outer rectangle aspect=1.003; near-square footprint, interchangeable axes",
+    "params": {
+      "height": 5.9,
+      "length": 24.8,
+      "rz": -18,
+      "width": 24.31
+    }
+  },
+  {
+    "class_name": "HalfCylinderRoof",
+    "file": "test/HalfCylinderRoof/sample_00992.txt",
+    "axis_error_deg": 90.0,
+    "estimated_angle_deg": -26.0,
+    "reference_angle_deg": 64.0,
+    "verdict": "WEAK",
+    "reason": "Robust outer rectangle aspect=1.098; upper-surface axis disagreement=29.78 deg",
+    "params": {
+      "length": 13.77,
+      "rz": 64,
+      "wallHeight": 2.9,
+      "width": 16.5
+    }
+  },
+  {
+    "class_name": "IndentedCuboid",
+    "file": "test/IndentedCuboid/sample_01068.txt",
+    "axis_error_deg": 89.0,
+    "estimated_angle_deg": -9.0,
+    "reference_angle_deg": 82.0,
+    "verdict": "WEAK",
+    "reason": "Robust outer rectangle aspect=1.014; near-square footprint, interchangeable axes",
+    "params": {
+      "backMarginRatio": 0.2771279919285096,
+      "frontMarginRatio": 0.3795454009801095,
+      "innerHeight": 2.6,
+      "leftMarginRatio": 0.14373454212034384,
+      "outerHeight": 7.6,
+      "outerLength": 34.9,
+      "outerWidth": 34.69,
+      "rightMarginRatio": 0.2814803575931233,
+      "rz": 82
+    }
+  },
+  {
+    "class_name": "PyramidRoof",
+    "file": "test/PyramidRoof/sample_01087.txt",
+    "axis_error_deg": 41.5,
+    "estimated_angle_deg": -46.5,
+    "reference_angle_deg": -5.0,
+    "verdict": "PASS",
+    "reason": "Robust outer rectangle aspect=1.912",
+    "params": {
+      "length": 6.03,
+      "rz": -95,
+      "totalHeight": 10.7,
+      "wallRatio": 0.6,
+      "width": 6.3
+    }
+  }
+]

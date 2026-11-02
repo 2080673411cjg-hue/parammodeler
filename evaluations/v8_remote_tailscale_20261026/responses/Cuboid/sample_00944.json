@@ -1,0 +1,53 @@
+{
+  "file": "test/Cuboid/sample_00944.txt",
+  "class": "Cuboid",
+  "band": 1,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "Cuboid",
+      "params": {
+        "geom_footprint_long": 23.905149459838867,
+        "geom_footprint_short": 19.648731231689453,
+        "geom_total_height": 7.525221347808838,
+        "length": 23.905149459838867,
+        "width": 19.648731231689453,
+        "height": 7.525221347808838
+      },
+      "aux_features": {
+        "bbox_x": 1.5198791027069092,
+        "bbox_y": 1.380744218826294,
+        "bbox_z": 0.5186525583267212,
+        "scale": 16.603811264038086,
+        "bbox_volume": 1.0884257555007935,
+        "aspect_ratio_xy": 0.9084566235542297
+      },
+      "canonical_alignment": {
+        "applied": true,
+        "status": "GEOMETRY_OK",
+        "reason": "Robust outer rectangle aspect=1.216"
+      },
+      "poseRotateZ": 28.0,
+      "orientation": {
+        "verdict": "PASS",
+        "pca_ratio": 1.8557518702950844,
+        "peak_concentration": 0.0,
+        "n_segments": 0,
+        "reason": "Robust outer rectangle aspect=1.216"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_cuboid_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "geom_footprint_long": 24.399999618530273,
+    "geom_footprint_short": 20.43000030517578,
+    "geom_total_height": 7.699999809265137
+  },
+  "prediction": {
+    "geom_footprint_long": 23.905149459838867,
+    "geom_footprint_short": 19.648731231689453,
+    "geom_total_height": 7.525221347808838
+  },
+  "seconds": 5.928486400051042
+}

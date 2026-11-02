@@ -252,14 +252,6 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
   if ( !stemNames.contains( prim ) )
     return { modelName, prim, script, QString() };
 
-  if ( isPTv3 && prim == QStringLiteral( "FourStageRoundTower" ) )
-  {
-    const QString towerLog = qEnvironmentVariable( "PTV3_TOWER_LOG" ).trimmed();
-    if ( !towerLog.isEmpty() )
-      return { modelName, prim, script,
-               QDir( QFileInfo( script ).absolutePath() ).absoluteFilePath( towerLog ) };
-  }
-
   // PCT variant selection: recent experiments showed that no single suffix is
   // best for all primitives.  Prefer the per-class test winner when it exists,
   // then fall back to the user-configured default suffix.
@@ -341,7 +333,7 @@ QString metadataRelativePathForPointCloud( const QString &filePath )
   return dir + relInfo.completeBaseName() + QStringLiteral( ".txt" );
 }
 
-bool metadataAuxForInput( const QString &filePath, QVector3D &bboxSize, double &scale )
+bool metadataAuxForInput( const QString &filePath, QVector3D &bboxSize, double &scale, bool &pointsNormalized )
 {
   const QString rel = metadataRelativePathForPointCloud( filePath );
   if ( rel.isEmpty() )
@@ -368,6 +360,8 @@ bool metadataAuxForInput( const QString &filePath, QVector3D &bboxSize, double &
     if ( !vectorFromJsonArray( info.value( QStringLiteral( "bboxSize" ) ), bboxSize ) )
       return false;
     scale = info.value( QStringLiteral( "scale" ) ).toDouble( 1.0 );
+    pointsNormalized = info.value( QStringLiteral( "normalization" ) ).toString() ==
+                       QStringLiteral( "centered_by_mean_and_scaled_by_max_radius" );
     return scale > 1e-9;
   }
 
@@ -634,7 +628,10 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
 
   QVector3D bboxSize = prepared.pointCloud.bboxMax - prepared.pointCloud.bboxMin;
   double scale = pointCloudNormalizationScale( prepared.pointCloud.points );
-  metadataAuxForInput( inputTxt, bboxSize, scale );
+  bool pointsNormalized = false;
+  metadataAuxForInput( inputTxt, bboxSize, scale, pointsNormalized );
+  pointsNormalized = pointsNormalized && isTextPointCloudFile( inputTxt );
+  const QString inputCoordinates = pointsNormalized ? QStringLiteral( "normalized" ) : QStringLiteral( "physical" );
 
   const QString remoteUrl = backend == PointNetBackend::PTv3
     ? ptv3RemoteEndpoint( QStringLiteral( "/regress" ) )
@@ -653,9 +650,11 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
     payload.insert( QStringLiteral( "bbox_y" ), bboxSize.y() );
     payload.insert( QStringLiteral( "bbox_z" ), bboxSize.z() );
     payload.insert( QStringLiteral( "scale" ), scale );
+    payload.insert( QStringLiteral( "input_coordinates" ), inputCoordinates );
     payload.insert( QStringLiteral( "num_points" ), numPoints );
     if ( backend == PointNetBackend::PTv3 )
-      payload.insert( QStringLiteral( "model_suffix" ), ParamModelerConfig::ptv3RegressionSuffix() );
+      payload.insert( QStringLiteral( "model_suffix" ),
+                      ParamModelerConfig::ptv3RegressionSuffix() );
 
     QJsonDocument responseDoc;
     if ( !postJson( remoteUrl, payload, config.modelName + QStringLiteral( " parameter regression" ), responseDoc, result.errorMessage ) )
@@ -716,6 +715,8 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
        // 新 checkpoint 在 best_model.pth 中声明 canonical_align；Python 侧按权重配置
        // 同步旋转点云并重算 bbox aux。旧 checkpoint 没有该标记，仍走原始坐标。
        << QStringLiteral( "--cpu" );
+  if ( backend == PointNetBackend::PTv3 )
+    args << QStringLiteral( "--input_coordinates" ) << inputCoordinates;
 
   QString stdoutText;
   if ( !runPythonProcess( config.scriptPath, pythonExe, args, config.modelName + QStringLiteral( " parameter regression" ), stdoutText, result.errorMessage ) )

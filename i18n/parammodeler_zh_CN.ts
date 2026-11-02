@@ -18,10 +18,31 @@
 <context>
     <name>ParamModelerDock</name>
     <message><source>Fit RMSE: %1
-P95: %2
+Surface fit: %2%
+%3
+Tolerance: %4 | N: %5
 Scene units</source><translation>拟合残差 RMSE：%1
-P95：%2
+表面贴合：%2%
+%3
+容差：%4 | 样本：%5
 单位：场景坐标单位</translation></message>
+    <message><source>Outside: %1% | Inside: %2%</source><translation>外侧：%1% | 内侧：%2%</translation></message>
+    <message><source>Inside/outside unavailable: open mesh</source><translation>内外比例不可用：模型未封闭</translation></message>
+    <message><source>Fit statistics and tolerance...</source><translation>拟合统计与容差...</translation></message>
+    <message><source>Fit statistics</source><translation>拟合统计</translation></message>
+    <message><source>Distance tolerance (scene units):</source><translation>距离容差（场景坐标单位）：</translation></message>
+    <message><source>Load a model and point cloud to evaluate.</source><translation>加载模型和点云后显示统计。</translation></message>
+    <message><source>Surface fit: points within the distance tolerance. Outside/inside: points farther from the actual model surface. The same tolerance is used while adjusting the model. Percentages use a fixed point sample and are not parameter accuracy.</source><translation>表面贴合：距模型实际表面不超过容差的点。外侧/内侧：超出容差且位于模型实体外/内的点。微调过程中容差保持固定。百分比基于固定点样本，不表示参数预测准确率。</translation></message>
+    <message><source>
+P95: %1
+Surface fit points: %2
+Outside points: %3
+Inside points: %4</source><translation>
+P95：%1
+贴合点数：%2
+外侧点数：%3
+内侧点数：%4</translation></message>
+    <message><source>N/A</source><translation>不适用</translation></message>
     <message><source>Eave</source><translation>檐口</translation></message>
     <message><source>Eave outer radius:</source><translation>檐口外半径：</translation></message>
     <message><source>Eave thickness:</source><translation>檐口厚度：</translation></message>

@@ -14,6 +14,7 @@ class ParamModelerDock;
 
 void randomizePrimitiveParams( ParamModelerDock *dock,
                                bool refreshPreview,
-                               bool randomizePose );
+                               bool randomizePose,
+                               int scaleBand = -1 );
 
 #endif // PARAMMODELER_RANDOMIZER_H

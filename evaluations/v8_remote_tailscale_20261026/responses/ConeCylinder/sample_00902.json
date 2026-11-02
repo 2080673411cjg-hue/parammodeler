@@ -1,0 +1,42 @@
+{
+  "file": "test/ConeCylinder/sample_00902.txt",
+  "class": "ConeCylinder",
+  "band": 1,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "ConeCylinder",
+      "params": {
+        "radius": 11.737483978271484,
+        "totalHeight": 10.400131225585938,
+        "cylinderRatio": 0.7547446489334106
+      },
+      "aux_features": {
+        "bbox_x": 23.411312103271484,
+        "bbox_y": 23.220596313476562,
+        "bbox_z": 10.32889175415039,
+        "scale": 14.138509750366211,
+        "bbox_volume": 5615.0400390625,
+        "aspect_ratio_xy": 0.9918537139892578
+      },
+      "canonical_alignment": {
+        "applied": false,
+        "status": "SKIPPED_CLASS",
+        "reason": "Class 'ConeCylinder' not in rotation enable list"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_conecylinder_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "radius": 11.75,
+    "totalHeight": 10.399999618530273,
+    "cylinderRatio": 0.7699999809265137
+  },
+  "prediction": {
+    "radius": 11.737483978271484,
+    "totalHeight": 10.400131225585938,
+    "cylinderRatio": 0.7547446489334106
+  },
+  "seconds": 5.843026499962434
+}

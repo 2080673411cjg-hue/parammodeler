@@ -1,0 +1,56 @@
+{
+  "file": "test/LHouse/sample_01033.txt",
+  "class": "LHouse",
+  "band": 0,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "LHouse",
+      "params": {
+        "outerLength": 14.056678771972656,
+        "outerWidth": 6.6087751388549805,
+        "cutoutLengthRatio": 0.3150062561035156,
+        "cutoutWidthRatio": 0.5711712837219238,
+        "height": 2.9655814170837402
+      },
+      "aux_features": {
+        "bbox_x": 14.585227966308594,
+        "bbox_y": 7.075973033905029,
+        "bbox_z": 3.3777573108673096,
+        "scale": 8.900634765625,
+        "bbox_volume": 348.6003723144531,
+        "aspect_ratio_xy": 0.48514655232429504
+      },
+      "canonical_alignment": {
+        "applied": true,
+        "status": "LHOUSE_DIRECTION_OK",
+        "reason": "LHouse full direction from missing corner; roof corner supports=[0, 49, 57, 59]"
+      },
+      "poseRotateZ": 14.0,
+      "orientation": {
+        "verdict": "PASS",
+        "pca_ratio": 3.9503489924435193,
+        "peak_concentration": 0.0,
+        "n_segments": 0,
+        "reason": "LHouse full direction from missing corner; roof corner supports=[0, 49, 57, 59]"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_lhouse_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "outerLength": 14.699999809265137,
+    "outerWidth": 6.989999771118164,
+    "cutoutLengthRatio": 0.28999999165534973,
+    "cutoutWidthRatio": 0.5899999737739563,
+    "height": 3.0999999046325684
+  },
+  "prediction": {
+    "outerLength": 14.056678771972656,
+    "outerWidth": 6.6087751388549805,
+    "cutoutLengthRatio": 0.3150062561035156,
+    "cutoutWidthRatio": 0.5711712837219238,
+    "height": 2.9655814170837402
+  },
+  "seconds": 5.87888880004175
+}

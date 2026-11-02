@@ -1,0 +1,438 @@
+{
+  "scope": "Feature-unit checks only, no GPU training or inference; new physical contract versus legacy and equivalent stored/physical views of existing normalized TXT.",
+  "train_samples": 800,
+  "test_pairs": 100,
+  "aux_names": [
+    "bbox_x",
+    "bbox_y",
+    "bbox_z",
+    "scale",
+    "bbox_volume",
+    "aspect_ratio_xy"
+  ],
+  "legacy_train_aux_mean": [
+    1.7841686010360718,
+    1.1138542890548706,
+    0.37214893102645874,
+    16.013282775878906,
+    0.7413287162780762,
+    0.6287183165550232
+  ],
+  "physical_train_aux_mean": [
+    28.714889526367188,
+    17.51311683654785,
+    5.673248767852783,
+    16.013282775878906,
+    3032.6484375,
+    0.6287183165550232
+  ],
+  "max_test_pair_bbox_difference": 3.814697265625e-06,
+  "samples": [
+    {
+      "file": "test/LHouse/sample_00001.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00002.txt",
+      "max_bbox_difference": 0.0
+    },
+    {
+      "file": "test/LHouse/sample_00003.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00004.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00005.txt",
+      "max_bbox_difference": 4.76837158203125e-07
+    },
+    {
+      "file": "test/LHouse/sample_00006.txt",
+      "max_bbox_difference": 4.76837158203125e-07
+    },
+    {
+      "file": "test/LHouse/sample_00007.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00008.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00009.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00010.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00011.txt",
+      "max_bbox_difference": 0.0
+    },
+    {
+      "file": "test/LHouse/sample_00012.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00013.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00014.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00015.txt",
+      "max_bbox_difference": 4.76837158203125e-07
+    },
+    {
+      "file": "test/LHouse/sample_00016.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00017.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00018.txt",
+      "max_bbox_difference": 2.384185791015625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00019.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00020.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00021.txt",
+      "max_bbox_difference": 0.0
+    },
+    {
+      "file": "test/LHouse/sample_00022.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00023.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00024.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00025.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00026.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00027.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00028.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00029.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00030.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00031.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00032.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00033.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00034.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00035.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00036.txt",
+      "max_bbox_difference": 4.76837158203125e-07
+    },
+    {
+      "file": "test/LHouse/sample_00037.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00038.txt",
+      "max_bbox_difference": 4.76837158203125e-07
+    },
+    {
+      "file": "test/LHouse/sample_00039.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00040.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00041.txt",
+      "max_bbox_difference": 0.0
+    },
+    {
+      "file": "test/LHouse/sample_00042.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00043.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00044.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00045.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00046.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00047.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00048.txt",
+      "max_bbox_difference": 4.76837158203125e-07
+    },
+    {
+      "file": "test/LHouse/sample_00049.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00050.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00051.txt",
+      "max_bbox_difference": 4.76837158203125e-07
+    },
+    {
+      "file": "test/LHouse/sample_00052.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00053.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00054.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00055.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00056.txt",
+      "max_bbox_difference": 0.0
+    },
+    {
+      "file": "test/LHouse/sample_00057.txt",
+      "max_bbox_difference": 4.76837158203125e-07
+    },
+    {
+      "file": "test/LHouse/sample_00058.txt",
+      "max_bbox_difference": 0.0
+    },
+    {
+      "file": "test/LHouse/sample_00059.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00060.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00061.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00062.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00063.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00064.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00065.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00066.txt",
+      "max_bbox_difference": 4.76837158203125e-07
+    },
+    {
+      "file": "test/LHouse/sample_00067.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00068.txt",
+      "max_bbox_difference": 0.0
+    },
+    {
+      "file": "test/LHouse/sample_00069.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00070.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00071.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00072.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00073.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00074.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00075.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00076.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00077.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00078.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00079.txt",
+      "max_bbox_difference": 0.0
+    },
+    {
+      "file": "test/LHouse/sample_00080.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00081.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00082.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00083.txt",
+      "max_bbox_difference": 4.76837158203125e-07
+    },
+    {
+      "file": "test/LHouse/sample_00084.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00085.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00086.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00087.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00088.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00089.txt",
+      "max_bbox_difference": 3.814697265625e-06
+    },
+    {
+      "file": "test/LHouse/sample_00090.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00091.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00092.txt",
+      "max_bbox_difference": 2.384185791015625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00093.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00094.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00095.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00096.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00097.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    },
+    {
+      "file": "test/LHouse/sample_00098.txt",
+      "max_bbox_difference": 9.5367431640625e-07
+    },
+    {
+      "file": "test/LHouse/sample_00099.txt",
+      "max_bbox_difference": 0.0
+    },
+    {
+      "file": "test/LHouse/sample_00100.txt",
+      "max_bbox_difference": 1.9073486328125e-06
+    }
+  ],
+  "source_sha256": {
+    "scripts\\main_reg.py": "ed9348a220272cf801d21c10bb849131be5174b8a968281fb4093ac362db1273",
+    "scripts\\train_ptv3_reg.py": "c889389911a6e4e02b227bb7f3a8b91c7daed5fb6059c1be7a46380554afe2f4",
+    "scripts\\ptv3_server.py": "7c3993b9d0ea8932f909f72dddfe64e3ce492044f935e6dd00301909331b6b60",
+    "parammodeler_pointnet.cpp": "c5f703b8d659430b0e2d5a85822082818248d84811d03e2ff66545ac3f47632c"
+  }
+}

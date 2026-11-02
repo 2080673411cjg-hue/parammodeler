@@ -1,0 +1,242 @@
+[
+  {
+    "class_name": "GabledRoof",
+    "length": 12,
+    "width": 10,
+    "yaw": -158,
+    "before_error_deg": 0.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "GabledRoof",
+    "length": 12,
+    "width": 10,
+    "yaw": -27,
+    "before_error_deg": 0.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "GabledRoof",
+    "length": 12,
+    "width": 10,
+    "yaw": 64,
+    "before_error_deg": 0.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "GabledRoof",
+    "length": 12,
+    "width": 10,
+    "yaw": 89,
+    "before_error_deg": 0.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "GabledRoof",
+    "length": 6,
+    "width": 40,
+    "yaw": -158,
+    "before_error_deg": 90.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "GabledRoof",
+    "length": 6,
+    "width": 40,
+    "yaw": -27,
+    "before_error_deg": 90.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "GabledRoof",
+    "length": 6,
+    "width": 40,
+    "yaw": 64,
+    "before_error_deg": 90.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "GabledRoof",
+    "length": 6,
+    "width": 40,
+    "yaw": 89,
+    "before_error_deg": 90.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "length": 12,
+    "width": 10,
+    "yaw": -158,
+    "before_error_deg": 0.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "length": 12,
+    "width": 10,
+    "yaw": -27,
+    "before_error_deg": 0.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "length": 12,
+    "width": 10,
+    "yaw": 64,
+    "before_error_deg": 0.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "length": 12,
+    "width": 10,
+    "yaw": 89,
+    "before_error_deg": 0.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "length": 6,
+    "width": 40,
+    "yaw": -158,
+    "before_error_deg": 90.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "length": 6,
+    "width": 40,
+    "yaw": -27,
+    "before_error_deg": 90.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "length": 6,
+    "width": 40,
+    "yaw": 64,
+    "before_error_deg": 90.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "length": 6,
+    "width": 40,
+    "yaw": 89,
+    "before_error_deg": 90.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "HalfCylinderRoof",
+    "length": 12,
+    "width": 10,
+    "yaw": -158,
+    "before_error_deg": 0.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "HalfCylinderRoof",
+    "length": 12,
+    "width": 10,
+    "yaw": -27,
+    "before_error_deg": 0.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "HalfCylinderRoof",
+    "length": 12,
+    "width": 10,
+    "yaw": 64,
+    "before_error_deg": 0.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "HalfCylinderRoof",
+    "length": 12,
+    "width": 10,
+    "yaw": 89,
+    "before_error_deg": 0.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "HalfCylinderRoof",
+    "length": 6,
+    "width": 40,
+    "yaw": -158,
+    "before_error_deg": 90.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "HalfCylinderRoof",
+    "length": 6,
+    "width": 40,
+    "yaw": -27,
+    "before_error_deg": 90.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "HalfCylinderRoof",
+    "length": 6,
+    "width": 40,
+    "yaw": 64,
+    "before_error_deg": 90.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  },
+  {
+    "class_name": "HalfCylinderRoof",
+    "length": 6,
+    "width": 40,
+    "yaw": 89,
+    "before_error_deg": 90.0,
+    "after_error_deg": 0.0,
+    "before_reliable": true,
+    "after_reliable": true
+  }
+]

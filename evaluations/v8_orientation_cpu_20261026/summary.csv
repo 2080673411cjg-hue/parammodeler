@@ -1,0 +1,14 @@
+﻿class_name,test_total,actual_geometry_calls,dataset_accepted,accepted,failed,skipped,skip_category,axis_error_count,axis_error_mean_deg,axis_error_p95_deg,axis_error_max_deg,weak_verdict_count,roof_wrong_axis_gt45_count,roof_near90_ge80_count,canonical_align,lhouse_canonical,canonical_aux_units,canonical_bbox_mode,elapsed_seconds
+Cuboid,200,200,200,200,0,0,,200,1.0758169316039912,0.5,89.85302584024885,14,,,True,False,legacy,full,9.799
+Cylinder,200,200,200,0,0,200,rotation_symmetric,0,,,,0,,,True,False,legacy,full,3.472
+LHouse,200,200,199,199,1,0,,199,0.5755114129194292,2.0,3.0,0,,,True,True,physical,lhouse_xy_quantile_005_995_v1,10.051
+ConeCylinder,200,200,200,0,0,200,rotation_symmetric,0,,,,0,,,True,False,legacy,full,3.604
+GabledRoof,200,200,200,200,0,0,,200,0.06933823280377376,0.34243534697552447,0.5,3,0,0,True,False,legacy,full,10.054
+PyramidRoof,200,200,200,200,0,0,,200,0.41538339851706035,0.5,41.5,17,,,True,False,legacy,full,9.898
+TruncatedPyramidRoof,200,200,200,200,0,0,,200,0.08045244206273389,0.5,0.5435191814707423,30,,,True,False,legacy,full,11.114
+HalfCylinderRoof,200,200,200,200,0,0,,200,0.9915089347965801,1.851830797595794,90.0,5,1,1,True,False,legacy,full,12.999
+CylinderDome,200,200,200,0,0,200,rotation_symmetric,0,,,,0,,,True,False,legacy,full,4.07
+IndentedCuboid,200,200,200,200,0,0,,200,0.8181550222838675,1.5,89.0,26,,,True,False,legacy,full,11.065
+AsymmetricGableHouse,200,200,200,200,0,0,,200,1.4271557573279905,0.5,90.0,17,3,3,True,False,legacy,full,10.808
+FourStageRoundTower,200,200,200,0,0,200,rotation_symmetric,0,,,,0,,,True,False,legacy,full,4.512
+TwoGableHouses,200,200,200,0,0,200,not_whitelisted,0,,,,0,,,True,False,legacy,full,4.294

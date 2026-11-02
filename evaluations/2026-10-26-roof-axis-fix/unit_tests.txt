@@ -1,0 +1,193 @@
+test_directional_labels_allow_small_geometric_angle_error (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_flat_surface_does_not_fabricate_a_ridge (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_folded_roof_ratio_preserves_physical_ridge_side (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_lhouse_geometry_resolves_missing_corner_for_all_directions (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_lhouse_legacy_checkpoint_stays_unrotated (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_lhouse_metadata_keeps_the_full_direction_and_targets (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_lhouse_rejects_rectangle_or_sparse_corner_support (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_near_square_is_not_rejected_as_circular (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_rectangle_axes_at_histogram_boundary (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_roof_candidates_ignore_sparse_high_outliers (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_roof_uses_ridge_axis_even_when_width_is_longer (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_short_wide_roofs_compare_relative_candidate_spans (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_square_reports_axis_ambiguity_but_has_rectangle_frame (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_unsupported_class_remains_unrotated (test_canonical_orientation.CanonicalOrientationTests) ... ok
+test_evaluation_directory_is_test_only (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+test_failed_geometry_is_counted_without_using_ground_truth_yaw (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+Cached points GabledRoof/test: 0 clouds (0.0 MiB)
+Cached points GabledRoof/test: 1 clouds (0.0 MiB)
+test_geometry_reports_do_not_overwrite_metadata_reports (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+Test samples: 1
+  length                MAE=0.0000  RMSE=0.0000  MAPE=0.00%  R²=1.0000
+  width                 MAE=0.0000  RMSE=0.0000  MAPE=0.00%  R²=1.0000
+  totalHeight           MAE=0.0000  RMSE=0.0000  MAPE=0.00%  R²=1.0000
+  wallRatio             MAE=0.0000  RMSE=0.0000  MAPE=0.00%  R²=1.0000
+  ridgeRatio            MAE=0.0000  RMSE=0.0000  MAPE=0.00%  R²=1.0000
+Mean MAE: 0.0000
+Cached points GabledRoof/test: 1 clouds (0.0 MiB)
+test_geometry_source_uses_estimated_angle_and_transforms_labels (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+Cached points LHouse/test: 1 clouds (0.0 MiB)
+test_lhouse_centered_shape_reports_notch_position_in_metres (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+test_lhouse_config_persists_the_opt_in_frame (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+Cached points LHouse/test: 1 clouds (0.0 MiB)
+test_lhouse_geometry_does_not_hide_a_180_degree_failure (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+test_lhouse_inference_uses_checkpoint_flag_and_full_pose (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+Cached points LHouse/test: 1 clouds (0.0 MiB)
+Cached points LHouse/test: 1 clouds (0.0 MiB)
+test_lhouse_opt_in_rotates_points_but_not_shape_labels (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+test_lhouse_uncertain_inference_does_not_silently_use_legacy_frame (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+Cached points GabledRoof/test: 1 clouds (0.0 MiB)
+test_metadata_source_remains_unchanged (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+Cached points GabledRoof/test: 1 clouds (0.0 MiB)
+test_ridge_geometry_detects_mixed_frame_even_with_perfect_dimensions (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+Cached points GabledRoof/test: 1 clouds (0.0 MiB)
+test_separate_evaluation_preserves_checkpoint_reports (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+test_separate_evaluation_rejects_checkpoint_or_nonempty_output (test_canonical_pipeline.CanonicalPipelineTests) ... ok
+test_corner_loss_does_not_replace_parameter_loss (test_canonical_pipeline.LHouseCornerTrainingTests) ... ok
+test_flag_is_opt_in_and_invalid_training_modes_are_rejected (test_canonical_pipeline.LHouseCornerTrainingTests) ... ok
+test_loss_is_unit_invariant_and_uses_target_names (test_canonical_pipeline.LHouseCornerTrainingTests) ... ok
+test_notch_formula_and_primary_output_gradients (test_canonical_pipeline.LHouseCornerTrainingTests) ... ok
+test_robust_bbox_is_opt_in_and_cannot_mix_experiments (test_canonical_pipeline.LHouseCornerTrainingTests) ... ok
+test_training_wires_loss_logs_and_checkpoint_without_changing_selection (test_canonical_pipeline.LHouseCornerTrainingTests) ...
+======================================================================
+ERROR: test_training_wires_loss_logs_and_checkpoint_without_changing_selection (test_canonical_pipeline.LHouseCornerTrainingTests) (weight=0, robust=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\tests\test_canonical_pipeline.py", line 329, in test_training_wires_loss_logs_and_checkpoint_without_changing_selection
+    regression.train(args)
+  File "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\scripts\main_reg.py", line 1175, in train
+    save_config(log_dir, args, targets, mean_np, std_np, aux_names, aux_mean_np, aux_std_np,
+  File "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\scripts\main_reg.py", line 1089, in save_config
+    (log_dir / "regression_config.json").write_text(
+  File "E:\mambaforge\envs\pointnet_train\lib\pathlib.py", line 1154, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+  File "E:\mambaforge\envs\pointnet_train\lib\pathlib.py", line 1119, in open
+    return self._accessor.open(self, mode, buffering, encoding, errors,
+PermissionError: [Errno 13] Permission denied: 'C:\\Users\\20806\\AppData\\Local\\Packages\\sandbox.{ff8c4eaa-f7d3-4268-b84a-19b214fcc158}\\AC\\Temp\\tmp7_fywl7y\\regression_config.json'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "E:\mambaforge\envs\pointnet_train\lib\shutil.py", line 622, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] 拒绝访问。: 'C:\\Users\\20806\\AppData\\Local\\Packages\\sandbox.{ff8c4eaa-f7d3-4268-b84a-19b214fcc158}\\AC\\Temp\\tmp7_fywl7y'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\tests\test_canonical_pipeline.py", line 321, in test_training_wires_loss_logs_and_checkpoint_without_changing_selection
+    with self.subTest(weight=weight, robust=robust), tempfile.TemporaryDirectory() as directory:
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 878, in __exit__
+    self.cleanup()
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 882, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 864, in _rmtree
+    _shutil.rmtree(name, onerror=onerror)
+  File "E:\mambaforge\envs\pointnet_train\lib\shutil.py", line 750, in rmtree
+    return _rmtree_unsafe(path, onerror)
+  File "E:\mambaforge\envs\pointnet_train\lib\shutil.py", line 624, in _rmtree_unsafe
+    onerror(os.rmdir, path, sys.exc_info())
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 849, in onerror
+    _resetperms(path)
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] 拒绝访问。: 'C:\\Users\\20806\\AppData\\Local\\Packages\\sandbox.{ff8c4eaa-f7d3-4268-b84a-19b214fcc158}\\AC\\Temp\\tmp7_fywl7y'
+
+======================================================================
+ERROR: test_training_wires_loss_logs_and_checkpoint_without_changing_selection (test_canonical_pipeline.LHouseCornerTrainingTests) (weight=0.2, robust=False)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\tests\test_canonical_pipeline.py", line 329, in test_training_wires_loss_logs_and_checkpoint_without_changing_selection
+    regression.train(args)
+  File "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\scripts\main_reg.py", line 1175, in train
+    save_config(log_dir, args, targets, mean_np, std_np, aux_names, aux_mean_np, aux_std_np,
+  File "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\scripts\main_reg.py", line 1089, in save_config
+    (log_dir / "regression_config.json").write_text(
+  File "E:\mambaforge\envs\pointnet_train\lib\pathlib.py", line 1154, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+  File "E:\mambaforge\envs\pointnet_train\lib\pathlib.py", line 1119, in open
+    return self._accessor.open(self, mode, buffering, encoding, errors,
+PermissionError: [Errno 13] Permission denied: 'C:\\Users\\20806\\AppData\\Local\\Packages\\sandbox.{ff8c4eaa-f7d3-4268-b84a-19b214fcc158}\\AC\\Temp\\tmp1ysaytnq\\regression_config.json'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "E:\mambaforge\envs\pointnet_train\lib\shutil.py", line 622, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] 拒绝访问。: 'C:\\Users\\20806\\AppData\\Local\\Packages\\sandbox.{ff8c4eaa-f7d3-4268-b84a-19b214fcc158}\\AC\\Temp\\tmp1ysaytnq'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\tests\test_canonical_pipeline.py", line 321, in test_training_wires_loss_logs_and_checkpoint_without_changing_selection
+    with self.subTest(weight=weight, robust=robust), tempfile.TemporaryDirectory() as directory:
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 878, in __exit__
+    self.cleanup()
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 882, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 864, in _rmtree
+    _shutil.rmtree(name, onerror=onerror)
+  File "E:\mambaforge\envs\pointnet_train\lib\shutil.py", line 750, in rmtree
+    return _rmtree_unsafe(path, onerror)
+  File "E:\mambaforge\envs\pointnet_train\lib\shutil.py", line 624, in _rmtree_unsafe
+    onerror(os.rmdir, path, sys.exc_info())
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 849, in onerror
+    _resetperms(path)
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] 拒绝访问。: 'C:\\Users\\20806\\AppData\\Local\\Packages\\sandbox.{ff8c4eaa-f7d3-4268-b84a-19b214fcc158}\\AC\\Temp\\tmp1ysaytnq'
+
+======================================================================
+ERROR: test_training_wires_loss_logs_and_checkpoint_without_changing_selection (test_canonical_pipeline.LHouseCornerTrainingTests) (weight=0, robust=True)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\tests\test_canonical_pipeline.py", line 329, in test_training_wires_loss_logs_and_checkpoint_without_changing_selection
+    regression.train(args)
+  File "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\scripts\main_reg.py", line 1175, in train
+    save_config(log_dir, args, targets, mean_np, std_np, aux_names, aux_mean_np, aux_std_np,
+  File "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\scripts\main_reg.py", line 1089, in save_config
+    (log_dir / "regression_config.json").write_text(
+  File "E:\mambaforge\envs\pointnet_train\lib\pathlib.py", line 1154, in write_text
+    with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
+  File "E:\mambaforge\envs\pointnet_train\lib\pathlib.py", line 1119, in open
+    return self._accessor.open(self, mode, buffering, encoding, errors,
+PermissionError: [Errno 13] Permission denied: 'C:\\Users\\20806\\AppData\\Local\\Packages\\sandbox.{ff8c4eaa-f7d3-4268-b84a-19b214fcc158}\\AC\\Temp\\tmpwi91ubjk\\regression_config.json'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "E:\mambaforge\envs\pointnet_train\lib\shutil.py", line 622, in _rmtree_unsafe
+    os.rmdir(path)
+PermissionError: [WinError 5] 拒绝访问。: 'C:\\Users\\20806\\AppData\\Local\\Packages\\sandbox.{ff8c4eaa-f7d3-4268-b84a-19b214fcc158}\\AC\\Temp\\tmpwi91ubjk'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\tests\test_canonical_pipeline.py", line 321, in test_training_wires_loss_logs_and_checkpoint_without_changing_selection
+    with self.subTest(weight=weight, robust=robust), tempfile.TemporaryDirectory() as directory:
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 878, in __exit__
+    self.cleanup()
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 882, in cleanup
+    self._rmtree(self.name, ignore_errors=self._ignore_cleanup_errors)
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 864, in _rmtree
+    _shutil.rmtree(name, onerror=onerror)
+  File "E:\mambaforge\envs\pointnet_train\lib\shutil.py", line 750, in rmtree
+    return _rmtree_unsafe(path, onerror)
+  File "E:\mambaforge\envs\pointnet_train\lib\shutil.py", line 624, in _rmtree_unsafe
+    onerror(os.rmdir, path, sys.exc_info())
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 849, in onerror
+    _resetperms(path)
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 286, in _resetperms
+    _dont_follow_symlinks(_os.chmod, path, 0o700)
+  File "E:\mambaforge\envs\pointnet_train\lib\tempfile.py", line 277, in _dont_follow_symlinks
+    func(path, *args)
+PermissionError: [WinError 5] 拒绝访问。: 'C:\\Users\\20806\\AppData\\Local\\Packages\\sandbox.{ff8c4eaa-f7d3-4268-b84a-19b214fcc158}\\AC\\Temp\\tmpwi91ubjk'
+
+----------------------------------------------------------------------
+Ran 34 tests in 4.426s
+
+FAILED (errors=3)

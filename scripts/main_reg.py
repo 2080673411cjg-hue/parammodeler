@@ -9,7 +9,12 @@ See PTv3_EXPERIMENT.md for Ubuntu setup and training commands.
 import argparse
 import csv
 import json
+import multiprocessing
+import os
 import random
+import time
+from collections import deque
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -100,6 +105,105 @@ def estimate_normals(points: np.ndarray, k: int = 16) -> np.ndarray:
             normal = -normal
         normals[i] = normal
     return normals.astype(np.float32)
+
+
+def duration_text(seconds):
+    hours, remainder = divmod(int(seconds), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+
+def init_normal_worker():
+    torch.set_num_threads(1)
+
+
+def precompute_normals(clouds, total, label, num_workers=0, normal_backend="numpy",
+                       normal_threads=4, data_root=None, source_points=False):
+    """Yield complete clouds in input order, with a bounded normal-task queue."""
+    if num_workers < 0:
+        raise ValueError("normal_workers must be non-negative")
+    if normal_backend not in ("numpy", "pcl") or normal_threads < 1:
+        raise ValueError("Unsupported normal backend or non-positive normal_threads")
+    workers = min(num_workers, total) if num_workers > 1 else 0
+    started = time.perf_counter()
+    cache = None
+    if normal_backend == "pcl":
+        from pcl_normals import NormalCache, PCLNormals
+        if data_root is None:
+            raise ValueError("PCL disk cache requires data_root")
+        cache = NormalCache(data_root, PCLNormals(), normal_threads)
+        workers = 0  # PCL uses its own OpenMP threads, without an outer process pool.
+        print(f"Normals {label}: PCL {cache.calculator.version} | threads={normal_threads} | "
+              f"disk_cache={cache.root}", flush=True)
+    print(f"Normals {label}: preparing {total} clouds | workers={workers}", flush=True)
+
+    def results():
+        if cache is not None:
+            for path, points in clouds:
+                base = points if source_points else normalize_points(load_txt_points(Path(path)))
+                yield path, points, cache.get(path, base)
+            return
+        if workers < 2:
+            for path, points in clouds:
+                yield path, points, estimate_normals(points)
+            return
+        source = iter(clouds)
+        with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn"),
+                                 initializer=init_normal_worker) as pool:
+            pending = deque()
+
+            def submit_next():
+                item = next(source, None)
+                if item is not None:
+                    path, points = item
+                    pending.append((path, points, pool.submit(estimate_normals, points)))
+
+            for _ in range(workers * 2):
+                submit_next()
+            while pending:
+                path, points, future = pending.popleft()
+                normals = future.result()
+                submit_next()
+                yield path, points, normals
+
+    last_report = started
+    for index, item in enumerate(results(), start=1):
+        now = time.perf_counter()
+        if index == 1 or index % 50 == 0 or index == total or now - last_report >= 10:
+            elapsed = now - started
+            remaining = elapsed / index * (total - index)
+            print(f"Normals {label}: {index}/{total} ({index / total:.1%}) | "
+                  f"elapsed {duration_text(elapsed)} | ETA {duration_text(remaining)} | "
+                  f"{index / max(elapsed, 1e-9):.2f} clouds/s", flush=True)
+            last_report = now
+        yield item
+    elapsed = time.perf_counter() - started
+    print(f"Normals {label} complete: {total} clouds | elapsed {duration_text(elapsed)} "
+          f"({elapsed:.2f}s) | {total / max(elapsed, 1e-9):.2f} clouds/s", flush=True)
+    if cache is not None:
+        print(f"Normals {label} cache: hit={cache.hits} computed={cache.computed}", flush=True)
+
+
+def normal_kwargs(args, checkpoint=None):
+    # Existing checkpoints always keep their original NumPy features.
+    backend = (checkpoint.get("normal_backend", "numpy") if checkpoint is not None
+               else getattr(args, "normal_backend", "numpy"))
+    if backend not in ("numpy", "pcl"):
+        raise ValueError(f"Unsupported checkpoint normal backend: {backend}")
+    return {"normal_backend": backend, "normal_threads": getattr(args, "normal_threads", 4)}
+
+
+def predict_normals(source_points, prepared_points, args, checkpoint, angle_deg=0.0):
+    if not checkpoint.get("use_normals", False):
+        return None
+    options = normal_kwargs(args, checkpoint)
+    if options["normal_backend"] == "numpy":
+        return estimate_normals(prepared_points)
+    from pcl_normals import PCLNormals, rotate_normals_z
+    normals, _, invalid = PCLNormals()(normalize_points(source_points), threads=options["normal_threads"])
+    if invalid:
+        raise ValueError(f"PCL produced {invalid} invalid normals for inference")
+    return rotate_normals_z(normals, angle_deg) if angle_deg else normals
 
 
 def sample_points(points: np.ndarray, num_points: int, train: bool,
@@ -385,6 +489,35 @@ def aux_vector_for_bbox(aux_values: np.ndarray, aux_names: List[str], bbox_size:
     record = {"pointCloudInfo": {"bboxSize": np.asarray(bbox_size, dtype=np.float32).tolist(),
                                  "scale": scale}}
     return aux_vector(record, aux_names)
+
+LHOUSE_ROBUST_BBOX_MODE = "lhouse_xy_quantile_005_995_v1"
+
+
+def validate_canonical_bbox_mode(mode, class_name, canonical_align, lhouse_canonical, aux_units):
+    if mode not in ("full", LHOUSE_ROBUST_BBOX_MODE):
+        raise ValueError(f"Unsupported canonical bbox mode: {mode}")
+    if mode != "full" and (class_name != "LHouse" or not canonical_align
+                            or not lhouse_canonical or aux_units != "physical"):
+        raise ValueError("Robust bbox requires canonical LHouse with physical auxiliary units")
+
+
+def physical_bbox_size(points: np.ndarray, input_coordinates: str, scale=None, bbox_mode="full") -> np.ndarray:
+    """Convert a canonical point span to scene units before deriving auxiliary features."""
+    span = np.ptp(points, axis=0).astype(np.float32)
+    if bbox_mode == LHOUSE_ROBUST_BBOX_MODE:
+        bounds = np.quantile(points[:, :2], [0.005, 0.995], axis=0)
+        span[:2] = bounds[1] - bounds[0]
+    elif bbox_mode != "full":
+        raise ValueError(f"Unsupported canonical bbox mode: {bbox_mode}")
+    if input_coordinates == "normalized":
+        if scale is None or not np.isfinite(scale) or scale <= 0:
+            raise ValueError("Normalized input requires a finite positive physical scale")
+        span = span * float(scale)
+    elif input_coordinates != "physical":
+        raise ValueError("Declare input_coordinates as physical or normalized for physical auxiliary features")
+    return span
+
+
 def primitive_geometry_summary(record: dict) -> Dict[str, float]:
     """Geometry labels used only as auxiliary supervision for regression training."""
     params = record.get("params", {})
@@ -498,7 +631,9 @@ class ParamRegressionDataset(Dataset):
                  targets, num_points, train=False, normalize=True,
                  jitter_sigma=0.0, random_rotate=False, aux_names=None,
                  use_normals=False, geom_aux_targets=None, target_mode="raw",
-                 canonical_align=False, orientation_source="metadata"):
+                 canonical_align=False, orientation_source="metadata", lhouse_canonical=False,
+                 canonical_aux_units="legacy", canonical_bbox_mode="full", cache_points=True,
+                 normal_workers=0, normal_backend="numpy", normal_threads=4):
         self.data_root = Path(data_root)
         self.metadata_path = Path(metadata_path)
         self.class_name = class_name
@@ -514,6 +649,15 @@ class ParamRegressionDataset(Dataset):
         self.geom_aux_targets = geom_aux_targets or []
         self.target_mode = target_mode
         self.canonical_align = bool(canonical_align)
+        self.lhouse_canonical = bool(lhouse_canonical)
+        self.canonical_aux_units = canonical_aux_units
+        self.canonical_bbox_mode = canonical_bbox_mode
+        self.cache_points = bool(cache_points)
+        self._points_cache: Dict[str, np.ndarray] = {}
+        if canonical_aux_units not in ("legacy", "physical"):
+            raise ValueError(f"Unsupported canonical auxiliary units: {canonical_aux_units}")
+        validate_canonical_bbox_mode(canonical_bbox_mode, class_name, self.canonical_align,
+                                     self.lhouse_canonical, canonical_aux_units)
         self.orientation_diagnostics = []
         self.geom_values: List[np.ndarray] = []
 
@@ -532,67 +676,125 @@ class ParamRegressionDataset(Dataset):
             if not path.exists():
                 raise FileNotFoundError(f"Metadata points to missing point cloud: {path}")
             theta = 0.0
+            original_points = None
             canonical_rec = rec
             if self.canonical_align:
-                theta_value = canonical_angle_from_metadata(rec, class_name)
+                theta_value = canonical_angle_from_metadata(rec, class_name, self.lhouse_canonical)
                 if theta_value is not None:
                     theta = float(theta_value)
                     original_points = load_txt_points(path)
                     if orientation_source == "geometry":
-                        orientation = canonical_orientation(original_points, class_name)
+                        orientation = canonical_orientation(original_points, class_name, self.lhouse_canonical)
                         diagnostic = {"file": rel, "applied": orientation["reliable"],
                                       "reason": orientation["reason"]}
                         if not orientation["reliable"]:
                             self.orientation_diagnostics.append(diagnostic)
                             continue
                         theta = float(orientation["canonical_angle_deg"])
-                        diagnostic["axis_error_deg"] = abs(fold_axis_degrees(theta - theta_value))
+                        diagnostic["axis_error_deg"] = (abs((theta - theta_value + 180.0) % 360.0 - 180.0)
+                                                        if self.lhouse_canonical
+                                                        else abs(fold_axis_degrees(theta - theta_value)))
                         self.orientation_diagnostics.append(diagnostic)
                     points = rotate_points_z(original_points, -theta)
                     info = dict(rec.get("pointCloudInfo", {}))
-                    info["bboxSize"] = np.ptp(points, axis=0).astype(float).tolist()
+                    if self.canonical_aux_units == "physical":
+                        coordinates = ("normalized" if info.get("normalization") ==
+                                       "centered_by_mean_and_scaled_by_max_radius" else "physical")
+                        bbox = physical_bbox_size(points, coordinates, info.get("scale"), self.canonical_bbox_mode)
+                    else:
+                        bbox = np.ptp(points, axis=0)
+                    info["bboxSize"] = bbox.astype(float).tolist()
                     canonical_rec = dict(rec)
                     canonical_rec["pointCloudInfo"] = info
             aux = aux_vector(canonical_rec, self.aux_names)
             raw_target = target_vector(rec, targets)
-            if self.canonical_align and canonical_angle_from_metadata(rec, class_name) is not None:
+            if self.canonical_align and canonical_angle_from_metadata(rec, class_name, self.lhouse_canonical) is not None:
                 raw_target = canonical_target_values(raw_target, targets, rec, class_name, theta)
             baseline = target_baseline_from_aux_values(targets, self.aux_names, aux, self.target_mode)
             target = apply_target_transform(raw_target, baseline, self.target_mode)
             self.samples.append((path, target, aux, canonical_rec, theta))
             self.geom_values.append(geometry_aux_vector(canonical_rec, self.geom_aux_targets))
+            if self.cache_points:
+                fixed_points = self._prepare_points(path, theta, original_points)
+                fixed_points.setflags(write=False)
+                self._points_cache[str(path)] = fixed_points
         if not self.samples and not self.orientation_diagnostics:
             raise RuntimeError(f"No samples for class={class_name}, split={split} in {metadata_path}")
+        if self.cache_points:
+            size_mib = sum(points.nbytes for points in self._points_cache.values()) / (1024 * 1024)
+            print(f"Cached points {class_name}/{split}: {len(self._points_cache)} clouds ({size_mib:.1f} MiB)", flush=True)
 
         # Precompute per-point normals once (kNN PCA is the bottleneck; caching
         # keeps every epoch fast instead of re-estimating per sample).
         self._normals_cache: Dict[str, np.ndarray] = {}
         if self.use_normals:
-            for index, (path, _, _, _, theta) in enumerate(self.samples, start=1):
-                pts = load_txt_points(path)
-                if self.canonical_align and theta:
-                    pts = rotate_points_z(pts, -theta)
-                if self.normalize:
-                    pts = normalize_points(pts)
-                self._normals_cache[str(path)] = estimate_normals(pts)
-                if index == 1 or index % 50 == 0 or index == len(self.samples):
-                    print(f"Normals {class_name}/{split}: {index}/{len(self.samples)}", flush=True)
+            def clouds():
+                for path, _, _, _, theta in self.samples:
+                    pts = self._points_cache.get(str(path))
+                    if pts is None:
+                        pts = self._prepare_points(path, theta)
+                    yield path, pts
+
+            prepared = precompute_normals(
+                    clouds(), len(self.samples), f"{class_name}/{split}", normal_workers,
+                    normal_backend=normal_backend, normal_threads=normal_threads, data_root=self.data_root)
+            for (path, _, normals), (_, _, _, _, theta) in zip(prepared, self.samples):
+                if normal_backend == "pcl" and self.canonical_align:
+                    from pcl_normals import rotate_normals_z
+                    # Normals are directions: apply rotation only, never centroid translation.
+                    if theta:
+                        normals = rotate_normals_z(normals, -theta)
+                normals.setflags(write=False)
+                self._normals_cache[str(path)] = normals
 
     def __len__(self):
         return len(self.samples)
 
-    def __getitem__(self, index):
-        path, target, aux, _, theta = self.samples[index]
-        points = load_txt_points(path)
+    def _prepare_points(self, path, theta, points=None):
+        if points is None:
+            points = load_txt_points(path)
         if self.canonical_align and theta:
             points = rotate_points_z(points, -theta)
         if self.normalize:
             points = normalize_points(points)
+        return points
+
+    def __getitem__(self, index):
+        path, target, aux, _, theta = self.samples[index]
+        points = self._points_cache.get(str(path))
+        if points is None:
+            points = self._prepare_points(path, theta)
         normals = self._normals_cache.get(str(path)) if self.use_normals else None
         points = sample_points(points, self.num_points, self.train,
                                self.jitter_sigma, self.random_rotate, normals)
         geom = self.geom_values[index] if self.geom_aux_targets else np.zeros((0,), dtype=np.float32)
         return torch.from_numpy(points), torch.from_numpy(aux), torch.from_numpy(target), torch.from_numpy(geom), str(path)
+
+
+def seed_data_worker(_worker_id):
+    seed = torch.initial_seed() % (2 ** 32)
+    np.random.seed(seed)
+    random.seed(seed)
+
+
+def make_data_loader(dataset, batch_size, shuffle, device, num_workers=0, seed=None):
+    options = {"num_workers": num_workers, "pin_memory": device.type == "cuda"}
+    if num_workers > 0:
+        options.update(persistent_workers=True, prefetch_factor=2,
+                       multiprocessing_context="spawn", worker_init_fn=seed_data_worker)
+        if seed is not None:
+            options["generator"] = torch.Generator().manual_seed(seed)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, **options)
+
+
+def data_loading_config(args):
+    workers = getattr(args, "num_workers", 0)
+    return {"cache_points": getattr(args, "cache_points", True), "num_workers": workers,
+            "normal_workers": getattr(args, "normal_workers", 0),
+            "normal_backend": getattr(args, "normal_backend", "numpy"),
+            "normal_threads": getattr(args, "normal_threads", 4),
+            "persistent_workers": workers > 0,
+            "worker_seed_mode": "torch_initial_seed_numpy_python_v1" if workers else "main_process"}
 
 
 # ============================================================================
@@ -706,6 +908,21 @@ def weighted_regression_loss(pred_norm, y_norm, pred_all, y, target_weights,
     raise ValueError(f"Unsupported loss reduction: {reduction}")
 
 
+def lhouse_notch_xy(values, targets):
+    length, width, length_ratio, width_ratio = (
+        values[:, targets.index(name)] for name in
+        ("outerLength", "outerWidth", "cutoutLengthRatio", "cutoutWidthRatio"))
+    return torch.stack((length * (1.0 - length_ratio), width * (1.0 - width_ratio)), dim=1)
+
+
+def lhouse_corner_loss(pred, true, targets, target_std, criterion):
+    # Decode the actual corner from the primary outputs, not a separate auxiliary head.
+    difference = lhouse_notch_xy(pred, targets) - lhouse_notch_xy(true, targets)
+    indices = [targets.index("outerLength"), targets.index("outerWidth")]
+    scale = target_std.reshape(1, -1)[:, indices].clamp_min(1e-6)
+    return criterion(difference / scale, torch.zeros_like(difference))
+
+
 def symmetry_weighted_regression_loss(pred_norm, y, mean, std, target_weights,
                                       criterion_elem, permutation,
                                       relative_weight=0.0, relative_eps=1e-3,
@@ -741,6 +958,47 @@ def standardized_mae_score(mae, target_std, target_weights):
             or not np.isfinite(weights).all() or np.any(weights < 0) or weights.sum() <= 0):
         raise ValueError("Expected positive finite std and non-negative finite weights")
     return float(np.sum((mae / np.maximum(std, 1e-6)) * weights) / weights.sum())
+
+
+TRUNCATED_DIMENSION_TARGETS = ("geom_footprint_long", "geom_footprint_short", "geom_total_height")
+TRUNCATED_SCALE_SETTINGS = {
+    "truncated_scale_balanced": True,
+    "dimension_relative_loss_weight": 0.05,
+    "dimension_relative_targets": list(TRUNCATED_DIMENSION_TARGETS),
+    "selection_metric": "scale_balanced_dimensionless_mae_v1",
+    "loss_recipe": "standardized_smooth_l1_truncated_relative_dimensions_v1",
+    "scale_band_source": "horizontalScaleBand",
+    "selection_ratio_error": "absolute",
+}
+
+
+def truncated_dimension_relative_loss(pred, true, targets, target_weights, eps):
+    indices = [targets.index(name) for name in TRUNCATED_DIMENSION_TARGETS]
+    weights = target_weights[indices]
+    errors = (pred[:, indices] - true[:, indices]).abs() / true[:, indices].abs().clamp_min(eps)
+    return ((errors * weights).sum(dim=1) / weights.sum()).mean()
+
+
+def truncated_scale_bands(dataset):
+    bands = [sample[3].get("horizontalScaleBand") for sample in dataset.samples]
+    if any(type(band) is not int or band not in (0, 1, 2) for band in bands) or set(bands) != {0, 1, 2}:
+        raise ValueError("Truncated scale experiment requires horizontalScaleBand 0/1/2 in train and val")
+    return np.asarray(bands, dtype=np.int64)
+
+
+def truncated_scale_balanced_score(metrics, targets, target_weights, bands, eps):
+    pred, true = np.asarray(metrics["pred"]), np.asarray(metrics["true"])
+    weights = np.asarray(target_weights, dtype=np.float64)
+    if (pred.shape != true.shape or pred.ndim != 2 or pred.shape[1] != len(targets)
+            or len(bands) != len(true) or set(bands) != {0, 1, 2}):
+        raise ValueError("Scale-balanced validation requires matching predictions and all three bands")
+    errors = np.abs(pred - true).astype(np.float64)
+    indices = [targets.index(name) for name in TRUNCATED_DIMENSION_TARGETS]
+    errors[:, indices] /= np.maximum(np.abs(true[:, indices]), eps)
+    # Ratio errors are already dimensionless; only physical dimensions are divided by their labels.
+    per_cloud = (errors * weights).sum(axis=1) / weights.sum()
+    scores = [float(per_cloud[np.asarray(bands) == band].mean()) for band in (0, 1, 2)]
+    return float(np.mean(scores)), scores
 
 
 INDENTED_180_MARGIN_PAIRS = (
@@ -814,9 +1072,9 @@ def evaluate(model, loader, device, mean, std, aux_mean, aux_std,
     pred_rows, true_rows, paths = [], [], []
     with torch.no_grad():
         for points, aux, targets, geom_targets, batch_paths in loader:
-            points = points.to(device)
-            aux = aux.to(device)
-            targets = targets.to(device)
+            points = points.to(device, non_blocking=device.type == "cuda")
+            aux = aux.to(device, non_blocking=device.type == "cuda")
+            targets = targets.to(device, non_blocking=device.type == "cuda")
             aux_norm = (aux - aux_mean) / aux_std if aux.shape[1] > 0 else aux
             pred_out = model(points, aux_norm)
             pred_norm = pred_out[:, :mean.shape[1]]
@@ -908,16 +1166,23 @@ def save_config(log_dir, args, targets, mean, std, aux_names, aux_mean, aux_std,
         "target_mean": mean.tolist(),
         "target_std": std.tolist(),
         "num_points": args.num_points,
+        "data_loading": data_loading_config(args),
         "normalize_points": args.normalize_points,
         "canonical_align": getattr(args, "canonical_align", False),
-        "canonical_frame_version": "metadata_yaw_v1" if getattr(args, "canonical_align", False) else None,
+        "lhouse_canonical": getattr(args, "lhouse_canonical", False),
+        "canonical_aux_units": getattr(args, "canonical_aux_units", "legacy"),
+        "canonical_bbox_mode": (LHOUSE_ROBUST_BBOX_MODE if getattr(args, "lhouse_robust_bbox", False) else "full"),
+        "canonical_frame_version": ("lhouse_full_yaw_v1" if getattr(args, "lhouse_canonical", False)
+                                    else "metadata_yaw_v1" if getattr(args, "canonical_align", False) else None),
         "aux_names": aux_names,
         "aux_mean": aux_mean.tolist(),
         "aux_std": aux_std.tolist(),
         "circular_targets": circular_targets or [],
         "geom_aux_targets": getattr(args, "geom_aux_targets", []),
         "geom_loss_weight": getattr(args, "geom_loss_weight", 0.0),
+        "lhouse_corner_loss_weight": getattr(args, "lhouse_corner_loss_weight", 0.0),
         "use_normals": getattr(args, 'use_normals', False),
+        "normal_backend": getattr(args, "normal_backend", "numpy"),
         "selection_metric": ("symmetry_weighted_standardized_mae" if (getattr(args, "indented_symmetry_180", False)
                               or getattr(args, "asym_ridge_symmetry_180", False)
                               or getattr(args, "gabled_ridge_symmetry_180", False))
@@ -932,8 +1197,13 @@ def save_config(log_dir, args, targets, mean, std, aux_names, aux_mean, aux_std,
                         if getattr(args, "gabled_ridge_symmetry_180", False)
                         else "standardized_wrapped_smooth_l1_asym_ridge_180_v1"
                         if getattr(args, "asym_ridge_symmetry_180", False)
+                        else "standardized_wrapped_smooth_l1_lhouse_corner_v1"
+                        if getattr(args, "lhouse_corner_loss_weight", 0.0) > 0
                         else "standardized_wrapped_smooth_l1_v2"),
     }
+    if getattr(args, "truncated_scale_balanced", False):
+        payload.update(TRUNCATED_SCALE_SETTINGS)
+        payload["dimension_relative_eps"] = args.relative_loss_eps
     (log_dir / "regression_config.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -975,6 +1245,9 @@ def train(args):
         ridge_index = roof_ridge_180_index(args.class_name, targets)
         symmetry_perm = list(range(len(targets)))
     target_mode = args.target_mode
+    corner_weight = args.lhouse_corner_loss_weight
+    scale_balanced = getattr(args, "truncated_scale_balanced", False)
+    bbox_mode = LHOUSE_ROBUST_BBOX_MODE if args.lhouse_robust_bbox else "full"
     aux_names = [] if args.no_aux else args.aux_features
 
     if args.backbone == "ptv3" and device.type != "cuda":
@@ -992,6 +1265,12 @@ def train(args):
         geom_aux_targets=args.geom_aux_targets,
         target_mode=target_mode,
         canonical_align=args.canonical_align,
+        lhouse_canonical=args.lhouse_canonical,
+        canonical_aux_units=args.canonical_aux_units,
+        canonical_bbox_mode=bbox_mode,
+        cache_points=getattr(args, "cache_points", True),
+        normal_workers=getattr(args, "normal_workers", 0),
+        **normal_kwargs(args),
     )
     val_split = "val"
     val_ds = ParamRegressionDataset(
@@ -1001,7 +1280,16 @@ def train(args):
         geom_aux_targets=args.geom_aux_targets,
         target_mode=target_mode,
         canonical_align=args.canonical_align,
+        lhouse_canonical=args.lhouse_canonical,
+        canonical_aux_units=args.canonical_aux_units,
+        canonical_bbox_mode=bbox_mode,
+        cache_points=getattr(args, "cache_points", True),
+        normal_workers=getattr(args, "normal_workers", 0),
+        **normal_kwargs(args),
     )
+    if scale_balanced:
+        truncated_scale_bands(train_ds)
+        val_scale_bands = truncated_scale_bands(val_ds)
 
     mean_np, std_np = compute_target_stats(train_ds)
     aux_mean_np, aux_std_np = compute_aux_stats(train_ds, len(aux_names))
@@ -1015,12 +1303,18 @@ def train(args):
     geom_mean = torch.tensor(geom_mean_np, dtype=torch.float32, device=device).view(1, -1)
     geom_std = torch.tensor(geom_std_np, dtype=torch.float32, device=device).view(1, -1)
 
-    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, num_workers=0)
-    val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
+    workers = getattr(args, "num_workers", 0)
+    seed = getattr(args, "seed", None)
+    train_loader = make_data_loader(train_ds, args.batch_size, True, device, workers, seed)
+    val_loader = make_data_loader(val_ds, args.batch_size, False, device, workers,
+                                  seed + 1 if seed is not None else None)
 
     print(f"Model: PTv3 | params: {sum(p.numel() for p in model.parameters())/1e6:.2f}M")
     print(f"Train samples: {len(train_ds)} | Val samples: {len(val_ds)}")
+    print(f"Data loading: {data_loading_config(args)} | pin_memory={train_loader.pin_memory}")
     print(f"Targets: {targets} | TargetMode: {target_mode} | Aux: {aux_names} | GeomAux: {args.geom_aux_targets} (weight={args.geom_loss_weight})")
+    if bbox_mode != "full":
+        print(f"Canonical bbox features: {bbox_mode} | XY quantiles=0.005,0.995 | Z=full span")
 
     criterion = nn.SmoothL1Loss(beta=args.smooth_l1_beta)
     criterion_elem = nn.SmoothL1Loss(beta=args.smooth_l1_beta, reduction="none")
@@ -1031,6 +1325,11 @@ def train(args):
     if args.target_weights or args.relative_loss_weight > 0:
         print(f"Loss: weighted SmoothL1 | target_weights={dict(zip(targets, target_weight_np.tolist()))} | "
               f"relative_loss_weight={args.relative_loss_weight}")
+    if corner_weight > 0:
+        print(f"LHouse corner loss: weight={corner_weight} | origin=outer_lower_left | scale=train_length_width_std")
+    if scale_balanced:
+        print("Truncated scale experiment: dimension relative weight=0.05 | ratios=original loss | "
+              "selection=equal mean of small/medium/large dimensionless validation MAE")
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=args.lr * 1e-3)
 
@@ -1042,17 +1341,23 @@ def train(args):
     history_path = log_dir / "train_history.csv"
     with history_path.open("w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f)
-        writer.writerow(["epoch", "train_loss", "val_mae_mean", "val_rmse_mean",
-                         "val_standardized_mae", "val_selection_score"])
+        history_columns = ["epoch", "train_loss", "val_mae_mean", "val_rmse_mean",
+                           "val_standardized_mae", "val_selection_score"]
+        if corner_weight > 0:
+            history_columns += ["val_local_notch_mean", "val_local_notch_p95"]
+        if scale_balanced:
+            history_columns += ["train_dimension_relative_loss", "val_scale_small", "val_scale_medium", "val_scale_large"]
+        writer.writerow(history_columns)
 
         for epoch in range(1, args.epochs + 1):
             model.train()
             total_loss, total_count = 0.0, 0
+            total_dimension_relative = 0.0
             for points, aux, y, geom_y, _ in train_loader:
-                points = points.to(device)
-                aux = aux.to(device)
-                y = y.to(device)
-                geom_y = geom_y.to(device)
+                points = points.to(device, non_blocking=device.type == "cuda")
+                aux = aux.to(device, non_blocking=device.type == "cuda")
+                y = y.to(device, non_blocking=device.type == "cuda")
+                geom_y = geom_y.to(device, non_blocking=device.type == "cuda")
                 y_norm = encode_targets(y, mean, std)
                 geom_norm = encode_targets(geom_y, geom_mean, geom_std) if geom_y.shape[1] > 0 else geom_y
                 aux_norm = (aux - aux_mean) / aux_std if aux.shape[1] > 0 else aux
@@ -1078,6 +1383,18 @@ def train(args):
                     )
                 else:
                     loss_total = criterion(pred_norm, y_norm)
+                if scale_balanced:
+                    baseline = target_baseline_from_aux_tensor(targets, aux_names, aux, target_mode)
+                    physical_pred = invert_target_transform_tensor(decode_targets(pred_norm, mean, std), baseline, target_mode)
+                    physical_true = invert_target_transform_tensor(y, baseline, target_mode)
+                    dimension_relative = truncated_dimension_relative_loss(
+                        physical_pred, physical_true, targets, target_weights, args.relative_loss_eps)
+                    loss_total = loss_total + TRUNCATED_SCALE_SETTINGS["dimension_relative_loss_weight"] * dimension_relative
+                    total_dimension_relative += dimension_relative.item() * points.size(0)
+                if corner_weight > 0:
+                    corner_loss = lhouse_corner_loss(decode_targets(pred_norm, mean, std), y,
+                                                     targets, std, criterion)
+                    loss_total = loss_total + corner_weight * corner_loss
                 if args.geom_aux_targets and args.geom_loss_weight > 0:
                     geom_loss = criterion(pred_geom_norm, geom_norm)
                     loss_total = loss_total + args.geom_loss_weight * geom_loss
@@ -1096,13 +1413,30 @@ def train(args):
             val_score = (symmetry_standardized_mae_score(val_metrics, std_np, target_weight_np, symmetry_perm,
                                                        complement_index=ridge_index)
                              if symmetry_perm is not None else val_direct_score)
-            writer.writerow([epoch, train_loss, val_mae_mean, val_rmse_mean,
-                             val_direct_score, val_score])
+            if scale_balanced:
+                val_score, band_scores = truncated_scale_balanced_score(
+                    val_metrics, targets, target_weight_np, val_scale_bands, args.relative_loss_eps)
+            history_row = [epoch, train_loss, val_mae_mean, val_rmse_mean, val_direct_score, val_score]
+            corner_message = ""
+            if corner_weight > 0:
+                corner_delta = (lhouse_notch_xy(torch.as_tensor(val_metrics["pred"]), targets)
+                                - lhouse_notch_xy(torch.as_tensor(val_metrics["true"]), targets))
+                corner_errors = torch.linalg.vector_norm(corner_delta, dim=1).numpy()
+                corner_mean, corner_p95 = float(corner_errors.mean()), float(np.percentile(corner_errors, 95))
+                history_row += [corner_mean, corner_p95]
+                corner_message = f" | val_local_notch_mean {corner_mean:.4f} | val_local_notch_p95 {corner_p95:.4f}"
+            if scale_balanced:
+                history_row += [total_dimension_relative / max(total_count, 1), *band_scores]
+                corner_message += (f" | val_scale_small {band_scores[0]:.4f}"
+                                   f" | val_scale_medium {band_scores[1]:.4f}"
+                                   f" | val_scale_large {band_scores[2]:.4f}")
+            writer.writerow(history_row)
             f.flush()
 
             print(f"Epoch {epoch:03d}/{args.epochs} | loss {train_loss:.5f} | "
                   f"val_mae {val_mae_mean:.4f} | val_rmse {val_rmse_mean:.4f} | "
-                  f"val_standardized_mae {val_direct_score:.4f} | val_selection_score {val_score:.4f}")
+                  f"val_standardized_mae {val_direct_score:.4f} | val_selection_score {val_score:.4f}"
+                  f"{corner_message}")
 
             if val_score < best_score:
                 best_score = val_score
@@ -1113,9 +1447,15 @@ def train(args):
                     "target_mean": mean_np.tolist(), "target_std": std_np.tolist(),
                     "geom_aux_targets": args.geom_aux_targets,
                     "geom_aux_mean": geom_mean_np.tolist(), "geom_aux_std": geom_std_np.tolist(),
+                    "lhouse_corner_loss_weight": corner_weight,
                     "num_points": args.num_points, "normalize_points": args.normalize_points,
+                    "data_loading": data_loading_config(args),
                     "canonical_align": args.canonical_align,
-                    "canonical_frame_version": "metadata_yaw_v1" if args.canonical_align else None,
+                    "lhouse_canonical": args.lhouse_canonical,
+                    "canonical_aux_units": args.canonical_aux_units,
+                    "canonical_bbox_mode": bbox_mode,
+                    "canonical_frame_version": ("lhouse_full_yaw_v1" if args.lhouse_canonical
+                                                else "metadata_yaw_v1" if args.canonical_align else None),
                     "aux_names": aux_names,
                     "aux_mean": aux_mean_np.tolist(), "aux_std": aux_std_np.tolist(),
                     "circular_targets": args.circular_targets,
@@ -1123,6 +1463,7 @@ def train(args):
                     "backbone_config": backbone_config(args),
                     "seed": args.seed,
                     "use_normals": args.use_normals,
+                    "normal_backend": getattr(args, "normal_backend", "numpy"),
                     "epoch": epoch,
                     "selection_metric": ("symmetry_weighted_standardized_mae" if symmetry_perm is not None
                                          else "weighted_standardized_mae"),
@@ -1137,7 +1478,11 @@ def train(args):
                                     if args.gabled_ridge_symmetry_180
                                     else "standardized_wrapped_smooth_l1_asym_ridge_180_v1"
                                     if args.asym_ridge_symmetry_180
+                                    else "standardized_wrapped_smooth_l1_lhouse_corner_v1"
+                                    if corner_weight > 0
                                     else "standardized_wrapped_smooth_l1_v2"),
+                    **({**TRUNCATED_SCALE_SETTINGS, "dimension_relative_eps": args.relative_loss_eps}
+                       if scale_balanced else {}),
                 }, log_dir / "best_model.pth")
                 save_metrics(log_dir, val_split, targets, val_metrics)
                 save_predictions(log_dir, val_split, targets, val_metrics)
@@ -1157,6 +1502,11 @@ def load_checkpoint(log_dir, device, args):
     if not ckpt_path.exists():
         raise FileNotFoundError(f"Missing checkpoint: {ckpt_path}")
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+    if ckpt.get("canonical_aux_units", "legacy") not in ("legacy", "physical"):
+        raise ValueError("Unsupported checkpoint canonical auxiliary units")
+    validate_canonical_bbox_mode(ckpt.get("canonical_bbox_mode", "full"), ckpt.get("class_name"),
+                                 ckpt.get("canonical_align", False), ckpt.get("lhouse_canonical", False),
+                                 ckpt.get("canonical_aux_units", "legacy"))
     if ckpt.get("backbone") != "ptv3":
         raise RuntimeError("This directory loads PTv3 checkpoints only. Use pct_simple for PCT weights.")
     args.circular_targets = list(ckpt.get("circular_targets", args.circular_targets))
@@ -1182,12 +1532,15 @@ def load_checkpoint(log_dir, device, args):
 def centered_geometry_errors(dataset, targets, metrics):
     """Measure shape/pose together, after aligning footprint centers (not translations)."""
     class_name = dataset.class_name
+    if class_name == "LHouse" and not dataset.lhouse_canonical:
+        return {}
     keys = {
         "Cuboid": ("length", "width"), "PyramidRoof": ("length", "width"),
         "TruncatedPyramidRoof": ("bottomLength", "bottomWidth"),
         "IndentedCuboid": ("outerLength", "outerWidth"),
         "GabledRoof": ("length", "width"), "AsymmetricGableHouse": ("length", "width"),
         "HalfCylinderRoof": ("length", "width"),
+        "LHouse": ("outerLength", "outerWidth"),
     }
     if class_name not in keys:
         return {}
@@ -1208,9 +1561,20 @@ def centered_geometry_errors(dataset, targets, metrics):
         pred_size = [predicted[length_key], predicted[width_key]]
         true_xy = rotate_xy(corners * true_size, float(true["rz"]))
         pred_xy = rotate_xy(corners * pred_size, yaw)
+        if class_name == "LHouse":
+            def outline(params):
+                length, width = params["outerLength"], params["outerWidth"]
+                x = length * (1.0 - params["cutoutLengthRatio"])
+                y = width * (1.0 - params["cutoutWidthRatio"])
+                return np.array([[0, 0], [length, 0], [length, y], [x, y],
+                                 [x, width], [0, width]]) - np.array([length, width]) / 2
+            true_xy = rotate_xy(outline(true), float(true["rz"]))
+            pred_xy = rotate_xy(outline(predicted), yaw)
         distances = np.linalg.norm(pred_xy[:, None, :] - true_xy[None, :, :], axis=2)
         row = {"file": str(path), "footprint_corner_error": float(
             (distances.min(axis=0).mean() + distances.min(axis=1).mean()) / 2)}
+        if class_name == "LHouse":
+            row["notch_corner_error"] = float(np.linalg.norm(pred_xy[3] - true_xy[3]))
         if class_name in ("GabledRoof", "AsymmetricGableHouse"):
             length_name = "ridgeLength" if class_name == "AsymmetricGableHouse" else "length"
             true_ridge = rotate_xy([[-true[length_name] / 2, (true["ridgeRatio"] - 0.5) * true_size[1]],
@@ -1222,7 +1586,7 @@ def centered_geometry_errors(dataset, targets, metrics):
                 np.linalg.norm(pred_ridge - true_ridge[::-1], axis=1).mean()))
         rows.append(row)
     result = {"centered_geometry_samples": rows}
-    for key in ("footprint_corner_error", "ridge_endpoint_error"):
+    for key in ("footprint_corner_error", "ridge_endpoint_error", "notch_corner_error"):
         values = [row[key] for row in rows if key in row]
         if values:
             result[key + "_mean"] = float(np.mean(values))
@@ -1232,6 +1596,13 @@ def centered_geometry_errors(dataset, targets, metrics):
 
 def test(args):
     log_dir = Path(args.log_dir)
+    separate_output = getattr(args, "eval_output_dir", None)
+    output_dir = Path(separate_output) if separate_output else log_dir
+    if separate_output:
+        if output_dir.resolve() == log_dir.resolve():
+            raise ValueError("Evaluation output must differ from the checkpoint directory")
+        if output_dir.exists() and (not output_dir.is_dir() or any(output_dir.iterdir())):
+            raise ValueError(f"Evaluation output must be a new or empty directory: {output_dir}")
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
     model, ckpt, targets, mean, std, aux_mean, aux_std = load_checkpoint(log_dir, device, args)
     class_name = args.class_name or ckpt["class_name"]
@@ -1251,6 +1622,12 @@ def test(args):
                                 geom_aux_targets=list(ckpt.get("geom_aux_targets", [])),
                                 target_mode=target_mode,
                                 canonical_align=bool(ckpt.get("canonical_align", False)),
+                                lhouse_canonical=bool(ckpt.get("lhouse_canonical", False)),
+                                canonical_aux_units=ckpt.get("canonical_aux_units", "legacy"),
+                                canonical_bbox_mode=ckpt.get("canonical_bbox_mode", "full"),
+                                cache_points=getattr(args, "cache_points", True),
+                                normal_workers=getattr(args, "normal_workers", 0),
+                                **normal_kwargs(args, ckpt),
                                 orientation_source=args.test_orientation)
     output_split = args.split + "_geometry" if geometry_test else args.split
     orientation_report = {"orientation_source": args.test_orientation,
@@ -1258,21 +1635,24 @@ def test(args):
                           "accepted": len(ds),
                           "failed": sum(not row["applied"] for row in ds.orientation_diagnostics),
                           "samples": ds.orientation_diagnostics}
+    if separate_output:
+        output_dir.mkdir(parents=True, exist_ok=True)
     if geometry_test:
-        (log_dir / f"orientation_{output_split}.json").write_text(
+        (output_dir / f"orientation_{output_split}.json").write_text(
             json.dumps(orientation_report, indent=2), encoding="utf-8")
     if not len(ds):
         raise RuntimeError("No usable test samples; inspect the orientation report")
-    loader = DataLoader(ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
+    loader = make_data_loader(ds, args.batch_size, False, device,
+                              getattr(args, "num_workers", 0), getattr(args, "seed", None))
     circ_indices = [i for i, t in enumerate(targets) if t in set(args.circular_targets)]
     metrics = evaluate(model, loader, device, mean, std, aux_mean, aux_std, targets, aux_names, target_mode, circ_indices)
-    save_metrics(log_dir, output_split, targets, metrics)
-    save_predictions(log_dir, output_split, targets, metrics)
-    save_regression_report(log_dir, output_split, class_name, targets, metrics)
-    save_regression_errors(log_dir, output_split, class_name, targets, metrics)
-    if geometry_test:
+    save_metrics(output_dir, output_split, targets, metrics)
+    save_predictions(output_dir, output_split, targets, metrics)
+    save_regression_report(output_dir, output_split, class_name, targets, metrics)
+    save_regression_errors(output_dir, output_split, class_name, targets, metrics)
+    if geometry_test or ckpt.get("lhouse_canonical", False):
         orientation_report.update(centered_geometry_errors(ds, targets, metrics))
-        (log_dir / f"orientation_{output_split}.json").write_text(
+        (output_dir / f"orientation_{output_split}.json").write_text(
             json.dumps(orientation_report, indent=2), encoding="utf-8")
     print(f"Test samples: {len(ds)}")
     for i, name in enumerate(targets):
@@ -1298,7 +1678,7 @@ def test(args):
                    "ridge_direct_mae": float(direct.mean()),
                    "ridge_equivalent_mae": float(np.minimum(direct, alternate).mean()),
                    "pose_disambiguation_required": True}
-        (log_dir / f"ridge_symmetry_{output_split}.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        (output_dir / f"ridge_symmetry_{output_split}.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
         print(f"Ridge symmetry diagnostics: {summary}")
 
 
@@ -1308,13 +1688,12 @@ def predict(args):
     model, ckpt, targets, mean, std, aux_mean, aux_std = load_checkpoint(log_dir, device, args)
     num_points = args.num_points or int(ckpt.get("num_points", 2048))
     normalize = bool(ckpt.get("normalize_points", True))
-    use_normals = bool(ckpt.get("use_normals", False))
     aux_names = list(ckpt.get("aux_names", []))
     target_mode = ckpt.get("target_mode", "raw")
 
+    record = None
     aux = np.zeros((0,), dtype=np.float32)
     if aux_names:
-        record = None
         metadata = args.metadata or str(Path(args.data_root) / "metadata" / "sample_params.json")
         metadata_path = Path(metadata)
         if metadata_path.exists():
@@ -1328,6 +1707,7 @@ def predict(args):
             aux = aux_from_args
 
     points = load_txt_points(Path(args.input))
+    source_points = points
 
     # ---- Canonical orientation alignment ----
     pose_rz_deg = None
@@ -1339,7 +1719,8 @@ def predict(args):
         if not _HAS_CANONICAL:
             raise SystemExit("Canonical checkpoint requires canonical_orientation.py beside main_reg.py")
         else:
-            orientation_info = canonical_orientation(points, class_name=ckpt.get("class_name"))
+            orientation_info = canonical_orientation(points, class_name=ckpt.get("class_name"),
+                                                     lhouse_canonical=bool(ckpt.get("lhouse_canonical", False)))
             if orientation_info["reliable"]:
                 points = orientation_info["aligned_points"]
                 pose_rz_deg = orientation_info["canonical_angle_deg"]
@@ -1349,11 +1730,22 @@ def predict(args):
                                  + orientation_info.get("reason", "unknown geometry"))
 
     if canonical_applied:
-        aux = aux_vector_for_bbox(aux, aux_names, np.ptp(points, axis=0))
+        bbox = np.ptp(points, axis=0)
+        if aux_names and ckpt.get("canonical_aux_units", "legacy") == "physical":
+            coordinates = getattr(args, "input_coordinates", None)
+            info = record.get("pointCloudInfo", {}) if record is not None else {}
+            if coordinates is None and record is not None:
+                coordinates = ("normalized" if info.get("normalization") ==
+                               "centered_by_mean_and_scaled_by_max_radius" else "physical")
+            scale = (float(aux[aux_names.index("scale")]) if "scale" in aux_names
+                     else info.get("scale", getattr(args, "scale", None)))
+            bbox = physical_bbox_size(points, coordinates, scale, ckpt.get("canonical_bbox_mode", "full"))
+        aux = aux_vector_for_bbox(aux, aux_names, bbox)
 
     if normalize:
         points = normalize_points(points)
-    normals = estimate_normals(points) if use_normals else None
+    normals = predict_normals(source_points, points, args, ckpt,
+                              -pose_rz_deg if canonical_applied else 0.0)
     points = sample_points(points, num_points, train=False, jitter_sigma=0.0, random_rotate=False, normals=normals)
     batch = torch.from_numpy(points).unsqueeze(0).to(device)
     aux_batch = torch.from_numpy(aux).unsqueeze(0).to(device)
@@ -1415,9 +1807,21 @@ def parse_args():
 
     # ── Logging ──
     parser.add_argument("--log_dir", default="logs/ptv3_reg_test")
+    parser.add_argument("--eval_output_dir", default=None,
+                        help="Test-only report directory; must be empty and differ from --log_dir.")
 
     # ── Training hyperparams ──
     parser.add_argument("--num_points", type=int, default=2048)
+    parser.add_argument("--cache_points", action=argparse.BooleanOptionalAction, default=True,
+                        help="Cache fixed point preprocessing in RAM; random training augmentation stays online.")
+    parser.add_argument("--num_workers", type=int, default=0,
+                        help="CPU data-loading processes; positive values use persistent spawned workers.")
+    parser.add_argument("--normal_workers", type=int, default=0 if os.name == "nt" else 2,
+                        help="CPU normal-preparation processes; 0 or 1 uses serial computation.")
+    parser.add_argument("--normal_backend", choices=["numpy", "pcl"], default="numpy",
+                        help="PCL uses persistent source-frame normals; test/predict follow the checkpoint.")
+    parser.add_argument("--normal_threads", type=int, default=4,
+                        help="OpenMP threads per PCL cloud; normal_workers applies only to NumPy.")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--lr", type=float, default=1e-3)
@@ -1438,6 +1842,10 @@ def parse_args():
                         help="Optional geometry auxiliary regression targets, e.g. geom_footprint_long geom_total_height")
     parser.add_argument("--geom_loss_weight", type=float, default=0.0,
                         help="Weight for optional geometry auxiliary regression loss.")
+    parser.add_argument("--lhouse_corner_loss_weight", type=float, default=0.0,
+                        help="Optional LHouse primary-output notch-position loss; 0 preserves the existing recipe.")
+    parser.add_argument("--truncated_scale_balanced", action="store_true",
+                        help="TruncatedPyramidRoof-only experiment: physical-dimension relative loss and equal-band validation selection.")
     parser.add_argument("--train_jitter_sigma", type=float, default=0.003)
     parser.add_argument("--random_rotate", action="store_true")
     parser.add_argument("--aux_features", nargs="+",
@@ -1449,9 +1857,17 @@ def parse_args():
     parser.add_argument("--bbox_y", type=float, default=None)
     parser.add_argument("--bbox_z", type=float, default=None)
     parser.add_argument("--scale", type=float, default=None)
+    parser.add_argument("--input_coordinates", choices=["physical", "normalized"], default=None,
+                        help="Predict input coordinate units; required for physical-aux checkpoints without metadata")
     parser.add_argument("--normalize_points", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--canonical_align", action="store_true",
                         help="Canonicalize training/test samples from metadata rz and apply the checkpoint frame at inference")
+    parser.add_argument("--lhouse_canonical", action="store_true",
+                        help="Experimental LHouse full-direction frame; stored in the checkpoint, legacy models stay unchanged")
+    parser.add_argument("--canonical_aux_units", choices=["legacy", "physical"], default="legacy",
+                        help="Training auxiliary bbox units; test/predict use the saved checkpoint setting")
+    parser.add_argument("--lhouse_robust_bbox", action="store_true",
+                        help="LHouse-only XY 0.005/0.995 bbox quantiles; checkpoint controls test/predict, Z stays full-span")
     parser.add_argument("--cpu", action="store_true")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--backbone", choices=["ptv3"], default="ptv3")
@@ -1468,11 +1884,53 @@ def parse_args():
 
     args = parser.parse_args()
 
+    if args.num_workers < 0:
+        raise SystemExit("--num_workers must be non-negative")
+    if args.normal_workers < 0:
+        raise SystemExit("--normal_workers must be non-negative")
+    if args.normal_threads < 1:
+        raise SystemExit("--normal_threads must be positive")
+    if args.eval_output_dir and args.mode != "test":
+        raise SystemExit("--eval_output_dir is only supported in test mode")
+    if args.truncated_scale_balanced:
+        required = {*TRUNCATED_DIMENSION_TARGETS, "geom_top_long_ratio", "geom_top_short_ratio", "wallRatio"}
+        if (args.mode != "train" or args.class_name != "TruncatedPyramidRoof"
+                or not args.canonical_align or args.target_mode != "bbox_residual"
+                or len(args.targets or []) != len(required) or set(args.targets or []) != required):
+            raise SystemExit("--truncated_scale_balanced requires canonical TruncatedPyramidRoof training with the six bbox_residual targets")
+        if (args.relative_loss_weight != 0 or args.lhouse_corner_loss_weight != 0
+                or args.indented_symmetry_180 or args.asym_ridge_symmetry_180 or args.gabled_ridge_symmetry_180):
+            raise SystemExit("Truncated scale experiment cannot combine with generic relative, corner or symmetry losses")
+        if not np.isfinite(args.relative_loss_eps) or args.relative_loss_eps <= 0:
+            raise SystemExit("Truncated scale experiment requires a finite positive relative_loss_eps")
+        weights = parse_target_weight_specs(args.targets, args.target_weights)
+        if sum(weights[args.targets.index(name)] for name in TRUNCATED_DIMENSION_TARGETS) <= 0:
+            raise SystemExit("Truncated scale experiment requires a positive physical-dimension weight")
     if args.mode == "train":
         if not args.class_name:
             raise SystemExit("--class_name is required for train mode")
         if not args.targets:
             raise SystemExit("--targets is required for train mode")
+        if args.lhouse_canonical and (args.class_name != "LHouse" or not args.canonical_align):
+            raise SystemExit("--lhouse_canonical requires LHouse and --canonical_align")
+        if args.canonical_aux_units == "physical" and not args.canonical_align:
+            raise SystemExit("Physical canonical auxiliary features require --canonical_align")
+        if args.lhouse_robust_bbox:
+            try:
+                validate_canonical_bbox_mode(LHOUSE_ROBUST_BBOX_MODE, args.class_name,
+                                             args.canonical_align, args.lhouse_canonical, args.canonical_aux_units)
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
+            if args.lhouse_corner_loss_weight != 0:
+                raise SystemExit("Run the robust-bbox comparison without LHouse corner loss")
+        if not np.isfinite(args.lhouse_corner_loss_weight) or args.lhouse_corner_loss_weight < 0:
+            raise SystemExit("--lhouse_corner_loss_weight must be finite and non-negative")
+        if args.lhouse_corner_loss_weight > 0:
+            required = {"outerLength", "outerWidth", "cutoutLengthRatio", "cutoutWidthRatio", "height"}
+            if (args.class_name != "LHouse" or not args.lhouse_canonical
+                    or args.canonical_aux_units != "physical" or args.target_mode != "raw"
+                    or len(args.targets) != len(required) or set(args.targets) != required):
+                raise SystemExit("LHouse corner loss requires the five raw LHouse targets, --lhouse_canonical and physical auxiliary units")
         if not args.metadata:
             args.metadata = str(Path(args.data_root) / "metadata" / "sample_params.json")
         if args.canonical_align and args.random_rotate:

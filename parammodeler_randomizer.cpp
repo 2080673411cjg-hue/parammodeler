@@ -9,6 +9,7 @@
 
 #include "parammodeler_randomizer.h"
 
+#include "buildmesh.h"
 #include "parammodeler_dock.h"
 #include "ui_parammodeler_dock.h"
 
@@ -20,7 +21,8 @@
 
 void randomizePrimitiveParams( ParamModelerDock *dock,
                                bool refreshPreview,
-                               bool randomizePose )
+                               bool randomizePose,
+                               int scaleBand )
 {
   const QScopedValueRollback<bool> heightGuard( dock->m_suspendHeightCompensation, true );
   auto rnd = []( double minVal, double maxVal, double step = 0.1 ) {
@@ -47,20 +49,18 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
   }
   else if ( prim == "LHouse" )
   {
-    const double totalLength    = rnd( 15.0, 41.0 );
-    const double wingRatio      = rnd( 0.25, 0.65 );
-    const double totalWidth     = rnd( 6.0, 14.0 );
-    double wingWidthRatio       = rnd( 0.35, 0.60 );
-    const double mainLength     = totalLength * ( 1.0 - wingRatio );
-    const double wingLength     = totalLength * wingRatio;
-    for ( int attempt = 0; attempt < 20; ++attempt )
+    const double totalLength = QRandomGenerator::global()->bounded( 150, 401 ) / 10.0;
+    const double totalWidth = QRandomGenerator::global()->bounded( 60, 401 ) / 10.0;
+    int wingPercent, wingWidthPercent;
+    // Resample the pair so every valid 0.01-grid combination has equal probability.
+    do
     {
-      wingWidthRatio = rnd( 0.35, 0.60 );
-      const double wingWidth = totalWidth * wingWidthRatio;
-      const double missingRatio = wingLength * ( totalWidth - wingWidth ) / ( ( mainLength + wingLength ) * totalWidth );
-      if ( missingRatio >= 0.16 )
-        break;
+      wingPercent = QRandomGenerator::global()->bounded( 25, 66 );
+      wingWidthPercent = QRandomGenerator::global()->bounded( 35, 61 );
     }
+    while ( wingPercent * ( 100 - wingWidthPercent ) < 1600 );
+    const double wingRatio = wingPercent / 100.0;
+    const double wingWidthRatio = wingWidthPercent / 100.0;
     set( dock->ui->spinBoxLTotalLength, totalLength );
     set( dock->ui->spinBoxLWingRatio, wingRatio );
     set( dock->ui->spinBoxLTotalWidth, totalWidth );
@@ -198,6 +198,66 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
     set( dock->ui->spinBoxTPPLeg, leg );
     set( dock->ui->spinBoxTPPHeight, rnd( 4.5, 14.0 ) );
     set( dock->ui->spinBoxTPPRatio, rnd( 0.25, 0.70, 0.01 ) );
+  }
+
+  // Scale the whole footprint, including dependent horizontal dimensions.
+  QVector<QDoubleSpinBox *> horizontalControls;
+  if ( prim == "Cuboid" )
+    horizontalControls = { dock->ui->spinBoxCLength, dock->ui->spinBoxCWidth };
+  else if ( prim == "Cylinder" )
+    horizontalControls = { dock->ui->spinBoxCylRadius };
+  else if ( prim == "LHouse" )
+    horizontalControls = { dock->ui->spinBoxLTotalLength, dock->ui->spinBoxLTotalWidth };
+  else if ( prim == "ConeCylinder" )
+    horizontalControls = { dock->ui->spinBoxConeCylRadius };
+  else if ( prim == "GabledRoof" )
+    horizontalControls = { dock->ui->spinBoxGRLength, dock->ui->spinBoxGRWidth };
+  else if ( prim == "PyramidRoof" )
+    horizontalControls = { dock->ui->spinBoxPRLength, dock->ui->spinBoxPRWidth };
+  else if ( prim == "TruncatedPyramidRoof" )
+    horizontalControls = { dock->ui->spinBoxTPRBottomLength, dock->ui->spinBoxTPRBottomWidth,
+                           dock->ui->spinBoxTPRTopLength, dock->ui->spinBoxTPRTopWidth };
+  else if ( prim == "HalfCylinderRoof" )
+    horizontalControls = { dock->ui->spinBoxHCRLength, dock->ui->spinBoxHCRWidth };
+  else if ( prim == "CylinderDome" || prim == "CylinderHemisphere" )
+    horizontalControls = { dock->ui->spinBoxCylHemiRadius };
+  else if ( prim == "IndentedCuboid" )
+    horizontalControls = { dock->ui->spinBoxICLength, dock->ui->spinBoxICWidth,
+                           dock->ui->spinBoxICInnerLength, dock->ui->spinBoxICInnerWidth };
+  else if ( prim == "AsymmetricGableHouse" )
+    horizontalControls = { dock->ui->spinBoxAGHLength, dock->ui->spinBoxAGHWidth,
+                           dock->ui->spinBoxAGHRidgeLength };
+  else if ( prim == "FourStageRoundTower" )
+    horizontalControls = { dock->ui->spinBoxFTBaseRadius, dock->ui->spinBoxFTEaveRadius,
+                           dock->ui->spinBoxFTMiddleTopRadius };
+  else if ( prim == "TwoGableHouses" )
+    horizontalControls = { dock->ui->spinBoxTGLength1, dock->ui->spinBoxTGLength2, dock->ui->spinBoxTGWidth };
+
+  if ( !horizontalControls.isEmpty() )
+  {
+    const MeshData mesh = BuildMesh::build( prim, dock );
+    if ( !mesh.isEmpty() )
+    {
+      QVector3D low = mesh.vertices.first(), high = low;
+      for ( const QVector3D &v : mesh.vertices )
+      {
+        low.setX( std::min( low.x(), v.x() ) );
+        low.setY( std::min( low.y(), v.y() ) );
+        high.setX( std::max( high.x(), v.x() ) );
+        high.setY( std::max( high.y(), v.y() ) );
+      }
+      const double span = std::max( high.x() - low.x(), high.y() - low.y() );
+      if ( span > 0.0 )
+      {
+        const int band = scaleBand >= 0 ? scaleBand % 3 : QRandomGenerator::global()->bounded( 3 );
+        // Leave 0.1 m inside each boundary for spin-box rounding.
+        const int limits[][2] = { { 61, 149 }, { 151, 249 }, { 251, 399 } };
+        const double targetSpan = QRandomGenerator::global()->bounded( limits[band][0], limits[band][1] + 1 ) / 10.0;
+        const double factor = targetSpan / span;
+        for ( QDoubleSpinBox *spin : horizontalControls )
+          set( spin, spin->value() * factor );
+      }
+    }
   }
 
   // --- 训练数据生成：随机水平朝向 ---

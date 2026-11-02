@@ -100,7 +100,8 @@ static void displayBBox( const QString &name, const QVector<QVector3D> &points,
   QVector<QVector3D> bottom;
   const double top = hardMin.z() + std::max( .5, (hardMax.z() - hardMin.z()) * .12 );
   for ( const auto &p : points ) if ( p.z() <= top ) bottom.append( p );
-  bool useBottom = name != "FourStageRoundTower" && bottom.size() >= std::max(50, int(std::ceil(points.size() * .05)));
+  const bool round = name == "Cylinder" || name == "ConeCylinder" || name == "CylinderDome";
+  bool useBottom = name != "FourStageRoundTower" && !round && bottom.size() >= std::max(50, int(std::ceil(points.size() * .05)));
   QVector3D bottomMin, bottomMax;
   if ( useBottom )
   {
@@ -111,6 +112,16 @@ static void displayBBox( const QString &name, const QVector<QVector3D> &points,
   }
   minimum = useBottom ? QVector3D(bottomMin.x(), bottomMin.y(), hardMin.z()) : QVector3D(fullMin.x(), fullMin.y(), hardMin.z());
   maximum = useBottom ? QVector3D(bottomMax.x(), bottomMax.y(), fullMax.z()) : fullMax;
+  QPointF center;
+  const bool fitted = name == "FourStageRoundTower"
+    ? ParamModelerAlignmentGeometry::towerCenter(points, fullMin, fullMax, center)
+    : round && ParamModelerAlignmentGeometry::roundBaseCenter(points, fullMin, fullMax, center);
+  if ( fitted )
+  {
+    const QVector3D halfSize = (fullMax-fullMin)*.5f;
+    minimum.setX(center.x()-halfSize.x()); minimum.setY(center.y()-halfSize.y());
+    maximum.setX(center.x()+halfSize.x()); maximum.setY(center.y()+halfSize.y());
+  }
 }
 
 static QVector3D align( const QString &name, const QString &path, const MeshData &mesh,

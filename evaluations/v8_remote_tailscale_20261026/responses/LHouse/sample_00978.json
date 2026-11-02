@@ -1,0 +1,12 @@
+{
+  "file": "test/LHouse/sample_00978.txt",
+  "class": "LHouse",
+  "band": 2,
+  "response": {
+    "ok": false,
+    "error": "Canonical orientation is uncertain for this cloud: LHouse needs three supported roof corners and one distinct missing corner\n"
+  },
+  "ok": false,
+  "error": "ValueError: Canonical orientation is uncertain for this cloud: LHouse needs three supported roof corners and one distinct missing corner\n",
+  "seconds": 5.470391799986828
+}

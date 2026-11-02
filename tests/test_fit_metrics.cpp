@@ -68,4 +68,36 @@ int main()
   for ( int i = 0; i < 10; ++i )
     near( evaluate( dense, sample, identity ).rmse, .1 );
   std::cout << "Fit metrics PASS; 4096 triangles / 2048 points: " << timer.elapsed() / 10.0 << " ms/update\n";
+
+  MeshData box;
+  box.addQuad( { 0, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 }, { 1, 0, 0 } );
+  box.addQuad( { 0, 0, 1 }, { 1, 0, 1 }, { 1, 1, 1 }, { 0, 1, 1 } );
+  box.addQuad( { 0, 0, 0 }, { 1, 0, 0 }, { 1, 0, 1 }, { 0, 0, 1 } );
+  box.addQuad( { 1, 0, 0 }, { 1, 1, 0 }, { 1, 1, 1 }, { 1, 0, 1 } );
+  box.addQuad( { 1, 1, 0 }, { 0, 1, 0 }, { 0, 1, 1 }, { 1, 1, 1 } );
+  box.addQuad( { 0, 1, 0 }, { 0, 0, 0 }, { 0, 0, 1 }, { 0, 1, 1 } );
+  QVector<QVector3D> classified { { 1.125f, .5f, .5f }, { 1.25f, .5f, .5f }, { .5f, .5f, .5f } };
+  metrics = evaluate( box, classified, identity, .125 );
+  assert( metrics.solidAvailable && metrics.surfaceCount == 1 && metrics.outsideCount == 1 && metrics.insideCount == 1 );
+  assert( metrics.surfaceCount + metrics.outsideCount + metrics.insideCount == metrics.count );
+  near( metrics.percentage( metrics.surfaceCount ) + metrics.percentage( metrics.outsideCount ) + metrics.percentage( metrics.insideCount ), 100 );
+  // Winding is not trusted: several legacy primitive faces have reversed normals.
+  for ( int i = 0; i < box.indices.size(); i += 6 ) std::swap( box.indices[i], box.indices[i + 1] );
+  metrics = evaluate( box, classified, identity, .125 );
+  assert( metrics.solidAvailable && metrics.insideCount == 1 && metrics.outsideCount == 1 );
+  QVector<QVector3D> posed;
+  for ( const auto &point : classified ) posed.append( pose.map( point ) );
+  metrics = evaluate( box, posed, pose, .126 );
+  assert( metrics.solidAvailable && metrics.surfaceCount == 1 && metrics.insideCount == 1 && metrics.outsideCount == 1 );
+  auto broader = evaluate( box, classified, identity, .3 );
+  assert( broader.surfaceCount == 2 && broader.insideCount == 1 && broader.outsideCount == 0 );
+  // Non-finite samples do not enter either the denominator or the categories.
+  classified.append( { std::numeric_limits<float>::quiet_NaN(), 0, 0 } );
+  metrics = evaluate( box, classified, identity, .125 );
+  assert( metrics.count == 3 );
+  auto open = evaluate( mesh, points, identity, .1 );
+  assert( !open.solidAvailable && open.surfaceCount == 1 && open.insideCount == 0 && open.outsideCount == 0 );
+  box.indices.resize( box.indices.size() - 6 );
+  assert( !evaluate( box, classified, identity, .125 ).solidAvailable );
+  std::cout << "Fit categories PASS: tolerance, pose, reversed normals, finite counts, open-mesh fallback\n";
 }

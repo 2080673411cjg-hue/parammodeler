@@ -47,7 +47,7 @@ class GabledTrainingTests(unittest.TestCase):
         with patch.object(server, "GABLED_LOG", "logs/ptv3_reg_gabledroof_trial_normals"):
             self.assertEqual(server.regression_log_dir("GabledRoof").name, "ptv3_reg_gabledroof_trial_normals")
             self.assertEqual(server.regression_log_dir("Cuboid").name,
-                             "ptv3_reg_cuboid_v4_canonical_normals")
+                             "ptv3_reg_cuboid_v9_normals")
             self.assertEqual(server.health()["gabled_reg_log"], str(server.regression_log_dir("GabledRoof")))
 
 

@@ -1,0 +1,54 @@
+{
+  "platform": "Windows-10-10.0.26200-SP0",
+  "pcl_version": "1.8.1",
+  "numpy_version": "2.2.6",
+  "source_sha256": "4bc886594343f27f2944e0e8c159b96f3b6e5fdfc5d0c583ad6fc7f5b4cf54a8",
+  "library_sha256": "b245531d5903e9d0d4c9a73ea7db657d00fe8498ad5d94dd8d40f75ea736e1cd",
+  "clouds": 130,
+  "k": 16,
+  "repeats": 3,
+  "read_normalize_seconds": 1.8987640999839641,
+  "timing_scope": "In-memory single Python process; includes FFI, output allocation, tree build and normal computation; excludes initial file reading, DLL loading and warmup",
+  "seconds_per_pass": {
+    "numpy": [
+      22.403060000011465,
+      23.35598530000425,
+      25.821486400003778
+    ],
+    "pcl_1_threads": [
+      0.5892810999939684,
+      0.6642321000108495,
+      0.6009049999993294
+    ],
+    "pcl_2_threads": [
+      0.3818135000183247,
+      0.4162582000135444,
+      0.40419059997657314
+    ],
+    "pcl_4_threads": [
+      0.27047429999220185,
+      0.2401726999960374,
+      0.2852398999966681
+    ]
+  },
+  "median_seconds": {
+    "numpy": 23.35598530000425,
+    "pcl_1_threads": 0.6009049999993294,
+    "pcl_2_threads": 0.40419059997657314,
+    "pcl_4_threads": 0.27047429999220185
+  },
+  "speedup_vs_numpy": {
+    "numpy": 1.0,
+    "pcl_1_threads": 38.86801624221851,
+    "pcl_2_threads": 57.78458306887384,
+    "pcl_4_threads": 86.35195765615305
+  },
+  "invalid_normals": 0,
+  "different_neighborhoods": 0,
+  "sign_flips": 0,
+  "degenerate_points": 0,
+  "angle_median_deg": 0.00041282935508837177,
+  "angle_p95_deg": 0.004681841165557401,
+  "angle_max_deg": 1.3715014930654459,
+  "over_one_degree": 3
+}

@@ -1,0 +1,253 @@
+{
+  "scope": "Same 100 synthetic test labels audited; saved predictions reused, no network rerun or QGIS test. Centered metrics align outer-bbox centers; common-origin metrics fix generated lower-left origin and include estimated yaw but exclude plugin translation. Old v4 shape comparison uses true metadata yaw; new geometry uses cloud-estimated yaw.",
+  "caveats": [
+    "A single seed, no repeated-run significance estimate.",
+    "Matching labels and paths do not prove historical point-cloud bytes unchanged.",
+    "The canonical path also recomputes bbox auxiliary features from normalized TXT coordinates, changing their scale relative to old LHouse metadata-derived physical bboxes. Not a strictly direction-only ablation.",
+    "Normalized dataset TXT and physical-coordinate inputs require an inference feature-unit consistency check before deployment.",
+    "Training succeeded but weights have not been switched in plugin or server."
+  ],
+  "best_epoch": 92,
+  "training_duration": "00:26:57.1",
+  "orientation_accepted": 100,
+  "orientation_failed": 0,
+  "orientation_error_deg": {
+    "median": 0.5,
+    "p95": 2.0,
+    "max": 3.0
+  },
+  "parameter_comparison": [
+    {
+      "target": "outerLength",
+      "v4_mae": 0.8816753482818603,
+      "trial_metadata_mae": 0.5454013538360596,
+      "trial_geometry_mae": 0.5569881629943848,
+      "geometry_improvement_percent": 36.8261612304575,
+      "better": 62,
+      "worse": 38
+    },
+    {
+      "target": "outerWidth",
+      "v4_mae": 0.788132734298706,
+      "trial_metadata_mae": 0.2415782070159912,
+      "trial_geometry_mae": 0.23513921737670898,
+      "geometry_improvement_percent": 70.16502333379924,
+      "better": 82,
+      "worse": 18
+    },
+    {
+      "target": "cutoutLengthRatio",
+      "v4_mae": 0.03150809407234192,
+      "trial_metadata_mae": 0.010879906117916107,
+      "trial_geometry_mae": 0.011959421932697296,
+      "geometry_improvement_percent": 62.04333430883279,
+      "better": 72,
+      "worse": 28
+    },
+    {
+      "target": "cutoutWidthRatio",
+      "v4_mae": 0.03898590296506882,
+      "trial_metadata_mae": 0.009644195437431335,
+      "trial_geometry_mae": 0.010643933117389679,
+      "geometry_improvement_percent": 72.69799515243602,
+      "better": 85,
+      "worse": 15
+    },
+    {
+      "target": "height",
+      "v4_mae": 0.09723580598831177,
+      "trial_metadata_mae": 0.13978567838668823,
+      "trial_geometry_mae": 0.14587236166000367,
+      "geometry_improvement_percent": -50.01918293096501,
+      "better": 38,
+      "worse": 62
+    }
+  ],
+  "geometry_comparison": {
+    "centered_notch_m": {
+      "v4": {
+        "mean": 1.0206245589451226,
+        "median": 0.7902161721597396,
+        "p95": 2.6458621786510967,
+        "max": 3.731412766199648
+      },
+      "trial_metadata": {
+        "mean": 0.31517225549057937,
+        "median": 0.24563386553281719,
+        "p95": 0.7438827765531733,
+        "max": 2.016148891059449
+      },
+      "trial_geometry": {
+        "mean": 0.3520700745205198,
+        "median": 0.2990278136255293,
+        "p95": 0.8921758189553473,
+        "max": 1.9516178026665745
+      },
+      "better": 80,
+      "worse": 20,
+      "worst_increase": 0.8398720329340792
+    },
+    "common_origin_notch_m": {
+      "v4": {
+        "mean": 1.0896577259653382,
+        "median": 0.8390926360629132,
+        "p95": 2.636013920916242,
+        "max": 5.071902954955805
+      },
+      "trial_metadata": {
+        "mean": 0.5053329713898256,
+        "median": 0.391481489954023,
+        "p95": 1.425810306725259,
+        "max": 2.7622700632654578
+      },
+      "trial_geometry": {
+        "mean": 0.5807022663450606,
+        "median": 0.490857381076367,
+        "p95": 1.4701417405002877,
+        "max": 2.5753271295036013
+      },
+      "better": 69,
+      "worse": 31,
+      "worst_increase": 0.9814475974952963
+    },
+    "centered_outline_m": {
+      "v4": {
+        "mean": 0.7670984153257521,
+        "median": 0.6999388002743618,
+        "p95": 1.4548881635840947,
+        "max": 2.402370485901155
+      },
+      "trial_metadata": {
+        "mean": 0.31946789184309743,
+        "median": 0.25695390337223895,
+        "p95": 0.7153882012094593,
+        "max": 1.1908188177387486
+      },
+      "trial_geometry": {
+        "mean": 0.36022686415898414,
+        "median": 0.3023950049190663,
+        "p95": 0.7314054889677314,
+        "max": 1.0922660187410238
+      },
+      "better": 82,
+      "worse": 18,
+      "worst_increase": 0.4355951074780636
+    }
+  },
+  "focus_samples": [
+    {
+      "file": "sample_00004.txt",
+      "geometry_direction_error_deg": 0.0,
+      "v4_centered_notch_m": 0.7982229850147576,
+      "v4_common_origin_notch_m": 1.4711790243016178,
+      "v4_centered_outline_m": 1.013111416117662,
+      "v4_outerLength": 41.35100555419922,
+      "v4_outerWidth": 12.33440113067627,
+      "v4_cutoutLengthRatio": 0.40120571851730347,
+      "v4_cutoutWidthRatio": 0.5629484057426453,
+      "v4_height": 6.1813249588012695,
+      "trial_metadata_centered_notch_m": 0.41517691025050507,
+      "trial_metadata_common_origin_notch_m": 0.06489954795194182,
+      "trial_metadata_centered_outline_m": 0.4360476221287984,
+      "trial_metadata_outerLength": 38.115352630615234,
+      "trial_metadata_outerWidth": 12.025074005126953,
+      "trial_metadata_cutoutLengthRatio": 0.38718757033348083,
+      "trial_metadata_cutoutWidthRatio": 0.5092838406562805,
+      "trial_metadata_height": 5.800235271453857,
+      "trial_geometry_centered_notch_m": 0.4151780043400121,
+      "trial_geometry_common_origin_notch_m": 0.06489880517385252,
+      "trial_geometry_centered_outline_m": 0.43604799152455803,
+      "trial_geometry_outerLength": 38.115352630615234,
+      "trial_geometry_outerWidth": 12.025074005126953,
+      "trial_geometry_cutoutLengthRatio": 0.38718754053115845,
+      "trial_geometry_cutoutWidthRatio": 0.5092838406562805,
+      "trial_geometry_height": 5.800235271453857,
+      "true_outerLength": 39.0,
+      "true_outerWidth": 11.899999618530273,
+      "true_cutoutLengthRatio": 0.4000000059604645,
+      "true_cutoutWidthRatio": 0.5,
+      "true_height": 5.900000095367432
+    },
+    {
+      "file": "sample_00067.txt",
+      "geometry_direction_error_deg": 1.0,
+      "v4_centered_notch_m": 0.29594841584724374,
+      "v4_common_origin_notch_m": 0.8316480315962653,
+      "v4_centered_outline_m": 0.6564911521871714,
+      "v4_outerLength": 16.529178619384766,
+      "v4_outerWidth": 5.394983291625977,
+      "v4_cutoutLengthRatio": 0.5848591327667236,
+      "v4_cutoutWidthRatio": 0.5638013482093811,
+      "v4_height": 5.358487129211426,
+      "trial_metadata_centered_notch_m": 0.45544195440800583,
+      "trial_metadata_common_origin_notch_m": 1.4538348485913724,
+      "trial_metadata_centered_outline_m": 0.8185399648072417,
+      "trial_metadata_outerLength": 17.081684112548828,
+      "trial_metadata_outerWidth": 6.445172309875488,
+      "trial_metadata_cutoutLengthRatio": 0.5619533061981201,
+      "trial_metadata_cutoutWidthRatio": 0.5871968865394592,
+      "trial_metadata_height": 5.417663097381592,
+      "trial_geometry_centered_notch_m": 0.37191395591327564,
+      "trial_geometry_common_origin_notch_m": 1.3755517349860766,
+      "trial_geometry_centered_outline_m": 0.7797713731908352,
+      "trial_geometry_outerLength": 17.00611114501953,
+      "trial_geometry_outerWidth": 6.501903533935547,
+      "trial_geometry_cutoutLengthRatio": 0.5667473077774048,
+      "trial_geometry_cutoutWidthRatio": 0.5875396132469177,
+      "trial_geometry_height": 5.410809516906738,
+      "true_outerLength": 15.100000381469727,
+      "true_outerWidth": 6.199999809265137,
+      "true_cutoutLengthRatio": 0.6000000238418579,
+      "true_cutoutWidthRatio": 0.6000000238418579,
+      "true_height": 5.199999809265137
+    },
+    {
+      "file": "sample_00088.txt",
+      "geometry_direction_error_deg": 0.5,
+      "v4_centered_notch_m": 0.0172387903852298,
+      "v4_common_origin_notch_m": 0.30665691437701637,
+      "v4_centered_outline_m": 0.21602104035966851,
+      "v4_outerLength": 22.719863891601562,
+      "v4_outerWidth": 7.537467002868652,
+      "v4_cutoutLengthRatio": 0.29702097177505493,
+      "v4_cutoutWidthRatio": 0.5921947956085205,
+      "v4_height": 3.7932019233703613,
+      "trial_metadata_centered_notch_m": 0.10253859397148132,
+      "trial_metadata_common_origin_notch_m": 0.29227247116625266,
+      "trial_metadata_centered_outline_m": 0.16616323545812403,
+      "trial_metadata_outerLength": 22.733421325683594,
+      "trial_metadata_outerWidth": 7.238100051879883,
+      "trial_metadata_cutoutLengthRatio": 0.3012751638889313,
+      "trial_metadata_cutoutWidthRatio": 0.5990490317344666,
+      "trial_metadata_height": 3.945542335510254,
+      "trial_geometry_centered_notch_m": 0.17673148304362518,
+      "trial_geometry_common_origin_notch_m": 0.3606494703315921,
+      "trial_geometry_centered_outline_m": 0.2166410493493777,
+      "trial_geometry_outerLength": 22.68246841430664,
+      "trial_geometry_outerWidth": 7.20267391204834,
+      "trial_geometry_cutoutLengthRatio": 0.3036704361438751,
+      "trial_geometry_cutoutWidthRatio": 0.5981325507164001,
+      "trial_geometry_height": 3.8972411155700684,
+      "true_outerLength": 23.100000381469727,
+      "true_outerWidth": 7.099999904632568,
+      "true_cutoutLengthRatio": 0.30000001192092896,
+      "true_cutoutWidthRatio": 0.6000000238418579,
+      "true_height": 3.9000000953674316
+    }
+  ],
+  "input_sha256": {
+    "E:\\pointnet\\datasets_aug\\metadata\\sample_params_LHouse.json": "cdd969f4fbe3b3a6baf62c3c7536d0ee0cd6c39500d352ac6120daa3250044b7",
+    "evaluations\\2026-10-21-lhouse-axis-preflight\\report.json": "df1bf686c1523104321949e5a30308d49bad6abd3b23c272a08c27a2d4fb89a3",
+    "E:\\pointnet\\ptv3_simple\\logs\\ptv3_reg_lhouse_axis_trial_normals\\orientation_test_geometry.json": "c07ab89b61c926fdfaad54f60325051068ef151861f7268c4fa1b817ba3b9e2d",
+    "E:\\pointnet\\ptv3_simple\\logs\\ptv3_reg_lhouse_v4_normals\\regression_predictions_test.csv": "0dab9ad68c24ee9463890613f4b8bb2ce1b6cf146c14cc157f659397c55f62ce",
+    "E:\\pointnet\\ptv3_simple\\logs\\ptv3_reg_lhouse_axis_trial_normals\\regression_predictions_test.csv": "e0ec0cad6fdbc13a5ec6d7352bf5e11e03b7bc8b645f8a6b549ba63332542998",
+    "E:\\pointnet\\ptv3_simple\\logs\\ptv3_reg_lhouse_axis_trial_normals\\regression_predictions_test_geometry.csv": "e605e41e927b2b9f8ac81a89c9e87820ded581d494edd4fb3721d302b70f00bc",
+    "E:\\pointnet\\ptv3_simple\\logs\\ptv3_reg_lhouse_v4_normals\\regression_config.json": "77a32dc3f11a40f7c3404e390f1e4c0e928649a13978fbe7a47d4e049455bff9",
+    "E:\\pointnet\\ptv3_simple\\logs\\ptv3_reg_lhouse_axis_trial_normals\\regression_config.json": "d6ba946f77d836bae8672907d2b390e20bc7dac62be0a65b47b577c30a92fec3",
+    "E:\\pointnet\\ptv3_simple\\logs\\ptv3_reg_lhouse_axis_trial_train.log": "67e0952203d5a84176dd2a1ae2be733d838d89b81c8af019f023c0d28c4494e4"
+  },
+  "source_sha256": {
+    "scripts/main_reg.py": "252c6d1bfb764bb4b281cc6f1ca5dd5472d86709fb8f85d4812578f39d64c020",
+    "scripts/canonical_orientation.py": "6c466525d3efc856cdac4821c1c9930f1e3965b45057d7198cf60504aefbb0a8"
+  }
+}

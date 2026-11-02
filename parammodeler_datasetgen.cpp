@@ -134,8 +134,9 @@ QJsonArray generateSplitSamples( const QString &prim,
     if ( progress.wasCanceled() )
       break;
 
-    dock->randomizeCurrentPrimitiveParams( false, true );
     const int fileIdx = startIdx + i + 1;
+    const int scaleBand = ( fileIdx - 1 ) % 3;
+    dock->randomizeCurrentPrimitiveParams( false, true, scaleBand );
     const QString fileName = QStringLiteral( "sample_%1.txt" ).arg( fileIdx, 5, 10, QChar( '0' ) );
     const QString relativePath = split + QStringLiteral( "/" ) + classDir + QStringLiteral( "/" ) + fileName;
     const QString fullPath = rootPath + QStringLiteral( "/" ) + relativePath;
@@ -150,6 +151,11 @@ QJsonArray generateSplitSamples( const QString &prim,
       item[QStringLiteral( "pointCount" )]  = pointCount;
       item[QStringLiteral( "params" )]      = currentPrimitiveParamsObject( prim, dock );
       item[QStringLiteral( "pointCloudInfo" )] = pointCloudInfoToJson( pcInfo );
+      if ( prim != QStringLiteral( "TriPrismPyramid" ) )
+      {
+        item[QStringLiteral( "horizontalScaleBand" )] = scaleBand;
+        item[QStringLiteral( "scaleSamplingVersion" )] = QStringLiteral( "horizontal_strata_v1" );
+      }
       records.append( item );
       generated++;
     }
@@ -333,7 +339,8 @@ void generateFullDataset( ParamModelerDock *dock )
         if ( progress.wasCanceled() )
           break;
 
-        dock->randomizeCurrentPrimitiveParams( false, true );
+        const int scaleBand = i % 3;
+        dock->randomizeCurrentPrimitiveParams( false, true, scaleBand );
         const QString split = ( i < targetPerClass * 8 / 10 )   ? QStringLiteral( "train" )
                               : ( i < targetPerClass * 9 / 10 ) ? QStringLiteral( "val" )
                                                                : QStringLiteral( "test" );
@@ -351,6 +358,11 @@ void generateFullDataset( ParamModelerDock *dock )
           item[QStringLiteral( "pointCount" )]  = pointCount;
           item[QStringLiteral( "params" )]      = currentPrimitiveParamsObject( prim, dock );
           item[QStringLiteral( "pointCloudInfo" )] = pointCloudInfoToJson( pcInfo );
+          if ( prim != QStringLiteral( "TriPrismPyramid" ) )
+          {
+            item[QStringLiteral( "horizontalScaleBand" )] = scaleBand;
+            item[QStringLiteral( "scaleSamplingVersion" )] = QStringLiteral( "horizontal_strata_v1" );
+          }
           metadataRecords.append( item );
           generated++;
         }

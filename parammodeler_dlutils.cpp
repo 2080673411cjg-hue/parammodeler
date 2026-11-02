@@ -1140,44 +1140,10 @@ static bool estimateShrinkWallRatio( const QVector<QVector3D> &points,
   return false;
 }
 
-static bool estimateRoofEaveFromOuterWalls( const QVector<QVector3D> &points,
-                                            const QVector3D &fpMin, const QVector3D &fpMax,
-                                            bool gabled, double zMin, double height,
-                                            double &eaveZ )
-{
-  const double length = static_cast<double>( fpMax.x() - fpMin.x() );
-  const double width = static_cast<double>( fpMax.y() - fpMin.y() );
-  if ( length <= 1e-6 || width <= 1e-6 || height <= 1e-6 )
-    return false;
-
-  QVector<float> wallZ;
-  wallZ.reserve( points.size() / 3 );
-  for ( const QVector3D &p : points )
-  {
-    const bool nearYWall = std::abs( p.y() - fpMin.y() ) <= width * 0.04 ||
-                           std::abs( p.y() - fpMax.y() ) <= width * 0.04;
-    const bool nearXWall = std::abs( p.x() - fpMin.x() ) <= length * 0.04 ||
-                           std::abs( p.x() - fpMax.x() ) <= length * 0.04;
-    if ( nearYWall || ( !gabled && nearXWall ) )
-      wallZ.append( p.z() );
-  }
-  if ( wallZ.size() < std::max( 32, static_cast<int>( points.size() * 0.03 ) ) )
-    return false;
-
-  std::sort( wallZ.begin(), wallZ.end() );
-  const double low = wallZ[static_cast<int>( wallZ.size() * 0.10 )];
-  const double high = wallZ[static_cast<int>( wallZ.size() * 0.98 )];
-  if ( low > zMin + height * 0.35 ||
-       high < zMin + height * 0.15 || high > zMin + height * 0.98 )
-    return false;
-  eaveZ = high;
-  return true;
-}
-
 // Locate the point-cloud counterpart of the manual alignment UpperOrigin.
 // XY is the robust lower-left footprint corner in the unrotated model frame.
-// Z is the global top for flat-topped solids, or the wall/roof transition for roofs.
-// Roof eaves are measured from outer wall samples, so the exact corner may be absent.
+// Z uses a supported top/rim plane or the roof plane extrapolated to its eave.
+// The exact corner may be absent; uncertain geometry retains the base-height fallback.
 bool semanticUpperPointCloudTarget( const QString &filePath,
                                            const QString &primitiveType,
                                            double rzDeg,
@@ -1241,6 +1207,20 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
       footprintSource = QStringLiteral( "full-verified" );
     }
   }
+  double sectionEave = 0.0;
+  bool hasHalfSection = false;
+  if ( primitiveType == QStringLiteral( "HalfCylinderRoof" ) )
+  {
+    QVector3D fullMin, fullMax;
+    robustBBoxFromPoints( canonicalPoints, fullMin, fullMax );
+    hasHalfSection = ParamModelerAlignmentGeometry::halfCylinderSection( canonicalPoints, fullMin, fullMax, sectionEave );
+    if ( hasHalfSection )
+    {
+      fpMin = fullMin;
+      fpMax = fullMax;
+      footprintSource = QStringLiteral( "arc-section" );
+    }
+  }
   const double length = static_cast<double>( fpMax.x() - fpMin.x() );
   const double width = static_cast<double>( fpMax.y() - fpMin.y() );
   if ( length <= 1e-6 || width <= 1e-6 )
@@ -1248,9 +1228,13 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
 
   double targetZ = static_cast<double>( hardMax.z() );
   detail = QStringLiteral( "top/%1" ).arg( footprintSource );
-  if ( flatCornerModel )
+  const bool indented = primitiveType == QStringLiteral( "IndentedCuboid" );
+  if ( flatCornerModel || indented )
   {
-    if ( ParamModelerAlignmentGeometry::supportedFlatRoofTop( canonicalPoints, targetZ ) )
+    const bool supported = indented
+      ? ParamModelerAlignmentGeometry::indentedRimTop( canonicalPoints, fpMin, fpMax, targetZ )
+      : ParamModelerAlignmentGeometry::supportedFlatRoofTop( canonicalPoints, targetZ );
+    if ( supported )
       detail = QStringLiteral( "supported-top/%1" ).arg( footprintSource );
     else if ( std::isfinite( fallbackUpperOffset ) && fallbackUpperOffset > 0.0 &&
               fallbackUpperOffset <= height * 1.5 )
@@ -1268,18 +1252,20 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
                              primitiveType == QStringLiteral( "TruncatedPyramidRoof" );
   if ( gabled || shrinkingRoof || twoGableHouses || halfCylinderRoof )
   {
-    const bool eaveFound = twoGableHouses
+    if ( hasHalfSection ) targetZ = sectionEave;
+    const bool eaveFound = hasHalfSection || ( twoGableHouses
       ? ParamModelerAlignmentGeometry::firstGableEave( canonicalPoints, fpMin, fpMax,
                                                        hardMin.z(), height, targetZ )
       : halfCylinderRoof
         ? ParamModelerAlignmentGeometry::halfCylinderEave( canonicalPoints, fpMin, fpMax,
                                                            hardMin.z(), height, targetZ )
-        : estimateRoofEaveFromOuterWalls( canonicalPoints, fpMin, fpMax, gabled,
-                                          hardMin.z(), height, targetZ );
+        : ParamModelerAlignmentGeometry::roofPlaneEave( canonicalPoints, fpMin, fpMax, gabled,
+                                                        hardMin.z(), height, targetZ ) );
     if ( eaveFound )
     {
       detail = QStringLiteral( "%1/%2" )
-                 .arg( halfCylinderRoof ? QStringLiteral( "arc-eave" ) : QStringLiteral( "wall-eave" ),
+                 .arg( halfCylinderRoof ? QStringLiteral( "arc-eave" )
+                                       : ( twoGableHouses ? QStringLiteral( "wall-eave" ) : QStringLiteral( "plane-eave" ) ),
                        footprintSource );
     }
     else
@@ -1298,8 +1284,51 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
   const double a = rzDeg * pi / 180.0;
   const double c = std::cos( a );
   const double s = std::sin( a );
-  const double x = static_cast<double>( fpMin.x() );
-  const double y = static_cast<double>( fpMin.y() );
+  QPointF corner( fpMin.x(), fpMin.y() );
+  if ( indented )
+  {
+    QVector3D fullMin, fullMax;
+    robustBBoxFromPoints( canonicalPoints, fullMin, fullMax );
+    corner = QPointF( fullMin.x(), fullMin.y() );
+    detail += QStringLiteral( "/outer-full" );
+    if ( ParamModelerAlignmentGeometry::flatOuterRimCorner( canonicalPoints, fullMin, fullMax, targetZ, corner ) )
+      detail += QStringLiteral( "/outer-rim" );
+    if ( ParamModelerAlignmentGeometry::indentedOuterWallCorner( canonicalPoints, fullMin, fullMax, targetZ, corner ) )
+      detail += QStringLiteral( "/outer-walls" );
+  }
+  else if ( primitiveType == QStringLiteral( "LHouse" ) )
+  {
+    QVector3D fullMin, fullMax;
+    robustBBoxFromPoints( canonicalPoints, fullMin, fullMax );
+    std::array<ParamModelerCornerFit::Plane, 2> walls;
+    if ( ParamModelerAlignmentGeometry::exteriorWallCorner( canonicalPoints, fullMin, fullMax, targetZ, corner, &walls ) )
+      detail += QStringLiteral( "/outer-wall-corner" );
+    // Complete only missing wall directions; retain the fitted wall reference.
+    if ( ParamModelerAlignmentGeometry::flatOuterRimCorner( canonicalPoints, fullMin, fullMax, targetZ, corner,
+                                                          {walls[0].radius <= 0, walls[1].radius <= 0} ) )
+      detail += QStringLiteral( "/missing-wall-top-edge" );
+  }
+  else if ( twoGableHouses )
+  {
+    QVector3D fullMin, fullMax;
+    robustBBoxFromPoints( canonicalPoints, fullMin, fullMax );
+    QPointF wallCorner = corner;
+    QVector3D roofCorner;
+    if ( twoGableHouses && ParamModelerAlignmentGeometry::firstGableRoofCorner(
+           canonicalPoints, fullMin, fullMax, corner, targetZ, roofCorner ) )
+    {
+      corner = QPointF( roofCorner.x(), roofCorner.y() );
+      targetZ = roofCorner.z();
+      detail = QStringLiteral( "first-roof-wall-corner/%1" ).arg( footprintSource );
+    }
+    else if ( ParamModelerAlignmentGeometry::exteriorWallCorner( canonicalPoints, fullMin, fullMax, targetZ, wallCorner ) )
+    {
+      corner = wallCorner;
+      detail += QStringLiteral( "/outer-wall-corner" );
+    }
+  }
+  const double x = corner.x();
+  const double y = corner.y();
   out = QVector3D( static_cast<float>( x * c - y * s ),
                    static_cast<float>( x * s + y * c ),
                    static_cast<float>( targetZ ) );

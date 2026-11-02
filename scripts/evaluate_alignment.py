@@ -33,7 +33,7 @@ def prepare(args):
     functions = source_functions()
     samples, audit = [], []
     for name, short, _, _ in RECIPES:
-        tag = "v5_normals" if name == "FourStageRoundTower" else "v4_canonical_normals"
+        tag = "v5_normals" if name == "FourStageRoundTower" else "v4_normals"
         log = args.logs / f"ptv3_reg_{short}_{tag}"
         config_path = log / "regression_config.json"
         predictions_path = log / "regression_predictions_test.csv"
@@ -95,7 +95,7 @@ def prepare(args):
                 "samples": samples, "audit": audit,
                 "sources": {p: digest(Path(__file__).parent.parent / p) for p in (
                     "buildmesh.cpp", "parammodeler_dlutils.cpp", "parammodeler_dock_alignment.cpp",
-                    "parammodeler_fit_metrics.h", "scripts/main_reg.py", "scripts/canonical_orientation.py",
+                    "parammodeler_fit_metrics.h", "parammodeler_alignment_geometry.h", "scripts/main_reg.py", "scripts/canonical_orientation.py",
                     "tests/evaluate_alignment.cpp", "scripts/evaluate_alignment.py")}}
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
@@ -172,12 +172,63 @@ def summarize(args):
     print(f"Saved {len(results)} rows to {args.output}")
 
 
+def compare(args):
+    before_manifest = json.loads((args.baseline / "manifest.json").read_text(encoding="utf-8"))
+    after_manifest = json.loads((args.output / "manifest.json").read_text(encoding="utf-8"))
+    keys = ("class", "prediction_sha256", "config_sha256", "metadata_sha256")
+    if [{k: r[k] for k in keys} for r in before_manifest["audit"]] != [
+        {k: r[k] for k in keys} for r in after_manifest["audit"]
+    ]:
+        raise ValueError("Cannot compare changed predictions, configs, or metadata")
+    before = json.loads((args.baseline / "results.json").read_text(encoding="utf-8"))
+    after = json.loads((args.output / "results.json").read_text(encoding="utf-8"))
+    def indexed(rows):
+        result = {(r["class"], r["group"], r["file"]): r for r in rows}
+        if len(result) != len(rows) or any(r.get("status") != "ok" for r in rows):
+            raise ValueError("Duplicate or failed evaluations")
+        return result
+    old, new = indexed(before), indexed(after)
+    if old.keys() != new.keys() or len(new) != 5200:
+        raise ValueError("Expected the same 5200 sample/group evaluations")
+    for key in old:
+        if key[1] in ("baseline", "shape"):
+            for metric in ("rmse", "p95", "inlier_0_2", "inlier_1pct"):
+                if abs(old[key][metric] - new[key][metric]) > 1e-6:
+                    raise ValueError(f"Shape/pose-independent baseline changed: {key}, {metric}")
+    comparisons = []
+    for name, _, _, _ in RECIPES:
+        for group in ("alignment", "combined"):
+            selected = sorted(k for k in old if k[:2] == (name, group))
+            metrics = ["xy_error", "z_error", "rmse", "p95"]
+            if name == "IndentedCuboid":
+                metrics += ["inner_xy_error", "inner_top_z_error"]
+            for metric in metrics:
+                x = np.array([old[k][metric] for k in selected])
+                y = np.array([new[k][metric] for k in selected])
+                comparisons.append({"class": name, "group": group, "metric": metric,
+                                    "before_median": float(np.median(x)), "after_median": float(np.median(y)),
+                                    "before_p95": float(np.percentile(x, 95)), "after_p95": float(np.percentile(y, 95)),
+                                    "improved": int(np.sum(y < x-1e-6)), "worsened": int(np.sum(y > x+1e-6)),
+                                    "unchanged": int(np.sum(np.abs(y-x) <= 1e-6)),
+                                    "worst_increase": float(np.max(y-x))})
+    with (args.output / "comparison.csv").open("w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(comparisons[0]))
+        writer.writeheader()
+        writer.writerows(comparisons)
+    print("PASS: same prediction/config/metadata hashes; all 2600 baseline/shape results unchanged")
+    for row in comparisons:
+        if row["group"] == "combined" and row["metric"] == "rmse":
+            print(f"{row['class']}: RMSE {row['before_median']:.3f} -> {row['after_median']:.3f}; "
+                  f"better/worse/same={row['improved']}/{row['worsened']}/{row['unchanged']}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("prepare", "summarize"))
+    parser.add_argument("mode", choices=("prepare", "summarize", "compare"))
     parser.add_argument("--data", type=Path, default=Path("E:/pointnet/datasets_aug"))
     parser.add_argument("--raw", type=Path, default=Path("E:/pointnet/datasets"))
     parser.add_argument("--logs", type=Path, default=Path("E:/pointnet/ptv3_simple/logs"))
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--baseline", type=Path, default=Path(__file__).resolve().parents[1] / "evaluations/2026-10-20-alignment")
     args = parser.parse_args()
-    (prepare if args.mode == "prepare" else summarize)(args)
+    {"prepare": prepare, "summarize": summarize, "compare": compare}[args.mode](args)

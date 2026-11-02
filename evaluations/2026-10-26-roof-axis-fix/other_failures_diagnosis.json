@@ -1,0 +1,105 @@
+[
+  {
+    "class_name": "LHouse",
+    "file": "test/LHouse/sample_00978.txt",
+    "params_for_diagnosis_only": {
+      "cutoutLengthRatio": 0.62,
+      "cutoutWidthRatio": 0.42000000000000004,
+      "height": 4.6,
+      "outerLength": 32,
+      "outerWidth": 7.83,
+      "rz": -49
+    },
+    "estimated_rectangle": -53.5,
+    "metadata_axis_for_scoring_only": -49.0,
+    "reason": "LHouse needs three supported roof corners and one distinct missing corner",
+    "bands": [
+      {
+        "name": "all",
+        "points": 2048,
+        "rectangle": [
+          -53.5,
+          4.263545383674706
+        ]
+      },
+      {
+        "name": "upper60",
+        "points": 819,
+        "rectangle": [
+          -51.0,
+          4.282564921096136
+        ]
+      },
+      {
+        "name": "lower10",
+        "points": 205,
+        "rectangle": [
+          -56.0,
+          2.0518078574766245
+        ]
+      },
+      {
+        "name": "lower40",
+        "points": 819,
+        "rectangle": [
+          -51.5,
+          4.2543450332363255
+        ]
+      }
+    ],
+    "roof_corner_counts": [
+      21,
+      73,
+      53,
+      9
+    ]
+  },
+  {
+    "class_name": "PyramidRoof",
+    "file": "test/PyramidRoof/sample_01087.txt",
+    "params_for_diagnosis_only": {
+      "length": 6.03,
+      "rz": -95,
+      "totalHeight": 10.7,
+      "wallRatio": 0.6,
+      "width": 6.3
+    },
+    "estimated_rectangle": -46.5,
+    "metadata_axis_for_scoring_only": -5.0,
+    "reason": "Robust outer rectangle aspect=1.912",
+    "bands": [
+      {
+        "name": "all",
+        "points": 2048,
+        "rectangle": [
+          -46.5,
+          1.9123845579998207
+        ]
+      },
+      {
+        "name": "upper60",
+        "points": 820,
+        "rectangle": [
+          -4.5,
+          1.0004913306072387
+        ]
+      },
+      {
+        "name": "lower10",
+        "points": 205,
+        "rectangle": [
+          -49.28238280575761,
+          2.0120216721750075
+        ]
+      },
+      {
+        "name": "lower40",
+        "points": 820,
+        "rectangle": [
+          -46.0,
+          1.9627277255999211
+        ]
+      }
+    ]
+  }
+]

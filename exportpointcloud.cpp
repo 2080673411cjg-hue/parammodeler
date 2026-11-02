@@ -668,48 +668,6 @@ static void classifyIndentedCuboidTriangles( const MeshData &mesh,
   }
 }
 
-static QVector<QVector3D> sampleLHouseNotchEdgePoints( ParamModelerDock *dock, int n )
-{
-  QVector<QVector3D> pts;
-  if ( !dock || n <= 0 )
-    return pts;
-
-  const double totalLength = dock->LTotalLength();
-  const double totalWidth = dock->LTotalWidth();
-  const double wingRatio = dock->LWingRatio();
-  const double wingWidthRatio = dock->LWingWidthRatio();
-  const double height = dock->LHeight();
-  const double aw = totalLength * ( 1.0 - wingRatio );
-  const double bd = totalWidth * wingWidthRatio;
-  if ( totalLength <= 0.0 || totalWidth <= 0.0 || aw <= 0.0 ||
-       aw >= totalLength || bd <= 0.0 || bd >= totalWidth || height <= 0.0 )
-    return pts;
-
-  const QVector<QVector3D> starts = {
-    QVector3D( aw, bd, height ),
-    QVector3D( aw, bd, height )
-  };
-  const QVector<QVector3D> ends = {
-    QVector3D( aw, totalWidth, height ),
-    QVector3D( totalLength, bd, height )
-  };
-  const QVector<double> lengths = {
-    totalWidth - bd,
-    totalLength - aw
-  };
-  const double total = lengths[0] + lengths[1];
-
-  pts.reserve( n );
-  for ( int i = 0; i < n; ++i )
-  {
-    const double r = static_cast<double>( qrand() ) / RAND_MAX * total;
-    const int edge = r < lengths[0] ? 0 : 1;
-    const float t = float( qrand() ) / RAND_MAX;
-    pts << ( starts[edge] * ( 1.0f - t ) + ends[edge] * t );
-  }
-  return pts;
-}
-
 static void classifyLHouseTriangles( const MeshData &mesh,
                                      QVector<int> &topTris,
                                      QVector<int> &outerWallTris,
@@ -1103,14 +1061,25 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
     QVector<int> topTris, outerWallTris, notchWallTris;
     classifyLHouseTriangles( mesh, topTris, outerWallTris, notchWallTris );
 
-    const int notchEdgeCount = qMax( 24, int( pointCount * 0.08 ) );
-    const int notchWallCount = int( pointCount * 0.24 );
-    const int outerWallCount = int( pointCount * 0.28 );
-    const int topCount = qMax( 0, pointCount - notchEdgeCount - notchWallCount - outerWallCount );
+    auto surfaceArea = [&mesh]( const QVector<int> &tris ) {
+      double area = 0.0;
+      for ( int i : tris )
+        area += triangleArea( mesh.vertices[mesh.indices[i * 3]],
+                              mesh.vertices[mesh.indices[i * 3 + 1]],
+                              mesh.vertices[mesh.indices[i * 3 + 2]] );
+      return area;
+    };
+    const double outerArea = surfaceArea( outerWallTris );
+    const double notchArea = surfaceArea( notchWallTris );
+    const int wallCount = int( pointCount * 0.40 );
+    const int notchWallCount = outerArea + notchArea > 0.0
+      ? qRound( wallCount * notchArea / ( outerArea + notchArea ) ) : 0;
+    const int outerWallCount = wallCount - notchWallCount;
+    const int topCount = pointCount - wallCount;
 
     roofPts << sampleGroup( mesh, topTris, topCount );
+    // Preserve the existing exterior-only occlusion policy for inner walls.
     roofPts << sampleGroup( mesh, notchWallTris, notchWallCount );
-    roofPts << sampleLHouseNotchEdgePoints( dock, notchEdgeCount );
     wallPts << sampleGroup( mesh, outerWallTris, outerWallCount );
   }
   else if ( primitiveType == QStringLiteral( "TruncatedPyramidRoof" ) )

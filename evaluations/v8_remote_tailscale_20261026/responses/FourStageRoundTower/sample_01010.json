@@ -1,0 +1,57 @@
+{
+  "file": "test/FourStageRoundTower/sample_01010.txt",
+  "class": "FourStageRoundTower",
+  "band": 1,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "FourStageRoundTower",
+      "params": {
+        "baseRadius": 8.505305290222168,
+        "baseHeight": 1.6067993640899658,
+        "middleHeight": 2.375138282775879,
+        "middleTopRadius": 1.232199788093567,
+        "middleRise": 0.41245386004447937,
+        "coneHeight": 1.1797194480895996,
+        "eaveRadius": 10.108992576599121,
+        "eaveHeight": 0.27364927530288696
+      },
+      "aux_features": {
+        "bbox_x": 19.901081085205078,
+        "bbox_y": 20.037843704223633,
+        "bbox_z": 4.938724994659424,
+        "scale": 11.497090339660645,
+        "bbox_volume": 1969.4388427734375,
+        "aspect_ratio_xy": 1.0068721771240234
+      },
+      "canonical_alignment": {
+        "applied": false,
+        "status": "SKIPPED_CLASS",
+        "reason": "Class 'FourStageRoundTower' not in rotation enable list"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_fourstage_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "baseRadius": 8.390000343322754,
+    "baseHeight": 1.4800000190734863,
+    "middleHeight": 2.4700000286102295,
+    "middleTopRadius": 1.350000023841858,
+    "middleRise": 0.4560000002384186,
+    "coneHeight": 1.4800000190734863,
+    "eaveRadius": 10.050000190734863,
+    "eaveHeight": 0.3630000054836273
+  },
+  "prediction": {
+    "baseRadius": 8.505305290222168,
+    "baseHeight": 1.6067993640899658,
+    "middleHeight": 2.375138282775879,
+    "middleTopRadius": 1.232199788093567,
+    "middleRise": 0.41245386004447937,
+    "coneHeight": 1.1797194480895996,
+    "eaveRadius": 10.108992576599121,
+    "eaveHeight": 0.27364927530288696
+  },
+  "seconds": 5.766373799997382
+}

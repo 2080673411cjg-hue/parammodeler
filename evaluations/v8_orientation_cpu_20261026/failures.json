@@ -1,0 +1,8 @@
+[
+  {
+    "class_name": "LHouse",
+    "file": "test/LHouse/sample_00978.txt",
+    "status": "GEOMETRY_UNCERTAIN",
+    "reason": "LHouse needs three supported roof corners and one distinct missing corner"
+  }
+]

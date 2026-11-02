@@ -74,19 +74,25 @@ class TranslationsTest(unittest.TestCase):
             dock.close()
             dock.deleteLater()
 
-    def test_fit_residual_label_fits_three_lines(self):
-        source = "Fit RMSE: %1\nP95: %2\nScene units"
+    def test_fit_caption_translation_and_layout(self):
+        source = "Fit RMSE: %1\nSurface fit: %2%\n%3\nTolerance: %4 | N: %5\nScene units"
         for chinese in (False, True):
             if chinese:
                 self.app.installTranslator(self.translator)
             text = QtCore.QCoreApplication.translate("ParamModelerDock", source)
-            label = QtWidgets.QLabel(text.replace("%1", "123.456").replace("%2", "234.567"))
+            sides = QtCore.QCoreApplication.translate("ParamModelerDock", "Outside: %1% | Inside: %2%")
+            sides = sides.replace("%1", "9.0").replace("%2", "3.0")
+            text = text.replace("%1", "0.068").replace("%2", "88.0").replace("%3", sides)
+            text = text.replace("%4", "0.1").replace("%5", "2048")
+            if chinese:
+                self.assertIn("表面贴合", text)
+                self.assertIn("外侧", text)
+            label = QtWidgets.QLabel(text)
             label.setWordWrap(True)
             label.setContentsMargins(6, 2, 6, 2)
-            height = label.fontMetrics().lineSpacing() * 3 + 8
-            label.setFixedHeight(height)
             for width in (320, 640):
-                self.assertLessEqual(label.heightForWidth(width), height)
+                # The live overlay wraps dynamically; it must fit the smallest tested viewport.
+                self.assertLessEqual(label.heightForWidth(width), 240 - 24)
             if chinese:
                 self.app.removeTranslator(self.translator)
 

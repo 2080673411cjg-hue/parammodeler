@@ -1,0 +1,54 @@
+{
+  "file": "test/TwoGableHouses/sample_01033.txt",
+  "class": "TwoGableHouses",
+  "band": 0,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "TwoGableHouses",
+      "params": {
+        "length1": 5.231701850891113,
+        "length2": 3.954141139984131,
+        "width": 2.467442512512207,
+        "totalHeight": 8.04631519317627,
+        "wallRatio": 0.7248242497444153,
+        "angle": 160.38453674316406,
+        "ridgeRatio": 0.37934255599975586
+      },
+      "aux_features": {
+        "bbox_x": 9.105172157287598,
+        "bbox_y": 4.227698802947998,
+        "bbox_z": 8.195928573608398,
+        "scale": 7.1074748039245605,
+        "bbox_volume": 315.49346923828125,
+        "aspect_ratio_xy": 0.4643183946609497
+      },
+      "canonical_alignment": {
+        "applied": false,
+        "status": "SKIPPED_CLASS",
+        "reason": "Class 'TwoGableHouses' not in rotation enable list"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_twogable_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "length1": 4.679999828338623,
+    "length2": 4.739999771118164,
+    "width": 2.5299999713897705,
+    "totalHeight": 8.199999809265137,
+    "wallRatio": 0.7099999785423279,
+    "angle": 159.0,
+    "ridgeRatio": 0.36000001430511475
+  },
+  "prediction": {
+    "length1": 5.231701850891113,
+    "length2": 3.954141139984131,
+    "width": 2.467442512512207,
+    "totalHeight": 8.04631519317627,
+    "wallRatio": 0.7248242497444153,
+    "angle": 160.38453674316406,
+    "ridgeRatio": 0.37934255599975586
+  },
+  "seconds": 5.896353400021326
+}

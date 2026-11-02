@@ -1,0 +1,39 @@
+{
+  "file": "test/Cylinder/sample_01010.txt",
+  "class": "Cylinder",
+  "band": 1,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "Cylinder",
+      "params": {
+        "radius": 9.81228256225586,
+        "height": 6.727442741394043
+      },
+      "aux_features": {
+        "bbox_x": 19.558639526367188,
+        "bbox_y": 19.394983291625977,
+        "bbox_z": 6.682999610900879,
+        "scale": 11.746188163757324,
+        "bbox_volume": 2535.125732421875,
+        "aspect_ratio_xy": 0.9916325211524963
+      },
+      "canonical_alignment": {
+        "applied": false,
+        "status": "SKIPPED_CLASS",
+        "reason": "Class 'Cylinder' not in rotation enable list"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_cylinder_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "radius": 9.800000190734863,
+    "height": 6.699999809265137
+  },
+  "prediction": {
+    "radius": 9.81228256225586,
+    "height": 6.727442741394043
+  },
+  "seconds": 5.760440199985169
+}

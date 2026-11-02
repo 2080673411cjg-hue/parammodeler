@@ -8,12 +8,13 @@ import math
 import os
 import re
 import sys
+from typing import Literal, Optional
 
 PTV3_DIR = Path(__file__).resolve().parent
-CLS_LOG = PTV3_DIR / os.environ.get("PTV3_CLS_LOG", "logs/ptv3_cls_v6")
-REG_SUFFIX = os.environ.get("PTV3_REG_SUFFIX", "_v4_canonical_normals").strip()
+CLS_LOG = PTV3_DIR / os.environ.get("PTV3_CLS_LOG", "logs/ptv3_cls_v9")
+REG_SUFFIX = os.environ.get("PTV3_REG_SUFFIX", "_v9_normals").strip()
 if not REG_SUFFIX:
-    REG_SUFFIX = "_v4_canonical_normals"
+    REG_SUFFIX = "_v9_normals"
 TOWER_LOG = os.environ.get("PTV3_TOWER_LOG", "").strip()
 GABLED_LOG = os.environ.get("PTV3_GABLED_LOG", "").strip()
 
@@ -39,7 +40,7 @@ app = FastAPI()
 
 def regression_log_dir( primitive_type, model_suffix=None ):
     override = TOWER_LOG if primitive_type == "FourStageRoundTower" else GABLED_LOG if primitive_type == "GabledRoof" else ""
-    if override:
+    if override and not model_suffix:
         path = Path(override).expanduser()
         return path if path.is_absolute() else PTV3_DIR / path
     suffix = model_suffix or REG_SUFFIX
@@ -61,6 +62,7 @@ class RegressReq(BaseModel):
     scale: float
     num_points: int = 2048
     model_suffix: str = ""
+    input_coordinates: Optional[Literal["physical", "normalized"]] = None
 
 @app.get("/health")
 def health():
@@ -139,6 +141,8 @@ def regress(req: RegressReq):
             "--bbox_z", str(req.bbox_z),
             "--scale", str(req.scale),
         ]
+        if getattr(req, "input_coordinates", None) is not None:
+            cmd += ["--input_coordinates", req.input_coordinates]
         response = run_json_command(cmd)
         if response.get("ok"):
             if prim == "FourStageRoundTower":

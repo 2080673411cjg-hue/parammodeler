@@ -1,0 +1,56 @@
+{
+  "file": "test/PyramidRoof/sample_01076.txt",
+  "class": "PyramidRoof",
+  "band": 1,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "PyramidRoof",
+      "params": {
+        "geom_footprint_long": 18.594486236572266,
+        "geom_footprint_short": 12.324962615966797,
+        "geom_total_height": 7.445395469665527,
+        "wallRatio": 0.633216381072998,
+        "length": 18.594486236572266,
+        "width": 12.324962615966797,
+        "totalHeight": 7.445395469665527
+      },
+      "aux_features": {
+        "bbox_x": 1.6442501544952393,
+        "bbox_y": 1.2622207403182983,
+        "bbox_z": 0.6542187929153442,
+        "scale": 11.945168495178223,
+        "bbox_volume": 1.3577700853347778,
+        "aspect_ratio_xy": 0.7676573395729065
+      },
+      "canonical_alignment": {
+        "applied": true,
+        "status": "GEOMETRY_OK",
+        "reason": "Robust outer rectangle aspect=1.561"
+      },
+      "poseRotateZ": -46.5,
+      "orientation": {
+        "verdict": "PASS",
+        "pca_ratio": 2.884577742647996,
+        "peak_concentration": 0.0,
+        "n_segments": 0,
+        "reason": "Robust outer rectangle aspect=1.561"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_pyramidroof_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "geom_footprint_long": 19.399999618530273,
+    "geom_footprint_short": 12.619999885559082,
+    "geom_total_height": 7.5,
+    "wallRatio": 0.6299999952316284
+  },
+  "prediction": {
+    "geom_footprint_long": 18.594486236572266,
+    "geom_footprint_short": 12.324962615966797,
+    "geom_total_height": 7.445395469665527,
+    "wallRatio": 0.633216381072998
+  },
+  "seconds": 5.888065300008748
+}

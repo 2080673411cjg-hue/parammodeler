@@ -1,0 +1,59 @@
+{
+  "file": "test/AsymmetricGableHouse/sample_01034.txt",
+  "class": "AsymmetricGableHouse",
+  "band": 1,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "AsymmetricGableHouse",
+      "params": {
+        "length": 19.97605323791504,
+        "width": 12.995085716247559,
+        "totalHeight": 7.287149429321289,
+        "wallRatio": 0.616817831993103,
+        "ridgeLength": 14.021577835083008,
+        "ridgeRatio": 0.41151100397109985
+      },
+      "aux_features": {
+        "bbox_x": 1.629754662513733,
+        "bbox_y": 1.5531904697418213,
+        "bbox_z": 0.599751353263855,
+        "scale": 13.304513931274414,
+        "bbox_volume": 1.5181622505187988,
+        "aspect_ratio_xy": 0.9530210494995117
+      },
+      "canonical_alignment": {
+        "applied": true,
+        "status": "RIDGE_AXIS_OK",
+        "reason": "Robust outer rectangle aspect=1.534; upper-surface axis disagreement=0.12 deg"
+      },
+      "poseRotateZ": -28.0,
+      "orientation": {
+        "verdict": "PASS",
+        "pca_ratio": 2.3095000351660997,
+        "peak_concentration": 0.0,
+        "n_segments": 0,
+        "reason": "Robust outer rectangle aspect=1.534; upper-surface axis disagreement=0.12 deg"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_asymgable_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "length": 20.399999618530273,
+    "width": 13.069999694824219,
+    "totalHeight": 7.300000190734863,
+    "wallRatio": 0.6100000143051147,
+    "ridgeLength": 14.460000038146973,
+    "ridgeRatio": 0.4099999964237213
+  },
+  "prediction": {
+    "length": 19.97605323791504,
+    "width": 12.995085716247559,
+    "totalHeight": 7.287149429321289,
+    "wallRatio": 0.616817831993103,
+    "ridgeLength": 14.021577835083008,
+    "ridgeRatio": 0.41151100397109985
+  },
+  "seconds": 5.750209499965422
+}

@@ -20,6 +20,11 @@
 #include <qgs3dmapsettings.h>
 
 #include <QColor>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QDoubleSpinBox>
+#include <QFormLayout>
+#include <QLabel>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
@@ -786,8 +791,11 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
     // The tower's short lower cylinder is partly occluded, while its wider
     // eave supplies a nearly complete circle. A bottom-slice bbox shifts its
     // apparent center toward the visible wall arc.
-    const bool tower = ui->comboPrimitive->currentText() == QLatin1String( "FourStageRoundTower" );
-    bool useBottomSlice = !tower && bottomSlice.size() >= minSlicePoints;
+    const QString primitive = ui->comboPrimitive->currentText();
+    const bool tower = primitive == QLatin1String( "FourStageRoundTower" );
+    const bool round = primitive == QLatin1String( "Cylinder" ) || primitive == QLatin1String( "ConeCylinder" ) ||
+                       primitive == QLatin1String( "CylinderDome" );
+    bool useBottomSlice = !tower && !round && bottomSlice.size() >= minSlicePoints;
     QString sliceReason = tower ? QStringLiteral( "tower-full-extent" )
                                 : ( useBottomSlice ? QStringLiteral( "ok" ) : QStringLiteral( "too-few-points" ) );
     if ( useBottomSlice )
@@ -808,6 +816,24 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
     displayMax = useBottomSlice
       ? QVector3D( sliceMax.x(), sliceMax.y(), fullRobustMax.z() )
       : fullRobustMax;
+    if ( round || tower )
+    {
+      QPointF center;
+      sliceReason = tower ? QStringLiteral( "tower-full-extent" ) : QStringLiteral( "round-full-extent" );
+      const bool fitted = tower
+        ? ParamModelerAlignmentGeometry::towerCenter( points, fullRobustMin, fullRobustMax, center )
+        : ParamModelerAlignmentGeometry::roundBaseCenter( points, fullRobustMin, fullRobustMax, center );
+      if ( fitted )
+      {
+        // Only the alignment-box center changes; evaluation keeps the measured bbox.
+        const QVector3D halfSize = ( fullRobustMax - fullRobustMin ) * 0.5f;
+        displayMin.setX( center.x() - halfSize.x() );
+        displayMin.setY( center.y() - halfSize.y() );
+        displayMax.setX( center.x() + halfSize.x() );
+        displayMax.setY( center.y() + halfSize.y() );
+        sliceReason = tower ? QStringLiteral( "tower-section-consensus" ) : QStringLiteral( "round-wall-circle" );
+      }
+    }
     hasDisplayBBox = true;
 
     const QVector3D fullRobustShift = fullRobustMin - hardMin;
@@ -974,6 +1000,47 @@ void ParamModelerDock::resetFitEvaluation()
   if ( m_fitTimer )
     m_fitTimer->stop();
   ParamModelerScene3D::setFitMetricText( mIface, QString() );
+  if ( m_fitDetailsLabel ) m_fitDetailsLabel->setText( tr( "Load a model and point cloud to evaluate." ) );
+}
+
+void ParamModelerDock::showFitEvaluationDetails()
+{
+  if ( m_fitDetailsDialog )
+  {
+    m_fitDetailsDialog->show();
+    m_fitDetailsDialog->raise();
+    m_fitDetailsDialog->activateWindow();
+    return;
+  }
+  auto *dialog = new QDialog( this );
+  dialog->setAttribute( Qt::WA_DeleteOnClose );
+  dialog->setWindowTitle( tr( "Fit statistics" ) );
+  auto *layout = new QFormLayout( dialog );
+  auto *tolerance = new QDoubleSpinBox( dialog );
+  tolerance->setDecimals( 6 );
+  tolerance->setRange( 0.000001, 1000000.0 );
+  tolerance->setSingleStep( 0.01 );
+  tolerance->setValue( m_fitTolerance );
+  layout->addRow( tr( "Distance tolerance (scene units):" ), tolerance );
+  auto *explanation = new QLabel( tr( "Surface fit: points within the distance tolerance. Outside/inside: points farther from the actual model surface. The same tolerance is used while adjusting the model. Percentages use a fixed point sample and are not parameter accuracy." ), dialog );
+  explanation->setWordWrap( true );
+  explanation->setMinimumWidth( 360 );
+  layout->addRow( explanation );
+  auto *details = new QLabel( tr( "Load a model and point cloud to evaluate." ), dialog );
+  details->setTextFormat( Qt::PlainText );
+  details->setWordWrap( true );
+  layout->addRow( details );
+  auto *buttons = new QDialogButtonBox( QDialogButtonBox::Close, dialog );
+  layout->addRow( buttons );
+  connect( buttons, &QDialogButtonBox::rejected, dialog, &QDialog::close );
+  connect( tolerance, qOverload<double>( &QDoubleSpinBox::valueChanged ), this, [this]( double value ) {
+    m_fitTolerance = value;
+    scheduleFitEvaluation();
+  } );
+  m_fitDetailsDialog = dialog;
+  m_fitDetailsLabel = details;
+  updateFitEvaluation();
+  dialog->show(); // Non-modal: parameters can still be adjusted in the main dock.
 }
 
 void ParamModelerDock::scheduleFitEvaluation()
@@ -994,6 +1061,7 @@ void ParamModelerDock::updateFitEvaluation()
 {
   if ( !m_realtimeModelLoaded || !m_pointCloudLayer || m_fitCloudPoints.isEmpty() )
   {
+    if ( m_fitDetailsLabel ) m_fitDetailsLabel->setText( tr( "Load a model and point cloud to evaluate." ) );
     scheduleFitEvaluation();
     return;
   }
@@ -1003,10 +1071,26 @@ void ParamModelerDock::updateFitEvaluation()
   pose.rotate( poseRotateX(), 1, 0, 0 );
   pose.rotate( poseRotateY(), 0, 1, 0 );
   pose.rotate( poseRotateZ(), 0, 0, 1 );
-  const auto metrics = ParamModelerFit::evaluate( mesh, m_fitCloudPoints, pose );
-  ParamModelerScene3D::setFitMetricText( mIface, metrics.count
-    ? tr( "Fit RMSE: %1\nP95: %2\nScene units" ).arg( metrics.rmse, 0, 'f', 3 ).arg( metrics.p95, 0, 'f', 3 )
-    : QString() );
+  const auto metrics = ParamModelerFit::evaluate( mesh, m_fitCloudPoints, pose, m_fitTolerance );
+  if ( !metrics.count )
+  {
+    ParamModelerScene3D::setFitMetricText( mIface, QString() );
+    if ( m_fitDetailsLabel ) m_fitDetailsLabel->setText( tr( "Load a model and point cloud to evaluate." ) );
+    return;
+  }
+  const QString sides = metrics.solidAvailable
+    ? tr( "Outside: %1% | Inside: %2%" ).arg( metrics.percentage( metrics.outsideCount ), 0, 'f', 1 )
+        .arg( metrics.percentage( metrics.insideCount ), 0, 'f', 1 )
+    : tr( "Inside/outside unavailable: open mesh" );
+  const QString text = tr( "Fit RMSE: %1\nSurface fit: %2%\n%3\nTolerance: %4 | N: %5\nScene units" )
+    .arg( metrics.rmse, 0, 'f', 3 ).arg( metrics.percentage( metrics.surfaceCount ), 0, 'f', 1 )
+    .arg( sides ).arg( m_fitTolerance, 0, 'g', 6 ).arg( metrics.count );
+  ParamModelerScene3D::setFitMetricText( mIface, text );
+  if ( m_fitDetailsLabel )
+    m_fitDetailsLabel->setText( text + tr( "\nP95: %1\nSurface fit points: %2\nOutside points: %3\nInside points: %4" )
+      .arg( metrics.p95, 0, 'f', 3 ).arg( metrics.surfaceCount )
+      .arg( metrics.solidAvailable ? QString::number( metrics.outsideCount ) : tr( "N/A" ) )
+      .arg( metrics.solidAvailable ? QString::number( metrics.insideCount ) : tr( "N/A" ) ) );
 }
 
 void ParamModelerDock::onLoadExternalPointCloud()

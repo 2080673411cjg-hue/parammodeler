@@ -40,14 +40,18 @@ def rotate_points_z(points: np.ndarray, angle_deg: float) -> np.ndarray:
     return out
 
 
-def canonical_angle_from_metadata(record: dict, class_name: str) -> float | None:
+def canonical_angle_from_metadata(record: dict, class_name: str,
+                                  lhouse_canonical: bool = False) -> float | None:
     """Return the training-frame yaw from generated metadata, or None if unsupported."""
-    if class_name not in _ROTATION_ENABLE_CLASSES:
+    lhouse = class_name == "LHouse" and lhouse_canonical
+    if class_name not in _ROTATION_ENABLE_CLASSES and not lhouse:
         return None
     params = record.get("params", {})
     if "rz" not in params:
         raise ValueError(f"{record.get('file', class_name)}: canonical training requires params.rz")
     rz = float(params["rz"])
+    if lhouse:
+        return (rz + 180.0) % 360.0 - 180.0
     if class_name in _RIDGE_AXIS_CLASSES:
         axis_offset = 0.0
     else:
@@ -103,25 +107,30 @@ def canonical_target_values(values: np.ndarray, targets: list[str], record: dict
     return result
 
 
-def _top_axis(points_xyz: np.ndarray):
-    """Estimate the roof ridge direction from the highest surface points."""
+def _top_axis(points_xyz: np.ndarray, rectangle_angle_deg: float):
+    """Choose the rectangle axis that retains its extent near the roof ridge."""
     z = points_xyz[:, 2]
-    span = float(np.ptp(z))
-    if span < 1e-6:
+    low, threshold, high = np.quantile(z, [0.005, 0.90, 0.995])
+    if high - low < 1e-6:
         return None
-    for fraction in (0.96, 0.90, 0.82, 0.72):
-        top = points_xyz[z >= float(z.min()) + span * fraction, :2]
-        if len(top) < 12:
-            continue
-        centered = top - top.mean(axis=0)
-        cov = centered.T @ centered / max(len(top) - 1, 1)
-        vals, vecs = np.linalg.eigh(cov)
-        vals, vecs = vals[::-1], vecs[:, ::-1]
-        ratio = float(vals[0] / max(vals[1], 1e-9))
-        angle = fold_axis_degrees(np.degrees(np.arctan2(vecs[1, 0], vecs[0, 0])))
-        if ratio >= 1.35:
-            return float(np.deg2rad(angle)), ratio, len(top)
-    return None
+    xy = rotate_points_z(points_xyz, -rectangle_angle_deg)[:, :2]
+    top = xy[(z >= threshold) & (z <= high)]
+    if len(top) < 12:
+        return None
+    footprint_span = np.ptp(np.quantile(xy, [0.01, 0.99], axis=0), axis=0)
+    if np.min(footprint_span) < 1e-8:
+        return None
+    # Trim isolated points in XY as well as Z. Across the ridge the upper surface
+    # contracts; along it the surface keeps more of its original footprint span.
+    # Relative spans also handle a short house whose width exceeds its length.
+    top_span = np.ptp(np.quantile(top, [0.10, 0.90], axis=0), axis=0)
+    coverage = top_span / footprint_span
+    axis = int(np.argmax(coverage))
+    ratio = float(coverage[axis] / max(coverage[1 - axis], 1e-9))
+    if ratio < 1.35:
+        return None
+    angle = fold_axis_degrees(rectangle_angle_deg + axis * 90.0)
+    return float(np.deg2rad(angle)), ratio, len(top)
 
 
 
@@ -155,7 +164,28 @@ def _rectangle_axis(points_xyz: np.ndarray):
     return fold_axis_degrees(angle), ratio
 
 
-def canonical_orientation(points_xyz: np.ndarray, class_name: str = None) -> dict:
+def _lhouse_direction(points_xyz: np.ndarray, angle: float):
+    """Resolve all four rectangle directions from the missing upper-right corner."""
+    points = rotate_points_z(points_xyz, -angle)
+    low, high = np.quantile(points[:, :2], [0.01, 0.99], axis=0)
+    if np.any(high - low <= 1e-6):
+        return None
+    top = points[points[:, 2] >= np.quantile(points[:, 2], 0.60), :2]
+    xy = (top - low) / (high - low)
+    counts = []
+    for x, y in ((True, True), (False, True), (False, False), (True, False)):
+        a, b = ((0.75, 1.0) if x else (0.0, 0.25)), ((0.75, 1.0) if y else (0.0, 0.25))
+        counts.append(int(np.sum((xy[:, 0] >= a[0]) & (xy[:, 0] <= a[1]) &
+                                 (xy[:, 1] >= b[0]) & (xy[:, 1] <= b[1]))))
+    order = np.argsort(counts)
+    # Three observed roof corners must support one distinctly missing corner.
+    if counts[order[1]] < 8 or counts[order[0]] > counts[order[1]] * 0.25:
+        return None
+    return (angle + int(order[0]) * 90.0 + 180.0) % 360.0 - 180.0, counts
+
+
+def canonical_orientation(points_xyz: np.ndarray, class_name: str = None,
+                          lhouse_canonical: bool = False) -> dict:
     """Estimate the model X axis, returning a matching inverse point rotation."""
     result = {
         "reliable": False,
@@ -172,7 +202,8 @@ def canonical_orientation(points_xyz: np.ndarray, class_name: str = None) -> dic
         "method": "none",
         "reason": "",
     }
-    if class_name is not None and class_name not in _ROTATION_ENABLE_CLASSES:
+    lhouse = class_name == "LHouse" and lhouse_canonical
+    if class_name is not None and class_name not in _ROTATION_ENABLE_CLASSES and not lhouse:
         result.update(status="SKIPPED_CLASS",
                       reason=f"Class '{class_name}' not in rotation enable list")
         return result
@@ -186,18 +217,38 @@ def canonical_orientation(points_xyz: np.ndarray, class_name: str = None) -> dic
     reason = f"Robust outer rectangle aspect={ratio:.3f}"
     if ratio < 1.08:
         reason += "; near-square footprint, interchangeable axes"
+    if class_name == "PyramidRoof":
+        upper = points_xyz[points_xyz[:, 2] >= np.quantile(points_xyz[:, 2], 0.60)]
+        roof_rectangle = _rectangle_axis(upper)
+        if roof_rectangle is not None:
+            roof_angle = roof_rectangle[0]
+            if abs(fold_axis_degrees(roof_angle - angle)) > 45.0:
+                roof_angle = fold_axis_degrees(roof_angle + 90.0)
+            if abs(fold_axis_degrees(roof_angle - angle)) > 10.0:
+                angle = roof_angle
+                verdict = "PASS" if roof_rectangle[1] >= 1.08 else "WEAK"
+                reason += "; footprint refined from upper pyramid surfaces"
+    if lhouse:
+        direction = _lhouse_direction(points_xyz, angle)
+        if direction is None:
+            upper = points_xyz[points_xyz[:, 2] >= np.quantile(points_xyz[:, 2], 0.60)]
+            roof_rectangle = _rectangle_axis(upper)
+            if roof_rectangle is not None:
+                direction = _lhouse_direction(points_xyz, roof_rectangle[0])
+        if direction is None:
+            result["reason"] = "LHouse needs three supported roof corners and one distinct missing corner"
+            return result
+        angle, counts = direction
+        verdict = "PASS"
+        reason = f"LHouse full direction from missing corner; roof corner supports={counts}"
     if class_name in _RIDGE_AXIS_CLASSES:
-        ridge = _top_axis(points_xyz)
+        ridge = _top_axis(points_xyz, angle)
         if ridge is None:
             result["reason"] = "Roof ridge direction could not be estimated from the upper surface"
             return result
-        ridge_deg = float(np.degrees(ridge[0]))
-        # Roof length follows the ridge, even if the house is wider than it is long.
-        if abs(fold_axis_degrees(angle - ridge_deg)) > 45.0:
-            angle = fold_axis_degrees(angle + 90.0)
-        disagreement = abs(fold_axis_degrees(angle - ridge_deg))
-        verdict = "PASS" if disagreement <= 10.0 else "WEAK"
-        reason += f"; upper-surface axis disagreement={disagreement:.2f} deg"
+        angle = fold_axis_degrees(np.degrees(ridge[0]))
+        verdict = "PASS"
+        reason += f"; upper-surface relative span aspect={ridge[1]:.3f}, points={ridge[2]}"
 
     radians = float(np.deg2rad(angle))
     c, s = np.cos(radians), np.sin(radians)
@@ -205,13 +256,13 @@ def canonical_orientation(points_xyz: np.ndarray, class_name: str = None) -> dic
     result.update({
         "reliable": True,
         "verdict": verdict,
-        "status": "RIDGE_AXIS_OK" if class_name in _RIDGE_AXIS_CLASSES else "GEOMETRY_OK",
+        "status": "LHOUSE_DIRECTION_OK" if lhouse else "RIDGE_AXIS_OK" if class_name in _RIDGE_AXIS_CLASSES else "GEOMETRY_OK",
         "canonical_angle_rad": radians,
         "canonical_angle_deg": angle,
         "pca_ratio": float(eigenvalues[-1] / max(eigenvalues[0], 1e-9)),
         "aligned_points": rotate_points_z(points_xyz, -angle),
         "rotation_matrix": np.array([[c, s, 0.0], [-s, c, 0.0], [0.0, 0.0, 1.0]], dtype=np.float32),
-        "method": "robust_rectangle",
+        "method": "lhouse_missing_corner" if lhouse else "robust_rectangle",
         "reason": reason,
     })
     return result

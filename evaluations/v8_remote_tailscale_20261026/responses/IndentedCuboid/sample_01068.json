@@ -1,0 +1,72 @@
+{
+  "file": "test/IndentedCuboid/sample_01068.txt",
+  "class": "IndentedCuboid",
+  "band": 2,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "IndentedCuboid",
+      "params": {
+        "geom_footprint_long": 35.80344009399414,
+        "geom_footprint_short": 33.42032241821289,
+        "geom_total_height": 6.591309070587158,
+        "innerHeight": 2.3302626609802246,
+        "geom_long_start_margin_ratio": 0.2691105604171753,
+        "geom_long_end_margin_ratio": 0.37661105394363403,
+        "geom_short_start_margin_ratio": 0.153266042470932,
+        "geom_short_end_margin_ratio": 0.2854801416397095,
+        "outerLength": 35.80344009399414,
+        "outerWidth": 33.42032241821289,
+        "outerHeight": 6.591309070587158,
+        "leftMarginRatio": 0.2691105604171753,
+        "rightMarginRatio": 0.37661105394363403,
+        "frontMarginRatio": 0.153266042470932,
+        "backMarginRatio": 0.2854801416397095
+      },
+      "aux_features": {
+        "bbox_x": 1.4668292999267578,
+        "bbox_y": 1.5493669509887695,
+        "bbox_z": 0.3296886682510376,
+        "scale": 25.26395034790039,
+        "bbox_volume": 0.7492691874504089,
+        "aspect_ratio_xy": 1.0562694072723389
+      },
+      "canonical_alignment": {
+        "applied": true,
+        "status": "GEOMETRY_OK",
+        "reason": "Robust outer rectangle aspect=1.014; near-square footprint, interchangeable axes"
+      },
+      "poseRotateZ": -9.0,
+      "orientation": {
+        "verdict": "WEAK",
+        "pca_ratio": 1.1026109264507318,
+        "peak_concentration": 0.0,
+        "n_segments": 0,
+        "reason": "Robust outer rectangle aspect=1.014; near-square footprint, interchangeable axes"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_indentedcuboid_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "geom_footprint_long": 34.900001525878906,
+    "geom_footprint_short": 34.689998626708984,
+    "geom_total_height": 7.599999904632568,
+    "innerHeight": 2.5999999046325684,
+    "geom_long_start_margin_ratio": 0.2771279811859131,
+    "geom_long_end_margin_ratio": 0.3795453906059265,
+    "geom_short_start_margin_ratio": 0.14373454451560974,
+    "geom_short_end_margin_ratio": 0.2814803719520569
+  },
+  "prediction": {
+    "geom_footprint_long": 35.80344009399414,
+    "geom_footprint_short": 33.42032241821289,
+    "geom_total_height": 6.591309070587158,
+    "innerHeight": 2.3302626609802246,
+    "geom_long_start_margin_ratio": 0.2691105604171753,
+    "geom_long_end_margin_ratio": 0.37661105394363403,
+    "geom_short_start_margin_ratio": 0.153266042470932,
+    "geom_short_end_margin_ratio": 0.2854801416397095
+  },
+  "seconds": 6.003040600044187
+}

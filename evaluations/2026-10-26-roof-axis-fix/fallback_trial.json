@@ -1,0 +1,82 @@
+[
+  {
+    "class": "LHouse",
+    "split": "test",
+    "count": 200,
+    "before_failed": 1,
+    "after_failed": 0,
+    "changed": [
+      {
+        "file": "test/LHouse/sample_00978.txt",
+        "before_error": null,
+        "after_error": 2.0,
+        "extra": {
+          "upper": [
+            -51.0,
+            4.282564921096136
+          ],
+          "corners": [
+            0,
+            79,
+            54,
+            42
+          ]
+        }
+      }
+    ],
+    "worse": []
+  },
+  {
+    "class": "LHouse",
+    "split": "val",
+    "count": 200,
+    "before_failed": 0,
+    "after_failed": 0,
+    "changed": [],
+    "worse": []
+  },
+  {
+    "class": "PyramidRoof",
+    "split": "test",
+    "count": 200,
+    "before_failed": 0,
+    "after_failed": 0,
+    "changed": [
+      {
+        "file": "test/PyramidRoof/sample_01087.txt",
+        "before_error": 41.5,
+        "after_error": 0.5,
+        "extra": {
+          "upper": [
+            -4.5,
+            1.0004913306072387
+          ],
+          "delta": 42.0
+        }
+      }
+    ],
+    "worse": []
+  },
+  {
+    "class": "PyramidRoof",
+    "split": "val",
+    "count": 200,
+    "before_failed": 0,
+    "after_failed": 0,
+    "changed": [
+      {
+        "file": "val/PyramidRoof/sample_00886.txt",
+        "before_error": 39.5,
+        "after_error": 0.0,
+        "extra": {
+          "upper": [
+            -86.0,
+            1.2593227513748584
+          ],
+          "delta": 39.5
+        }
+      }
+    ],
+    "worse": []
+  }
+]

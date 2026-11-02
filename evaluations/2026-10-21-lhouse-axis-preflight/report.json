@@ -1,0 +1,3656 @@
+{
+  "scope": "Orientation-module preflight only; not trained-model accuracy or live-plugin acceptance. Validation used to develop support windows; test measured after fixing them. Reuses the existing synthetic split, not real data.",
+  "sources": {
+    "scripts/main_reg.py": "252c6d1bfb764bb4b281cc6f1ca5dd5472d86709fb8f85d4812578f39d64c020",
+    "scripts/train_ptv3_reg.py": "597ceafa2e9dad451cb7e5eb4c7497938cf956710607b96d22fa5181bf772e0d",
+    "scripts/canonical_orientation.py": "6c466525d3efc856cdac4821c1c9930f1e3965b45057d7198cf60504aefbb0a8"
+  },
+  "summary": [
+    {
+      "source": "raw",
+      "split": "val",
+      "total": 100,
+      "accepted": 100,
+      "failed": 0,
+      "over_10_degrees": 0,
+      "median_deg": 2.9042247859933923e-06,
+      "p95_deg": 1.5249999999999986,
+      "max_deg": 3.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "total": 100,
+      "accepted": 100,
+      "failed": 0,
+      "over_10_degrees": 0,
+      "median_deg": 0.00016558324861648543,
+      "p95_deg": 1.5,
+      "max_deg": 3.269413376899479
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "total": 100,
+      "accepted": 100,
+      "failed": 0,
+      "over_10_degrees": 0,
+      "median_deg": 0.4065777447790282,
+      "p95_deg": 1.6635772434032285,
+      "max_deg": 3.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "total": 100,
+      "accepted": 100,
+      "failed": 0,
+      "over_10_degrees": 0,
+      "median_deg": 0.5,
+      "p95_deg": 2.0,
+      "max_deg": 3.0
+    }
+  ],
+  "samples": [
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00001.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[60, 69, 0, 57]",
+      "angle_deg": -90.99999667531063,
+      "direction_error_deg": 3.324689373584988e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00002.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 63, 58, 53]",
+      "angle_deg": 4.999999469568536,
+      "direction_error_deg": 5.304314640852681e-07
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00003.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[55, 69, 0, 59]",
+      "angle_deg": -120.99999682906099,
+      "direction_error_deg": 3.1709390100331802e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00004.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[76, 81, 0, 67]",
+      "angle_deg": -116.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00005.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 69, 80, 73]",
+      "angle_deg": 22.954719763133767,
+      "direction_error_deg": 0.04528023686623328
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00006.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 81, 71, 111]",
+      "angle_deg": 30.133908809327693,
+      "direction_error_deg": 0.13390880932769278
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00007.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[72, 75, 0, 47]",
+      "angle_deg": -179.01612073608146,
+      "direction_error_deg": 1.0161207360814615
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00008.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 72, 52, 64]",
+      "angle_deg": 26.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00009.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 93, 104, 70]",
+      "angle_deg": -21.0,
+      "direction_error_deg": 3.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00010.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 73, 70, 63]",
+      "angle_deg": 1.9999971092967712,
+      "direction_error_deg": 2.890703228786151e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00011.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 62, 72, 58]",
+      "angle_deg": 33.99999783490205,
+      "direction_error_deg": 2.1650979533660575e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00012.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[61, 69, 0, 48]",
+      "angle_deg": -129.11169987226174,
+      "direction_error_deg": 0.11169987226173816
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00013.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 44, 63, 85]",
+      "angle_deg": -79.03481260642332,
+      "direction_error_deg": 0.03481260642331563
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00014.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[80, 66, 0, 89]",
+      "angle_deg": 112.0,
+      "direction_error_deg": 2.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00015.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 52, 69, 74]",
+      "angle_deg": 1.9999999834007554,
+      "direction_error_deg": 1.6599244645476574e-08
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00016.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[39, 79, 0, 86]",
+      "angle_deg": -168.9999991687983,
+      "direction_error_deg": 8.312017030220886e-07
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00017.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 75, 78, 65]",
+      "angle_deg": -83.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00018.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 62, 56, 70]",
+      "angle_deg": -6.1241446348968225,
+      "direction_error_deg": 0.12414463489682248
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00019.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[67, 61, 0, 83]",
+      "angle_deg": -130.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00020.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 80, 72, 68]",
+      "angle_deg": -48.99999919270695,
+      "direction_error_deg": 8.07293048410429e-07
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00021.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[65, 77, 0, 61]",
+      "angle_deg": 96.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00022.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 79, 63, 70]",
+      "angle_deg": -13.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00023.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[63, 69, 0, 57]",
+      "angle_deg": 173.00001603504194,
+      "direction_error_deg": 1.603504193781191e-05
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00024.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 57, 74, 72]",
+      "angle_deg": 53.9999965173198,
+      "direction_error_deg": 3.4826801993403933e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00025.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[62, 65, 0, 59]",
+      "angle_deg": -157.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00026.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[68, 60, 0, 64]",
+      "angle_deg": 110.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00027.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 51, 69, 57]",
+      "angle_deg": 46.99999953767315,
+      "direction_error_deg": 4.6232685235736426e-07
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00028.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[83, 67, 0, 102]",
+      "angle_deg": 164.66647455560684,
+      "direction_error_deg": 1.3335254443931603
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00029.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 61, 60, 65]",
+      "angle_deg": 18.999997523976447,
+      "direction_error_deg": 2.4760235532994557e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00030.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 65, 68, 78]",
+      "angle_deg": -42.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00031.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[51, 52, 0, 68]",
+      "angle_deg": -155.99934014401367,
+      "direction_error_deg": 0.0006598559863277842
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00032.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[74, 84, 0, 76]",
+      "angle_deg": 126.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00033.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 51, 54, 66]",
+      "angle_deg": -84.00000156696186,
+      "direction_error_deg": 1.5669618562696996e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00034.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[64, 76, 0, 65]",
+      "angle_deg": 141.99999667526384,
+      "direction_error_deg": 3.3247361557187105e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00035.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[70, 94, 0, 109]",
+      "angle_deg": -107.80603679334189,
+      "direction_error_deg": 0.8060367933418888
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00036.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[59, 69, 0, 52]",
+      "angle_deg": -100.00000141620148,
+      "direction_error_deg": 1.4162014849716797e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00037.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 83, 53, 64]",
+      "angle_deg": -53.00000074985354,
+      "direction_error_deg": 7.498535410377372e-07
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00038.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 82, 73, 55]",
+      "angle_deg": 0.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00039.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 67, 79, 83]",
+      "angle_deg": -47.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00040.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[99, 69, 0, 78]",
+      "angle_deg": -157.99952620620968,
+      "direction_error_deg": 0.0004737937903200873
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00041.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 63, 53, 44]",
+      "angle_deg": 52.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00042.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 49, 52, 67]",
+      "angle_deg": -53.99999648638703,
+      "direction_error_deg": 3.5136129667989735e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00043.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 65, 61, 68]",
+      "angle_deg": 66.99999527439161,
+      "direction_error_deg": 4.725608391709102e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00044.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[66, 52, 0, 56]",
+      "angle_deg": 136.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00045.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[79, 67, 0, 80]",
+      "angle_deg": -147.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00046.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 56, 60, 49]",
+      "angle_deg": 57.99999777078054,
+      "direction_error_deg": 2.229219461469256e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00047.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[67, 61, 0, 59]",
+      "angle_deg": 96.99999715434922,
+      "direction_error_deg": 2.8456507834562217e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00048.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 64, 72, 63]",
+      "angle_deg": 80.99999844601945,
+      "direction_error_deg": 1.5539805531261663e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00049.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 68, 65, 57]",
+      "angle_deg": -61.99999708225366,
+      "direction_error_deg": 2.9177463432006334e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00050.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[77, 57, 0, 71]",
+      "angle_deg": -132.00000544375825,
+      "direction_error_deg": 5.4437582548416685e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00001.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[86, 61, 0, 68]",
+      "angle_deg": -127.99999884065221,
+      "direction_error_deg": 1.1593477893256932e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00002.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 71, 60, 68]",
+      "angle_deg": -53.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00003.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[63, 70, 0, 67]",
+      "angle_deg": 97.99999907146827,
+      "direction_error_deg": 9.285317332796694e-07
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00004.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 50, 58, 46]",
+      "angle_deg": 44.00000322207447,
+      "direction_error_deg": 3.2220744685673708e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00005.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 75, 75, 64]",
+      "angle_deg": -63.26941337689948,
+      "direction_error_deg": 3.269413376899479
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00006.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[56, 57, 0, 60]",
+      "angle_deg": -178.9905387157284,
+      "direction_error_deg": 0.00946128427159465
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00007.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[58, 76, 0, 44]",
+      "angle_deg": 158.93399101942407,
+      "direction_error_deg": 0.06600898057592985
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00008.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[70, 84, 0, 77]",
+      "angle_deg": 113.88159441222564,
+      "direction_error_deg": 0.11840558777436172
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00009.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[46, 70, 0, 66]",
+      "angle_deg": 140.993094260186,
+      "direction_error_deg": 0.006905739813987566
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00010.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[86, 93, 0, 89]",
+      "angle_deg": 142.99999363527502,
+      "direction_error_deg": 6.364724981722247e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00011.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 48, 63, 65]",
+      "angle_deg": -9.0001906477371,
+      "direction_error_deg": 0.00019064773709942529
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00012.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 68, 65, 58]",
+      "angle_deg": -82.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00013.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 71, 67, 87]",
+      "angle_deg": 7.999479549562807,
+      "direction_error_deg": 0.0005204504371931762
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00014.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 80, 76, 67]",
+      "angle_deg": 87.99999871325281,
+      "direction_error_deg": 1.2867471923527773e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00015.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[69, 65, 0, 70]",
+      "angle_deg": -154.9999944287531,
+      "direction_error_deg": 5.571246902036364e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00016.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[63, 61, 0, 73]",
+      "angle_deg": -133.00000313581342,
+      "direction_error_deg": 3.135813415156008e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00017.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 59, 70, 58]",
+      "angle_deg": -61.00000268857812,
+      "direction_error_deg": 2.6885781210239657e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00018.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 77, 76, 70]",
+      "angle_deg": 80.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00019.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 75, 70, 65]",
+      "angle_deg": 28.90929975494521,
+      "direction_error_deg": 0.09070024505479068
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00020.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[34, 67, 0, 50]",
+      "angle_deg": -97.99999976604414,
+      "direction_error_deg": 2.3395585913021932e-07
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00021.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 63, 62, 72]",
+      "angle_deg": -65.12724552596478,
+      "direction_error_deg": 0.12724552596478134
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00022.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[79, 91, 0, 85]",
+      "angle_deg": 139.37126833418665,
+      "direction_error_deg": 0.6287316658133477
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00023.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 57, 70, 69]",
+      "angle_deg": -49.02305183758017,
+      "direction_error_deg": 0.023051837580169376
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00024.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 69, 72, 92]",
+      "angle_deg": -21.00000173019086,
+      "direction_error_deg": 1.7301908599165472e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00025.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[47, 59, 0, 70]",
+      "angle_deg": 103.99999830298611,
+      "direction_error_deg": 1.6970138858596329e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00026.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 83, 58, 96]",
+      "angle_deg": -77.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00027.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[60, 84, 0, 79]",
+      "angle_deg": -112.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00028.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 51, 66, 59]",
+      "angle_deg": -75.30117563432759,
+      "direction_error_deg": 0.301175634327592
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00029.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 92, 68, 67]",
+      "angle_deg": -76.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00030.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[59, 70, 0, 54]",
+      "angle_deg": 120.00007199619819,
+      "direction_error_deg": 7.199619818720748e-05
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00031.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[95, 80, 0, 66]",
+      "angle_deg": -125.15474966484385,
+      "direction_error_deg": 2.1547496648438482
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00032.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 74, 99, 91]",
+      "angle_deg": -3.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00033.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[82, 65, 0, 67]",
+      "angle_deg": -150.5,
+      "direction_error_deg": 2.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00034.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[62, 80, 0, 62]",
+      "angle_deg": 146.99101997689854,
+      "direction_error_deg": 0.008980023101457846
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00035.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 58, 69, 59]",
+      "angle_deg": -39.00193990063275,
+      "direction_error_deg": 0.0019399006327489587
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00036.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 68, 65, 64]",
+      "angle_deg": -63.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00037.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[62, 61, 0, 86]",
+      "angle_deg": -139.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00038.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 75, 70, 80]",
+      "angle_deg": -30.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00039.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 69, 63, 90]",
+      "angle_deg": -62.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00040.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[67, 59, 0, 78]",
+      "angle_deg": -168.00000378027767,
+      "direction_error_deg": 3.780277666010079e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00041.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[73, 73, 0, 77]",
+      "angle_deg": 127.99999718453614,
+      "direction_error_deg": 2.815463858496514e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00042.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 73, 59, 68]",
+      "angle_deg": -55.000000129637954,
+      "direction_error_deg": 1.2963795370524167e-07
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00043.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[53, 61, 0, 79]",
+      "angle_deg": 92.99999896460594,
+      "direction_error_deg": 1.0353940638196946e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00044.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[51, 68, 0, 67]",
+      "angle_deg": -178.00000331333462,
+      "direction_error_deg": 3.3133346164504474e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00045.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[58, 69, 0, 65]",
+      "angle_deg": 111.99999003917026,
+      "direction_error_deg": 9.960829743249633e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00046.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[51, 59, 0, 73]",
+      "angle_deg": -93.2194134740945,
+      "direction_error_deg": 0.21941347409449463
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00047.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[76, 82, 0, 72]",
+      "angle_deg": -154.05409537290006,
+      "direction_error_deg": 0.05409537290006483
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00048.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 66, 92, 70]",
+      "angle_deg": 86.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00049.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[60, 55, 0, 77]",
+      "angle_deg": 163.99999934194057,
+      "direction_error_deg": 6.580594344995916e-07
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00050.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 82, 100, 77]",
+      "angle_deg": 54.19059674415337,
+      "direction_error_deg": 0.19059674415336758
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00051.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[63, 58, 0, 68]",
+      "angle_deg": -152.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00052.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[86, 74, 0, 85]",
+      "angle_deg": -130.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00053.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 58, 60, 65]",
+      "angle_deg": 39.99999769203913,
+      "direction_error_deg": 2.3079608695297793e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00054.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[72, 72, 0, 62]",
+      "angle_deg": 139.9999955557165,
+      "direction_error_deg": 4.4442834905567e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00055.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 65, 91, 73]",
+      "angle_deg": -45.841893145239,
+      "direction_error_deg": 0.15810685476100161
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00056.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 61, 71, 68]",
+      "angle_deg": -85.99999833751102,
+      "direction_error_deg": 1.6624889838112722e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00057.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[56, 76, 0, 89]",
+      "angle_deg": 119.92889891624156,
+      "direction_error_deg": 0.07110108375843538
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00058.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[83, 72, 0, 78]",
+      "angle_deg": -107.99999817885111,
+      "direction_error_deg": 1.8211488850283786e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00059.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 68, 70, 70]",
+      "angle_deg": 68.99999642463266,
+      "direction_error_deg": 3.5753673444105516e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00060.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 97, 68, 107]",
+      "angle_deg": 20.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00061.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 55, 78, 54]",
+      "angle_deg": 43.000002345212636,
+      "direction_error_deg": 2.3452126356460212e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00062.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[71, 69, 0, 78]",
+      "angle_deg": -180.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00063.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 39, 50, 55]",
+      "angle_deg": -31.000000688255653,
+      "direction_error_deg": 6.882556533582829e-07
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00064.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 75, 58, 80]",
+      "angle_deg": 1.9642735071610957,
+      "direction_error_deg": 0.03572649283890428
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00065.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 51, 55, 55]",
+      "angle_deg": -36.99999807641669,
+      "direction_error_deg": 1.9235833121911128e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00066.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 67, 73, 73]",
+      "angle_deg": 41.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00067.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[58, 67, 0, 73]",
+      "angle_deg": -91.99999754946879,
+      "direction_error_deg": 2.4505312126166245e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00068.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 62, 54, 74]",
+      "angle_deg": -73.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00069.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[77, 83, 0, 87]",
+      "angle_deg": -140.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00070.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[47, 65, 0, 88]",
+      "angle_deg": 151.99999954209142,
+      "direction_error_deg": 4.5790858393957024e-07
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00071.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 62, 80, 79]",
+      "angle_deg": -74.5,
+      "direction_error_deg": 3.5
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00072.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[99, 87, 0, 101]",
+      "angle_deg": -124.0,
+      "direction_error_deg": 3.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00073.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[58, 57, 0, 64]",
+      "angle_deg": -142.0000147569956,
+      "direction_error_deg": 1.4756995597053901e-05
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00074.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 82, 74, 66]",
+      "angle_deg": 63.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00075.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[50, 53, 0, 94]",
+      "angle_deg": 116.99999367735381,
+      "direction_error_deg": 6.322646186163183e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00076.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[74, 109, 0, 84]",
+      "angle_deg": 173.00000259578684,
+      "direction_error_deg": 2.5957868388104544e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00077.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[60, 62, 0, 88]",
+      "angle_deg": 178.00000202082748,
+      "direction_error_deg": 2.0208274804645043e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00078.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[77, 55, 0, 54]",
+      "angle_deg": -174.99999031590858,
+      "direction_error_deg": 9.684091423878272e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00079.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[62, 62, 0, 85]",
+      "angle_deg": -113.99999898745716,
+      "direction_error_deg": 1.0125428389073932e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00080.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 76, 67, 62]",
+      "angle_deg": 50.9999839062221,
+      "direction_error_deg": 1.609377790146027e-05
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00081.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 46, 69, 72]",
+      "angle_deg": -60.00456914911538,
+      "direction_error_deg": 0.004569149115383198
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00082.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 79, 95, 92]",
+      "angle_deg": 67.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00083.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 61, 63, 76]",
+      "angle_deg": 36.999996312162324,
+      "direction_error_deg": 3.6878376761251275e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00084.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 61, 51, 67]",
+      "angle_deg": 48.00000276292178,
+      "direction_error_deg": 2.7629217811409035e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00085.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 72, 48, 58]",
+      "angle_deg": -58.00000131295877,
+      "direction_error_deg": 1.3129587728144543e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00086.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[82, 69, 0, 70]",
+      "angle_deg": 126.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00087.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[77, 88, 0, 57]",
+      "angle_deg": 114.3726865812987,
+      "direction_error_deg": 0.6273134187013056
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00088.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[55, 67, 0, 64]",
+      "angle_deg": 176.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00089.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[76, 84, 0, 63]",
+      "angle_deg": -98.00000255559837,
+      "direction_error_deg": 2.5555983711456065e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00090.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 59, 61, 65]",
+      "angle_deg": -44.9999990072661,
+      "direction_error_deg": 9.927339021942316e-07
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00091.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 76, 70, 104]",
+      "angle_deg": 23.99999895446055,
+      "direction_error_deg": 1.0455394487962621e-06
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00092.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 68, 59, 69]",
+      "angle_deg": -35.00001088459493,
+      "direction_error_deg": 1.0884594928484148e-05
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00093.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 62, 68, 63]",
+      "angle_deg": 39.00000014993583,
+      "direction_error_deg": 1.4993582908573444e-07
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00094.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[81, 69, 0, 76]",
+      "angle_deg": 158.0,
+      "direction_error_deg": 2.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00095.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[78, 85, 0, 63]",
+      "angle_deg": 113.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00096.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 61, 52, 84]",
+      "angle_deg": 39.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00097.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 54, 67, 61]",
+      "angle_deg": -74.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00098.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[56, 71, 0, 75]",
+      "angle_deg": -123.99999947197034,
+      "direction_error_deg": 5.280296591081424e-07
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00099.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[79, 65, 0, 65]",
+      "angle_deg": -174.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "raw",
+      "split": "val",
+      "file": "val/LHouse/sample_00100.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 46, 63, 60]",
+      "angle_deg": -36.99999980803028,
+      "direction_error_deg": 1.9196971834389842e-07
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00051.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[59, 84, 0, 86]",
+      "angle_deg": 107.26146396283565,
+      "direction_error_deg": 1.2614639628356485
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00052.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[70, 53, 0, 52]",
+      "angle_deg": 107.9999970719557,
+      "direction_error_deg": 2.9280442959134234e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00053.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[80, 61, 0, 78]",
+      "angle_deg": -143.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00054.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 83, 51, 62]",
+      "angle_deg": 3.000000213591136,
+      "direction_error_deg": 2.1359113588914624e-07
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00055.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[63, 49, 0, 75]",
+      "angle_deg": 164.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00056.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 52, 66, 64]",
+      "angle_deg": -40.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00057.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 93, 85, 80]",
+      "angle_deg": -58.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00058.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 78, 73, 93]",
+      "angle_deg": -60.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00059.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 67, 85, 74]",
+      "angle_deg": 1.9999967259552136,
+      "direction_error_deg": 3.27404478639437e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00060.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[84, 63, 0, 76]",
+      "angle_deg": -154.99999854262876,
+      "direction_error_deg": 1.4573712405763217e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00061.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[82, 62, 0, 77]",
+      "angle_deg": -147.00014051876013,
+      "direction_error_deg": 0.00014051876013354558
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00062.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 78, 70, 84]",
+      "angle_deg": -60.00000532032675,
+      "direction_error_deg": 5.320326749824744e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00063.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[66, 70, 0, 49]",
+      "angle_deg": -159.00000248834868,
+      "direction_error_deg": 2.4883486844373692e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00064.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[69, 100, 0, 94]",
+      "angle_deg": -144.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00065.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[59, 83, 0, 77]",
+      "angle_deg": -174.99999639456564,
+      "direction_error_deg": 3.6054343581781723e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00066.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 86, 67, 74]",
+      "angle_deg": -65.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00067.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 88, 101, 83]",
+      "angle_deg": -70.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00068.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 85, 77, 60]",
+      "angle_deg": 28.00000009483898,
+      "direction_error_deg": 9.483898111284361e-08
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00069.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[90, 74, 0, 87]",
+      "angle_deg": -131.18498507133938,
+      "direction_error_deg": 1.1849850713393835
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00070.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[70, 53, 0, 63]",
+      "angle_deg": -159.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00071.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 62, 65, 66]",
+      "angle_deg": 43.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00072.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[50, 62, 0, 64]",
+      "angle_deg": 176.99999036523337,
+      "direction_error_deg": 9.634766627186764e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00073.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 85, 72, 75]",
+      "angle_deg": 56.99999713029982,
+      "direction_error_deg": 2.8697001823729806e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00074.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[72, 75, 0, 72]",
+      "angle_deg": 152.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00075.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[77, 77, 0, 61]",
+      "angle_deg": -162.99999249216955,
+      "direction_error_deg": 7.507830446229491e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00076.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[60, 56, 0, 62]",
+      "angle_deg": -144.0000313316532,
+      "direction_error_deg": 3.133165319013642e-05
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00077.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[65, 54, 0, 82]",
+      "angle_deg": -151.9999995059968,
+      "direction_error_deg": 4.940031885780627e-07
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00078.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[56, 78, 0, 75]",
+      "angle_deg": 155.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00079.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 68, 63, 72]",
+      "angle_deg": 9.000000890173936,
+      "direction_error_deg": 8.901739363409433e-07
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00080.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 103, 86, 102]",
+      "angle_deg": 36.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00081.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 43, 83, 63]",
+      "angle_deg": 80.53937744387036,
+      "direction_error_deg": 0.5393774438703645
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00082.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 67, 49, 68]",
+      "angle_deg": 18.98168833380487,
+      "direction_error_deg": 0.018311666195131693
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00083.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 95, 61, 73]",
+      "angle_deg": 51.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00084.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[62, 53, 0, 78]",
+      "angle_deg": -90.9999971649321,
+      "direction_error_deg": 2.835067903106392e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00085.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 76, 70, 86]",
+      "angle_deg": 86.00074902329357,
+      "direction_error_deg": 0.0007490232935651875
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00086.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[70, 71, 0, 73]",
+      "angle_deg": -105.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00087.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 73, 76, 79]",
+      "angle_deg": -80.99999618301138,
+      "direction_error_deg": 3.816988623839279e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00088.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[62, 58, 0, 74]",
+      "angle_deg": 92.99999931637069,
+      "direction_error_deg": 6.836293096057489e-07
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00089.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 60, 55, 69]",
+      "angle_deg": 31.989970307563908,
+      "direction_error_deg": 0.010029692436091864
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00090.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 65, 74, 67]",
+      "angle_deg": 59.95842830864137,
+      "direction_error_deg": 0.041571691358626595
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00091.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[67, 85, 0, 60]",
+      "angle_deg": 115.00000309227505,
+      "direction_error_deg": 3.092275051130855e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00092.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[58, 78, 0, 53]",
+      "angle_deg": -95.99992727922245,
+      "direction_error_deg": 7.272077755260398e-05
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00093.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[51, 67, 0, 62]",
+      "angle_deg": -171.99999578163812,
+      "direction_error_deg": 4.218361880248267e-06
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00094.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[89, 75, 0, 73]",
+      "angle_deg": 137.80402377272202,
+      "direction_error_deg": 0.19597622727798125
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00095.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 56, 69, 71]",
+      "angle_deg": 54.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00096.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[68, 66, 0, 80]",
+      "angle_deg": -117.30996423785211,
+      "direction_error_deg": 0.3099642378521139
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00097.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 73, 85, 58]",
+      "angle_deg": -60.5,
+      "direction_error_deg": 2.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00098.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 59, 71, 75]",
+      "angle_deg": 1.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00099.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[74, 100, 0, 95]",
+      "angle_deg": -178.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "raw",
+      "split": "test",
+      "file": "test/LHouse/sample_00100.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[76, 70, 0, 83]",
+      "angle_deg": -102.40832166900759,
+      "direction_error_deg": 0.4083216690075915
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00001.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[44, 57, 0, 53]",
+      "angle_deg": -90.83441100173582,
+      "direction_error_deg": 0.16558899826418383
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00002.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 56, 59, 34]",
+      "angle_deg": 4.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00003.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[43, 55, 0, 44]",
+      "angle_deg": -121.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00004.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[63, 68, 0, 48]",
+      "angle_deg": -116.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00005.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 51, 66, 40]",
+      "angle_deg": 22.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00006.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 47, 44, 64]",
+      "angle_deg": 30.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00007.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[49, 53, 0, 30]",
+      "angle_deg": -179.06532835629156,
+      "direction_error_deg": 1.065328356291559
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00008.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 59, 36, 53]",
+      "angle_deg": 26.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00009.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 59, 70, 71]",
+      "angle_deg": -19.802849389367196,
+      "direction_error_deg": 1.8028493893671964
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00010.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 57, 55, 44]",
+      "angle_deg": 1.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00011.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 60, 64, 53]",
+      "angle_deg": 34.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00012.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[57, 66, 0, 37]",
+      "angle_deg": -129.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00013.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 32, 41, 56]",
+      "angle_deg": -79.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00014.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[63, 48, 0, 69]",
+      "angle_deg": 112.0,
+      "direction_error_deg": 2.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00015.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 50, 58, 48]",
+      "angle_deg": 1.8751658889789837,
+      "direction_error_deg": 0.12483411102101627
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00016.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[31, 54, 0, 65]",
+      "angle_deg": -169.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00017.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 48, 54, 51]",
+      "angle_deg": -83.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00018.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 42, 52, 51]",
+      "angle_deg": -6.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00019.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[50, 37, 0, 74]",
+      "angle_deg": -129.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00020.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 54, 58, 49]",
+      "angle_deg": -49.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00021.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[53, 58, 0, 47]",
+      "angle_deg": 96.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00022.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 59, 45, 60]",
+      "angle_deg": -13.438713408922752,
+      "direction_error_deg": 0.43871340892275157
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00023.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[57, 47, 0, 50]",
+      "angle_deg": 173.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00024.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 44, 67, 54]",
+      "angle_deg": 53.625557919364695,
+      "direction_error_deg": 0.3744420806353048
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00025.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[53, 55, 0, 54]",
+      "angle_deg": -158.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00026.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[55, 44, 0, 50]",
+      "angle_deg": 110.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00027.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 45, 54, 42]",
+      "angle_deg": 47.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00028.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[52, 48, 0, 70]",
+      "angle_deg": 164.34375286954224,
+      "direction_error_deg": 1.656247130457757
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00029.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 55, 53, 47]",
+      "angle_deg": 18.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00030.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 48, 60, 61]",
+      "angle_deg": -42.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00031.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[44, 50, 0, 53]",
+      "angle_deg": -156.14832650407732,
+      "direction_error_deg": 0.14832650407731762
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00032.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[69, 51, 0, 58]",
+      "angle_deg": 123.5,
+      "direction_error_deg": 3.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00033.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 44, 60, 53]",
+      "angle_deg": -84.21298322491614,
+      "direction_error_deg": 0.21298322491614385
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00034.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[48, 53, 0, 39]",
+      "angle_deg": 141.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00035.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[44, 60, 0, 68]",
+      "angle_deg": -108.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00036.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[51, 48, 0, 48]",
+      "angle_deg": -100.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00037.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 64, 43, 42]",
+      "angle_deg": -52.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00038.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 60, 60, 33]",
+      "angle_deg": -0.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00039.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 48, 63, 67]",
+      "angle_deg": -47.07238893764932,
+      "direction_error_deg": 0.07238893764932186
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00040.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[69, 54, 0, 60]",
+      "angle_deg": -158.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00041.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 42, 51, 55]",
+      "angle_deg": 52.158914773188485,
+      "direction_error_deg": 0.15891477318848501
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00042.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 38, 46, 63]",
+      "angle_deg": -54.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00043.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 48, 47, 48]",
+      "angle_deg": 66.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00044.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[44, 43, 0, 49]",
+      "angle_deg": 136.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00045.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[47, 50, 0, 62]",
+      "angle_deg": -147.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00046.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 60, 47, 37]",
+      "angle_deg": 57.73278348370775,
+      "direction_error_deg": 0.26721651629225107
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00047.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[64, 53, 0, 69]",
+      "angle_deg": 96.77989639180748,
+      "direction_error_deg": 0.22010360819251673
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00048.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 50, 56, 54]",
+      "angle_deg": 80.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00049.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 57, 47, 44]",
+      "angle_deg": -62.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00050.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[55, 41, 0, 63]",
+      "angle_deg": -132.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00001.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[59, 55, 0, 49]",
+      "angle_deg": -128.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00002.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 54, 45, 48]",
+      "angle_deg": -53.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00003.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[48, 46, 0, 50]",
+      "angle_deg": 97.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00004.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 42, 40, 39]",
+      "angle_deg": 44.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00005.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 56, 60, 53]",
+      "angle_deg": -63.0,
+      "direction_error_deg": 3.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00006.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[42, 46, 0, 36]",
+      "angle_deg": -178.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00007.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[56, 58, 0, 29]",
+      "angle_deg": 158.65481758186405,
+      "direction_error_deg": 0.3451824181359484
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00008.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[50, 61, 0, 54]",
+      "angle_deg": 114.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00009.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[34, 54, 0, 46]",
+      "angle_deg": 140.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00010.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[54, 69, 0, 70]",
+      "angle_deg": 143.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00011.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 43, 50, 55]",
+      "angle_deg": -9.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00012.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 62, 54, 54]",
+      "angle_deg": -82.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00013.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 37, 57, 59]",
+      "angle_deg": 6.0,
+      "direction_error_deg": 2.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00014.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 65, 58, 52]",
+      "angle_deg": 87.77181478871637,
+      "direction_error_deg": 0.22818521128363045
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00015.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[50, 65, 0, 44]",
+      "angle_deg": -155.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00016.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[48, 43, 0, 63]",
+      "angle_deg": -134.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00017.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 53, 55, 40]",
+      "angle_deg": -61.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00018.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 72, 61, 57]",
+      "angle_deg": 79.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00019.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 52, 59, 49]",
+      "angle_deg": 29.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00020.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[38, 55, 0, 43]",
+      "angle_deg": -98.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00021.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 55, 42, 55]",
+      "angle_deg": -65.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00022.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[57, 59, 0, 49]",
+      "angle_deg": 139.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00023.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 35, 50, 42]",
+      "angle_deg": -49.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00024.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 61, 60, 65]",
+      "angle_deg": -21.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00025.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[42, 52, 0, 73]",
+      "angle_deg": 104.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00026.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 72, 49, 61]",
+      "angle_deg": -77.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00027.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[42, 53, 0, 47]",
+      "angle_deg": -113.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00028.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 44, 52, 49]",
+      "angle_deg": -74.55887830015456,
+      "direction_error_deg": 0.44112169984543925
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00029.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 62, 47, 45]",
+      "angle_deg": -76.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00030.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[44, 45, 0, 38]",
+      "angle_deg": 119.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00031.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[80, 60, 0, 47]",
+      "angle_deg": -125.5,
+      "direction_error_deg": 2.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00032.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 54, 69, 70]",
+      "angle_deg": -3.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00033.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[60, 63, 0, 61]",
+      "angle_deg": -150.0,
+      "direction_error_deg": 2.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00034.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[36, 61, 0, 54]",
+      "angle_deg": 147.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00035.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 44, 52, 47]",
+      "angle_deg": -39.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00036.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 52, 54, 56]",
+      "angle_deg": -63.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00037.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[51, 48, 0, 57]",
+      "angle_deg": -140.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00038.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 46, 45, 57]",
+      "angle_deg": -30.73421162862698,
+      "direction_error_deg": 1.26578837137302
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00039.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 49, 41, 57]",
+      "angle_deg": -63.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00040.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[44, 47, 0, 43]",
+      "angle_deg": -168.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00041.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[53, 57, 0, 68]",
+      "angle_deg": 128.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00042.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 51, 54, 61]",
+      "angle_deg": -55.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00043.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[44, 39, 0, 46]",
+      "angle_deg": 93.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00044.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[43, 56, 0, 37]",
+      "angle_deg": -179.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00045.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[52, 50, 0, 45]",
+      "angle_deg": 111.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00046.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[38, 42, 0, 50]",
+      "angle_deg": -94.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00047.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[49, 57, 0, 44]",
+      "angle_deg": -154.41833857950007,
+      "direction_error_deg": 0.41833857950007314
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00048.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 54, 72, 66]",
+      "angle_deg": 86.4474804935374,
+      "direction_error_deg": 0.5525195064626018
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00049.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[41, 45, 0, 74]",
+      "angle_deg": 164.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00050.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 51, 68, 50]",
+      "angle_deg": 54.25937476584403,
+      "direction_error_deg": 0.2593747658440293
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00051.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[45, 40, 0, 50]",
+      "angle_deg": -152.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00052.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[71, 43, 0, 66]",
+      "angle_deg": -130.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00053.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 48, 59, 49]",
+      "angle_deg": 39.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00054.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[52, 50, 0, 41]",
+      "angle_deg": 139.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00055.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 41, 61, 49]",
+      "angle_deg": -46.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00056.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 49, 43, 38]",
+      "angle_deg": -86.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00057.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[49, 46, 0, 66]",
+      "angle_deg": 120.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00058.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[54, 49, 0, 64]",
+      "angle_deg": -108.26094988354276,
+      "direction_error_deg": 0.2609498835427644
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00059.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 39, 55, 45]",
+      "angle_deg": 68.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00060.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 62, 47, 75]",
+      "angle_deg": 19.98972744719677,
+      "direction_error_deg": 1.0102725528032295
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00061.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 50, 52, 44]",
+      "angle_deg": 43.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00062.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[59, 51, 0, 61]",
+      "angle_deg": 179.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00063.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 43, 34, 53]",
+      "angle_deg": -31.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00064.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 52, 44, 54]",
+      "angle_deg": 1.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00065.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 51, 43, 48]",
+      "angle_deg": -37.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00066.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 47, 44, 51]",
+      "angle_deg": 41.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00067.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[44, 48, 0, 53]",
+      "angle_deg": -92.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00068.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 48, 42, 47]",
+      "angle_deg": -75.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00069.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[52, 51, 0, 66]",
+      "angle_deg": -140.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00070.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[47, 48, 0, 66]",
+      "angle_deg": 152.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00071.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 60, 55, 51]",
+      "angle_deg": -77.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00072.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[66, 65, 0, 69]",
+      "angle_deg": -124.45531049177578,
+      "direction_error_deg": 3.4553104917757764
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00073.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[41, 54, 0, 51]",
+      "angle_deg": -143.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00074.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 67, 55, 49]",
+      "angle_deg": 61.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00075.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[35, 41, 0, 79]",
+      "angle_deg": 117.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00076.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[62, 87, 0, 60]",
+      "angle_deg": 173.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00077.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[52, 43, 0, 73]",
+      "angle_deg": 177.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00078.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[63, 50, 0, 48]",
+      "angle_deg": -175.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00079.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[48, 64, 0, 67]",
+      "angle_deg": -114.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00080.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 72, 64, 71]",
+      "angle_deg": 50.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00081.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 45, 49, 55]",
+      "angle_deg": -60.12555239182586,
+      "direction_error_deg": 0.1255523918258632
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00082.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 54, 64, 55]",
+      "angle_deg": 67.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00083.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 51, 50, 59]",
+      "angle_deg": 36.837811643140014,
+      "direction_error_deg": 0.16218835685998556
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00084.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 45, 39, 48]",
+      "angle_deg": 48.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00085.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[1, 70, 34, 47]",
+      "angle_deg": -58.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00086.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[47, 45, 0, 51]",
+      "angle_deg": 126.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00087.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[52, 58, 0, 41]",
+      "angle_deg": 114.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00088.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[46, 55, 0, 45]",
+      "angle_deg": 176.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00089.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[73, 54, 0, 61]",
+      "angle_deg": -98.1888988373828,
+      "direction_error_deg": 0.18889883738279423
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00090.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 52, 47, 50]",
+      "angle_deg": -45.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00091.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 48, 44, 76]",
+      "angle_deg": 24.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00092.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 48, 43, 50]",
+      "angle_deg": -35.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00093.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 56, 70, 46]",
+      "angle_deg": 38.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00094.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[59, 48, 0, 41]",
+      "angle_deg": 157.5,
+      "direction_error_deg": 2.5
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00095.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[40, 61, 0, 49]",
+      "angle_deg": 112.77999334805105,
+      "direction_error_deg": 0.22000665194894964
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00096.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 42, 51, 66]",
+      "angle_deg": 39.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00097.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 49, 57, 53]",
+      "angle_deg": -74.07925676488966,
+      "direction_error_deg": 0.0792567648896636
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00098.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[42, 59, 0, 51]",
+      "angle_deg": -123.82440208415329,
+      "direction_error_deg": 0.17559791584670847
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00099.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[78, 52, 0, 38]",
+      "angle_deg": -173.72572717618448,
+      "direction_error_deg": 0.7257271761844777
+    },
+    {
+      "source": "augmented",
+      "split": "val",
+      "file": "val/LHouse/sample_00100.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 52, 49, 54]",
+      "angle_deg": -37.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00051.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[39, 50, 0, 51]",
+      "angle_deg": 107.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00052.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[63, 40, 0, 49]",
+      "angle_deg": 108.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00053.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[58, 48, 0, 51]",
+      "angle_deg": -144.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00054.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 54, 40, 46]",
+      "angle_deg": 3.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00055.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[57, 43, 0, 65]",
+      "angle_deg": 164.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00056.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 41, 56, 53]",
+      "angle_deg": -40.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00057.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 73, 71, 58]",
+      "angle_deg": -59.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00058.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 85, 45, 64]",
+      "angle_deg": -59.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00059.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 40, 64, 52]",
+      "angle_deg": 1.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00060.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[61, 56, 0, 65]",
+      "angle_deg": -155.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00061.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[76, 42, 0, 64]",
+      "angle_deg": -147.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00062.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 67, 52, 60]",
+      "angle_deg": -60.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00063.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[50, 48, 0, 35]",
+      "angle_deg": -159.43303384083492,
+      "direction_error_deg": 0.43303384083492347
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00064.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[56, 66, 0, 67]",
+      "angle_deg": -145.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00065.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[58, 67, 0, 71]",
+      "angle_deg": -175.0471124456239,
+      "direction_error_deg": 0.04711244562389538
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00066.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 56, 47, 72]",
+      "angle_deg": -65.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00067.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 57, 76, 67]",
+      "angle_deg": -71.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00068.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 63, 51, 50]",
+      "angle_deg": 28.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00069.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[66, 55, 0, 46]",
+      "angle_deg": -130.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00070.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[43, 43, 0, 57]",
+      "angle_deg": -159.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00071.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 60, 49, 58]",
+      "angle_deg": 42.57225394636566,
+      "direction_error_deg": 0.42774605363433693
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00072.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[40, 48, 0, 54]",
+      "angle_deg": 177.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00073.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 55, 53, 67]",
+      "angle_deg": 56.706239586413346,
+      "direction_error_deg": 0.2937604135866536
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00074.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[43, 48, 0, 43]",
+      "angle_deg": 151.0,
+      "direction_error_deg": 2.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00075.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[71, 56, 0, 49]",
+      "angle_deg": -163.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00076.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[71, 53, 0, 30]",
+      "angle_deg": -144.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00077.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[63, 46, 0, 77]",
+      "angle_deg": -152.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00078.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[45, 61, 0, 45]",
+      "angle_deg": 155.2294660160402,
+      "direction_error_deg": 0.2294660160401918
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00079.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 52, 56, 48]",
+      "angle_deg": 9.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00080.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 68, 67, 65]",
+      "angle_deg": 36.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00081.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 32, 67, 55]",
+      "angle_deg": 81.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00082.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 58, 40, 64]",
+      "angle_deg": 18.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00083.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 65, 40, 52]",
+      "angle_deg": 52.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00084.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[46, 42, 0, 59]",
+      "angle_deg": -91.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00085.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 51, 48, 60]",
+      "angle_deg": 86.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00086.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[61, 44, 0, 52]",
+      "angle_deg": -105.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00087.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 45, 56, 61]",
+      "angle_deg": -82.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00088.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[47, 50, 0, 56]",
+      "angle_deg": 92.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00089.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 47, 43, 55]",
+      "angle_deg": 32.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00090.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[1, 58, 53, 38]",
+      "angle_deg": 59.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00091.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[56, 65, 0, 44]",
+      "angle_deg": 115.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00092.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[42, 65, 0, 49]",
+      "angle_deg": -96.0,
+      "direction_error_deg": 0.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00093.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[43, 59, 0, 59]",
+      "angle_deg": -172.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00094.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[67, 51, 0, 56]",
+      "angle_deg": 137.5,
+      "direction_error_deg": 0.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00095.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 35, 38, 53]",
+      "angle_deg": 53.70523132747803,
+      "direction_error_deg": 1.2947686725219683
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00096.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[49, 52, 0, 58]",
+      "angle_deg": -117.08699046573815,
+      "direction_error_deg": 0.08699046573815394
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00097.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 54, 57, 50]",
+      "angle_deg": -59.5,
+      "direction_error_deg": 1.5
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00098.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[0, 47, 55, 40]",
+      "angle_deg": 1.0,
+      "direction_error_deg": 1.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00099.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[48, 69, 0, 61]",
+      "angle_deg": -179.0,
+      "direction_error_deg": 2.0
+    },
+    {
+      "source": "augmented",
+      "split": "test",
+      "file": "test/LHouse/sample_00100.txt",
+      "accepted": true,
+      "reason": "LHouse full direction from missing corner; roof corner supports=[60, 56, 0, 50]",
+      "angle_deg": -102.5,
+      "direction_error_deg": 0.5
+    }
+  ]
+}

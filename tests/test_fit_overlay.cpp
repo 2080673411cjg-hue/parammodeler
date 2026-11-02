@@ -17,7 +17,7 @@ int main( int argc, char **argv )
   QGuiApplication app( argc, argv );
   QFontDatabase::addApplicationFont( QStringLiteral( "C:/Windows/Fonts/msyh.ttc" ) );
   QGuiApplication::setFont( QFont( QStringLiteral( "Microsoft YaHei" ), 10 ) );
-  const QString text = QString::fromUtf8( "拟合残差 RMSE：0.068\nP95：0.145\n单位：场景坐标单位" );
+  const QString text = QString::fromUtf8( "拟合残差 RMSE：0.068\n表面贴合：88.0%\n外侧：9.0% | 内侧：3.0%\n容差：0.1 | 样本：2048\n单位：场景坐标单位" );
   assert( ParamModelerFitOverlay::captionImage( {}, { 640, 480 }, app.font() ).isNull() );
   assert( ParamModelerFitOverlay::captionImage( text, { 20, 20 }, app.font() ).isNull() );
 

@@ -1,0 +1,59 @@
+{
+  "file": "test/AsymmetricGableHouse/sample_00944.txt",
+  "class": "AsymmetricGableHouse",
+  "band": 1,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "AsymmetricGableHouse",
+      "params": {
+        "length": 19.428142547607422,
+        "width": 20.880802154541016,
+        "totalHeight": 10.223104476928711,
+        "wallRatio": 0.6129910349845886,
+        "ridgeLength": 12.7942476272583,
+        "ridgeRatio": 0.6586111783981323
+      },
+      "aux_features": {
+        "bbox_x": 1.3227057456970215,
+        "bbox_y": 1.505094051361084,
+        "bbox_z": 0.6949265003204346,
+        "scale": 15.622123718261719,
+        "bbox_volume": 1.3834573030471802,
+        "aspect_ratio_xy": 1.137890338897705
+      },
+      "canonical_alignment": {
+        "applied": true,
+        "status": "RIDGE_AXIS_OK",
+        "reason": "Robust outer rectangle aspect=1.064; near-square footprint, interchangeable axes; upper-surface axis disagreement=35.68 deg"
+      },
+      "poseRotateZ": -17.876563489313185,
+      "orientation": {
+        "verdict": "WEAK",
+        "pca_ratio": 1.179311864127631,
+        "peak_concentration": 0.0,
+        "n_segments": 0,
+        "reason": "Robust outer rectangle aspect=1.064; near-square footprint, interchangeable axes; upper-surface axis disagreement=35.68 deg"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_asymgable_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "length": 20.25,
+    "width": 21.5,
+    "totalHeight": 10.600000381469727,
+    "wallRatio": 0.6499999761581421,
+    "ridgeLength": 13.399999618530273,
+    "ridgeRatio": 0.6800000071525574
+  },
+  "prediction": {
+    "length": 19.428142547607422,
+    "width": 20.880802154541016,
+    "totalHeight": 10.223104476928711,
+    "wallRatio": 0.6129910349845886,
+    "ridgeLength": 12.7942476272583,
+    "ridgeRatio": 0.6586111783981323
+  },
+  "seconds": 5.855599400005303
+}

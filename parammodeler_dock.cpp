@@ -876,6 +876,9 @@ void ParamModelerDock::initPointNet()
   m_fitTimer->setSingleShot( true );
   m_fitTimer->setInterval( 200 );
   connect( m_fitTimer, &QTimer::timeout, this, &ParamModelerDock::updateFitEvaluation );
+  ui->menuLoad3D->addSeparator();
+  QAction *fitStatisticsAction = ui->menuLoad3D->addAction( tr( "Fit statistics and tolerance..." ) );
+  connect( fitStatisticsAction, &QAction::triggered, this, &ParamModelerDock::showFitEvaluationDetails );
 
   ui->widgetInversionPanel->setVisible( false );
   ui->widgetInversionPanel->setMinimumWidth( 0 );
@@ -1089,9 +1092,9 @@ void ParamModelerDock::onRandomizeCurrentPrimitive()
   randomizeCurrentPrimitiveParams( true );
 }
 
-void ParamModelerDock::randomizeCurrentPrimitiveParams( bool refreshPreview, bool randomizePose )
+void ParamModelerDock::randomizeCurrentPrimitiveParams( bool refreshPreview, bool randomizePose, int scaleBand )
 {
-  randomizePrimitiveParams( this, refreshPreview, randomizePose );
+  randomizePrimitiveParams( this, refreshPreview, randomizePose, scaleBand );
 }
 
 

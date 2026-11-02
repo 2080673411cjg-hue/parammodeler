@@ -1,0 +1,30 @@
+[
+  {
+    "class_name": "HalfCylinderRoof",
+    "file": "test/HalfCylinderRoof/sample_00992.txt",
+    "axis_error_deg": 90.0,
+    "near90_ge80": true,
+    "reason": "Robust outer rectangle aspect=1.098; upper-surface axis disagreement=29.78 deg"
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "file": "test/AsymmetricGableHouse/sample_00907.txt",
+    "axis_error_deg": 90.0,
+    "near90_ge80": true,
+    "reason": "Robust outer rectangle aspect=1.205; upper-surface axis disagreement=26.25 deg"
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "file": "test/AsymmetricGableHouse/sample_00972.txt",
+    "axis_error_deg": 89.54328841313509,
+    "near90_ge80": true,
+    "reason": "Robust outer rectangle aspect=1.941; upper-surface axis disagreement=20.23 deg"
+  },
+  {
+    "class_name": "AsymmetricGableHouse",
+    "file": "test/AsymmetricGableHouse/sample_01086.txt",
+    "axis_error_deg": 90.0,
+    "near90_ge80": true,
+    "reason": "Robust outer rectangle aspect=1.010; near-square footprint, interchangeable axes; upper-surface axis disagreement=16.30 deg"
+  }
+]

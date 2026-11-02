@@ -1,0 +1,45 @@
+{
+  "file": "test/CylinderDome/sample_01011.txt",
+  "class": "CylinderDome",
+  "band": 2,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "CylinderDome",
+      "params": {
+        "radius": 13.902992248535156,
+        "totalHeight": 9.66124153137207,
+        "cylinderRatio": 0.726870059967041,
+        "bulge": 0.26229584217071533
+      },
+      "aux_features": {
+        "bbox_x": 27.513870239257812,
+        "bbox_y": 27.289628982543945,
+        "bbox_z": 9.69218921661377,
+        "scale": 16.18765640258789,
+        "bbox_volume": 7277.3154296875,
+        "aspect_ratio_xy": 0.9918498992919922
+      },
+      "canonical_alignment": {
+        "applied": false,
+        "status": "SKIPPED_CLASS",
+        "reason": "Class 'CylinderDome' not in rotation enable list"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_cylinderdome_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "radius": 13.800000190734863,
+    "totalHeight": 9.699999809265137,
+    "cylinderRatio": 0.7200000286102295,
+    "bulge": 0.2800000011920929
+  },
+  "prediction": {
+    "radius": 13.902992248535156,
+    "totalHeight": 9.66124153137207,
+    "cylinderRatio": 0.726870059967041,
+    "bulge": 0.26229584217071533
+  },
+  "seconds": 5.8340208000154234
+}

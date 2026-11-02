@@ -1,0 +1,3 @@
+﻿class,file,error
+LHouse,test/LHouse/sample_00978.txt,"ValueError: Canonical orientation is uncertain for this cloud: LHouse needs three supported roof corners and one distinct missing corner
+"

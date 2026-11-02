@@ -1,0 +1,64 @@
+{
+  "file": "test/TruncatedPyramidRoof/sample_01055.txt",
+  "class": "TruncatedPyramidRoof",
+  "band": 1,
+  "response": {
+    "ok": true,
+    "result": {
+      "class": "TruncatedPyramidRoof",
+      "params": {
+        "geom_footprint_long": 21.144540786743164,
+        "geom_footprint_short": 13.945658683776855,
+        "geom_top_long_ratio": 0.413521945476532,
+        "geom_top_short_ratio": 0.4536614716053009,
+        "geom_total_height": 7.770094394683838,
+        "wallRatio": 0.7111055850982666,
+        "bottomLength": 21.144540786743164,
+        "bottomWidth": 13.945658683776855,
+        "topLengthRatio": 0.413521945476532,
+        "topWidthRatio": 0.4536614716053009,
+        "totalHeight": 7.770094394683838
+      },
+      "aux_features": {
+        "bbox_x": 1.6011055707931519,
+        "bbox_y": 1.440718412399292,
+        "bbox_z": 0.5877810120582581,
+        "scale": 14.29399299621582,
+        "bbox_volume": 1.3558592796325684,
+        "aspect_ratio_xy": 0.899827241897583
+      },
+      "canonical_alignment": {
+        "applied": true,
+        "status": "GEOMETRY_OK",
+        "reason": "Robust outer rectangle aspect=1.479"
+      },
+      "poseRotateZ": -33.0,
+      "orientation": {
+        "verdict": "PASS",
+        "pca_ratio": 2.084440080222349,
+        "peak_concentration": 0.0,
+        "n_segments": 0,
+        "reason": "Robust outer rectangle aspect=1.479"
+      }
+    },
+    "model_log_dir": "/home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_truncatedpyramid_v8_normals"
+  },
+  "ok": true,
+  "truth": {
+    "geom_footprint_long": 21.100000381469727,
+    "geom_footprint_short": 14.210000038146973,
+    "geom_top_long_ratio": 0.3909952640533447,
+    "geom_top_short_ratio": 0.44123855233192444,
+    "geom_total_height": 7.900000095367432,
+    "wallRatio": 0.699999988079071
+  },
+  "prediction": {
+    "geom_footprint_long": 21.144540786743164,
+    "geom_footprint_short": 13.945658683776855,
+    "geom_top_long_ratio": 0.413521945476532,
+    "geom_top_short_ratio": 0.4536614716053009,
+    "geom_total_height": 7.770094394683838,
+    "wallRatio": 0.7111055850982666
+  },
+  "seconds": 5.962767399963923
+}

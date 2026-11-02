@@ -32,6 +32,8 @@
 #include <qgspointxy.h>
 
 class QCheckBox;
+class QDialog;
+class QLabel;
 class QProgressDialog;
 class QPushButton;
 class QToolButton;
@@ -68,7 +70,7 @@ class ParamModelerDock : public QDockWidget
                                           const QString &rootPath, int pointCount,
                                           ParamModelerDock *dock, QProgressDialog &progress,
                                           int &generated, int &failed );
-  friend void randomizePrimitiveParams( ParamModelerDock *dock, bool refreshPreview, bool randomizePose );
+  friend void randomizePrimitiveParams( ParamModelerDock *dock, bool refreshPreview, bool randomizePose, int scaleBand );
 
 public:
   explicit ParamModelerDock( QgisInterface *iface, QWidget *parent = nullptr );
@@ -193,8 +195,9 @@ private:
   void schedulePreviewUpdate();
   void scheduleFitEvaluation();
   void updateFitEvaluation();
+  void showFitEvaluationDetails();
   void resetFitEvaluation();
-  void randomizeCurrentPrimitiveParams( bool refreshPreview, bool randomizePose = false );
+  void randomizeCurrentPrimitiveParams( bool refreshPreview, bool randomizePose = false, int scaleBand = -1 );
   bool loadPointCloudToQGIS3D( const QString &filePath, bool showMessage );
 
   // 缓存输入文件的 metadata（center 质心用于反归一化，bbox 极值/底面用于对齐）
@@ -255,6 +258,9 @@ private:
   bool             m_previewUpdateInProgress = false;
   QTimer *m_fitTimer = nullptr;
   QVector<QVector3D> m_fitCloudPoints;
+  double m_fitTolerance = 0.10;
+  QPointer<QDialog> m_fitDetailsDialog;
+  QPointer<QLabel> m_fitDetailsLabel;
 		
   QgsVectorLayer *m_modelLayer = nullptr;//新增一个成员变量，缓存图层指针
   QPointer<QgsMapLayer> m_pointCloudLayer;    // 缓存外部点云图层，用于清除

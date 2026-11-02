@@ -1,2 +1,7 @@
 .vs/
 **/__pycache__/
+/tmp*/
+/close-zoom-restore-*/
+/parammodeler-i18n-*/
+/tests/torchinductor_*/
+/evaluations/pcl_normals_20261030/*.dll

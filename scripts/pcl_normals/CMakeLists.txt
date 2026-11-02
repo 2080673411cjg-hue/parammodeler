@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 3.16)
+project(parammodeler_pcl_normals LANGUAGES C CXX)
+
+find_package(PCL REQUIRED COMPONENTS common kdtree)
+find_package(OpenMP REQUIRED COMPONENTS CXX)
+
+add_library(pcl_normals SHARED pcl_normals.cpp)
+target_compile_features(pcl_normals PRIVATE cxx_std_14)
+target_include_directories(pcl_normals SYSTEM PRIVATE ${PCL_INCLUDE_DIRS})
+target_link_directories(pcl_normals PRIVATE ${PCL_LIBRARY_DIRS})
+target_compile_options(pcl_normals PRIVATE ${PCL_DEFINITIONS})
+target_compile_definitions(pcl_normals PRIVATE PCL_BENCH_VERSION="${PCL_VERSION}")
+target_link_libraries(pcl_normals PRIVATE ${PCL_LIBRARIES} OpenMP::OpenMP_CXX)
+if(MSVC)
+  target_compile_options(pcl_normals PRIVATE /O2 /wd4996)
+endif()
