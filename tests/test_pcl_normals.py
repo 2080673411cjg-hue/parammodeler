@@ -37,7 +37,7 @@ class CacheTests(unittest.TestCase):
                 return np.ones_like(points), None, 0
 
         with tempfile.TemporaryDirectory(dir=ROOT / 'tests') as folder:
-            source = Path(folder) / 'train/Cuboid/a.txt'
+            source = Path(folder) / 'train/FlatRoofHouse/a.txt'
             calc = Calculator()
             points = np.zeros((8, 3), np.float32)
             cache = NormalCache(folder, calc)
@@ -98,13 +98,13 @@ class NativePipelineTests(unittest.TestCase):
         self.records = []
         for split, count in (('train', 2), ('val', 1), ('test', 1)):
             for i in range(count):
-                relative = f'{split}/GabledRoof/sample_{i}.txt'
+                relative = f'{split}/GableRoofHouse/sample_{i}.txt'
                 path = self.root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 points = np.random.default_rng(i).normal(size=(48, 3)).astype(np.float32)
                 # Additional semantic columns must not be interpreted as normals.
                 np.savetxt(path, np.column_stack((points, np.ones(len(points)))))
-                self.records.append({'type': 'GabledRoof', 'split': split, 'file': relative,
+                self.records.append({'type': 'GableRoofHouse', 'split': split, 'file': relative,
                     'params': {'length': 12, 'width': 10, 'totalHeight': 8,
                                'wallRatio': .6, 'ridgeRatio': .3, 'rz': 37},
                     'pointCloudInfo': {'bboxSize': [12, 10, 8], 'scale': 7}})
@@ -119,9 +119,9 @@ class NativePipelineTests(unittest.TestCase):
             prepare_cache()
         self.assertIn('hit=0 computed=4', stream.getvalue())
         with contextlib.redirect_stdout(io.StringIO()) as stream:
-            cls = classification.PointCloudClassificationDataset(self.root, 'train', ['GabledRoof'], 32,
+            cls = classification.PointCloudClassificationDataset(self.root, 'train', ['GableRoofHouse'], 32,
                 use_normals=True, normal_backend='pcl', normal_workers=2)
-            ds = regression.ParamRegressionDataset(self.root, self.metadata, 'GabledRoof', 'train',
+            ds = regression.ParamRegressionDataset(self.root, self.metadata, 'GableRoofHouse', 'train',
                 ['length', 'width'], 32, use_normals=True, normal_backend='pcl', canonical_align=True)
         self.assertEqual(stream.getvalue().count('hit=2 computed=0'), 2)
         self.assertIn('workers=0', stream.getvalue())
@@ -174,8 +174,8 @@ class NativePipelineTests(unittest.TestCase):
                 return self.head(points.mean(dim=1))
 
         for split in ('train', 'val', 'test'):
-            for path in (self.root / split / 'GabledRoof').glob('*.txt'):
-                dest = path.parent.parent / 'Cuboid' / path.name
+            for path in (self.root / split / 'GableRoofHouse').glob('*.txt'):
+                dest = path.parent.parent / 'FlatRoofHouse' / path.name
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 dest.write_bytes(path.read_bytes())
         log_dir = self.root / 'logs'
@@ -190,7 +190,7 @@ class NativePipelineTests(unittest.TestCase):
                 self.assertEqual(ckpt['normal_backend'], 'pcl')
                 config = json.loads((log_dir / 'classification_config.json').read_text(encoding='utf-8'))
                 self.assertEqual(config['normal_backend'], 'pcl')
-                args.input = str(self.root / 'test/GabledRoof/sample_0.txt')
+                args.input = str(self.root / 'test/GableRoofHouse/sample_0.txt')
                 args.normal_backend = 'numpy'  # The saved backend must take precedence.
                 with patch.object(regression, 'estimate_normals', side_effect=AssertionError('wrong backend')):
                     classification.predict(args)

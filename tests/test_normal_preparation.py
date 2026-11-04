@@ -100,22 +100,22 @@ if __name__ == "__main__":
     root = Path(__file__).parent
     records = []
     for i in range(4):
-        relative = f"train/GabledRoof/{i}.txt"
+        relative = f"train/GableRoofHouse/{i}.txt"
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         np.savetxt(path, np.random.default_rng(i).normal(size=(32, 3)))
-        records.append({"type": "GabledRoof", "split": "train", "file": relative,
+        records.append({"type": "GableRoofHouse", "split": "train", "file": relative,
             "params": {"length": 12, "width": 10, "totalHeight": 8,
                        "wallRatio": .6, "ridgeRatio": .3, "rz": 120},
             "pointCloudInfo": {"bboxSize": [12, 10, 8], "scale": 7}})
     (root / "metadata.json").write_text(json.dumps(records), encoding="utf-8")
     for cache in (False, True):
         options = dict(train=True, jitter_sigma=.003, use_normals=True, cache_points=cache)
-        old = PointCloudClassificationDataset(root, "train", ["GabledRoof"], 16,
+        old = PointCloudClassificationDataset(root, "train", ["GableRoofHouse"], 16,
             random_rotate=True, normal_workers=0, **options)
         np.random.seed(987)
         rng_before = np.random.get_state()
-        new = PointCloudClassificationDataset(root, "train", ["GabledRoof"], 16,
+        new = PointCloudClassificationDataset(root, "train", ["GableRoofHouse"], 16,
             random_rotate=True, normal_workers=2, **options)
         rng_after = np.random.get_state()
         assert rng_before[0] == rng_after[0]
@@ -124,7 +124,7 @@ if __name__ == "__main__":
         compare(old, new)
         regression_options = dict(canonical_align=True, aux_names=["bbox_x", "bbox_y", "scale"],
                                   geom_aux_targets=["geom_total_height"], **options)
-        args = (root, root / "metadata.json", "GabledRoof", "train",
+        args = (root, root / "metadata.json", "GableRoofHouse", "train",
                 ["length", "width", "totalHeight", "wallRatio", "ridgeRatio"], 16)
         compare(ParamRegressionDataset(*args, normal_workers=0, **regression_options),
                 ParamRegressionDataset(*args, normal_workers=2, **regression_options))

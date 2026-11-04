@@ -1,5 +1,7 @@
 """Test all thirteen regression checkpoints using estimated geometry orientation."""
 
+from primitive_names import canonical_class_name, regression_slug
+
 import argparse
 import csv
 import importlib.util
@@ -21,7 +23,7 @@ def prepare_plan(data_root, log_root, output_root, run_tag):
         raise ValueError("Keep evaluation output outside the dataset and checkpoint directories")
     classes = {recipe[0] for recipe in RECIPES}
     records = [row for row in read_json(data_root / "metadata/sample_params.json")
-               if row.get("split") == "test" and row.get("type") in classes]
+               if row.get("split") == "test" and canonical_class_name(row.get("type")) in classes]
     seen = set()
     for row in records:
         relative = str(row.get("file", "")).replace("\\", "/")
@@ -34,14 +36,14 @@ def prepare_plan(data_root, log_root, output_root, run_tag):
         seen.add(relative)
     jobs = []
     for name, slug, _, _ in RECIPES:
-        count = sum(row["type"] == name for row in records)
+        count = sum(canonical_class_name(row["type"]) == name for row in records)
         if count != 200:
             raise ValueError(f"Expected 200 test clouds for {name}, found {count}")
-        directory = log_root / f"ptv3_reg_{slug}_{run_tag}_normals"
+        directory = log_root / f"ptv3_reg_{regression_slug(name, run_tag)}_{run_tag}_normals"
         if not (directory / "best_model.pth").is_file():
             raise FileNotFoundError(directory / "best_model.pth")
         config = read_json(directory / "regression_config.json")
-        if config.get("class_name") != name or not config.get("canonical_align"):
+        if canonical_class_name(config.get("class_name")) != name or not config.get("canonical_align"):
             raise ValueError(f"Unexpected class or non-canonical checkpoint: {directory}")
         jobs.append({"class": name, "directory": str(directory), "expected": count})
     return records, jobs
@@ -62,8 +64,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data_root", required=True)
     parser.add_argument("--log_root", default="logs")
-    parser.add_argument("--output_root", default="evaluations/ptv3_v8_geometry")
-    parser.add_argument("--run_tag", default="v8")
+    parser.add_argument("--output_root", default="evaluations/ptv3_v10_geometry")
+    parser.add_argument("--run_tag", default="v10")
     parser.add_argument("--dry_run", action="store_true")
     args = parser.parse_args()
     data_root, log_root, output_root = (Path(value).resolve() for value in

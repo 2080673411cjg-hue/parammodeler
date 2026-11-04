@@ -42,9 +42,9 @@ class ClassificationLoadingTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root / "metadata").mkdir()
         (self.root / "metadata/class_names.txt").write_text(
-            "Cuboid\nCylinder\nTriPrismPyramid\n", encoding="utf-8")
+            "FlatRoofHouse\nCylinder\nTriPrismPyramid\n", encoding="utf-8")
         for split, count in (("train", 4), ("val", 2)):
-            for name in ("Cuboid", "Cylinder", "TriPrismPyramid"):
+            for name in ("FlatRoofHouse", "RoundFlatRoofHouse", "TriPrismPyramid"):
                 folder = self.root / split / name
                 folder.mkdir(parents=True)
                 for index in range(count):
@@ -53,7 +53,7 @@ class ClassificationLoadingTests(unittest.TestCase):
 
     def dataset(self, cache, normalize=True, normals=True):
         return classification.PointCloudClassificationDataset(
-            self.root, "train", ["Cuboid", "Cylinder"], 8, train=True,
+            self.root, "train", ["FlatRoofHouse", "RoundFlatRoofHouse"], 8, train=True,
             normalize=normalize, jitter_sigma=.003, random_rotate=True,
             use_normals=normals, cache_points=cache)
 
@@ -98,9 +98,9 @@ class ClassificationLoadingTests(unittest.TestCase):
             self.assertEqual(read.call_count, 2)
 
     def test_triangular_prism_is_excluded_from_metadata_and_folder_discovery(self):
-        self.assertEqual(classification.discover_class_names(self.root), ["Cuboid", "Cylinder"])
+        self.assertEqual(classification.discover_class_names(self.root), ["FlatRoofHouse", "RoundFlatRoofHouse"])
         (self.root / "metadata/class_names.txt").unlink()
-        self.assertEqual(classification.discover_class_names(self.root), ["Cuboid", "Cylinder"])
+        self.assertEqual(classification.discover_class_names(self.root), ["FlatRoofHouse", "RoundFlatRoofHouse"])
 
     def test_loader_uses_explicit_cpu_device_and_spawn_options(self):
         with patch("builtins.print"):
@@ -160,7 +160,7 @@ class ClassificationLoadingTests(unittest.TestCase):
             classification.main()
         config = json.loads((output / "classification_config.json").read_text())
         checkpoint = classification.load_checkpoint(output, torch.device("cpu"))
-        self.assertEqual(config["class_names"], ["Cuboid", "Cylinder"])
+        self.assertEqual(config["class_names"], ["FlatRoofHouse", "RoundFlatRoofHouse"])
         self.assertEqual(checkpoint["class_names"], config["class_names"])
         self.assertEqual(checkpoint["data_loading"], config["data_loading"])
         self.assertTrue(config["data_loading"]["cache_points"])
@@ -236,7 +236,7 @@ from main import PointCloudClassificationDataset, make_loader
 
 def run(cache):
     root = Path(__file__).parent
-    ds = PointCloudClassificationDataset(root, "train", ["Cuboid", "Cylinder"], 8,
+    ds = PointCloudClassificationDataset(root, "train", ["FlatRoofHouse", "RoundFlatRoofHouse"], 8,
         train=True, jitter_sigma=.003, random_rotate=True, cache_points=cache)
     loader = make_loader(ds, 2, True, 2, torch.device("cpu"), 42)
     return [[(points.clone(), labels.clone(), paths) for points, labels, paths in loader]
@@ -263,10 +263,10 @@ if __name__ == "__main__":
         with torch.no_grad():
             model.head.weight.zero_()
             model.head.bias.copy_(torch.tensor([10., -10.]))
-        torch.save({"state_dict": model.state_dict(), "class_names": ["LHouse", "Cuboid"],
+        torch.save({"state_dict": model.state_dict(), "class_names": ["LShapedHouse", "FlatRoofHouse"],
                     "num_points": 8, "normalize_points": True, "use_normals": False},
                    output / "best_model.pth")
-        argv = ["main.py", "--mode", "predict", "--input", str(self.root / "train/Cuboid/0.txt"),
+        argv = ["main.py", "--mode", "predict", "--input", str(self.root / "train/FlatRoofHouse/0.txt"),
                 "--data_root", str(self.root), "--log_dir", str(output), "--topk", "2", "--cpu"]
         stream = io.StringIO()
         with patch.object(sys, "argv", argv), patch.object(classification, "build_model", return_value=TinyClassifier()), \
@@ -274,19 +274,19 @@ if __name__ == "__main__":
              contextlib.redirect_stdout(stream):
             classification.main()
         result = json.loads(stream.getvalue())
-        self.assertEqual([item["class"] for item in result], ["LHouse", "Cuboid"])
+        self.assertEqual([item["class"] for item in result], ["LShapedHouse", "FlatRoofHouse"])
         self.assertGreater(result[0]["prob"], .99)
 
     def test_amp_checkpoint_remains_loadable_for_fp32_prediction(self):
         output = self.root / "amp_checkpoint"
         output.mkdir()
         model = TinyClassifier()
-        torch.save({"state_dict": model.state_dict(), "class_names": ["Cuboid", "Cylinder"],
+        torch.save({"state_dict": model.state_dict(), "class_names": ["FlatRoofHouse", "RoundFlatRoofHouse"],
                     "num_points": 8, "normalize_points": True, "use_normals": False, "amp": True},
                    output / "best_model.pth")
         dtypes = []
         model.register_forward_hook(lambda module, inputs, result: dtypes.append(result.dtype))
-        argv = ["main.py", "--mode", "predict", "--input", str(self.root / "train/Cuboid/0.txt"),
+        argv = ["main.py", "--mode", "predict", "--input", str(self.root / "train/FlatRoofHouse/0.txt"),
                 "--data_root", str(self.root), "--log_dir", str(output), "--cpu"]
         stream = io.StringIO()
         with patch.object(sys, "argv", argv), patch.object(classification, "build_model", return_value=model), \

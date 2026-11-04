@@ -10,6 +10,44 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 
 项目的核心目标不是只输出一个不可编辑的三角网格，而是把建筑点云转换为结构化、可解释、可编辑、可复现的参数化三维模型。
 
+## v2.4.2（2026-11-04）
+
+本版统一十三类建筑的名称，接入 v10 分类和回归权重，增加推理状态、微调前后拟合对比及任务终止。
+
+### 一键完成可终止
+
+参数估计窗口运行时，进度条右侧显示“终止”。点击后中断当前推理等待，停止后续分类、回归、加载和对齐步骤；不弹出推理失败警告，窗口保留，可重新执行。已经完成的参数应用或场景加载保留，不自动撤回。分类仍采用现有第一候选。
+
+本机推理会停止此次 Python 子进程；远程请求会取消连接，配套服务在检测到断连后停止此次推理子进程，不影响服务或其他请求。文件读取、模型生成与场景加载等同步步骤会在当前步骤结束后响应终止。用户自行编译插件；远程端请同步更新的 `E:/pointnet/ptv3_simple/ptv3_server.py` 后重启，无需重训，命令见 [v10 部署](scripts/README.md#v10-部署2026-11-03)。
+
+### 实际模型版本与方向状态
+
+参数估计窗口在分类结果下显示实际使用的分类模型、回归模型和回归输入的方向规范化状态；悬停可查看完整权重路径及方向说明。分类接口补充成功请求的 `model_log_dir`，插件按实际返回路径显示版本；旧服务未返回路径或方向状态时显示“未确认”。未启用规范化的类别单独提示，不据此宣称位置已对齐。
+
+“一键完成”后重新打开同一份点云、同一基元与后端的窗口，可查看最近推理信息。插件由用户编译；远程分类版本确认需将更新的 `ptv3_server.py` 同步到 Ubuntu 并重启服务，无需重训。部署命令见 [v10 部署](scripts/README.md#v10-部署2026-11-03)。
+
+### 微调前后拟合对比
+
+三维视图现有浮窗增加“初始 → 当前”的 RMSE 和表面贴合率。初始状态记录微调前的模型、位置和固定点样本；自动预测流程在完成对齐后记录，拖动参数或调整位置时保持基准。外侧/内侧点比例继续表示当前模型。
+
+修改容差时，初始模型和当前模型按同一容差重新评价；换点云、重新加载模型、切换基元或应用新预测后开始新的比较。详见“拟合统计与容差”。本次不涉及训练或 Ubuntu 同步，用户自行编译插件后生效。
+
+### 分类与十三类回归接入 v10
+
+插件默认值、恢复默认值、服务入口与串联推理入口统一切到分类 `ptv3_cls_v10`、回归 `_v10_normals`。首次读取配置时将已有设置一次性切到 v10，后续手动选择其他版本继续生效。十三类按新短名定位权重，例如 L 形为 `ptv3_reg_lshaped_v10_normals`、曲面顶圆屋为 `ptv3_reg_curvedround_v10_normals`；旧版本仍可按旧短名加载。
+
+本轮分类测试 2598/2600 正确（99.9231%），十三类回归均完成 100 轮。数据已经重新生成，不能把 v9/v10 各自报告的差值直接视为同集精度提升。完整结果见 [v10 训练分析](evaluations/v10_training_review_20261103.md)。41 项模型选择及名称兼容测试、配置源文件 MSVC 语法检查通过；本地脚本已同步，插件由用户编译，Ubuntu 服务仍需同步并重启，见 [v10 部署](scripts/README.md#v10-部署2026-11-03)。
+
+### 建筑类别命名统一与 v10 数据流程
+
+十三类使用房屋名称，中文显示与内部类别 ID 分开。新生成的数据、标签与训练配方采用新 ID，训练版本继续递增为 **v10**。完整名称表、生成/增强/PCL缓存/训练命令和 Ubuntu 同步清单见 [改名与 v10 操作流程](scripts/renaming-v10.md)。三棱柱继续排除。
+
+该次改名保留了当时的 v9 默认权重，现已按文首记录切换为 v10。旧类别名在读取时映射为新 ID，分类输出索引顺序不变；v1～v9 回归目录继续按旧短名定位，v10 使用新短名。此次不移动已有数据、历史实验目录或改写 checkpoint，也不改变几何、参数、采样和损失定义。重新生成数据应覆盖旧类别目录，避免混用新旧名称。
+
+### 已知对齐问题
+
+对 v10 十三类共 2600 份合成测试样本做了离线复测。使用真值尺寸和朝向隔离自动平移时，46 份水平偏移超过 1 米。其中 34 份坡顶房屋采用了覆盖不完整的底层轮廓，另有 11 份带檐曲面顶圆屋回退到包围盒中心。双坡顶 1806、平顶四坡 1890 和曲面顶圆屋 1983 可用于复查。底层轮廓校验和圆塔圆心回退改进列入后续开发。
+
 ## v2.4.1（2026-11-02）
 
 本版汇总 v2.4.0 之后的对齐、数据、训练与拟合评价改进，作为基元改名前的保存版本。现有中文名称、英文类别标识、数据目录及权重映射继续沿用。
@@ -23,7 +61,7 @@ ParamModeler 是一个面向 QGIS 的参数化三维建筑基元建模与点云�
 
 v9 分类为 2591/2600 正确（99.65%）；同集回归的 64 个参数中 38 项 MAE 下降、26 项上升，不能将版本升级表述为全部参数精度提升。部分回归报告使用 metadata 朝向，完整姿态定位与形状贴合应分别评价，详见 [v9 训练分析](evaluations/v9_training_review_20261102.md)。
 
-以下按日期保留实施过程和当时的验证条件；当前发布状态以本节为准。本次发布更新源码版本及日志，未重新构建插件 DLL。
+以下按日期保留当时的实施过程和验证条件。
 
 ## 分类与十三类回归统一接入 v9（2026-11-02）
 
@@ -235,13 +273,13 @@ v4 测试集（各类100份）显示：屋脊方向规范化后，GabledRoof `ri
 
 PTv3 远程推理和本地 PCT 现作为两个可选入口；首批角锚定模型可按点云左下墙顶/檐口语义角自动对齐。面板估计与对齐代码已拆分，圆锥、穹顶、圆塔和半圆柱屋顶的实时线框缺线已修复，并精简了圆塔底部檐口内圈。具体变更和验证范围见 `dl-pipeline-log.md`。
 
-PTv3 分类默认使用 `ptv3_cls_v9`；插件与仓库服务脚本的回归默认值为 `ptv3_reg_<类别短名>_v9_normals`。当前增强集每类 train/val/test 为 1600/200/200，共 26000 份；分类 v9 测试准确率为 99.65%（2591/2600）。Ubuntu 线上服务需同步脚本并重启，实际分类版本以 `/health` 的 `cls_log` 为准；QGIS 分类、回归与对齐流程仍需现场验收。
+PTv3 分类默认使用 `ptv3_cls_v10`；插件与仓库服务脚本的回归默认值为 `ptv3_reg_<新类别短名>_v10_normals`。当前增强集每类 train/val/test 为 1600/200/200，共 26000 份；分类 v10 测试准确率为 99.9231%（2598/2600）。Ubuntu 线上服务需同步脚本并重启，实际分类版本以 `/health` 的 `cls_log` 为准；QGIS 分类、回归与对齐流程仍需现场验收。
 
-PTv3 服务可在插件“PointNet 路径设置”中切换实验室局域网 `http://192.168.1.113:8008` 与 Tailscale `http://100.70.215.84:8008`，两种模式共用 Ubuntu 上的权重，无需重新训练。切换后下次推理生效；局域网需能访问实验室机器，Tailscale 需两机在线。部署新版服务后，`/health` 默认应显示 `reg_suffix` 为 `_v9_normals`，单次回归响应中的 `model_log_dir` 用于确认该请求实际加载的目录。仓库内的 `scripts/ptv3_server.py` 是服务端部署副本；Ubuntu 的 `uvicorn` 进程需持续运行。更完整的训练与部署命令见 `scripts/README.md`。
+PTv3 服务可在插件“PointNet 路径设置”中切换实验室局域网 `http://192.168.1.113:8008` 与 Tailscale `http://100.70.215.84:8008`，两种模式共用 Ubuntu 上的权重，无需重新训练。切换后下次推理生效；局域网需能访问实验室机器，Tailscale 需两机在线。部署新版服务后，`/health` 默认应显示 `reg_suffix` 为 `_v10_normals`，单次回归响应中的 `model_log_dir` 用于确认该请求实际加载的目录。仓库内的 `scripts/ptv3_server.py` 是服务端部署副本；Ubuntu 的 `uvicorn` 进程需持续运行。更完整的训练与部署命令见 `scripts/README.md`。
 
 ### 2026-09-21
 
-参数估计窗口按钮顺序为“分类 / 估计参数 / 一键完成 / 返回微调”。加载有效点云后，“一键完成”按当前后端依次执行分类、回归（沿用几何校正开关和强度百分比）、加载模型与点云、自动对齐，成功后关闭窗口返回微调。任何一步失败即中止并保留窗口；运行时禁用输入修改和重复点击。原有分步按钮保留，三面拟合角点仍需人工选面，不包含在自动流程中。
+参数估计窗口按钮顺序为“分类 / 估计参数 / 一键完成 / 返回微调”。加载有效点云后，“一键完成”按当前后端依次执行分类、回归（沿用几何校正开关和强度百分比）、加载模型与点云、自动对齐，成功后关闭窗口返回微调。任何一步失败即中止并保留窗口；运行时禁用输入修改和重复点击，进度条旁可点“终止”停止后续流程。原有分步按钮保留，三面拟合角点仍需人工选面，不包含在自动流程中。
 
 几何校正从“完全覆盖”改为可调融合：`0%` 保持 PCT 预测，`100%` 等价于旧版点云几何强修正，默认 `70%` 按 `PCT + 0.7 * (几何测量 - PCT)` 写回参数。当前支持 Cuboid / Cylinder / GabledRoof，并已扩展到第一批 v4-1 四类 HalfCylinderRoof / TruncatedPyramidRoof / LHouse / IndentedCuboid；评估 CSV schema v2 会记录当次推理是否启用校正及强度。
 
@@ -287,29 +325,29 @@ PTv3 服务可在插件“PointNet 路径设置”中切换实验室局域网 `h
 
 | 类型标识 | 说明 | 主要参数 |
 |---|---|---|
-| `Cuboid` | 长方体 | `length`, `width`, `height` |
-| `Cylinder` | 圆柱体 | `radius`, `height` |
-| `LHouse` | L 型房屋 | `outerLength`, `outerWidth`, `cutoutLengthRatio`, `cutoutWidthRatio`, `height` |
-| `ConeCylinder` | 圆柱 + 圆锥 | `radius`, `totalHeight`, `cylinderRatio` |
-| `GabledRoof` | 人字形屋顶房屋 | `length`, `width`, `totalHeight`, `wallRatio`, `ridgeRatio`（旧四参数权重默认屋脊居中） |
-| `PyramidRoof` | 金字塔屋顶房屋 | `length`, `width`, `totalHeight`, `wallRatio` |
-| `TruncatedPyramidRoof` | 截顶金字塔屋顶 | `bottomLength`, `bottomWidth`, `topLengthRatio`, `topWidthRatio`, `totalHeight`, `wallRatio` |
-| `HalfCylinderRoof` | 半圆柱拱顶房屋 | `length`, `width`, `wallHeight`（`roofRadius = width/2` 派生） |
-| `CylinderDome` | 圆柱穹顶 | `radius`, `totalHeight`, `cylinderRatio`, `bulge` |
-| `IndentedCuboid` | 凹陷长方体 | `outerLength`, `outerWidth`, `outerHeight`, `innerLengthRatio`, `innerWidthRatio`, `innerHeight`, `innerMinXRatio`, `innerMinYRatio` |
-| `AsymmetricGableHouse` | 非对称人字形房屋 | `length`, `width`, `totalHeight`, `wallRatio`, `ridgeLength`, `ridgeRatio` |
-| `FourStageRoundTower` | 四段式圆塔 | `baseRadius`, `baseHeight`, `middleHeight`, `middleTopRadius`, `middleRise`, `coneHeight`, `eaveRadius`, `eaveHeight`（八个实际尺寸；旧 `middleBulge` 权重不兼容） |
-| `TwoGableHouses` | 双人字形房屋 | `length1`, `length2`, `width`, `totalHeight`, `wallRatio`, `angle`, `ridgeRatio` |
+| `FlatRoofHouse` | 矩形平顶房屋 | `length`, `width`, `height` |
+| `RoundFlatRoofHouse` | 圆形平顶房屋 | `radius`, `height` |
+| `LShapedHouse` | L形平顶房屋 | `outerLength`, `outerWidth`, `cutoutLengthRatio`, `cutoutWidthRatio`, `height` |
+| `ConicalRoofHouse` | 圆锥顶圆屋 | `radius`, `totalHeight`, `cylinderRatio` |
+| `GableRoofHouse` | 双坡顶房屋 | `length`, `width`, `totalHeight`, `wallRatio`, `ridgeRatio`（旧四参数权重默认屋脊居中） |
+| `PyramidalRoofHouse` | 四坡尖顶房屋 | `length`, `width`, `totalHeight`, `wallRatio` |
+| `FlatTopHipRoofHouse` | 平顶四坡房屋 | `bottomLength`, `bottomWidth`, `topLengthRatio`, `topWidthRatio`, `totalHeight`, `wallRatio` |
+| `BarrelRoofHouse` | 筒拱顶房屋 | `length`, `width`, `wallHeight`（`roofRadius = width/2` 派生） |
+| `DomeRoofHouse` | 穹顶圆屋 | `radius`, `totalHeight`, `cylinderRatio`, `bulge` |
+| `RecessedRoofHouse` | 内凹式平顶房屋 | `outerLength`, `outerWidth`, `outerHeight`, `innerLengthRatio`, `innerWidthRatio`, `innerHeight`, `innerMinXRatio`, `innerMinYRatio` |
+| `ShortRidgeHipRoofHouse` | 短脊四坡顶房屋 | `length`, `width`, `totalHeight`, `wallRatio`, `ridgeLength`, `ridgeRatio` |
+| `CurvedRoofRoundHouse` | 带檐曲面顶圆屋 | `baseRadius`, `baseHeight`, `middleHeight`, `middleTopRadius`, `middleRise`, `coneHeight`, `eaveRadius`, `eaveHeight`（八个实际尺寸；旧 `middleBulge` 权重不兼容） |
+| `AngledGableHouse` | 转折式双坡顶房屋 | `length1`, `length2`, `width`, `totalHeight`, `wallRatio`, `angle`, `ridgeRatio` |
 | `TriPrismPyramid` | 三棱柱 + 三棱锥 | `leg`, `baseSide`, `totalHeight`, `pyramidRatio` |
 
-`CylinderDome` 是当前正式类型名，代码中仍兼容旧名 `CylinderHemisphere`。
+当前类别 ID 见上表。读取旧权重时兼容全部旧类别名及 `CylinderHemisphere`；三棱柱仅保留手工建模，不参与本轮数据生成与训练。
 
 **锚点（原点）按类划分**（v2.3.5 起，方案 B；判定集中在 `BuildMesh::usesCornerAnchor()`）：
 
 | 锚点 | 类 | 行为 |
 |---|---|---|
-| **底面左下角** | Cuboid / GabledRoof / PyramidRoof / TruncatedPyramidRoof / HalfCylinderRoof / IndentedCuboid / AsymmetricGableHouse / LHouse / TwoGableHouses | 构建时原点即 (0,0,0)，不再居中；长/宽沿 +X/+Y **单边生长**，旋转绕左下角 |
-| 底面中心 | Cylinder / ConeCylinder / CylinderDome / FourStageRoundTower / TriPrismPyramid | 走 `centerMeshOnBaseFace()` 平移到 bbox 中心；旋转绕中心 |
+| **底面左下角** | FlatRoofHouse / GableRoofHouse / PyramidalRoofHouse / FlatTopHipRoofHouse / BarrelRoofHouse / RecessedRoofHouse / ShortRidgeHipRoofHouse / LShapedHouse / AngledGableHouse | 构建时原点即 (0,0,0)，不再居中；长/宽沿 +X/+Y **单边生长**，旋转绕左下角 |
+| 底面中心 | RoundFlatRoofHouse / ConicalRoofHouse / DomeRoofHouse / CurvedRoofRoundHouse / TriPrismPyramid | 走 `centerMeshOnBaseFace()` 平移到 bbox 中心；旋转绕中心 |
 
 锚点 / 生长原点 / 旋转轴**三者绑定，不能拆**（曾试"生长用左下角、旋转留中心"，自洽性破裂）。
 详见 `scripts/grow-anchor-design.md`。

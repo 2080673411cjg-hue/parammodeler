@@ -52,23 +52,23 @@ static MeshData build( const QString &name, const Values &v )
     if ( !v.contains( key ) ) throw std::runtime_error( std::string( "Missing mesh parameter: " ) + key );
     return v.value( key );
   };
-  if ( name == "Cuboid" ) return BuildMesh::buildCuboid( CuboidParams{p("length"), p("width"), p("height")} );
-  if ( name == "Cylinder" ) return BuildMesh::buildCylinder( CylinderParams{p("radius"), p("cylHeight")} );
-  if ( name == "LHouse" ) return lHouse( LHouseParams{p("lTotalL"), p("lWingR"), p("lTotalW"), p("lWingWR"), p("lHeight")} );
-  if ( name == "ConeCylinder" ) return BuildMesh::buildConeCylinder( ConeCylinderParams{p("ccRadius"), p("ccCylHeight"), p("ccConeHeight")} );
-  if ( name == "GabledRoof" ) return BuildMesh::buildGabledRoof( GabledRoofParams{p("grLength"), p("grWidth"), p("grWallHeight"), p("grRoofHeight"), p("grRidgeRatio")} );
-  if ( name == "PyramidRoof" ) return BuildMesh::buildPyramidRoof( PyramidRoofParams{p("prLength"), p("prWidth"), p("prWallHeight"), p("prRoofHeight")} );
-  if ( name == "TruncatedPyramidRoof" ) return BuildMesh::buildTruncatedPyramidRoof( TruncatedPyramidRoofParams{p("tpBottomLength"), p("tpBottomWidth"), p("tpTopLength"), p("tpTopWidth"), p("tpWallHeight"), p("tpRoofHeight")} );
-  if ( name == "HalfCylinderRoof" ) return BuildMesh::buildHalfCylinderRoof( HalfCylinderRoofParams{p("hcrLength"), p("hcrWidth"), p("hcrWallHeight")} );
-  if ( name == "CylinderDome" ) return BuildMesh::buildCylinderHemisphere( CylinderHemisphereParams{p("chRadius"), p("chCylHeight"), p("chDomeHeight"), p("chBulge")} );
-  if ( name == "IndentedCuboid" )
+  if ( name == "FlatRoofHouse" ) return BuildMesh::buildCuboid( CuboidParams{p("length"), p("width"), p("height")} );
+  if ( name == "RoundFlatRoofHouse" ) return BuildMesh::buildCylinder( CylinderParams{p("radius"), p("cylHeight")} );
+  if ( name == "LShapedHouse" ) return lHouse( LHouseParams{p("lTotalL"), p("lWingR"), p("lTotalW"), p("lWingWR"), p("lHeight")} );
+  if ( name == "ConicalRoofHouse" ) return BuildMesh::buildConeCylinder( ConeCylinderParams{p("ccRadius"), p("ccCylHeight"), p("ccConeHeight")} );
+  if ( name == "GableRoofHouse" ) return BuildMesh::buildGabledRoof( GabledRoofParams{p("grLength"), p("grWidth"), p("grWallHeight"), p("grRoofHeight"), p("grRidgeRatio")} );
+  if ( name == "PyramidalRoofHouse" ) return BuildMesh::buildPyramidRoof( PyramidRoofParams{p("prLength"), p("prWidth"), p("prWallHeight"), p("prRoofHeight")} );
+  if ( name == "FlatTopHipRoofHouse" ) return BuildMesh::buildTruncatedPyramidRoof( TruncatedPyramidRoofParams{p("tpBottomLength"), p("tpBottomWidth"), p("tpTopLength"), p("tpTopWidth"), p("tpWallHeight"), p("tpRoofHeight")} );
+  if ( name == "BarrelRoofHouse" ) return BuildMesh::buildHalfCylinderRoof( HalfCylinderRoofParams{p("hcrLength"), p("hcrWidth"), p("hcrWallHeight")} );
+  if ( name == "DomeRoofHouse" ) return BuildMesh::buildCylinderHemisphere( CylinderHemisphereParams{p("chRadius"), p("chCylHeight"), p("chDomeHeight"), p("chBulge")} );
+  if ( name == "RecessedRoofHouse" )
   {
     return BuildMesh::buildIndentedCuboid( IndentedCuboidParams{p("icOuterL"), p("icOuterW"), p("icOuterH"),
       p("icInnerL"), p("icInnerW"), p("icInnerH"), p("icOffsetX"), p("icOffsetY")} );
   }
-  if ( name == "AsymmetricGableHouse" ) return BuildMesh::buildAsymmetricGableHouse( AsymmetricGableHouseParams{p("aghLength"), p("aghWidth"), p("aghWallHeight"), p("aghRoofHeight"), p("aghRidgeLen"), p("aghRidgeRatio")} );
-  if ( name == "FourStageRoundTower" ) return BuildMesh::buildFourStageRoundTower( FourStageRoundTowerParams{p("ftBaseR"), p("ftBaseH"), p("ftMidH"), p("ftMidTopR"), p("ftMidRise"), p("ftConeH"), p("ftEaveRadius"), p("ftEaveHeight")} );
-  if ( name == "TwoGableHouses" ) return BuildMesh::buildTwoGableHouses( TwoGableHousesParams{p("tgLength1"), p("tgLength2"), p("tgWidth"), p("tgWallHeight"), p("tgRoofHeight"), p("tgAngle"), p("tgRidgeRatio")} );
+  if ( name == "ShortRidgeHipRoofHouse" ) return BuildMesh::buildAsymmetricGableHouse( AsymmetricGableHouseParams{p("aghLength"), p("aghWidth"), p("aghWallHeight"), p("aghRoofHeight"), p("aghRidgeLen"), p("aghRidgeRatio")} );
+  if ( name == "CurvedRoofRoundHouse" ) return BuildMesh::buildFourStageRoundTower( FourStageRoundTowerParams{p("ftBaseR"), p("ftBaseH"), p("ftMidH"), p("ftMidTopR"), p("ftMidRise"), p("ftConeH"), p("ftEaveRadius"), p("ftEaveHeight")} );
+  if ( name == "AngledGableHouse" ) return BuildMesh::buildTwoGableHouses( TwoGableHousesParams{p("tgLength1"), p("tgLength2"), p("tgWidth"), p("tgWallHeight"), p("tgRoofHeight"), p("tgAngle"), p("tgRidgeRatio")} );
   throw std::runtime_error( "Unsupported class" );
 }
 
@@ -100,8 +100,8 @@ static void displayBBox( const QString &name, const QVector<QVector3D> &points,
   QVector<QVector3D> bottom;
   const double top = hardMin.z() + std::max( .5, (hardMax.z() - hardMin.z()) * .12 );
   for ( const auto &p : points ) if ( p.z() <= top ) bottom.append( p );
-  const bool round = name == "Cylinder" || name == "ConeCylinder" || name == "CylinderDome";
-  bool useBottom = name != "FourStageRoundTower" && !round && bottom.size() >= std::max(50, int(std::ceil(points.size() * .05)));
+  const bool round = name == "RoundFlatRoofHouse" || name == "ConicalRoofHouse" || name == "DomeRoofHouse";
+  bool useBottom = name != "CurvedRoofRoundHouse" && !round && bottom.size() >= std::max(50, int(std::ceil(points.size() * .05)));
   QVector3D bottomMin, bottomMax;
   if ( useBottom )
   {
@@ -113,7 +113,7 @@ static void displayBBox( const QString &name, const QVector<QVector3D> &points,
   minimum = useBottom ? QVector3D(bottomMin.x(), bottomMin.y(), hardMin.z()) : QVector3D(fullMin.x(), fullMin.y(), hardMin.z());
   maximum = useBottom ? QVector3D(bottomMax.x(), bottomMax.y(), fullMax.z()) : fullMax;
   QPointF center;
-  const bool fitted = name == "FourStageRoundTower"
+  const bool fitted = name == "CurvedRoofRoundHouse"
     ? ParamModelerAlignmentGeometry::towerCenter(points, fullMin, fullMax, center)
     : round && ParamModelerAlignmentGeometry::roundBaseCenter(points, fullMin, fullMax, center);
   if ( fitted )
@@ -245,7 +245,7 @@ int main( int argc, char **argv )
           QMatrix4x4 pose;
           pose.translate(translation);
           pose.rotate(yaw, 0, 0, 1);
-          if ( automatic && name == "IndentedCuboid" )
+          if ( automatic && name == "RecessedRoofHouse" )
           {
             interior = alignInterior(v, allPoints, pose);
             mesh = build(name, v);
@@ -257,7 +257,7 @@ int main( int argc, char **argv )
           result.insert("z_error", std::abs(translation.z()));
           result.insert("tx", translation.x()); result.insert("ty", translation.y()); result.insert("tz", translation.z());
           result.insert("target_source", detail); result.insert("interior", interior);
-          if ( name == "IndentedCuboid" )
+          if ( name == "RecessedRoofHouse" )
           {
             const QVector3D localDelta(v.value("icOffsetX")-truth.value("icOffsetX"), v.value("icOffsetY")-truth.value("icOffsetY"), 0);
             const QVector3D worldDelta = pose.mapVector(localDelta) + translation;

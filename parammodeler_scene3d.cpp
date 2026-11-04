@@ -374,16 +374,16 @@ static QVector<float> extractWireframeEdges( const MeshData &mesh,
   double maxZ = std::numeric_limits<double>::lowest();
   double minY = std::numeric_limits<double>::max();
   double maxY = std::numeric_limits<double>::lowest();
-  const bool roundShape = primitiveType == QLatin1String( "Cylinder" )
-                          || primitiveType == QLatin1String( "CylinderDome" )
+  const bool roundShape = primitiveType == QLatin1String( "RoundFlatRoofHouse" )
+                          || primitiveType == QLatin1String( "DomeRoofHouse" )
                           || primitiveType == QLatin1String( "CylinderHemisphere" )
-                          || primitiveType == QLatin1String( "ConeCylinder" )
-                          || primitiveType == QLatin1String( "FourStageRoundTower" );
-  const bool halfCylinderRoof = primitiveType == QLatin1String( "HalfCylinderRoof" );
-  const bool roundTower = primitiveType == QLatin1String( "FourStageRoundTower" );
-  const bool dome = primitiveType == QLatin1String( "CylinderDome" )
+                          || primitiveType == QLatin1String( "ConicalRoofHouse" )
+                          || primitiveType == QLatin1String( "CurvedRoofRoundHouse" );
+  const bool halfCylinderRoof = primitiveType == QLatin1String( "BarrelRoofHouse" );
+  const bool roundTower = primitiveType == QLatin1String( "CurvedRoofRoundHouse" );
+  const bool dome = primitiveType == QLatin1String( "DomeRoofHouse" )
                     || primitiveType == QLatin1String( "CylinderHemisphere" );
-  const bool joinedGables = primitiveType == QLatin1String( "TwoGableHouses" );
+  const bool joinedGables = primitiveType == QLatin1String( "AngledGableHouse" );
 
   for ( int i = 0; i < triCount; ++i )
   {

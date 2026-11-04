@@ -30,25 +30,25 @@ inline QMap<QString, double> paramsInMetadataFrame( const QString &primitiveType
     if ( aligned.contains( first ) && aligned.contains( second ) )
       std::swap( aligned[first], aligned[second] );
   };
-  if ( ( primitiveType == QStringLiteral( "GabledRoof" ) ||
-         primitiveType == QStringLiteral( "AsymmetricGableHouse" ) ) && turns == 2 &&
+  if ( ( primitiveType == QStringLiteral( "GableRoofHouse" ) ||
+         primitiveType == QStringLiteral( "ShortRidgeHipRoofHouse" ) ) && turns == 2 &&
        aligned.contains( QStringLiteral( "ridgeRatio" ) ) )
     aligned[QStringLiteral( "ridgeRatio" )] = 1.0 - aligned.value( QStringLiteral( "ridgeRatio" ) );
 
   if ( turns % 2 )
   {
-    if ( primitiveType == QStringLiteral( "Cuboid" ) || primitiveType == QStringLiteral( "PyramidRoof" ) )
+    if ( primitiveType == QStringLiteral( "FlatRoofHouse" ) || primitiveType == QStringLiteral( "PyramidalRoofHouse" ) )
       swapPair( QStringLiteral( "length" ), QStringLiteral( "width" ) );
-    else if ( primitiveType == QStringLiteral( "TruncatedPyramidRoof" ) )
+    else if ( primitiveType == QStringLiteral( "FlatTopHipRoofHouse" ) )
     {
       swapPair( QStringLiteral( "bottomLength" ), QStringLiteral( "bottomWidth" ) );
       swapPair( QStringLiteral( "topLengthRatio" ), QStringLiteral( "topWidthRatio" ) );
       swapPair( QStringLiteral( "topLength" ), QStringLiteral( "topWidth" ) );
     }
-    else if ( primitiveType == QStringLiteral( "IndentedCuboid" ) )
+    else if ( primitiveType == QStringLiteral( "RecessedRoofHouse" ) )
       swapPair( QStringLiteral( "outerLength" ), QStringLiteral( "outerWidth" ) );
   }
-  if ( primitiveType == QStringLiteral( "IndentedCuboid" ) )
+  if ( primitiveType == QStringLiteral( "RecessedRoofHouse" ) )
   {
     const std::array<QString, 4> sides = { QStringLiteral( "leftMarginRatio" ), QStringLiteral( "rightMarginRatio" ),
                                           QStringLiteral( "frontMarginRatio" ), QStringLiteral( "backMarginRatio" ) };
@@ -75,16 +75,16 @@ inline QMap<QString, double> remapCanonicalParams( const QString &primitiveType,
       std::swap( aligned[first], aligned[second] );
   };
 
-  if ( primitiveType == QStringLiteral( "Cuboid" ) ||
-       primitiveType == QStringLiteral( "PyramidRoof" ) )
+  if ( primitiveType == QStringLiteral( "FlatRoofHouse" ) ||
+       primitiveType == QStringLiteral( "PyramidalRoofHouse" ) )
     swapPair( QStringLiteral( "length" ), QStringLiteral( "width" ) );
-  else if ( primitiveType == QStringLiteral( "TruncatedPyramidRoof" ) )
+  else if ( primitiveType == QStringLiteral( "FlatTopHipRoofHouse" ) )
   {
     swapPair( QStringLiteral( "bottomLength" ), QStringLiteral( "bottomWidth" ) );
     swapPair( QStringLiteral( "topLengthRatio" ), QStringLiteral( "topWidthRatio" ) );
     swapPair( QStringLiteral( "topLength" ), QStringLiteral( "topWidth" ) );
   }
-  else if ( primitiveType == QStringLiteral( "IndentedCuboid" ) )
+  else if ( primitiveType == QStringLiteral( "RecessedRoofHouse" ) )
   {
     swapPair( QStringLiteral( "outerLength" ), QStringLiteral( "outerWidth" ) );
     swapPair( QStringLiteral( "leftMarginRatio" ), QStringLiteral( "frontMarginRatio" ) );

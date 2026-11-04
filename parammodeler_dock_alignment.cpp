@@ -118,7 +118,7 @@ void ParamModelerDock::alignModelToPointCloud( const MeshData &mesh, const QVect
     const double tz = static_cast<double>( pcRef.z() ) - static_cast<double>( mRef.z() );
     setPoseTranslate( tx, ty, tz );
 
-    if ( primitiveType == QLatin1String( "IndentedCuboid" ) )
+    if ( primitiveType == QLatin1String( "RecessedRoofHouse" ) )
       alignIndentedInteriorToPointCloud();
 
     DEBUG_LOG( QString( "[Align] %1 anchor=%2 rz=%3 pcRef=(%4,%5,%6) modelRef=(%7,%8,%9) → tx=%10 ty=%11 tz=%12\n" )
@@ -273,7 +273,7 @@ bool ParamModelerDock::pointCloudAlignTarget( QVector3D &out, bool *usesSemantic
 {
   if ( usesSemanticUpper )
     *usesSemanticUpper = false;
-  const QString primitiveType = ui->comboPrimitive->currentText();
+  const QString primitiveType = this->primitiveType();
   const bool corner = BuildMesh::usesCornerAnchor( primitiveType );
   const bool wantsSemanticUpper = usesSemanticUpperAlignment( primitiveType );
   const MeshData mesh = BuildMesh::build( primitiveType, this );
@@ -468,7 +468,7 @@ void ParamModelerDock::startTranslate3D( bool fitCorner )
     // Finish the 2D interaction at its own source, with zero translation.
     handleManualTranslateClick( m_manualTranslateSource, Qt::LeftButton );
   }
-  MeshData sourceMesh = BuildMesh::build( ui->comboPrimitive->currentText(), this );
+  MeshData sourceMesh = BuildMesh::build( this->primitiveType(), this );
   m_manualTranslate3DLocalAnchor = QVector3D();
   if ( !anchorLocalPoint( m_manualAlign3DAnchorMode, sourceMesh, m_manualTranslate3DLocalAnchor ) )
   {
@@ -482,11 +482,11 @@ void ParamModelerDock::startTranslate3D( bool fitCorner )
   auto *tool = new ParamModelerPick3D( canvas, layer, source );
   if ( fitCorner )
   {
-    const QString type = ui->comboPrimitive->currentText();
-    if ( type != QStringLiteral( "Cuboid" ) &&
-         type != QStringLiteral( "TruncatedPyramidRoof" ) &&
-         type != QStringLiteral( "LHouse" ) &&
-         type != QStringLiteral( "IndentedCuboid" ) )
+    const QString type = this->primitiveType();
+    if ( type != QStringLiteral( "FlatRoofHouse" ) &&
+         type != QStringLiteral( "FlatTopHipRoofHouse" ) &&
+         type != QStringLiteral( "LShapedHouse" ) &&
+         type != QStringLiteral( "RecessedRoofHouse" ) )
     {
       delete tool;
       return;
@@ -551,7 +551,7 @@ void ParamModelerDock::startManualTranslateByClick()
     return;
   }
 
-  const QString prim = ui->comboPrimitive->currentText();
+  const QString prim = this->primitiveType();
   const MeshData mesh = BuildMesh::build( prim, this );
   if ( mesh.isEmpty() )
   {
@@ -791,10 +791,10 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
     // The tower's short lower cylinder is partly occluded, while its wider
     // eave supplies a nearly complete circle. A bottom-slice bbox shifts its
     // apparent center toward the visible wall arc.
-    const QString primitive = ui->comboPrimitive->currentText();
-    const bool tower = primitive == QLatin1String( "FourStageRoundTower" );
-    const bool round = primitive == QLatin1String( "Cylinder" ) || primitive == QLatin1String( "ConeCylinder" ) ||
-                       primitive == QLatin1String( "CylinderDome" );
+    const QString primitive = this->primitiveType();
+    const bool tower = primitive == QLatin1String( "CurvedRoofRoundHouse" );
+    const bool round = primitive == QLatin1String( "RoundFlatRoofHouse" ) || primitive == QLatin1String( "ConicalRoofHouse" ) ||
+                       primitive == QLatin1String( "DomeRoofHouse" );
     bool useBottomSlice = !tower && !round && bottomSlice.size() >= minSlicePoints;
     QString sliceReason = tower ? QStringLiteral( "tower-full-extent" )
                                 : ( useBottomSlice ? QStringLiteral( "ok" ) : QStringLiteral( "too-few-points" ) );
@@ -871,7 +871,7 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
       {
         // Fallback: estimate real-world centre / scale from the current
         // model mesh instead of trusting the broken metadata record.
-        const QString prim = ui->comboPrimitive->currentText();
+        const QString prim = this->primitiveType();
         const MeshData mesh = BuildMesh::build( prim, this );
         if ( !mesh.isEmpty() )
         {
@@ -997,6 +997,7 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
 void ParamModelerDock::resetFitEvaluation()
 {
   m_fitCloudPoints.clear();
+  m_fitBaseline.clear();
   if ( m_fitTimer )
     m_fitTimer->stop();
   ParamModelerScene3D::setFitMetricText( mIface, QString() );
@@ -1022,7 +1023,7 @@ void ParamModelerDock::showFitEvaluationDetails()
   tolerance->setSingleStep( 0.01 );
   tolerance->setValue( m_fitTolerance );
   layout->addRow( tr( "Distance tolerance (scene units):" ), tolerance );
-  auto *explanation = new QLabel( tr( "Surface fit: points within the distance tolerance. Outside/inside: points farther from the actual model surface. The same tolerance is used while adjusting the model. Percentages use a fixed point sample and are not parameter accuracy." ), dialog );
+  auto *explanation = new QLabel( tr( "Initial values use the model before fine tuning and remain fixed while editing. Changing tolerance recalculates both initial and current values with the same point sample. Loading a point cloud or a model, changing primitive type, or applying a new prediction starts a new comparison. Surface fit: points within the distance tolerance. Outside/inside describe the current model. These percentages are not parameter accuracy." ), dialog );
   explanation->setWordWrap( true );
   explanation->setMinimumWidth( 360 );
   layout->addRow( explanation );
@@ -1053,6 +1054,19 @@ void ParamModelerDock::scheduleFitEvaluation()
     ParamModelerScene3D::setFitMetricText( mIface, QString() );
     return;
   }
+  if ( !m_fitBaseline )
+  {
+    const MeshData mesh = BuildMesh::build( this->primitiveType(), this );
+    if ( !mesh.isEmpty() )
+    {
+      QMatrix4x4 pose;
+      pose.translate( poseTranslateX(), poseTranslateY(), poseTranslateZ() );
+      pose.rotate( poseRotateX(), 1, 0, 0 );
+      pose.rotate( poseRotateY(), 0, 1, 0 );
+      pose.rotate( poseRotateZ(), 0, 0, 1 );
+      m_fitBaseline = QSharedPointer<ParamModelerFit::Baseline>::create( mesh, m_fitCloudPoints, pose );
+    }
+  }
   if ( !m_fitTimer->isActive() )
     m_fitTimer->start();
 }
@@ -1065,7 +1079,7 @@ void ParamModelerDock::updateFitEvaluation()
     scheduleFitEvaluation();
     return;
   }
-  const MeshData mesh = BuildMesh::build( ui->comboPrimitive->currentText(), this );
+  const MeshData mesh = BuildMesh::build( this->primitiveType(), this );
   QMatrix4x4 pose;
   pose.translate( poseTranslateX(), poseTranslateY(), poseTranslateZ() );
   pose.rotate( poseRotateX(), 1, 0, 0 );
@@ -1078,16 +1092,25 @@ void ParamModelerDock::updateFitEvaluation()
     if ( m_fitDetailsLabel ) m_fitDetailsLabel->setText( tr( "Load a model and point cloud to evaluate." ) );
     return;
   }
+  if ( !m_fitBaseline )
+    m_fitBaseline = QSharedPointer<ParamModelerFit::Baseline>::create( mesh, m_fitCloudPoints, pose );
+  const auto &initial = m_fitBaseline->metrics( m_fitTolerance );
   const QString sides = metrics.solidAvailable
-    ? tr( "Outside: %1% | Inside: %2%" ).arg( metrics.percentage( metrics.outsideCount ), 0, 'f', 1 )
+    ? tr( "Current outside: %1% | inside: %2%" ).arg( metrics.percentage( metrics.outsideCount ), 0, 'f', 1 )
         .arg( metrics.percentage( metrics.insideCount ), 0, 'f', 1 )
     : tr( "Inside/outside unavailable: open mesh" );
-  const QString text = tr( "Fit RMSE: %1\nSurface fit: %2%\n%3\nTolerance: %4 | N: %5\nScene units" )
-    .arg( metrics.rmse, 0, 'f', 3 ).arg( metrics.percentage( metrics.surfaceCount ), 0, 'f', 1 )
-    .arg( sides ).arg( m_fitTolerance, 0, 'g', 6 ).arg( metrics.count );
+  const QString text = initial.count
+    ? tr( "Initial → Current (scene units)\nRMSE %1 → %2\nSurface fit: %3% → %4%\n%5\nTolerance: %6 | N: %7" )
+        .arg( initial.rmse, 0, 'f', 3 ).arg( metrics.rmse, 0, 'f', 3 )
+        .arg( initial.percentage( initial.surfaceCount ), 0, 'f', 1 )
+        .arg( metrics.percentage( metrics.surfaceCount ), 0, 'f', 1 )
+        .arg( sides ).arg( m_fitTolerance, 0, 'g', 6 ).arg( metrics.count )
+    : tr( "Fit RMSE: %1\nSurface fit: %2%\n%3\nTolerance: %4 | N: %5\nScene units" )
+        .arg( metrics.rmse, 0, 'f', 3 ).arg( metrics.percentage( metrics.surfaceCount ), 0, 'f', 1 )
+        .arg( sides ).arg( m_fitTolerance, 0, 'g', 6 ).arg( metrics.count );
   ParamModelerScene3D::setFitMetricText( mIface, text );
   if ( m_fitDetailsLabel )
-    m_fitDetailsLabel->setText( text + tr( "\nP95: %1\nSurface fit points: %2\nOutside points: %3\nInside points: %4" )
+    m_fitDetailsLabel->setText( text + tr( "\nCurrent P95: %1\nCurrent surface fit points: %2\nCurrent outside points: %3\nCurrent inside points: %4" )
       .arg( metrics.p95, 0, 'f', 3 ).arg( metrics.surfaceCount )
       .arg( metrics.solidAvailable ? QString::number( metrics.outsideCount ) : tr( "N/A" ) )
       .arg( metrics.solidAvailable ? QString::number( metrics.insideCount ) : tr( "N/A" ) ) );
@@ -1204,7 +1227,7 @@ void ParamModelerDock::retargetAnchorLockToCurrentPosition()
   if ( m_anchorLockMode == AnchorPointMode::None || m_anchorLockCompensating )
     return;
 
-  const MeshData mesh = BuildMesh::build( ui->comboPrimitive->currentText(), this );
+  const MeshData mesh = BuildMesh::build( this->primitiveType(), this );
   QVector3D localPoint;
   if ( !anchorLockLocalPoint( mesh, localPoint ) )
     return;

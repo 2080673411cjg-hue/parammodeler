@@ -7,6 +7,7 @@
          email                : 2080673411@qq.com
  ***************************************************************************/
 
+#include "parammodeler_primitive_names.h"
 #include "parammodeler_datasetgen.h"
 
 #include "exportpointcloud.h"
@@ -195,8 +196,8 @@ void generateFullDataset( ParamModelerDock *dock )
   QStringList primitiveTypes;
   for ( int i = 0; i < dock->ui->comboPrimitive->count(); ++i )
   {
-    const QString prim = dock->ui->comboPrimitive->itemText( i );
-    if ( !prim.isEmpty() && !primitiveTypes.contains( prim ) && prim != QStringLiteral( "CylinderHemisphere" ) )
+    const QString prim = dock->ui->comboPrimitive->itemData( i ).toString();
+    if ( !prim.isEmpty() && !primitiveTypes.contains( prim ) && prim != QStringLiteral( "CylinderHemisphere" ) && prim != QStringLiteral( "TriPrismPyramid" ) )
       primitiveTypes << prim;
   }
 
@@ -226,7 +227,7 @@ void generateFullDataset( ParamModelerDock *dock )
 
   // ---- 5. prepare directories ----------------------------------------------
   const int pointCount = 2048;
-  const QString originalPrimitive = dock->ui->comboPrimitive->currentText();
+  const QString originalPrimitive = dock->primitiveType();
   const bool previousUpdating = dock->m_isUpdating;
   dock->m_isUpdating = true;
   const QMap<QString, QVector<double>> savedPoses = dock->m_poseMap;
@@ -300,7 +301,7 @@ void generateFullDataset( ParamModelerDock *dock )
       if ( needTrain + needVal + needTest == 0 )
         continue;
 
-      dock->ui->comboPrimitive->setCurrentText( prim );
+      dock->setPrimitiveType( prim );
 
       const int startTrain = maxSampleIndexInDir( rootDir.filePath( QStringLiteral( "train/" ) + classDir ) );
       const int startVal   = maxSampleIndexInDir( rootDir.filePath( QStringLiteral( "val/" ) + classDir ) );
@@ -333,7 +334,7 @@ void generateFullDataset( ParamModelerDock *dock )
       rootDir.mkpath( QStringLiteral( "val/" ) + classDir );
       rootDir.mkpath( QStringLiteral( "test/" ) + classDir );
 
-      dock->ui->comboPrimitive->setCurrentText( prim );
+      dock->setPrimitiveType( prim );
       for ( int i = 0; i < targetPerClass; ++i )
       {
         if ( progress.wasCanceled() )
@@ -384,7 +385,7 @@ void generateFullDataset( ParamModelerDock *dock )
 
   // ---- 8. restore state ----------------------------------------------------
   dock->m_poseMap = savedPoses;
-  dock->ui->comboPrimitive->setCurrentText( originalPrimitive );
+  dock->setPrimitiveType( originalPrimitive );
   dock->m_isUpdating = previousUpdating;
   if ( dock->m_previewTimer )
     dock->m_previewTimer->stop();
@@ -431,16 +432,16 @@ void completeSelectedPrimitiveDatasets( ParamModelerDock *dock )
   auto *classGrid = new QGridLayout;
   QMap<QString, QCheckBox *> checkboxes;
   const QSet<QString> defaults = {
-    QStringLiteral( "LHouse" ), QStringLiteral( "TwoGableHouses" ),
-    QStringLiteral( "IndentedCuboid" ), QStringLiteral( "AsymmetricGableHouse" )
+    QStringLiteral( "LShapedHouse" ), QStringLiteral( "AngledGableHouse" ),
+    QStringLiteral( "RecessedRoofHouse" ), QStringLiteral( "ShortRidgeHipRoofHouse" )
   };
   for ( int i = 0; i < dock->ui->comboPrimitive->count(); ++i )
   {
-    const QString prim = dock->ui->comboPrimitive->itemText( i );
+    const QString prim = dock->ui->comboPrimitive->itemData( i ).toString();
     if ( prim.isEmpty() || prim == QStringLiteral( "CylinderHemisphere" ) ||
          prim == QStringLiteral( "TriPrismPyramid" ) )
       continue;
-    auto *check = new QCheckBox( prim, &selection );
+    auto *check = new QCheckBox( ParamModelerPrimitiveNames::display( prim ), &selection );
     check->setChecked( defaults.contains( prim ) );
     classGrid->addWidget( check, checkboxes.size() / 2, checkboxes.size() % 2 );
     checkboxes.insert( prim, check );
@@ -534,7 +535,7 @@ void completeSelectedPrimitiveDatasets( ParamModelerDock *dock )
   int totalMissing = 0;
   for ( const QString &prim : primitives )
   {
-    if ( dock->ui->comboPrimitive->findText( prim ) < 0 )
+    if ( dock->ui->comboPrimitive->findData( prim ) < 0 )
     {
       QMessageBox::warning( dock, QObject::tr( "Primitive unavailable" ), prim );
       return;
@@ -571,7 +572,7 @@ void completeSelectedPrimitiveDatasets( ParamModelerDock *dock )
        != QMessageBox::Yes )
     return;
 
-  const QString originalPrimitive = dock->ui->comboPrimitive->currentText();
+  const QString originalPrimitive = dock->primitiveType();
   const bool previousUpdating = dock->m_isUpdating;
   const QMap<QString, QVector<double>> savedPoses = dock->m_poseMap;
   dock->m_isUpdating = true;
@@ -588,7 +589,7 @@ void completeSelectedPrimitiveDatasets( ParamModelerDock *dock )
   {
     if ( progress.wasCanceled() )
       break;
-    dock->ui->comboPrimitive->setCurrentText( prim );
+    dock->setPrimitiveType( prim );
     for ( const QString &split : splits )
     {
       if ( progress.wasCanceled() )
@@ -607,7 +608,7 @@ void completeSelectedPrimitiveDatasets( ParamModelerDock *dock )
   }
 
   dock->m_poseMap = savedPoses;
-  dock->ui->comboPrimitive->setCurrentText( originalPrimitive );
+  dock->setPrimitiveType( originalPrimitive );
   dock->m_isUpdating = previousUpdating;
   if ( dock->m_previewTimer )
     dock->m_previewTimer->stop();
@@ -645,7 +646,7 @@ void completeSelectedPrimitiveDatasets( ParamModelerDock *dock )
 
 void generateSinglePrimitiveDataset( ParamModelerDock *dock )
 {
-  const QString prim = dock->ui->comboPrimitive->currentText();
+  const QString prim = dock->primitiveType();
   if ( prim.isEmpty() )
     return;
 
@@ -698,7 +699,7 @@ void generateSinglePrimitiveDataset( ParamModelerDock *dock )
   // ---- 3. prepare ----------------------------------------------------------
   const int pointCount = 2048;
   const QString classDir = safeClassDirName( prim );
-  const QString originalPrimitive = dock->ui->comboPrimitive->currentText();
+  const QString originalPrimitive = dock->primitiveType();
   const bool previousUpdating = dock->m_isUpdating;
   dock->m_isUpdating = true;
   const QMap<QString, QVector<double>> savedPoses = dock->m_poseMap;
@@ -731,7 +732,7 @@ void generateSinglePrimitiveDataset( ParamModelerDock *dock )
       rootDir.mkpath( split + QStringLiteral( "/" ) + classDir );
   }
 
-  dock->ui->comboPrimitive->setCurrentText( prim );
+  dock->setPrimitiveType( prim );
 
   // ---- 4. generate ---------------------------------------------------------
   const int startTrain = appendMode ? maxSampleIndexInDir( rootDir.filePath( QStringLiteral( "train/" ) + classDir ) ) : 0;
@@ -831,7 +832,7 @@ void generateSinglePrimitiveDataset( ParamModelerDock *dock )
 
   // ---- 6. restore state ----------------------------------------------------
   dock->m_poseMap = savedPoses;
-  dock->ui->comboPrimitive->setCurrentText( originalPrimitive );
+  dock->setPrimitiveType( originalPrimitive );
   dock->m_isUpdating = previousUpdating;
   if ( dock->m_previewTimer )
     dock->m_previewTimer->stop();

@@ -1,4 +1,4 @@
-"""Execute base LHouse sampling before footprint stratification, with a seeded RNG."""
+"""Execute base LShapedHouse sampling before footprint stratification, with a seeded RNG."""
 
 from collections import Counter
 import csv
@@ -21,8 +21,8 @@ class LHouseRandomizerTests(unittest.TestCase):
             raise unittest.SkipTest("A C++ compiler is required for the sampling block")
         source = (ROOT / "parammodeler_randomizer.cpp").read_text(encoding="utf-8")
         helpers = source[source.index("  auto rnd ="):source.index("  const QString prim")]
-        start = source.index('  else if ( prim == "LHouse" )')
-        block = source[start:source.index('  else if ( prim == "ConeCylinder" )', start)]
+        start = source.index('  else if ( prim == "LShapedHouse" )')
+        block = source[start:source.index('  else if ( prim == "ConicalRoofHouse" )', start)]
         block = block[block.index("{") + 1:block.rfind("}")]
         harness = r"""
 #include <cmath>

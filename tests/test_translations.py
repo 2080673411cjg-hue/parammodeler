@@ -12,10 +12,10 @@ from PyQt5 import QtCore, QtWidgets, uic
 
 ROOT = Path(__file__).resolve().parents[1]
 QT_BIN = Path(os.environ.get("PARAMMODELER_QT_BIN", "E:/mambaforge/envs/qgis_dev/Library/bin"))
-PRIMITIVES = ["Cuboid", "Cylinder", "LHouse", "ConeCylinder", "GabledRoof",
-              "PyramidRoof", "TruncatedPyramidRoof", "HalfCylinderRoof", "CylinderDome",
-              "IndentedCuboid", "AsymmetricGableHouse", "FourStageRoundTower",
-              "TwoGableHouses", "TriPrismPyramid"]
+PRIMITIVES = ["FlatRoofHouse", "RoundFlatRoofHouse", "LShapedHouse", "ConicalRoofHouse", "GableRoofHouse",
+              "PyramidalRoofHouse", "FlatTopHipRoofHouse", "BarrelRoofHouse", "DomeRoofHouse",
+              "RecessedRoofHouse", "ShortRidgeHipRoofHouse", "CurvedRoofRoundHouse",
+              "AngledGableHouse", "TriPrismPyramid"]
 
 
 class TranslationsTest(unittest.TestCase):
@@ -75,18 +75,22 @@ class TranslationsTest(unittest.TestCase):
             dock.deleteLater()
 
     def test_fit_caption_translation_and_layout(self):
-        source = "Fit RMSE: %1\nSurface fit: %2%\n%3\nTolerance: %4 | N: %5\nScene units"
+        source = "Initial → Current (scene units)\nRMSE %1 → %2\nSurface fit: %3% → %4%\n%5\nTolerance: %6 | N: %7"
         for chinese in (False, True):
             if chinese:
                 self.app.installTranslator(self.translator)
             text = QtCore.QCoreApplication.translate("ParamModelerDock", source)
-            sides = QtCore.QCoreApplication.translate("ParamModelerDock", "Outside: %1% | Inside: %2%")
+            sides = QtCore.QCoreApplication.translate("ParamModelerDock", "Current outside: %1% | inside: %2%")
             sides = sides.replace("%1", "9.0").replace("%2", "3.0")
-            text = text.replace("%1", "0.068").replace("%2", "88.0").replace("%3", sides)
-            text = text.replace("%4", "0.1").replace("%5", "2048")
+            text = text.replace("%1", "0.170").replace("%2", "0.068")
+            text = text.replace("%3", "70.0").replace("%4", "88.0").replace("%5", sides)
+            text = text.replace("%6", "0.1").replace("%7", "2048")
             if chinese:
                 self.assertIn("表面贴合", text)
                 self.assertIn("外侧", text)
+                self.assertIn("初始 → 当前", text)
+                self.assertIn("0.170 → 0.068", text)
+                self.assertIn("70.0% → 88.0%", text)
             label = QtWidgets.QLabel(text)
             label.setWordWrap(True)
             label.setContentsMargins(6, 2, 6, 2)

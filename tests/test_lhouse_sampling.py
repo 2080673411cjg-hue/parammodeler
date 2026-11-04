@@ -1,4 +1,4 @@
-"""Check production LHouse point budgets with stubbed existing geometry helpers."""
+"""Check production LShapedHouse point budgets with stubbed existing geometry helpers."""
 
 import csv
 import io
@@ -20,9 +20,9 @@ class LHouseSamplingTests(unittest.TestCase):
         if compiler is None:
             raise unittest.SkipTest("A C++ compiler is required for the sampling block")
         cls.source = (ROOT / "exportpointcloud.cpp").read_text(encoding="utf-8")
-        start = cls.source.index('  else if ( primitiveType == QStringLiteral( "LHouse" ) )')
+        start = cls.source.index('  else if ( primitiveType == QStringLiteral( "LShapedHouse" ) )')
         cls.block = cls.source[start:cls.source.index(
-            '  else if ( primitiveType == QStringLiteral( "TruncatedPyramidRoof" ) )', start)]
+            '  else if ( primitiveType == QStringLiteral( "FlatTopHipRoofHouse" ) )', start)]
         body = cls.block[cls.block.index("{") + 1:cls.block.rfind("}")]
         harness = r"""
 #include <cmath>

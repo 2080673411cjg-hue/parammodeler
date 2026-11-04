@@ -27,7 +27,7 @@ class AuxiliaryUnitTests(unittest.TestCase):
         info = {"bboxSize": np.ptp(self.physical, axis=0).tolist(), "scale": self.scale}
         if normalized:
             info["normalization"] = "centered_by_mean_and_scaled_by_max_radius"
-        return {"type": "LHouse", "split": "test", "file": "test/LHouse/a.txt",
+        return {"type": "LShapedHouse", "split": "test", "file": "test/LShapedHouse/a.txt",
                 "params": dict(zip(self.targets, [20, 10, .4, .6, 5]), rz=120),
                 "pointCloudInfo": info}
 
@@ -37,7 +37,7 @@ class AuxiliaryUnitTests(unittest.TestCase):
              patch.object(regression, "load_txt_points", return_value=points), \
              patch.object(Path, "exists", return_value=True):
             return regression.ParamRegressionDataset(
-                "data", "metadata.json", "LHouse", "test", self.targets, 4, train=train,
+                "data", "metadata.json", "LShapedHouse", "test", self.targets, 4, train=train,
                 aux_names=self.names, canonical_align=True, lhouse_canonical=True,
                 canonical_aux_units=units, canonical_bbox_mode=bbox_mode)
 
@@ -48,7 +48,7 @@ class AuxiliaryUnitTests(unittest.TestCase):
                        "aligned_points": regression.rotate_points_z(points, -120),
                        "canonical_angle_deg": 120, "verdict": "PASS", "pca_ratio": 2,
                        "peak_concentration": 0, "n_ransac_segments": 0}
-        checkpoint = {"class_name": "LHouse", "canonical_align": True, "lhouse_canonical": True,
+        checkpoint = {"class_name": "LShapedHouse", "canonical_align": True, "lhouse_canonical": True,
                       "aux_names": self.names}
         if units is not None:
             checkpoint["canonical_aux_units"] = units
@@ -176,17 +176,17 @@ class AuxiliaryUnitTests(unittest.TestCase):
         mode = regression.LHOUSE_ROBUST_BBOX_MODE
         with self.assertRaisesRegex(ValueError, "Unsupported canonical bbox mode"):
             regression.physical_bbox_size(self.local, "physical", bbox_mode="unknown")
-        for units, name, canonical, lhouse in (("legacy", "LHouse", True, True),
-                                                ("physical", "Cuboid", True, True),
-                                                ("physical", "LHouse", False, True),
-                                                ("physical", "LHouse", True, False)):
+        for units, name, canonical, lhouse in (("legacy", "LShapedHouse", True, True),
+                                                ("physical", "FlatRoofHouse", True, True),
+                                                ("physical", "LShapedHouse", False, True),
+                                                ("physical", "LShapedHouse", True, False)):
             with self.subTest(units=units, name=name, canonical=canonical, lhouse=lhouse), \
                  self.assertRaisesRegex(ValueError, "Robust bbox requires"):
                 regression.validate_canonical_bbox_mode(mode, name, canonical, lhouse, units)
         with self.assertRaisesRegex(ValueError, "Unsupported canonical bbox mode"):
             self.dataset(True, bbox_mode="unknown")
         for checkpoint in ({"canonical_bbox_mode": "unknown"},
-                           {"canonical_bbox_mode": mode, "class_name": "Cuboid", "canonical_aux_units": "physical"}):
+                           {"canonical_bbox_mode": mode, "class_name": "FlatRoofHouse", "canonical_aux_units": "physical"}):
             with patch.object(Path, "exists", return_value=True), \
                  patch.object(torch, "load", return_value=checkpoint), \
                  self.assertRaises(ValueError):
@@ -196,7 +196,7 @@ class AuxiliaryUnitTests(unittest.TestCase):
         self.add_outlier()
         mode = regression.LHOUSE_ROBUST_BBOX_MODE
         dataset = self.dataset(True, bbox_mode=mode)
-        checkpoint = {"class_name": "LHouse", "canonical_align": True, "lhouse_canonical": True,
+        checkpoint = {"class_name": "LShapedHouse", "canonical_align": True, "lhouse_canonical": True,
                       "canonical_aux_units": "physical", "canonical_bbox_mode": mode}
         args = SimpleNamespace(log_dir="unused", cpu=True, class_name=None, num_points=4,
                                metadata="metadata.json", data_root="data", split="test", batch_size=1,

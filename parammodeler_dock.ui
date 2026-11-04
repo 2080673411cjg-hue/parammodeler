@@ -186,67 +186,67 @@
             <widget class="QComboBox" name="comboPrimitive">
              <item>
               <property name="text">
-               <string notr="true">Cuboid</string>
+               <string notr="true">FlatRoofHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string notr="true">Cylinder</string>
+               <string notr="true">RoundFlatRoofHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string notr="true">LHouse</string>
+               <string notr="true">LShapedHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string notr="true">ConeCylinder</string>
+               <string notr="true">ConicalRoofHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string notr="true">GabledRoof</string>
+               <string notr="true">GableRoofHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string notr="true">PyramidRoof</string>
+               <string notr="true">PyramidalRoofHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string notr="true">TruncatedPyramidRoof</string>
+               <string notr="true">FlatTopHipRoofHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string notr="true">HalfCylinderRoof</string>
+               <string notr="true">BarrelRoofHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string notr="true">CylinderDome</string>
+               <string notr="true">DomeRoofHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string notr="true">IndentedCuboid</string>
+               <string notr="true">RecessedRoofHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string notr="true">AsymmetricGableHouse</string>
+               <string notr="true">ShortRidgeHipRoofHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string notr="true">FourStageRoundTower</string>
+               <string notr="true">CurvedRoofRoundHouse</string>
               </property>
              </item>
              <item>
               <property name="text">
-               <string notr="true">TwoGableHouses</string>
+               <string notr="true">AngledGableHouse</string>
               </property>
              </item>
              <item>

@@ -148,7 +148,7 @@ bool ExportJSON::writeJSON( ParamModelerDock *dock )
         return false;
     }
 
-    QString primitiveType = dock->ui->comboPrimitive->currentText();
+    QString primitiveType = dock->primitiveType();
 
     QJsonObject root;
     root["type"] = primitiveType;
@@ -185,18 +185,18 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
 {
     QJsonObject p;
 
-    if ( type == "Cuboid" )
+    if ( type == "FlatRoofHouse" )
     {
         p["length"]  = dock->cuboidLength();
         p["width"]  = dock->cuboidWidth();
         p["height"] = dock->cuboidHeight();
     }
-    else if ( type == "Cylinder" )
+    else if ( type == "RoundFlatRoofHouse" )
     {
       p["radius"] = dock->cylinderRadius();
       p["height"] = dock->cylinderHeight();
     }
-    else if ( type == "LHouse" )
+    else if ( type == "LShapedHouse" )
     {
       p["totalLength"]    = dock->LTotalLength();
       p["wingRatio"]      = dock->LWingRatio();
@@ -204,7 +204,7 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
       p["wingWidthRatio"] = dock->LWingWidthRatio();
       p["height"]         = dock->LHeight();
     }
-    else if ( type == "ConeCylinder" )
+    else if ( type == "ConicalRoofHouse" )
     {
         p["radius"] = dock->coneCylRadius();
         const double cylH = dock->coneCylCylHeight();
@@ -213,7 +213,7 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
         p["totalHeight"] = totalH;
         p["cylinderRatio"] = totalH > 1e-6 ? cylH / totalH : 0.7;
     }
-    else if ( type == "GabledRoof" )
+    else if ( type == "GableRoofHouse" )
     {
         p["length"] = dock->gabledRoofLength();
         p["width"] = dock->gabledRoofWidth();
@@ -224,7 +224,7 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
         p["totalHeight"] = totalH;
         p["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
     }
-    else if ( type == "PyramidRoof" )
+    else if ( type == "PyramidalRoofHouse" )
     {
         p["length"] = dock->pyramidLength();
         p["width"] = dock->pyramidWidth();
@@ -234,7 +234,7 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
         p["totalHeight"] = totalH;
         p["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
     }
-    else if ( type == "TruncatedPyramidRoof" )
+    else if ( type == "FlatTopHipRoofHouse" )
     {
       p["length"] = dock->tpBottomLength();
       p["width"] = dock->tpBottomWidth();
@@ -246,14 +246,14 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
       p["topLength"] = dock->tpTopLength();
       p["topWidth"] = dock->tpTopWidth();
     }
-    else if ( type == "HalfCylinderRoof" )
+    else if ( type == "BarrelRoofHouse" )
     {
         p["length"]      = dock->hcrLength();
         p["width"]      = dock->hcrWidth();
         p["wallHeight"] = dock->hcrWallHeight();
         p["radius"]     = dock->hcrRadius();
     }
-    else if ( type == "CylinderDome" || type == "CylinderHemisphere" )
+    else if ( type == "DomeRoofHouse" || type == "CylinderHemisphere" )
     {
       p["radius"]     = dock->cylHemiRadius();
       const double cylH = dock->cylHemiHeight();
@@ -263,7 +263,7 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
       p["cylinderRatio"] = totalH > 1e-6 ? cylH / totalH : 0.7;
       p["bulgeFactor"]= dock->cylHemiBulge();
     }
-    else if ( type == "IndentedCuboid" )
+    else if ( type == "RecessedRoofHouse" )
     {
       p["outerLength"]  = dock->icOuterLength();
       p["outerWidth"]  = dock->icOuterWidth();
@@ -274,7 +274,7 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
       p["offsetX"]     = dock->icOffsetX();
       p["offsetY"]     = dock->icOffsetY();
     }
-    else if ( type == "AsymmetricGableHouse" )
+    else if ( type == "ShortRidgeHipRoofHouse" )
     {
       p["length"]       = dock->aghLength();
       p["width"]       = dock->aghWidth();
@@ -287,7 +287,7 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
       p["ridgeOffset"] = dock->aghRidgeOffset();
       p["ridgeRatio"]  = dock->aghRidgeRatio();
     }
-    else if ( type == "FourStageRoundTower" )
+    else if ( type == "CurvedRoofRoundHouse" )
     {
       p["baseRadius"]     = dock->ftBaseRadius();
       p["baseHeight"]     = dock->ftBaseHeight();
@@ -298,7 +298,7 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
       p["eaveRadius"] = dock->ftEaveRadius();
       p["eaveHeight"] = dock->ftEaveHeight();
     }
-    else if ( type == "TwoGableHouses" )
+    else if ( type == "AngledGableHouse" )
     {
       p["length1"]     = dock->tgLength1();
       p["length2"]     = dock->tgLength2();

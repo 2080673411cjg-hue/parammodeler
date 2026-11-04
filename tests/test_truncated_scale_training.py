@@ -25,13 +25,13 @@ runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
 sys.path.pop(0)
 
-RECIPE = next(recipe for recipe in runner.RECIPES if recipe[0] == "TruncatedPyramidRoof")
+RECIPE = next(recipe for recipe in runner.RECIPES if recipe[0] == "FlatTopHipRoofHouse")
 TARGETS = RECIPE[2].split()
 WEIGHTS = torch.tensor(list(map(float, RECIPE[3].split())))
 
 
 def args(*extra):
-    argv = ["main_reg.py", "--mode", "train", "--class_name", "TruncatedPyramidRoof",
+    argv = ["main_reg.py", "--mode", "train", "--class_name", "FlatTopHipRoofHouse",
             "--targets", *TARGETS, "--target_mode", "bbox_residual", "--canonical_align",
             "--target_weights", *[f"{name}={weight}" for name, weight in zip(TARGETS, RECIPE[3].split())],
             "--relative_loss_eps", "0.05", *extra]
@@ -96,7 +96,7 @@ class TruncatedScaleTrainingTests(unittest.TestCase):
     def test_flags_are_opt_in_and_restricted_to_this_recipe(self):
         self.assertFalse(args().truncated_scale_balanced)
         self.assertTrue(args("--truncated_scale_balanced").truncated_scale_balanced)
-        invalid = [("--class_name", "Cuboid"), ("--target_mode", "raw"), ("--targets", "length"),
+        invalid = [("--class_name", "FlatRoofHouse"), ("--target_mode", "raw"), ("--targets", "length"),
                    ("--relative_loss_weight", ".05"), ("--indented_symmetry_180",), ("--mode", "test"),
                    ("--relative_loss_eps", "0"), ("--relative_loss_eps", "nan"),
                    ("--target_weights", "default=0", "wallRatio=1")]
@@ -114,9 +114,9 @@ class TruncatedScaleTrainingTests(unittest.TestCase):
         self.assertEqual(experiment, baseline + ["--truncated_scale_balanced"])
         self.assertEqual(test, test_after)
         self.assertEqual(experiment[experiment.index("--relative_loss_weight") + 1], "0.0")
-        cuboid = next(recipe for recipe in runner.RECIPES if recipe[0] == "Cuboid")
+        cuboid = next(recipe for recipe in runner.RECIPES if recipe[0] == "FlatRoofHouse")
         self.assertNotIn("--truncated_scale_balanced", runner.commands(settings, cuboid)[1])
-        for extra in (["--classes", "Cuboid"], ["--no-canonical_align"]):
+        for extra in (["--classes", "FlatRoofHouse"], ["--no-canonical_align"]):
             argv = ["train_ptv3_reg.py", "--truncated_scale_balanced", "--dry_run", *extra]
             with patch.object(sys, "argv", argv), patch("sys.stderr"), self.assertRaises(SystemExit):
                 runner.main()
@@ -125,9 +125,9 @@ class TruncatedScaleTrainingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=ROOT / "tests") as temp:
             root = Path(temp)
             (root / "metadata").mkdir()
-            records = [{"type": "TruncatedPyramidRoof", "split": split, "horizontalScaleBand": band}
+            records = [{"type": "FlatTopHipRoofHouse", "split": split, "horizontalScaleBand": band}
                        for split in ("train", "val") for band in (0, 1, 2)]
-            records.append({"type": "TruncatedPyramidRoof", "split": "test"})
+            records.append({"type": "FlatTopHipRoofHouse", "split": "test"})
             metadata = root / "metadata/sample_params.json"
             metadata.write_text(json.dumps(records), encoding="utf-8")
             runner.validate_truncated_scale_bands(root)

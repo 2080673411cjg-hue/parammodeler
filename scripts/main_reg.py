@@ -1,10 +1,12 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 """Standalone PTv3 parameter regression: train, test, and single-cloud predict.
 
 Data/target/loss definitions are copied from the existing PCT v6 pipeline.
 This directory is self-contained and does not import or modify pct_simple.
 See PTv3_EXPERIMENT.md for Ubuntu setup and training commands.
 """
+
+from primitive_names import canonical_class_name
 
 import argparse
 import csv
@@ -403,28 +405,29 @@ def invert_target_transform_tensor(values: torch.Tensor, baseline: torch.Tensor,
 
 
 def prediction_params_for_plugin(class_name: str, targets: List[str], values: np.ndarray) -> Dict[str, float]:
+    class_name = canonical_class_name(class_name)
     params = {name: float(value) for name, value in zip(targets, values)}
 
     def put(source: str, dest: str):
         if source in params:
             params[dest] = params[source]
 
-    if class_name == "Cuboid":
+    if class_name == "FlatRoofHouse":
         put("geom_footprint_long", "length")
         put("geom_footprint_short", "width")
         put("geom_total_height", "height")
-    elif class_name == "PyramidRoof":
+    elif class_name == "PyramidalRoofHouse":
         put("geom_footprint_long", "length")
         put("geom_footprint_short", "width")
         put("geom_total_height", "totalHeight")
-    elif class_name == "TruncatedPyramidRoof":
+    elif class_name == "FlatTopHipRoofHouse":
         put("geom_footprint_long", "bottomLength")
         put("geom_footprint_short", "bottomWidth")
         put("geom_top_long_ratio", "topLengthRatio")
         put("geom_top_short_ratio", "topWidthRatio")
         put("geom_total_height", "totalHeight")
 
-    elif class_name == "IndentedCuboid":
+    elif class_name == "RecessedRoofHouse":
         put("geom_footprint_long", "outerLength")
         put("geom_footprint_short", "outerWidth")
         put("geom_total_height", "outerHeight")
@@ -494,9 +497,10 @@ LHOUSE_ROBUST_BBOX_MODE = "lhouse_xy_quantile_005_995_v1"
 
 
 def validate_canonical_bbox_mode(mode, class_name, canonical_align, lhouse_canonical, aux_units):
+    class_name = canonical_class_name(class_name)
     if mode not in ("full", LHOUSE_ROBUST_BBOX_MODE):
         raise ValueError(f"Unsupported canonical bbox mode: {mode}")
-    if mode != "full" and (class_name != "LHouse" or not canonical_align
+    if mode != "full" and (class_name != "LShapedHouse" or not canonical_align
                             or not lhouse_canonical or aux_units != "physical"):
         raise ValueError("Robust bbox requires canonical LHouse with physical auxiliary units")
 
@@ -521,7 +525,7 @@ def physical_bbox_size(points: np.ndarray, input_coordinates: str, scale=None, b
 def primitive_geometry_summary(record: dict) -> Dict[str, float]:
     """Geometry labels used only as auxiliary supervision for regression training."""
     params = record.get("params", {})
-    prim = record.get("type", "")
+    prim = canonical_class_name(record.get("type", ""))
     info = record.get("pointCloudInfo", {})
     bbox = info.get("bboxSize", [0.0, 0.0, 0.0])
     bbox_x, bbox_y, bbox_z = float(bbox[0]), float(bbox[1]), float(bbox[2])
@@ -533,36 +537,36 @@ def primitive_geometry_summary(record: dict) -> Dict[str, float]:
     width = min(bbox_x, bbox_y)
     height = bbox_z
 
-    if prim == "Cuboid":
+    if prim == "FlatRoofHouse":
         length, width, height = p("length"), p("width"), p("height")
-    elif prim == "Cylinder":
+    elif prim == "RoundFlatRoofHouse":
         length = width = 2.0 * p("radius")
         height = p("height")
-    elif prim == "LHouse":
+    elif prim == "LShapedHouse":
         length = p("outerLength", p("totalLength", length))
         width = p("outerWidth", p("totalWidth", width))
         height = p("height", height)
-    elif prim == "ConeCylinder":
+    elif prim == "ConicalRoofHouse":
         length = width = 2.0 * p("radius")
         height = p("totalHeight", p("cylHeight") + p("coneHeight"))
-    elif prim in ("GabledRoof", "PyramidRoof", "AsymmetricGableHouse"):
+    elif prim in ("GableRoofHouse", "PyramidalRoofHouse", "ShortRidgeHipRoofHouse"):
         length, width = p("length", length), p("width", width)
         height = p("totalHeight", p("wallHeight") + p("roofHeight"))
-    elif prim == "TruncatedPyramidRoof":
+    elif prim == "FlatTopHipRoofHouse":
         length, width = p("bottomLength", length), p("bottomWidth", width)
         height = p("totalHeight", p("wallHeight") + p("roofHeight"))
-    elif prim == "HalfCylinderRoof":
+    elif prim == "BarrelRoofHouse":
         length, width = p("length", length), p("width", width)
         height = p("wallHeight", height) + 0.5 * p("width", width)
-    elif prim == "CylinderDome":
+    elif prim == "DomeRoofHouse":
         length = width = 2.0 * p("radius")
         height = p("totalHeight", p("cylHeight") + p("domeHeight"))
-    elif prim == "IndentedCuboid":
+    elif prim == "RecessedRoofHouse":
         length, width, height = p("outerLength", length), p("outerWidth", width), p("outerHeight", height)
-    elif prim == "FourStageRoundTower":
+    elif prim == "CurvedRoofRoundHouse":
         length = width = 2.0 * p("baseRadius")
         height = p("baseHeight") + p("middleHeight") + p("coneHeight")
-    elif prim == "TwoGableHouses":
+    elif prim == "AngledGableHouse":
         length = p("length1", 0.0) + p("length2", 0.0)
         width = p("width", width)
         height = p("totalHeight", p("wallHeight") + p("roofHeight"))
@@ -580,14 +584,14 @@ def primitive_geometry_summary(record: dict) -> Dict[str, float]:
         "geom_bbox_y": bbox_y,
         "geom_bbox_z": bbox_z,
     }
-    if prim == "TruncatedPyramidRoof":
+    if prim == "FlatTopHipRoofHouse":
         if length >= width:
             summary["geom_top_long_ratio"] = p("topLengthRatio", 0.6)
             summary["geom_top_short_ratio"] = p("topWidthRatio", 0.6)
         else:
             summary["geom_top_long_ratio"] = p("topWidthRatio", 0.6)
             summary["geom_top_short_ratio"] = p("topLengthRatio", 0.6)
-    if prim == "IndentedCuboid":
+    if prim == "RecessedRoofHouse":
         if length >= width:
             summary["geom_long_start_margin_ratio"] = p("leftMarginRatio", 0.2)
             summary["geom_long_end_margin_ratio"] = p("rightMarginRatio", 0.4)
@@ -634,6 +638,7 @@ class ParamRegressionDataset(Dataset):
                  canonical_align=False, orientation_source="metadata", lhouse_canonical=False,
                  canonical_aux_units="legacy", canonical_bbox_mode="full", cache_points=True,
                  normal_workers=0, normal_backend="numpy", normal_threads=4):
+        class_name = canonical_class_name(class_name)
         self.data_root = Path(data_root)
         self.metadata_path = Path(metadata_path)
         self.class_name = class_name
@@ -669,7 +674,7 @@ class ParamRegressionDataset(Dataset):
         records = load_metadata(self.metadata_path)
         self.samples: List[Tuple[Path, np.ndarray, np.ndarray, dict, float]] = []
         for rec in records:
-            if rec.get("type") != class_name or rec.get("split") != split:
+            if canonical_class_name(rec.get("type")) != class_name or rec.get("split") != split:
                 continue
             rel = str(rec.get("file", "")).replace("\\", "/")
             path = self.data_root / rel
@@ -1008,7 +1013,8 @@ INDENTED_180_MARGIN_PAIRS = (
 
 
 def indented_180_permutation(class_name, targets):
-    if class_name != "IndentedCuboid":
+    class_name = canonical_class_name(class_name)
+    if class_name != "RecessedRoofHouse":
         raise ValueError("180-degree margin symmetry is only defined for IndentedCuboid")
     if len(set(targets)) != len(targets):
         raise ValueError("Targets must be unique for 180-degree margin symmetry")
@@ -1023,7 +1029,8 @@ def indented_180_permutation(class_name, targets):
 
 
 def asym_ridge_180_index(class_name, targets):
-    if class_name != "AsymmetricGableHouse":
+    class_name = canonical_class_name(class_name)
+    if class_name != "ShortRidgeHipRoofHouse":
         raise ValueError("Ridge 180-degree symmetry is only defined for AsymmetricGableHouse")
     if len(set(targets)) != len(targets) or "ridgeRatio" not in targets:
         raise ValueError("Ridge symmetry requires unique targets including ridgeRatio")
@@ -1031,9 +1038,10 @@ def asym_ridge_180_index(class_name, targets):
 
 
 def roof_ridge_180_index(class_name, targets):
-    if class_name not in ("GabledRoof", "AsymmetricGableHouse"):
+    class_name = canonical_class_name(class_name)
+    if class_name not in ("GableRoofHouse", "ShortRidgeHipRoofHouse"):
         raise ValueError("Ridge symmetry requires GabledRoof or AsymmetricGableHouse")
-    return asym_ridge_180_index("AsymmetricGableHouse", targets)
+    return asym_ridge_180_index("ShortRidgeHipRoofHouse", targets)
 
 
 def symmetry_standardized_mae_score(metrics, target_std, target_weights, permutation,
@@ -1132,6 +1140,7 @@ def save_predictions(log_dir, split, targets, metrics):
 
 
 def save_regression_report(log_dir, split, class_name, targets, metrics):
+    class_name = canonical_class_name(class_name)
     with (log_dir / f"regression_report_{split}.csv").open("w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
         w.writerow(["class", "param", "mae", "rmse", "mape_percent", "r2", "num_samples"])
@@ -1143,6 +1152,7 @@ def save_regression_report(log_dir, split, class_name, targets, metrics):
 
 
 def save_regression_errors(log_dir, split, class_name, targets, metrics):
+    class_name = canonical_class_name(class_name)
     with (log_dir / f"regression_errors_{split}.csv").open("w", newline="", encoding="utf-8-sig") as f:
         w = csv.writer(f)
         w.writerow(["file", "class", "param", "true", "pred", "error", "abs_error", "percent_error"])
@@ -1502,6 +1512,7 @@ def load_checkpoint(log_dir, device, args):
     if not ckpt_path.exists():
         raise FileNotFoundError(f"Missing checkpoint: {ckpt_path}")
     ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)
+    ckpt["class_name"] = canonical_class_name(ckpt.get("class_name"))
     if ckpt.get("canonical_aux_units", "legacy") not in ("legacy", "physical"):
         raise ValueError("Unsupported checkpoint canonical auxiliary units")
     validate_canonical_bbox_mode(ckpt.get("canonical_bbox_mode", "full"), ckpt.get("class_name"),
@@ -1532,15 +1543,15 @@ def load_checkpoint(log_dir, device, args):
 def centered_geometry_errors(dataset, targets, metrics):
     """Measure shape/pose together, after aligning footprint centers (not translations)."""
     class_name = dataset.class_name
-    if class_name == "LHouse" and not dataset.lhouse_canonical:
+    if class_name == "LShapedHouse" and not dataset.lhouse_canonical:
         return {}
     keys = {
-        "Cuboid": ("length", "width"), "PyramidRoof": ("length", "width"),
-        "TruncatedPyramidRoof": ("bottomLength", "bottomWidth"),
-        "IndentedCuboid": ("outerLength", "outerWidth"),
-        "GabledRoof": ("length", "width"), "AsymmetricGableHouse": ("length", "width"),
-        "HalfCylinderRoof": ("length", "width"),
-        "LHouse": ("outerLength", "outerWidth"),
+        "FlatRoofHouse": ("length", "width"), "PyramidalRoofHouse": ("length", "width"),
+        "FlatTopHipRoofHouse": ("bottomLength", "bottomWidth"),
+        "RecessedRoofHouse": ("outerLength", "outerWidth"),
+        "GableRoofHouse": ("length", "width"), "ShortRidgeHipRoofHouse": ("length", "width"),
+        "BarrelRoofHouse": ("length", "width"),
+        "LShapedHouse": ("outerLength", "outerWidth"),
     }
     if class_name not in keys:
         return {}
@@ -1561,7 +1572,7 @@ def centered_geometry_errors(dataset, targets, metrics):
         pred_size = [predicted[length_key], predicted[width_key]]
         true_xy = rotate_xy(corners * true_size, float(true["rz"]))
         pred_xy = rotate_xy(corners * pred_size, yaw)
-        if class_name == "LHouse":
+        if class_name == "LShapedHouse":
             def outline(params):
                 length, width = params["outerLength"], params["outerWidth"]
                 x = length * (1.0 - params["cutoutLengthRatio"])
@@ -1573,10 +1584,10 @@ def centered_geometry_errors(dataset, targets, metrics):
         distances = np.linalg.norm(pred_xy[:, None, :] - true_xy[None, :, :], axis=2)
         row = {"file": str(path), "footprint_corner_error": float(
             (distances.min(axis=0).mean() + distances.min(axis=1).mean()) / 2)}
-        if class_name == "LHouse":
+        if class_name == "LShapedHouse":
             row["notch_corner_error"] = float(np.linalg.norm(pred_xy[3] - true_xy[3]))
-        if class_name in ("GabledRoof", "AsymmetricGableHouse"):
-            length_name = "ridgeLength" if class_name == "AsymmetricGableHouse" else "length"
+        if class_name in ("GableRoofHouse", "ShortRidgeHipRoofHouse"):
+            length_name = "ridgeLength" if class_name == "ShortRidgeHipRoofHouse" else "length"
             true_ridge = rotate_xy([[-true[length_name] / 2, (true["ridgeRatio"] - 0.5) * true_size[1]],
                                     [true[length_name] / 2, (true["ridgeRatio"] - 0.5) * true_size[1]]], true["rz"])
             pred_ridge = rotate_xy([[-predicted[length_name] / 2, (predicted["ridgeRatio"] - 0.5) * pred_size[1]],
@@ -1796,7 +1807,7 @@ def parse_args():
     # ── Data ──
     parser.add_argument("--data_root", default="E:/pointnet/datasets_aug")
     parser.add_argument("--metadata", default=None)
-    parser.add_argument("--class_name", default=None)
+    parser.add_argument("--class_name", type=canonical_class_name, default=None)
     parser.add_argument("--targets", nargs="+", default=None)
     parser.add_argument("--target_mode", choices=["raw", "bbox_residual"], default="raw",
                         help="raw predicts target values directly; bbox_residual predicts target - bbox baseline.")
@@ -1894,7 +1905,7 @@ def parse_args():
         raise SystemExit("--eval_output_dir is only supported in test mode")
     if args.truncated_scale_balanced:
         required = {*TRUNCATED_DIMENSION_TARGETS, "geom_top_long_ratio", "geom_top_short_ratio", "wallRatio"}
-        if (args.mode != "train" or args.class_name != "TruncatedPyramidRoof"
+        if (args.mode != "train" or args.class_name != "FlatTopHipRoofHouse"
                 or not args.canonical_align or args.target_mode != "bbox_residual"
                 or len(args.targets or []) != len(required) or set(args.targets or []) != required):
             raise SystemExit("--truncated_scale_balanced requires canonical TruncatedPyramidRoof training with the six bbox_residual targets")
@@ -1911,7 +1922,7 @@ def parse_args():
             raise SystemExit("--class_name is required for train mode")
         if not args.targets:
             raise SystemExit("--targets is required for train mode")
-        if args.lhouse_canonical and (args.class_name != "LHouse" or not args.canonical_align):
+        if args.lhouse_canonical and (args.class_name != "LShapedHouse" or not args.canonical_align):
             raise SystemExit("--lhouse_canonical requires LHouse and --canonical_align")
         if args.canonical_aux_units == "physical" and not args.canonical_align:
             raise SystemExit("Physical canonical auxiliary features require --canonical_align")
@@ -1927,7 +1938,7 @@ def parse_args():
             raise SystemExit("--lhouse_corner_loss_weight must be finite and non-negative")
         if args.lhouse_corner_loss_weight > 0:
             required = {"outerLength", "outerWidth", "cutoutLengthRatio", "cutoutWidthRatio", "height"}
-            if (args.class_name != "LHouse" or not args.lhouse_canonical
+            if (args.class_name != "LShapedHouse" or not args.lhouse_canonical
                     or args.canonical_aux_units != "physical" or args.target_mode != "raw"
                     or len(args.targets) != len(required) or set(args.targets) != required):
                 raise SystemExit("LHouse corner loss requires the five raw LHouse targets, --lhouse_canonical and physical auxiliary units")
@@ -1954,7 +1965,7 @@ def parse_args():
             except ValueError as exc:
                 raise SystemExit(str(exc)) from exc
         if args.gabled_ridge_symmetry_180:
-            if args.class_name != "GabledRoof" or args.asym_ridge_symmetry_180 or args.indented_symmetry_180 or args.circular_targets or args.target_mode != "raw":
+            if args.class_name != "GableRoofHouse" or args.asym_ridge_symmetry_180 or args.indented_symmetry_180 or args.circular_targets or args.target_mode != "raw":
                 raise SystemExit("Gabled ridge symmetry requires GabledRoof raw targets and no other symmetry/circular mode")
             try:
                 roof_ridge_180_index(args.class_name, args.targets)

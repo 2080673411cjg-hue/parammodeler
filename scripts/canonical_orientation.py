@@ -8,16 +8,18 @@ canonical_orientation.py — 建筑点云规范姿态估计模块
 # 旋转对齐白名单：只有明确验证过的类别才启用旋转对齐
 # 不在白名单中的类别默认跳过（安全第一）
 _ROTATION_ENABLE_CLASSES = {
-    "Cuboid",
-    "IndentedCuboid",
-    "GabledRoof",
-    "PyramidRoof",
-    "TruncatedPyramidRoof",
-    "AsymmetricGableHouse",
-    "HalfCylinderRoof",
+    "FlatRoofHouse",
+    "RecessedRoofHouse",
+    "GableRoofHouse",
+    "PyramidalRoofHouse",
+    "FlatTopHipRoofHouse",
+    "ShortRidgeHipRoofHouse",
+    "BarrelRoofHouse",
 }
 
-_RIDGE_AXIS_CLASSES = {"GabledRoof", "AsymmetricGableHouse", "HalfCylinderRoof"}
+_RIDGE_AXIS_CLASSES = {"GableRoofHouse", "ShortRidgeHipRoofHouse", "BarrelRoofHouse"}
+
+from primitive_names import canonical_class_name
 
 import numpy as np
 from scipy.spatial import ConvexHull
@@ -43,7 +45,8 @@ def rotate_points_z(points: np.ndarray, angle_deg: float) -> np.ndarray:
 def canonical_angle_from_metadata(record: dict, class_name: str,
                                   lhouse_canonical: bool = False) -> float | None:
     """Return the training-frame yaw from generated metadata, or None if unsupported."""
-    lhouse = class_name == "LHouse" and lhouse_canonical
+    class_name = canonical_class_name(class_name)
+    lhouse = class_name == "LShapedHouse" and lhouse_canonical
     if class_name not in _ROTATION_ENABLE_CLASSES and not lhouse:
         return None
     params = record.get("params", {})
@@ -56,10 +59,10 @@ def canonical_angle_from_metadata(record: dict, class_name: str,
         axis_offset = 0.0
     else:
         dim_keys = {
-            "Cuboid": ("length", "width"),
-            "IndentedCuboid": ("outerLength", "outerWidth"),
-            "PyramidRoof": ("length", "width"),
-            "TruncatedPyramidRoof": ("bottomLength", "bottomWidth"),
+            "FlatRoofHouse": ("length", "width"),
+            "RecessedRoofHouse": ("outerLength", "outerWidth"),
+            "PyramidalRoofHouse": ("length", "width"),
+            "FlatTopHipRoofHouse": ("bottomLength", "bottomWidth"),
         }
         length_key, width_key = dim_keys[class_name]
         length = float(params[length_key])
@@ -71,18 +74,19 @@ def canonical_angle_from_metadata(record: dict, class_name: str,
 def canonical_target_values(values: np.ndarray, targets: list[str], record: dict,
                             class_name: str, canonical_angle_deg: float) -> np.ndarray:
     """Transform directional labels into the same folded frame as the point cloud."""
+    class_name = canonical_class_name(class_name)
     result = np.asarray(values, dtype=np.float32).copy()
     params = record.get("params", {})
     rz = float(params.get("rz", canonical_angle_deg))
     delta = np.deg2rad(rz - float(canonical_angle_deg))
     quarter_turn = int(np.rint(delta / (np.pi / 2))) % 4
 
-    if class_name in {"GabledRoof", "AsymmetricGableHouse"} and "ridgeRatio" in targets:
+    if class_name in {"GableRoofHouse", "ShortRidgeHipRoofHouse"} and "ridgeRatio" in targets:
         if quarter_turn == 2:
             index = targets.index("ridgeRatio")
             result[index] = 1.0 - result[index]
 
-    if class_name == "IndentedCuboid":
+    if class_name == "RecessedRoofHouse":
         side_values = {
             "left": float(params.get("leftMarginRatio", 0.2)),
             "right": float(params.get("rightMarginRatio", 0.4)),
@@ -187,6 +191,7 @@ def _lhouse_direction(points_xyz: np.ndarray, angle: float):
 def canonical_orientation(points_xyz: np.ndarray, class_name: str = None,
                           lhouse_canonical: bool = False) -> dict:
     """Estimate the model X axis, returning a matching inverse point rotation."""
+    class_name = canonical_class_name(class_name)
     result = {
         "reliable": False,
         "verdict": "FAIL",
@@ -202,7 +207,7 @@ def canonical_orientation(points_xyz: np.ndarray, class_name: str = None,
         "method": "none",
         "reason": "",
     }
-    lhouse = class_name == "LHouse" and lhouse_canonical
+    lhouse = class_name == "LShapedHouse" and lhouse_canonical
     if class_name is not None and class_name not in _ROTATION_ENABLE_CLASSES and not lhouse:
         result.update(status="SKIPPED_CLASS",
                       reason=f"Class '{class_name}' not in rotation enable list")
@@ -217,7 +222,7 @@ def canonical_orientation(points_xyz: np.ndarray, class_name: str = None,
     reason = f"Robust outer rectangle aspect={ratio:.3f}"
     if ratio < 1.08:
         reason += "; near-square footprint, interchangeable axes"
-    if class_name == "PyramidRoof":
+    if class_name == "PyramidalRoofHouse":
         upper = points_xyz[points_xyz[:, 2] >= np.quantile(points_xyz[:, 2], 0.60)]
         roof_rectangle = _rectangle_axis(upper)
         if roof_rectangle is not None:

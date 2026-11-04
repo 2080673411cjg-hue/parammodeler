@@ -1,5 +1,7 @@
 """Compare v4/v5 against v7 on one frozen 300-cloud test set, without training."""
 
+from primitive_names import canonical_class_name
+
 import argparse
 import csv
 import hashlib
@@ -15,9 +17,9 @@ import numpy as np
 
 
 RECIPES = (
-    ("Cuboid", "cuboid", "v4"),
-    ("TruncatedPyramidRoof", "truncatedpyramid", "v4"),
-    ("FourStageRoundTower", "fourstage", "v5"),
+    ("FlatRoofHouse", "cuboid", "v4"),
+    ("FlatTopHipRoofHouse", "truncatedpyramid", "v4"),
+    ("CurvedRoofRoundHouse", "fourstage", "v5"),
 )
 GROUPS = {"all": None, "small": 0, "medium": 1, "large": 2}
 
@@ -43,7 +45,7 @@ def prepare_plan(data_root, log_root, output_root):
     records = []
     seen = set()
     for record in read_json(data_root / "metadata/sample_params.json"):
-        if record.get("type") not in classes or record.get("split") != "test":
+        if canonical_class_name(record.get("type")) not in classes or record.get("split") != "test":
             continue
         relative = str(record.get("file", "")).replace("\\", "/")
         parts = PurePosixPath(relative).parts
@@ -58,7 +60,7 @@ def prepare_plan(data_root, log_root, output_root):
         records.append(record)
     models = {}
     for class_name, slug, old_tag in RECIPES:
-        count = sum(record["type"] == class_name for record in records)
+        count = sum(canonical_class_name(record["type"]) == class_name for record in records)
         if count != 100:
             raise ValueError(f"Expected 100 test clouds for {class_name}, found {count}")
         models[class_name] = {}
@@ -67,7 +69,7 @@ def prepare_plan(data_root, log_root, output_root):
             if not (directory / "best_model.pth").is_file():
                 raise FileNotFoundError(directory / "best_model.pth")
             config = read_json(directory / "regression_config.json")
-            if config.get("class_name") != class_name or not config.get("canonical_align"):
+            if canonical_class_name(config.get("class_name")) != class_name or not config.get("canonical_align"):
                 raise ValueError(f"Unexpected class or non-canonical model: {directory}")
             models[class_name][tag] = {"directory": str(directory), "targets": config["targets"]}
         if models[class_name][old_tag]["targets"] != models[class_name]["v7"]["targets"]:

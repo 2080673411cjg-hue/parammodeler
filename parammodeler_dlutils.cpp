@@ -90,21 +90,21 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
   };
 
   const QString prim = primitiveType == QStringLiteral( "CylinderHemisphere" )
-                         ? QStringLiteral( "CylinderDome" )
+                         ? QStringLiteral( "DomeRoofHouse" )
                          : primitiveType;
 
-  if ( prim == QStringLiteral( "Cuboid" ) )
+  if ( prim == QStringLiteral( "FlatRoofHouse" ) )
   {
     put( QStringLiteral( "length" ), QStringLiteral( "length" ) );
     put( QStringLiteral( "width" ), QStringLiteral( "width" ) );
     put( QStringLiteral( "height" ), QStringLiteral( "height" ) );
   }
-  else if ( prim == QStringLiteral( "Cylinder" ) )
+  else if ( prim == QStringLiteral( "RoundFlatRoofHouse" ) )
   {
     put( QStringLiteral( "radius" ), QStringLiteral( "radius" ) );
     put( QStringLiteral( "height" ), QStringLiteral( "cylHeight" ) );
   }
-  else if ( prim == QStringLiteral( "LHouse" ) )
+  else if ( prim == QStringLiteral( "LShapedHouse" ) )
   {
     const bool hasFootprintParams =
       has( QStringLiteral( "outerLength" ) ) ||
@@ -129,25 +129,25 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
     }
     put( QStringLiteral( "height" ), QStringLiteral( "lHeight" ) );
   }
-  else if ( prim == QStringLiteral( "ConeCylinder" ) )
+  else if ( prim == QStringLiteral( "ConicalRoofHouse" ) )
   {
     put( QStringLiteral( "radius" ), QStringLiteral( "ccRadius" ) );
     putCylinderRatio( QStringLiteral( "ccCylHeight" ), QStringLiteral( "ccConeHeight" ) );
   }
-  else if ( prim == QStringLiteral( "GabledRoof" ) )
+  else if ( prim == QStringLiteral( "GableRoofHouse" ) )
   {
     put( QStringLiteral( "length" ), QStringLiteral( "grLength" ) );
     put( QStringLiteral( "width" ), QStringLiteral( "grWidth" ) );
     putWallRatio( QStringLiteral( "grWallHeight" ), QStringLiteral( "grRoofHeight" ) );
     uiParams.insert( QStringLiteral( "grRidgeRatio" ), val( QStringLiteral( "ridgeRatio" ), 0.5 ) );
   }
-  else if ( prim == QStringLiteral( "PyramidRoof" ) )
+  else if ( prim == QStringLiteral( "PyramidalRoofHouse" ) )
   {
     put( QStringLiteral( "length" ), QStringLiteral( "prLength" ) );
     put( QStringLiteral( "width" ), QStringLiteral( "prWidth" ) );
     putWallRatio( QStringLiteral( "prWallHeight" ), QStringLiteral( "prRoofHeight" ) );
   }
-  else if ( prim == QStringLiteral( "TruncatedPyramidRoof" ) )
+  else if ( prim == QStringLiteral( "FlatTopHipRoofHouse" ) )
   {
     put( QStringLiteral( "bottomLength" ), QStringLiteral( "tpBottomLength" ) );
     put( QStringLiteral( "bottomWidth" ), QStringLiteral( "tpBottomWidth" ) );
@@ -163,19 +163,19 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
       put( QStringLiteral( "topWidth" ), QStringLiteral( "tpTopWidth" ) );
     putWallRatio( QStringLiteral( "tpWallHeight" ), QStringLiteral( "tpRoofHeight" ) );
   }
-  else if ( prim == QStringLiteral( "HalfCylinderRoof" ) )
+  else if ( prim == QStringLiteral( "BarrelRoofHouse" ) )
   {
     put( QStringLiteral( "length" ), QStringLiteral( "hcrLength" ) );
     put( QStringLiteral( "width" ), QStringLiteral( "hcrWidth" ) );
     put( QStringLiteral( "wallHeight" ), QStringLiteral( "hcrWallHeight" ) );
   }
-  else if ( prim == QStringLiteral( "CylinderDome" ) )
+  else if ( prim == QStringLiteral( "DomeRoofHouse" ) )
   {
     put( QStringLiteral( "radius" ), QStringLiteral( "chRadius" ) );
     putCylinderRatio( QStringLiteral( "chCylHeight" ), QStringLiteral( "chDomeHeight" ) );
     put( QStringLiteral( "bulge" ), QStringLiteral( "chBulge" ) );
   }
-  else if ( prim == QStringLiteral( "IndentedCuboid" ) )
+  else if ( prim == QStringLiteral( "RecessedRoofHouse" ) )
   {
     put( QStringLiteral( "outerLength" ), QStringLiteral( "icOuterL" ) );
     put( QStringLiteral( "outerWidth" ), QStringLiteral( "icOuterW" ) );
@@ -226,7 +226,7 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
         put( QStringLiteral( "offsetY" ), QStringLiteral( "icOffsetY" ) );
     }
   }
-  else if ( prim == QStringLiteral( "AsymmetricGableHouse" ) )
+  else if ( prim == QStringLiteral( "ShortRidgeHipRoofHouse" ) )
   {
     put( QStringLiteral( "length" ), QStringLiteral( "aghLength" ) );
     put( QStringLiteral( "width" ), QStringLiteral( "aghWidth" ) );
@@ -234,7 +234,7 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
     put( QStringLiteral( "ridgeLength" ), QStringLiteral( "aghRidgeLen" ) );
     put( QStringLiteral( "ridgeRatio" ), QStringLiteral( "aghRidgeRatio" ) );
   }
-  else if ( prim == QStringLiteral( "FourStageRoundTower" ) )
+  else if ( prim == QStringLiteral( "CurvedRoofRoundHouse" ) )
   {
     put( QStringLiteral( "baseRadius" ), QStringLiteral( "ftBaseR" ) );
     put( QStringLiteral( "baseHeight" ), QStringLiteral( "ftBaseH" ) );
@@ -250,7 +250,7 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
     uiParams.insert( QStringLiteral( "ftEaveRadius" ), val( QStringLiteral( "eaveRadius" ), fallbackRadius ) );
     uiParams.insert( QStringLiteral( "ftEaveHeight" ), val( QStringLiteral( "eaveHeight" ), fallbackHeight ) );
   }
-  else if ( prim == QStringLiteral( "TwoGableHouses" ) )
+  else if ( prim == QStringLiteral( "AngledGableHouse" ) )
   {
     put( QStringLiteral( "length1" ), QStringLiteral( "tgLength1" ) );
     put( QStringLiteral( "length2" ), QStringLiteral( "tgLength2" ) );
@@ -271,18 +271,18 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
 QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModelerDock *dock )
 {
   QJsonObject params;
-  if ( prim == "Cuboid" )
+  if ( prim == "FlatRoofHouse" )
   {
     params["length"] = dock->cuboidLength();
     params["width"] = dock->cuboidWidth();
     params["height"] = dock->cuboidHeight();
   }
-  else if ( prim == "Cylinder" )
+  else if ( prim == "RoundFlatRoofHouse" )
   {
     params["radius"] = dock->cylinderRadius();
     params["height"] = dock->cylinderHeight();
   }
-  else if ( prim == "LHouse" )
+  else if ( prim == "LShapedHouse" )
   {
     params["outerLength"]       = dock->LTotalLength();
     params["outerWidth"]        = dock->LTotalWidth();
@@ -290,7 +290,7 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["cutoutWidthRatio"]  = 1.0 - dock->LWingWidthRatio();
     params["height"] = dock->LHeight();
   }
-  else if ( prim == "ConeCylinder" )
+  else if ( prim == "ConicalRoofHouse" )
   {
     params["radius"] = dock->coneCylRadius();
     const double cylH = dock->coneCylCylHeight();
@@ -299,7 +299,7 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["totalHeight"] = totalH;
     params["cylinderRatio"] = totalH > 1e-6 ? cylH / totalH : 0.7;
   }
-  else if ( prim == "GabledRoof" )
+  else if ( prim == "GableRoofHouse" )
   {
     params["length"] = dock->gabledRoofLength();
     params["width"] = dock->gabledRoofWidth();
@@ -310,7 +310,7 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["totalHeight"] = totalH;
     params["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
   }
-  else if ( prim == "PyramidRoof" )
+  else if ( prim == "PyramidalRoofHouse" )
   {
     params["length"] = dock->pyramidLength();
     params["width"] = dock->pyramidWidth();
@@ -320,7 +320,7 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["totalHeight"] = totalH;
     params["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
   }
-  else if ( prim == "TruncatedPyramidRoof" )
+  else if ( prim == "FlatTopHipRoofHouse" )
   {
     const double bottomLength = dock->tpBottomLength();
     const double bottomWidth = dock->tpBottomWidth();
@@ -334,13 +334,13 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["totalHeight"] = totalH;
     params["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
   }
-  else if ( prim == "HalfCylinderRoof" )
+  else if ( prim == "BarrelRoofHouse" )
   {
     params["length"] = dock->hcrLength();
     params["width"] = dock->hcrWidth();
     params["wallHeight"] = dock->hcrWallHeight();
   }
-  else if ( prim == "CylinderDome" || prim == "CylinderHemisphere" )
+  else if ( prim == "DomeRoofHouse" || prim == "CylinderHemisphere" )
   {
     params["radius"] = dock->cylHemiRadius();
     const double cylH = dock->cylHemiHeight();
@@ -350,7 +350,7 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["cylinderRatio"] = totalH > 1e-6 ? cylH / totalH : 0.7;
     params["bulge"] = dock->cylHemiBulge();
   }
-  else if ( prim == "IndentedCuboid" )
+  else if ( prim == "RecessedRoofHouse" )
   {
     const double outerLength = dock->icOuterLength();
     const double outerWidth = dock->icOuterWidth();
@@ -367,7 +367,7 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["frontMarginRatio"] = outerWidth > 1e-6 ? offsetY / outerWidth : 0.2;
     params["backMarginRatio"] = outerWidth > 1e-6 ? ( outerWidth - offsetY - innerWidth ) / outerWidth : 0.4;
   }
-  else if ( prim == "AsymmetricGableHouse" )
+  else if ( prim == "ShortRidgeHipRoofHouse" )
   {
     params["length"] = dock->aghLength();
     params["width"] = dock->aghWidth();
@@ -379,7 +379,7 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["ridgeLength"] = dock->aghRidgeLength();
     params["ridgeRatio"] = dock->aghRidgeRatio();
   }
-  else if ( prim == "FourStageRoundTower" )
+  else if ( prim == "CurvedRoofRoundHouse" )
   {
     params["baseRadius"] = dock->ftBaseRadius();
     params["baseHeight"] = dock->ftBaseHeight();
@@ -390,7 +390,7 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["eaveRadius"] = dock->ftEaveRadius();
     params["eaveHeight"] = dock->ftEaveHeight();
   }
-  else if ( prim == "TwoGableHouses" )
+  else if ( prim == "AngledGableHouse" )
   {
     params["length1"] = dock->tgLength1();
     params["length2"] = dock->tgLength2();
@@ -800,15 +800,15 @@ bool pointCloudMetadataLooksBuggy( const QVector3D &center, double scale )
 
 bool usesSemanticUpperAlignment( const QString &primitiveType )
 {
-  return primitiveType == QStringLiteral( "Cuboid" ) ||
-         primitiveType == QStringLiteral( "PyramidRoof" ) ||
-         primitiveType == QStringLiteral( "TruncatedPyramidRoof" ) ||
-         primitiveType == QStringLiteral( "GabledRoof" ) ||
-         primitiveType == QStringLiteral( "AsymmetricGableHouse" ) ||
-         primitiveType == QStringLiteral( "IndentedCuboid" ) ||
-         primitiveType == QStringLiteral( "LHouse" ) ||
-         primitiveType == QStringLiteral( "HalfCylinderRoof" ) ||
-         primitiveType == QStringLiteral( "TwoGableHouses" );
+  return primitiveType == QStringLiteral( "FlatRoofHouse" ) ||
+         primitiveType == QStringLiteral( "PyramidalRoofHouse" ) ||
+         primitiveType == QStringLiteral( "FlatTopHipRoofHouse" ) ||
+         primitiveType == QStringLiteral( "GableRoofHouse" ) ||
+         primitiveType == QStringLiteral( "ShortRidgeHipRoofHouse" ) ||
+         primitiveType == QStringLiteral( "RecessedRoofHouse" ) ||
+         primitiveType == QStringLiteral( "LShapedHouse" ) ||
+         primitiveType == QStringLiteral( "BarrelRoofHouse" ) ||
+         primitiveType == QStringLiteral( "AngledGableHouse" );
 }
 
 QMatrix4x4 modelRotationMatrix( const ParamModelerDock *dock )
@@ -999,20 +999,20 @@ bool shouldSwapCanonicalRegressionAxes( const QString &primitiveType,
   if ( nn.contains( QStringLiteral( "poseRotateZ" ) ) || !std::isfinite( rzDeg ) ||
        !nn.contains( QStringLiteral( "geom_footprint_long" ) ) ||
        !nn.contains( QStringLiteral( "geom_footprint_short" ) ) ||
-       ( primitiveType != QStringLiteral( "Cuboid" ) &&
-         primitiveType != QStringLiteral( "PyramidRoof" ) &&
-         primitiveType != QStringLiteral( "TruncatedPyramidRoof" ) &&
-         primitiveType != QStringLiteral( "IndentedCuboid" ) ) )
+       ( primitiveType != QStringLiteral( "FlatRoofHouse" ) &&
+         primitiveType != QStringLiteral( "PyramidalRoofHouse" ) &&
+         primitiveType != QStringLiteral( "FlatTopHipRoofHouse" ) &&
+         primitiveType != QStringLiteral( "RecessedRoofHouse" ) ) )
     return false;
 
   QString lengthKey = QStringLiteral( "length" );
   QString widthKey = QStringLiteral( "width" );
-  if ( primitiveType == QStringLiteral( "TruncatedPyramidRoof" ) )
+  if ( primitiveType == QStringLiteral( "FlatTopHipRoofHouse" ) )
   {
     lengthKey = QStringLiteral( "bottomLength" );
     widthKey = QStringLiteral( "bottomWidth" );
   }
-  else if ( primitiveType == QStringLiteral( "IndentedCuboid" ) )
+  else if ( primitiveType == QStringLiteral( "RecessedRoofHouse" ) )
   {
     lengthKey = QStringLiteral( "outerLength" );
     widthKey = QStringLiteral( "outerWidth" );
@@ -1191,8 +1191,8 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
   QString footprintSource;
   if ( !footprintBBoxForGeometryCorrection( canonicalPoints, fpMin, fpMax, footprintSource ) )
     return false;
-  const bool flatCornerModel = primitiveType == QStringLiteral( "Cuboid" ) ||
-                               primitiveType == QStringLiteral( "LHouse" );
+  const bool flatCornerModel = primitiveType == QStringLiteral( "FlatRoofHouse" ) ||
+                               primitiveType == QStringLiteral( "LShapedHouse" );
   if ( flatCornerModel && footprintSource == QStringLiteral( "bottom" ) )
   {
     QVector3D fullMin, fullMax;
@@ -1209,7 +1209,7 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
   }
   double sectionEave = 0.0;
   bool hasHalfSection = false;
-  if ( primitiveType == QStringLiteral( "HalfCylinderRoof" ) )
+  if ( primitiveType == QStringLiteral( "BarrelRoofHouse" ) )
   {
     QVector3D fullMin, fullMax;
     robustBBoxFromPoints( canonicalPoints, fullMin, fullMax );
@@ -1228,7 +1228,7 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
 
   double targetZ = static_cast<double>( hardMax.z() );
   detail = QStringLiteral( "top/%1" ).arg( footprintSource );
-  const bool indented = primitiveType == QStringLiteral( "IndentedCuboid" );
+  const bool indented = primitiveType == QStringLiteral( "RecessedRoofHouse" );
   if ( flatCornerModel || indented )
   {
     const bool supported = indented
@@ -1244,12 +1244,12 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
     }
   }
 
-  const bool gabled = primitiveType == QStringLiteral( "GabledRoof" ) ||
-                      primitiveType == QStringLiteral( "AsymmetricGableHouse" );
-  const bool twoGableHouses = primitiveType == QStringLiteral( "TwoGableHouses" );
-  const bool halfCylinderRoof = primitiveType == QStringLiteral( "HalfCylinderRoof" );
-  const bool shrinkingRoof = primitiveType == QStringLiteral( "PyramidRoof" ) ||
-                             primitiveType == QStringLiteral( "TruncatedPyramidRoof" );
+  const bool gabled = primitiveType == QStringLiteral( "GableRoofHouse" ) ||
+                      primitiveType == QStringLiteral( "ShortRidgeHipRoofHouse" );
+  const bool twoGableHouses = primitiveType == QStringLiteral( "AngledGableHouse" );
+  const bool halfCylinderRoof = primitiveType == QStringLiteral( "BarrelRoofHouse" );
+  const bool shrinkingRoof = primitiveType == QStringLiteral( "PyramidalRoofHouse" ) ||
+                             primitiveType == QStringLiteral( "FlatTopHipRoofHouse" );
   if ( gabled || shrinkingRoof || twoGableHouses || halfCylinderRoof )
   {
     if ( hasHalfSection ) targetZ = sectionEave;
@@ -1296,7 +1296,7 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
     if ( ParamModelerAlignmentGeometry::indentedOuterWallCorner( canonicalPoints, fullMin, fullMax, targetZ, corner ) )
       detail += QStringLiteral( "/outer-walls" );
   }
-  else if ( primitiveType == QStringLiteral( "LHouse" ) )
+  else if ( primitiveType == QStringLiteral( "LShapedHouse" ) )
   {
     QVector3D fullMin, fullMax;
     robustBBoxFromPoints( canonicalPoints, fullMin, fullMax );
@@ -1499,15 +1499,15 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
     return;
 
   const QString prim = primitiveType == QStringLiteral( "CylinderHemisphere" )
-                         ? QStringLiteral( "CylinderDome" )
+                         ? QStringLiteral( "DomeRoofHouse" )
                          : primitiveType;
-  if ( prim != QStringLiteral( "Cuboid" ) &&
-       prim != QStringLiteral( "Cylinder" ) &&
-       prim != QStringLiteral( "GabledRoof" ) &&
-       prim != QStringLiteral( "HalfCylinderRoof" ) &&
-       prim != QStringLiteral( "TruncatedPyramidRoof" ) &&
-       prim != QStringLiteral( "LHouse" ) &&
-       prim != QStringLiteral( "IndentedCuboid" ) )
+  if ( prim != QStringLiteral( "FlatRoofHouse" ) &&
+       prim != QStringLiteral( "RoundFlatRoofHouse" ) &&
+       prim != QStringLiteral( "GableRoofHouse" ) &&
+       prim != QStringLiteral( "BarrelRoofHouse" ) &&
+       prim != QStringLiteral( "FlatTopHipRoofHouse" ) &&
+       prim != QStringLiteral( "LShapedHouse" ) &&
+       prim != QStringLiteral( "RecessedRoofHouse" ) )
     return;
 
   QVector<QVector3D> points;
@@ -1545,7 +1545,7 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
   const double fpWidth = static_cast<double>( fpMax.y() - fpMin.y() );
   const double strength = std::max( 0.0, std::min( 1.0, m_geometryCorrectionStrength ) );
 
-  if ( prim == QStringLiteral( "Cuboid" ) )
+  if ( prim == QStringLiteral( "FlatRoofHouse" ) )
   {
     const double length = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "length" ), fpLength, strength ) : uiParams.value( QStringLiteral( "length" ), fpLength );
     const double width = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "width" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "width" ), fpWidth );
@@ -1564,7 +1564,7 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
     return;
   }
 
-  if ( prim == QStringLiteral( "Cylinder" ) )
+  if ( prim == QStringLiteral( "RoundFlatRoofHouse" ) )
   {
     QVector3D robustMin, robustMax;
     robustBBoxFromPoints( canonicalPoints, robustMin, robustMax );
@@ -1591,7 +1591,7 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
     return;
   }
 
-  if ( prim == QStringLiteral( "GabledRoof" ) )
+  if ( prim == QStringLiteral( "GableRoofHouse" ) )
   {
     const double length = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "grLength" ), fpLength, strength ) : uiParams.value( QStringLiteral( "grLength" ), fpLength );
     const double width = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "grWidth" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "grWidth" ), fpWidth );
@@ -1629,7 +1629,7 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
     }
   }
 
-  if ( prim == QStringLiteral( "HalfCylinderRoof" ) )
+  if ( prim == QStringLiteral( "BarrelRoofHouse" ) )
   {
     const double length = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "hcrLength" ), fpLength, strength ) : uiParams.value( QStringLiteral( "hcrLength" ), fpLength );
     const double width = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "hcrWidth" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "hcrWidth" ), fpWidth );
@@ -1651,7 +1651,7 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
     return;
   }
 
-  if ( prim == QStringLiteral( "TruncatedPyramidRoof" ) )
+  if ( prim == QStringLiteral( "FlatTopHipRoofHouse" ) )
   {
     const double bottomLength = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpBottomLength" ), fpLength, strength ) : uiParams.value( QStringLiteral( "tpBottomLength" ), fpLength );
     const double bottomWidth = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "tpBottomWidth" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "tpBottomWidth" ), fpWidth );
@@ -1714,7 +1714,7 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
     return;
   }
 
-  if ( prim == QStringLiteral( "LHouse" ) )
+  if ( prim == QStringLiteral( "LShapedHouse" ) )
   {
     const double totalLength = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "lTotalL" ), fpLength, strength ) : uiParams.value( QStringLiteral( "lTotalL" ), fpLength );
     const double totalWidth = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "lTotalW" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "lTotalW" ), fpWidth );
@@ -1749,7 +1749,7 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
     return;
   }
 
-  if ( prim == QStringLiteral( "IndentedCuboid" ) )
+  if ( prim == QStringLiteral( "RecessedRoofHouse" ) )
   {
     const double outerLength = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOuterL" ), fpLength, strength ) : uiParams.value( QStringLiteral( "icOuterL" ), fpLength );
     const double outerWidth = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "icOuterW" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "icOuterW" ), fpWidth );

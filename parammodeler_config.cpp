@@ -118,6 +118,16 @@ static void migratePtv3ModelDefaults()
     settings.setValue( suffixKey, QStringLiteral( "_v9_normals" ) );
     settings.setValue( v9MigrationKey, true );
   }
+
+  const QString v10MigrationKey = QStringLiteral( "parammodeler/ptv3ModelDefaultsV10" );
+  if ( !settings.value( v10MigrationKey, false ).toBool() )
+  {
+    const QString clsDir = ParamModelerConfig::pointnetBaseDir() +
+                           QStringLiteral( "ptv3_simple/logs/ptv3_cls_v10" );
+    settings.setValue( QStringLiteral( "parammodeler/ptv3ClassifyLogDir" ), clsDir );
+    settings.setValue( suffixKey, QStringLiteral( "_v10_normals" ) );
+    settings.setValue( v10MigrationKey, true );
+  }
 }
 
 // ------------------------------------------------------------------
@@ -227,14 +237,14 @@ QString ptv3ClassifyLogDir()
 {
   migratePtv3ModelDefaults();
   return setting( QStringLiteral( "parammodeler/ptv3ClassifyLogDir" ),
-                  pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v9" ) );
+                  pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v10" ) );
 }
 
 QString ptv3RegressionSuffix()
 {
   migratePtv3ModelDefaults();
   return setting( QStringLiteral( "parammodeler/ptv3RegressionSuffix" ),
-                  QStringLiteral( "_v9_normals" ) );
+                  QStringLiteral( "_v10_normals" ) );
 }
 
 // ------------------------------------------------------------------
@@ -441,8 +451,8 @@ void showSettingsDialog( QWidget *parent )
     edtDataset->setText(   QStringLiteral( "E:/pointnet/datasets_aug" ) );
     edtPctClsLog->setText( QStringLiteral( "E:/pointnet/pct_simple/logs/pct_cls_v4" ) );
     edtPctSuffix->setText( QStringLiteral( "_v4_normals" ) );
-    edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v9" ) );
-    edtPtv3Suffix->setText( QStringLiteral( "_v9_normals" ) );
+    edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v10" ) );
+    edtPtv3Suffix->setText( QStringLiteral( "_v10_normals" ) );
   } );
 
   auto *btnBox = new QHBoxLayout;

@@ -12,20 +12,20 @@ import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 HORIZONTAL = {
-    "Cuboid": "CLength CWidth",
-    "Cylinder": "CylRadius",
-    "LHouse": "LTotalLength LTotalWidth",
-    "ConeCylinder": "ConeCylRadius",
-    "GabledRoof": "GRLength GRWidth",
-    "PyramidRoof": "PRLength PRWidth",
-    "TruncatedPyramidRoof": "TPRBottomLength TPRBottomWidth TPRTopLength TPRTopWidth",
-    "HalfCylinderRoof": "HCRLength HCRWidth",
-    "CylinderDome": "CylHemiRadius",
+    "FlatRoofHouse": "CLength CWidth",
+    "RoundFlatRoofHouse": "CylRadius",
+    "LShapedHouse": "LTotalLength LTotalWidth",
+    "ConicalRoofHouse": "ConeCylRadius",
+    "GableRoofHouse": "GRLength GRWidth",
+    "PyramidalRoofHouse": "PRLength PRWidth",
+    "FlatTopHipRoofHouse": "TPRBottomLength TPRBottomWidth TPRTopLength TPRTopWidth",
+    "BarrelRoofHouse": "HCRLength HCRWidth",
+    "DomeRoofHouse": "CylHemiRadius",
     "CylinderHemisphere": "CylHemiRadius",
-    "IndentedCuboid": "ICLength ICWidth ICInnerLength ICInnerWidth",
-    "AsymmetricGableHouse": "AGHLength AGHWidth AGHRidgeLength",
-    "FourStageRoundTower": "FTBaseRadius FTEaveRadius FTMiddleTopRadius",
-    "TwoGableHouses": "TGLength1 TGLength2 TGWidth",
+    "RecessedRoofHouse": "ICLength ICWidth ICInnerLength ICInnerWidth",
+    "ShortRidgeHipRoofHouse": "AGHLength AGHWidth AGHRidgeLength",
+    "CurvedRoofRoundHouse": "FTBaseRadius FTEaveRadius FTMiddleTopRadius",
+    "AngledGableHouse": "TGLength1 TGLength2 TGWidth",
     "TriPrismPyramid": "",
 }
 
@@ -37,7 +37,7 @@ class ScaleSamplingTests(unittest.TestCase):
             self.skipTest("A C++ compiler is required")
         source = (ROOT / "parammodeler_randomizer.cpp").read_text(encoding="utf-8")
         helpers = source[source.index("  auto rnd ="):source.index("  const QString prim")]
-        base = source[source.index('  if ( prim == "Cuboid" )'):source.index("  QVector<QDoubleSpinBox *> horizontalControls;")]
+        base = source[source.index('  if ( prim == "FlatRoofHouse" )'):source.index("  QVector<QDoubleSpinBox *> horizontalControls;")]
         scaling = source[source.index("  QVector<QDoubleSpinBox *> horizontalControls;"):source.index("  // ---", source.index("horizontalControls;"))]
         names = sorted(set(re.findall(r"dock->ui->(spinBox\w+)", helpers + base + scaling)))
         widgets = {widget.get("name"): widget for widget in ET.parse(ROOT / "parammodeler_dock.ui").iter("widget")}
@@ -93,19 +93,19 @@ struct BuildMesh {
   static MeshData build(const QString &prim, Dock *dock) {
     auto &u = *dock->ui;
     double x = 0, y = 0;
-    if (prim == "Cuboid") { x = u.spinBoxCLength->value(); y = u.spinBoxCWidth->value(); }
-    if (prim == "LHouse") { x = u.spinBoxLTotalLength->value(); y = u.spinBoxLTotalWidth->value(); }
-    if (prim == "GabledRoof") { x = u.spinBoxGRLength->value(); y = u.spinBoxGRWidth->value(); }
-    if (prim == "PyramidRoof") { x = u.spinBoxPRLength->value(); y = u.spinBoxPRWidth->value(); }
-    if (prim == "TruncatedPyramidRoof") { x = u.spinBoxTPRBottomLength->value(); y = u.spinBoxTPRBottomWidth->value(); }
-    if (prim == "HalfCylinderRoof") { x = u.spinBoxHCRLength->value(); y = u.spinBoxHCRWidth->value(); }
-    if (prim == "IndentedCuboid") { x = u.spinBoxICLength->value(); y = u.spinBoxICWidth->value(); }
-    if (prim == "AsymmetricGableHouse") { x = u.spinBoxAGHLength->value(); y = u.spinBoxAGHWidth->value(); }
-    if (prim == "Cylinder") x = y = 2 * u.spinBoxCylRadius->value();
-    if (prim == "ConeCylinder") x = y = 2 * u.spinBoxConeCylRadius->value();
-    if (prim == "CylinderDome" || prim == "CylinderHemisphere") x = y = 2 * u.spinBoxCylHemiRadius->value();
-    if (prim == "FourStageRoundTower") x = y = 2 * u.spinBoxFTEaveRadius->value();
-    if (prim == "TwoGableHouses") {
+    if (prim == "FlatRoofHouse") { x = u.spinBoxCLength->value(); y = u.spinBoxCWidth->value(); }
+    if (prim == "LShapedHouse") { x = u.spinBoxLTotalLength->value(); y = u.spinBoxLTotalWidth->value(); }
+    if (prim == "GableRoofHouse") { x = u.spinBoxGRLength->value(); y = u.spinBoxGRWidth->value(); }
+    if (prim == "PyramidalRoofHouse") { x = u.spinBoxPRLength->value(); y = u.spinBoxPRWidth->value(); }
+    if (prim == "FlatTopHipRoofHouse") { x = u.spinBoxTPRBottomLength->value(); y = u.spinBoxTPRBottomWidth->value(); }
+    if (prim == "BarrelRoofHouse") { x = u.spinBoxHCRLength->value(); y = u.spinBoxHCRWidth->value(); }
+    if (prim == "RecessedRoofHouse") { x = u.spinBoxICLength->value(); y = u.spinBoxICWidth->value(); }
+    if (prim == "ShortRidgeHipRoofHouse") { x = u.spinBoxAGHLength->value(); y = u.spinBoxAGHWidth->value(); }
+    if (prim == "RoundFlatRoofHouse") x = y = 2 * u.spinBoxCylRadius->value();
+    if (prim == "ConicalRoofHouse") x = y = 2 * u.spinBoxConeCylRadius->value();
+    if (prim == "DomeRoofHouse" || prim == "CylinderHemisphere") x = y = 2 * u.spinBoxCylHemiRadius->value();
+    if (prim == "CurvedRoofRoundHouse") x = y = 2 * u.spinBoxFTEaveRadius->value();
+    if (prim == "AngledGableHouse") {
       const double turn = (180 - u.spinBoxTGAngle->value()) * std::acos(-1) / 180;
       x = u.spinBoxTGLength1->value() + u.spinBoxTGLength2->value() * std::cos(turn);
       y = u.spinBoxTGWidth->value() + u.spinBoxTGLength2->value() * std::sin(turn);

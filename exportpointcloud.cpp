@@ -456,9 +456,9 @@ bool ExportPointCloud::exportLabeledTXT( const QString &fileName,
 static bool isBoxLike( const QString &primType )
 {
   static const QSet<QString> s = {
-    "Cuboid", "GabledRoof", "PyramidRoof", "TruncatedPyramidRoof",
-    "HalfCylinderRoof", "AsymmetricGableHouse",
-    "LHouse", "IndentedCuboid"
+    "FlatRoofHouse", "GableRoofHouse", "PyramidalRoofHouse", "FlatTopHipRoofHouse",
+    "BarrelRoofHouse", "ShortRidgeHipRoofHouse",
+    "LShapedHouse", "RecessedRoofHouse"
   };
   return s.contains( primType );
 }
@@ -466,7 +466,7 @@ static bool isBoxLike( const QString &primType )
 static bool isCylinderLike( const QString &primType )
 {
   static const QSet<QString> s = {
-    "Cylinder", "CylinderDome", "ConeCylinder", "FourStageRoundTower"
+    "RoundFlatRoofHouse", "DomeRoofHouse", "ConicalRoofHouse", "CurvedRoofRoundHouse"
   };
   return s.contains( primType );
 }
@@ -1039,7 +1039,7 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
   QVector<QVector3D> roofPts;
   QVector<QVector3D> wallPts;
 
-  if ( primitiveType == QStringLiteral( "IndentedCuboid" ) )
+  if ( primitiveType == QStringLiteral( "RecessedRoofHouse" ) )
   {
     QVector<int> outerTopTris, recessFloorTris, outerWallTris, recessWallTris;
     classifyIndentedCuboidTriangles( mesh, outerTopTris, recessFloorTris, outerWallTris, recessWallTris );
@@ -1056,7 +1056,7 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
     roofPts << sampleIndentedRimPoints( dock, rimCount );
     wallPts << sampleGroup( mesh, outerWallTris, outerWallCount );
   }
-  else if ( primitiveType == QStringLiteral( "LHouse" ) )
+  else if ( primitiveType == QStringLiteral( "LShapedHouse" ) )
   {
     QVector<int> topTris, outerWallTris, notchWallTris;
     classifyLHouseTriangles( mesh, topTris, outerWallTris, notchWallTris );
@@ -1082,7 +1082,7 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
     roofPts << sampleGroup( mesh, notchWallTris, notchWallCount );
     wallPts << sampleGroup( mesh, outerWallTris, outerWallCount );
   }
-  else if ( primitiveType == QStringLiteral( "TruncatedPyramidRoof" ) )
+  else if ( primitiveType == QStringLiteral( "FlatTopHipRoofHouse" ) )
   {
     QVector<int> topTris, roofSlopeTris, wallTris;
     classifyTruncatedPyramidRoofTriangles( mesh, dock->tpWallHeight(), topTris, roofSlopeTris, wallTris );
@@ -1097,11 +1097,11 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
     roofPts << sampleTruncatedPyramidRoofEdgePoints( dock, edgeCount );
     wallPts << sampleGroup( mesh, wallTris, wallCount );
   }
-  else if ( primitiveType == QStringLiteral( "AsymmetricGableHouse" ) ||
-            primitiveType == QStringLiteral( "GabledRoof" ) )
+  else if ( primitiveType == QStringLiteral( "ShortRidgeHipRoofHouse" ) ||
+            primitiveType == QStringLiteral( "GableRoofHouse" ) )
   {
     QVector<int> roofTris, wallTris;
-    const bool fullRidge = primitiveType == QStringLiteral( "GabledRoof" );
+    const bool fullRidge = primitiveType == QStringLiteral( "GableRoofHouse" );
     classifyWallAndRoofByHeight( mesh, fullRidge ? dock->gabledRoofWallHeight() : dock->aghWallHeight(), roofTris, wallTris );
 
     const int edgeCount = qMax( 32, int( pointCount * 0.14 ) );
@@ -1112,7 +1112,7 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
     roofPts << sampleGableHouseEdgePoints( dock, edgeCount, fullRidge );
     wallPts << sampleGroup( mesh, wallTris, wallCount );
   }
-  else if ( primitiveType == QStringLiteral( "TwoGableHouses" ) )
+  else if ( primitiveType == QStringLiteral( "AngledGableHouse" ) )
   {
     QVector<int> roofTris, wallTris;
     classifyWallAndRoofByHeight( mesh, dock->tgWallHeight(), roofTris, wallTris );
@@ -1166,7 +1166,7 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
   }
 
   // ── ★ 在导出时直接应用遮挡 ──
-  if ( primitiveType == QStringLiteral( "IndentedCuboid" ) )
+  if ( primitiveType == QStringLiteral( "RecessedRoofHouse" ) )
     wallPts = applyBoxOcclusion( wallPts, rz, 0.3 );
   else if ( isBoxLike( primitiveType ) )
     wallPts = applyBoxOcclusion( wallPts, rz, 0.3 );

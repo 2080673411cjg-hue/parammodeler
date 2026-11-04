@@ -17,6 +17,19 @@
 </context>
 <context>
     <name>ParamModelerDock</name>
+    <message><source>FlatRoofHouse</source><translation>矩形平顶房屋</translation></message>
+    <message><source>RoundFlatRoofHouse</source><translation>圆形平顶房屋</translation></message>
+    <message><source>LShapedHouse</source><translation>L形平顶房屋</translation></message>
+    <message><source>ConicalRoofHouse</source><translation>圆锥顶圆屋</translation></message>
+    <message><source>GableRoofHouse</source><translation>双坡顶房屋</translation></message>
+    <message><source>PyramidalRoofHouse</source><translation>四坡尖顶房屋</translation></message>
+    <message><source>FlatTopHipRoofHouse</source><translation>平顶四坡房屋</translation></message>
+    <message><source>BarrelRoofHouse</source><translation>筒拱顶房屋</translation></message>
+    <message><source>DomeRoofHouse</source><translation>穹顶圆屋</translation></message>
+    <message><source>RecessedRoofHouse</source><translation>内凹式平顶房屋</translation></message>
+    <message><source>ShortRidgeHipRoofHouse</source><translation>短脊四坡顶房屋</translation></message>
+    <message><source>CurvedRoofRoundHouse</source><translation>带檐曲面顶圆屋</translation></message>
+    <message><source>AngledGableHouse</source><translation>转折式双坡顶房屋</translation></message>
     <message><source>Fit RMSE: %1
 Surface fit: %2%
 %3
@@ -26,6 +39,16 @@ Scene units</source><translation>拟合残差 RMSE：%1
 %3
 容差：%4 | 样本：%5
 单位：场景坐标单位</translation></message>
+    <message><source>Initial → Current (scene units)
+RMSE %1 → %2
+Surface fit: %3% → %4%
+%5
+Tolerance: %6 | N: %7</source><translation>初始 → 当前（场景坐标单位）
+拟合残差 RMSE：%1 → %2
+表面贴合：%3% → %4%
+%5
+容差：%6 | 样本：%7</translation></message>
+    <message><source>Current outside: %1% | inside: %2%</source><translation>当前外侧：%1% | 内侧：%2%</translation></message>
     <message><source>Outside: %1% | Inside: %2%</source><translation>外侧：%1% | 内侧：%2%</translation></message>
     <message><source>Inside/outside unavailable: open mesh</source><translation>内外比例不可用：模型未封闭</translation></message>
     <message><source>Fit statistics and tolerance...</source><translation>拟合统计与容差...</translation></message>
@@ -33,6 +56,16 @@ Scene units</source><translation>拟合残差 RMSE：%1
     <message><source>Distance tolerance (scene units):</source><translation>距离容差（场景坐标单位）：</translation></message>
     <message><source>Load a model and point cloud to evaluate.</source><translation>加载模型和点云后显示统计。</translation></message>
     <message><source>Surface fit: points within the distance tolerance. Outside/inside: points farther from the actual model surface. The same tolerance is used while adjusting the model. Percentages use a fixed point sample and are not parameter accuracy.</source><translation>表面贴合：距模型实际表面不超过容差的点。外侧/内侧：超出容差且位于模型实体外/内的点。微调过程中容差保持固定。百分比基于固定点样本，不表示参数预测准确率。</translation></message>
+    <message><source>Initial values use the model before fine tuning and remain fixed while editing. Changing tolerance recalculates both initial and current values with the same point sample. Loading a point cloud or a model, changing primitive type, or applying a new prediction starts a new comparison. Surface fit: points within the distance tolerance. Outside/inside describe the current model. These percentages are not parameter accuracy.</source><translation>初始值取自微调前的模型，编辑时保持该模型和位置不变作为基准。修改容差会用同一批点重新计算初始值和当前值。加载点云或模型、切换基元或应用新的预测后重新开始比较。表面贴合：距模型表面不超过容差的点。外侧/内侧描述当前模型。以上百分比不表示参数预测准确率。</translation></message>
+    <message><source>
+Current P95: %1
+Current surface fit points: %2
+Current outside points: %3
+Current inside points: %4</source><translation>
+当前 P95：%1
+当前贴合点数：%2
+当前外侧点数：%3
+当前内侧点数：%4</translation></message>
     <message><source>
 P95: %1
 Surface fit points: %2
@@ -43,6 +76,23 @@ P95：%1
 外侧点数：%3
 内侧点数：%4</translation></message>
     <message><source>N/A</source><translation>不适用</translation></message>
+    <message><source>Result: %1
+Confidence: %2%</source><translation>识别类别：%1
+置信度：%2%</translation></message>
+    <message><source>Classification model: %1
+Regression model: %2
+Direction preprocessing: %3</source><translation>分类模型：%1
+参数回归模型：%2
+方向处理：%3</translation></message>
+    <message><source>Pending parameter estimation</source><translation>待参数估计</translation></message>
+    <message><source>Not returned</source><translation>未返回</translation></message>
+    <message><source>Last result: %1</source><translation>最近识别结果：%1</translation></message>
+    <message><source>The service did not report the actual model path. Update ptv3_server.py and restart the service to confirm its version.</source><translation>服务未返回实际权重路径。请更新 ptv3_server.py 并重启服务后确认版本。</translation></message>
+    <message><source>Classification checkpoint: %1
+Regression checkpoint: %2
+Direction preprocessing concerns the regression input; it does not confirm position alignment or parameter accuracy.</source><translation>分类权重：%1
+回归权重：%2
+方向处理描述回归输入的规范化状态，不代表位置已经对齐或参数预测准确。</translation></message>
     <message><source>Eave</source><translation>檐口</translation></message>
     <message><source>Eave outer radius:</source><translation>檐口外半径：</translation></message>
     <message><source>Eave thickness:</source><translation>檐口厚度：</translation></message>
@@ -917,6 +967,9 @@ P95：%1
         <source>Complete all</source>
         <translation>一键完成</translation>
     </message>
+    <message><source>Stop</source><translation>终止</translation></message>
+    <message><source>Stopping...</source><translation>正在终止…</translation></message>
+    <message><source>Stopped. Completed steps are kept. You can retry or return to fine tuning.</source><translation>已终止。已完成的步骤予以保留，可重新执行或返回微调。</translation></message>
     <message>
         <location filename="../parammodeler_dock.cpp" line="1657"/>
         <source>Return to fine tuning</source>
@@ -1979,6 +2032,12 @@ Folder: %3</source>
 </context>
 <context>
     <name>PointNetRunner</name>
+    <message><source>Prediction stopped.</source><translation>已终止推理。</translation></message>
+    <message><source>%1 (version unconfirmed)</source><translation>%1（版本未确认）</translation></message>
+    <message><source>Unconfirmed (direction status not returned)</source><translation>未确认（未返回方向状态）</translation></message>
+    <message><source>Normalized for parameter prediction</source><translation>已按识别方向完成规范化</translation></message>
+    <message><source>Not applied for this primitive</source><translation>此类基元未执行方向规范化</translation></message>
+    <message><source>Direction normalization not applied</source><translation>未应用方向规范化</translation></message>
     <message>
         <source>This tower checkpoint uses the old bulge definition. Retrain with middleRise (metres) before using it.</source>
         <translation>当前圆塔权重使用旧鼓包定义，请用隆起高度 middleRise（米）重新训练后再使用。</translation>

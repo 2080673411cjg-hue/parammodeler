@@ -15,14 +15,14 @@ class GabledTrainingTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
         (self.root / "metadata").mkdir()
-        self.recipe = next(r for r in runner.RECIPES if r[0] == "GabledRoof")
+        self.recipe = next(r for r in runner.RECIPES if r[0] == "GableRoofHouse")
 
     def tearDown(self):
         self.temp.cleanup()
 
     def validate(self, params):
         (self.root / "metadata/sample_params.json").write_text(
-            json.dumps([{"type": "GabledRoof", "file": "train/GabledRoof/sample.txt", "params": params}]), encoding="utf-8")
+            json.dumps([{"type": "GableRoofHouse", "file": "train/GableRoofHouse/sample.txt", "params": params}]), encoding="utf-8")
         runner.validate_gabled_targets(self.root, [self.recipe])
 
     def test_new_target_and_legacy_data_guard(self):
@@ -45,10 +45,10 @@ class GabledTrainingTests(unittest.TestCase):
 
     def test_server_override_does_not_change_other_classes(self):
         with patch.object(server, "GABLED_LOG", "logs/ptv3_reg_gabledroof_trial_normals"):
-            self.assertEqual(server.regression_log_dir("GabledRoof").name, "ptv3_reg_gabledroof_trial_normals")
-            self.assertEqual(server.regression_log_dir("Cuboid").name,
+            self.assertEqual(server.regression_log_dir("GableRoofHouse").name, "ptv3_reg_gabledroof_trial_normals")
+            self.assertEqual(server.regression_log_dir("FlatRoofHouse").name,
                              "ptv3_reg_cuboid_v9_normals")
-            self.assertEqual(server.health()["gabled_reg_log"], str(server.regression_log_dir("GabledRoof")))
+            self.assertEqual(server.health()["gabled_reg_log"], str(server.regression_log_dir("GableRoofHouse")))
 
 
 if __name__ == "__main__":

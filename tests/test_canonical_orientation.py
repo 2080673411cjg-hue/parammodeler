@@ -1,10 +1,13 @@
 """CPU checks for canonical geometry and directional target labels."""
 
 import importlib.util
+import sys
 from pathlib import Path
 import unittest
 
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 
 spec = importlib.util.spec_from_file_location(
@@ -28,9 +31,9 @@ def noisy_roof(class_name, length, width, seed=19):
     xy = rng.uniform(0, 1, (2400, 2)) * [length, width]
     x, y = xy.T
     tent = np.minimum(y / (width * .7), (width - y) / (width * .3))
-    if class_name == "HalfCylinderRoof":
+    if class_name == "BarrelRoofHouse":
         roof = width / 2 * np.sqrt(np.maximum(0, 1 - (2 * y / width - 1) ** 2))
-    elif class_name == "AsymmetricGableHouse":
+    elif class_name == "ShortRidgeHipRoofHouse":
         roof = 2 * np.minimum(tent, np.minimum(x, length - x) / (length * .25))
     else:
         roof = 2 * tent
@@ -54,19 +57,19 @@ class CanonicalOrientationTests(unittest.TestCase):
         for angle in (0, 45, 89, 90, 120, 180):
             with self.subTest(angle=angle):
                 points = canonical.rotate_points_z(rectangle(), angle)
-                result = canonical.canonical_orientation(points, "Cuboid")
+                result = canonical.canonical_orientation(points, "FlatRoofHouse")
                 self.assertTrue(result["reliable"], result["reason"])
                 error = abs(canonical.fold_axis_degrees(result["canonical_angle_deg"] - angle))
                 self.assertLess(error, 1.0)
 
     def test_near_square_is_not_rejected_as_circular(self):
         points = canonical.rotate_points_z(rectangle(width=1.9), 37)
-        result = canonical.canonical_orientation(points, "IndentedCuboid")
+        result = canonical.canonical_orientation(points, "RecessedRoofHouse")
         self.assertTrue(result["reliable"], result["reason"])
         self.assertLess(abs(canonical.fold_axis_degrees(result["canonical_angle_deg"] - 37)), 1.0)
 
     def test_square_reports_axis_ambiguity_but_has_rectangle_frame(self):
-        result = canonical.canonical_orientation(rectangle(width=2.0), "Cuboid")
+        result = canonical.canonical_orientation(rectangle(width=2.0), "FlatRoofHouse")
         self.assertTrue(result["reliable"], result["reason"])
         self.assertEqual(result["verdict"], "WEAK")
 
@@ -75,12 +78,12 @@ class CanonicalOrientationTests(unittest.TestCase):
         ridge = np.column_stack((np.linspace(-0.5, 0.5, 128),
                                  np.full(128, 0.3), np.ones(128)))
         points = canonical.rotate_points_z(np.vstack((footprint, ridge)).astype(np.float32), 89)
-        result = canonical.canonical_orientation(points, "AsymmetricGableHouse")
+        result = canonical.canonical_orientation(points, "ShortRidgeHipRoofHouse")
         self.assertTrue(result["reliable"], result["reason"])
         self.assertLess(abs(canonical.fold_axis_degrees(result["canonical_angle_deg"] - 89)), 1.0)
 
     def test_roof_candidates_ignore_sparse_high_outliers(self):
-        for class_name in ("GabledRoof", "AsymmetricGableHouse", "HalfCylinderRoof"):
+        for class_name in ("GableRoofHouse", "ShortRidgeHipRoofHouse", "BarrelRoofHouse"):
             points = noisy_roof(class_name, length=12, width=10)
             for yaw in (-158, -27, 64, 89):
                 with self.subTest(class_name=class_name, yaw=yaw):
@@ -96,7 +99,7 @@ class CanonicalOrientationTests(unittest.TestCase):
 
     def test_short_wide_roofs_compare_relative_candidate_spans(self):
         # Absolute top extents alone can favor the width of a short, wide roof.
-        for class_name in ("GabledRoof", "AsymmetricGableHouse", "HalfCylinderRoof"):
+        for class_name in ("GableRoofHouse", "ShortRidgeHipRoofHouse", "BarrelRoofHouse"):
             points = noisy_roof(class_name, length=6, width=40)
             for yaw in (22, -64):
                 with self.subTest(class_name=class_name, yaw=yaw):
@@ -106,7 +109,7 @@ class CanonicalOrientationTests(unittest.TestCase):
                     self.assertLess(error, 2)
 
     def test_flat_surface_does_not_fabricate_a_ridge(self):
-        for class_name in ("GabledRoof", "AsymmetricGableHouse", "HalfCylinderRoof"):
+        for class_name in ("GableRoofHouse", "ShortRidgeHipRoofHouse", "BarrelRoofHouse"):
             with self.subTest(class_name=class_name):
                 result = canonical.canonical_orientation(rectangle(), class_name)
                 self.assertFalse(result["reliable"])
@@ -117,7 +120,7 @@ class CanonicalOrientationTests(unittest.TestCase):
         top[:, 2] = 1
         points = canonical.rotate_points_z(np.vstack((rectangle(width=2), top)), 31)
         self.assertGreater(float(np.ptp(points[:, 2])), 0)
-        for class_name in ("GabledRoof", "AsymmetricGableHouse", "HalfCylinderRoof"):
+        for class_name in ("GableRoofHouse", "ShortRidgeHipRoofHouse", "BarrelRoofHouse"):
             with self.subTest(class_name=class_name):
                 result = canonical.canonical_orientation(points, class_name)
                 self.assertFalse(result["reliable"])
@@ -128,9 +131,9 @@ class CanonicalOrientationTests(unittest.TestCase):
     def test_folded_roof_ratio_preserves_physical_ridge_side(self):
         for angle in (0, 90, 120, 180):
             record = {"params": {"rz": angle}}
-            theta = canonical.canonical_angle_from_metadata(record, "GabledRoof")
+            theta = canonical.canonical_angle_from_metadata(record, "GableRoofHouse")
             q = canonical.canonical_target_values(np.array([0.3]), ["ridgeRatio"], record,
-                                                   "GabledRoof", theta)[0]
+                                                   "GableRoofHouse", theta)[0]
             original = np.array([0, (0.3 - 0.5) * 10])
             restored = np.array([0, (q - 0.5) * 10])
             def rotate(point, yaw):
@@ -140,27 +143,27 @@ class CanonicalOrientationTests(unittest.TestCase):
 
     def test_directional_labels_allow_small_geometric_angle_error(self):
         values = canonical.canonical_target_values(
-            np.array([0.3]), ["ridgeRatio"], {"params": {"rz": 120}}, "GabledRoof", -55)
+            np.array([0.3]), ["ridgeRatio"], {"params": {"rz": 120}}, "GableRoofHouse", -55)
         self.assertAlmostEqual(float(values[0]), 0.7, places=6)
 
     def test_unsupported_class_remains_unrotated(self):
-        result = canonical.canonical_orientation(rectangle(), "TwoGableHouses")
+        result = canonical.canonical_orientation(rectangle(), "AngledGableHouse")
         self.assertEqual(result["status"], "SKIPPED_CLASS")
         np.testing.assert_array_equal(result["aligned_points"], rectangle())
 
     def test_lhouse_legacy_checkpoint_stays_unrotated(self):
-        self.assertIsNone(canonical.canonical_angle_from_metadata({"params": {"rz": 120}}, "LHouse"))
-        self.assertEqual(canonical.canonical_orientation(rectangle(), "LHouse")["status"], "SKIPPED_CLASS")
+        self.assertIsNone(canonical.canonical_angle_from_metadata({"params": {"rz": 120}}, "LShapedHouse"))
+        self.assertEqual(canonical.canonical_orientation(rectangle(), "LShapedHouse")["status"], "SKIPPED_CLASS")
 
     def test_lhouse_metadata_keeps_the_full_direction_and_targets(self):
         for yaw in (0, 69, 120, 180, -174, 270):
             record = {"params": {"rz": yaw}}
-            theta = canonical.canonical_angle_from_metadata(record, "LHouse", lhouse_canonical=True)
+            theta = canonical.canonical_angle_from_metadata(record, "LShapedHouse", lhouse_canonical=True)
             self.assertAlmostEqual((theta - yaw + 180) % 360 - 180, 0)
             values = np.array([20, 10, .4, .6, 5])
             np.testing.assert_array_equal(canonical.canonical_target_values(
                 values, ["outerLength", "outerWidth", "cutoutLengthRatio", "cutoutWidthRatio", "height"],
-                record, "LHouse", theta), values.astype(np.float32))
+                record, "LShapedHouse", theta), values.astype(np.float32))
 
     def test_lhouse_geometry_resolves_missing_corner_for_all_directions(self):
         rng = np.random.default_rng(42)
@@ -171,7 +174,7 @@ class CanonicalOrientationTests(unittest.TestCase):
             for yaw in (0, 44, 69, 93, 120, 179, -174, -71):
                 with self.subTest(length=length, width=width, yaw=yaw):
                     points = canonical.rotate_points_z(top, yaw)
-                    result = canonical.canonical_orientation(points, "LHouse", lhouse_canonical=True)
+                    result = canonical.canonical_orientation(points, "LShapedHouse", lhouse_canonical=True)
                     self.assertTrue(result["reliable"], result["reason"])
                     error = abs((result["canonical_angle_deg"] - yaw + 180) % 360 - 180)
                     # Surface-only sampling gives an approximate rectangle, but not a quarter-turn ambiguity.
@@ -180,8 +183,8 @@ class CanonicalOrientationTests(unittest.TestCase):
     def test_lhouse_rejects_rectangle_or_sparse_corner_support(self):
         rng = np.random.default_rng(7)
         full = np.column_stack((rng.uniform(0, 1, (3000, 2)) * [20, 10], np.full(3000, 5)))
-        self.assertFalse(canonical.canonical_orientation(full, "LHouse", lhouse_canonical=True)["reliable"])
-        self.assertFalse(canonical.canonical_orientation(rectangle(), "LHouse", lhouse_canonical=True)["reliable"])
+        self.assertFalse(canonical.canonical_orientation(full, "LShapedHouse", lhouse_canonical=True)["reliable"])
+        self.assertFalse(canonical.canonical_orientation(rectangle(), "LShapedHouse", lhouse_canonical=True)["reliable"])
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 #include "parammodeler_dock.h"
+#include "parammodeler_primitive_names.h"
 #include "ui_parammodeler_dock.h"
 #include "buildmesh.h"
 #include "parammodeler_dlutils.h"
@@ -48,7 +49,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   };
   EstimateDialog dialog( this );
   dialog.setWindowTitle( tr( "Point cloud classification and parameter estimation" ) );
-  dialog.resize( 560, 520 );
+  dialog.resize( 560, 580 );
 
   auto *mainLayout = new QVBoxLayout( &dialog );
   auto *inputTitle = new QLabel( tr( "1. Input point cloud" ), &dialog );
@@ -110,9 +111,22 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   resultLabel->setWordWrap( true );
   resultLabel->setStyleSheet( QStringLiteral( "font-weight: bold; padding: 4px 0;" ) );
 
+  auto *modelInfo = new QLabel( &dialog );
+  modelInfo->setTextFormat( Qt::PlainText );
+  modelInfo->setWordWrap( true );
+  modelInfo->setStyleSheet( QStringLiteral( "color: #555;" ) );
+  modelInfo->setVisible( false );
+
   auto *progress = new QProgressBar( &dialog );
   progress->setVisible( false );
   progress->setTextVisible( false );
+  auto *btnStop = new QPushButton( tr( "Stop" ), &dialog );
+  btnStop->setObjectName( QStringLiteral( "btnStopEstimate" ) );
+  btnStop->setAutoDefault( false );
+  btnStop->setVisible( false );
+  auto *progressLayout = new QHBoxLayout();
+  progressLayout->addWidget( progress, 1 );
+  progressLayout->addWidget( btnStop );
 
   auto *buttonLayout = new QHBoxLayout();
   auto *btnClassify = new QPushButton( tr( "Classify" ), &dialog );
@@ -141,13 +155,20 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   bool parametersApplied = false;
   bool inputReady = false;
   bool classified = false;
+  bool cancelRequested = false;
   QString classificationSummary;
+  QString classificationModel;
+  QString classificationCheckpoint;
 
   const auto clearEstimate = [&]() {
     parametersApplied = false;
     table->setRowCount( 0 );
     m_evaluationRaw.clear();
     m_evaluationCorrected.clear();
+    m_evaluationInferenceInfo.clear();
+    m_evaluationInferenceTooltip.clear();
+    modelInfo->clear();
+    modelInfo->setVisible( false );
     m_dlAnchorParams.clear();
     m_hasDlAnchor = false;
     if ( m_resetAnchorBtn ) m_resetAnchorBtn->setEnabled( false );
@@ -163,6 +184,8 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     btnInverse->setEnabled( !busy && inputReady && classified );
     btnComplete->setEnabled( !busy && inputReady );
     btnFinish->setEnabled( !busy );
+    btnStop->setVisible( busy );
+    btnStop->setEnabled( busy && !cancelRequested );
     progress->setRange( 0, busy ? 0 : 100 );
     progress->setVisible( busy );
   };
@@ -175,7 +198,8 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   mainLayout->addWidget( chkGeometryCorrection );
   mainLayout->addLayout( correctionStrengthLayout );
   mainLayout->addWidget( resultLabel );
-  mainLayout->addWidget( progress );
+  mainLayout->addWidget( modelInfo );
+  mainLayout->addLayout( progressLayout );
   mainLayout->addLayout( buttonLayout );
   mainLayout->addWidget( table );
 
@@ -257,6 +281,18 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     return PointNetBackend::PCT;
   };
 
+  const auto shouldCancel = [&]() { return cancelRequested; };
+  const auto continueOperation = [&]() {
+    QApplication::processEvents();
+    return !cancelRequested;
+  };
+  connect( btnStop, &QPushButton::clicked, &dialog, [&] {
+    if ( !dialog.busy ) return;
+    cancelRequested = true;
+    btnStop->setEnabled( false );
+    resultLabel->setText( tr( "Stopping..." ) );
+  } );
+
   const auto classify = [&]() -> bool {
     if ( m_inputDataPath.isEmpty() )
       return false;
@@ -264,9 +300,10 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     classified = false;
     clearEstimate();
     resultLabel->setText( tr( "Classifying..." ) );
-    QApplication::processEvents();
+    if ( !continueOperation() ) return false;
 
-    PointNetPredictResult result = PointNetRunner::predict( m_inputDataPath, selectedBackend(), 2048, 3 );
+    PointNetPredictResult result = PointNetRunner::predict( m_inputDataPath, selectedBackend(), 2048, 3, shouldCancel );
+    if ( result.canceled || !continueOperation() ) return false;
 
     if ( !result.errorMessage.isEmpty() )
     {
@@ -282,19 +319,27 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     }
 
     const PointNetPrediction top1 = result.predictions.first();
-    if ( ui->comboPrimitive->findText( top1.className ) < 0 )
+    if ( ui->comboPrimitive->findData( top1.className ) < 0 )
     {
-      QMessageBox::warning( &dialog, tr( "Classification failed" ), tr( "Unsupported primitive: %1" ).arg( top1.className ) );
+      QMessageBox::warning( &dialog, tr( "Classification failed" ), tr( "Unsupported primitive: %1" ).arg( ParamModelerPrimitiveNames::display( top1.className ) ) );
       resultLabel->setText( tr( "Result: -" ) );
       return false;
     }
     resultLabel->setText(
-      tr( "Result: %1\nConfidence: %2%\nSwitched to corresponding primitive. You can estimate parameters and return to fine tuning." )
-        .arg( top1.className )
+      tr( "Result: %1\nConfidence: %2%" )
+        .arg( ParamModelerPrimitiveNames::display( top1.className ) )
         .arg( top1.probability * 100.0, 0, 'f', 1 )
     );
-    ui->comboPrimitive->setCurrentText( top1.className );
+    setPrimitiveType( top1.className );
     classificationSummary = resultLabel->text();
+    classificationModel = inferenceModelDescription( result.modelName, result.checkpointPath );
+    classificationCheckpoint = result.checkpointPath;
+    modelInfo->setText( tr( "Classification model: %1\nRegression model: %2\nDirection preprocessing: %3" )
+      .arg( classificationModel, tr( "Pending parameter estimation" ), tr( "Pending parameter estimation" ) ) );
+    modelInfo->setToolTip( result.checkpointPath.isEmpty()
+      ? tr( "The service did not report the actual model path. Update ptv3_server.py and restart the service to confirm its version." )
+      : result.checkpointPath );
+    modelInfo->setVisible( true );
     classified = true;
     return true;
   };
@@ -305,10 +350,11 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
 
     clearEstimate();
     resultLabel->setText( tr( "Estimating parameters..." ) );
-    QApplication::processEvents();
+    if ( !continueOperation() ) return false;
 
-    const QString prim = ui->comboPrimitive->currentText();
-    const PointNetRegressionResult regression = PointNetRunner::predictParams( m_inputDataPath, selectedBackend(), prim, 2048 );
+    const QString prim = this->primitiveType();
+    const PointNetRegressionResult regression = PointNetRunner::predictParams( m_inputDataPath, selectedBackend(), prim, 2048, shouldCancel );
+    if ( regression.canceled || !continueOperation() ) return false;
 
     if ( !regression.errorMessage.isEmpty() )
     {
@@ -324,6 +370,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     QMap<QString, double> params = pointNetParamsToUiParams( prim, frameParams, swapCanonicalAxes );
     const auto rawParams = params;
     applyDataDrivenParamCorrections( prim, params );
+    if ( !continueOperation() ) return false;
     if ( params.isEmpty() )
     {
       resultLabel->setText( tr( "Parameter estimation failed" ) );
@@ -357,6 +404,19 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     }
     onUpdatePreview();
     resultLabel->setText( classificationSummary + tr( "\nParameters applied to main panel." ) );
+    const QString info = tr( "Classification model: %1\nRegression model: %2\nDirection preprocessing: %3" )
+      .arg( classificationModel, inferenceModelDescription( regression.modelName, regression.checkpointPath ),
+            inferenceDirectionDescription( regression.canonicalAlignment ) );
+    QString tooltip = tr( "Classification checkpoint: %1\nRegression checkpoint: %2\nDirection preprocessing concerns the regression input; it does not confirm position alignment or parameter accuracy." )
+      .arg( classificationCheckpoint.isEmpty() ? tr( "Not returned" ) : classificationCheckpoint,
+            regression.checkpointPath.isEmpty() ? tr( "Not returned" ) : regression.checkpointPath );
+    const QString reason = regression.canonicalAlignment.value( QStringLiteral( "reason" ) ).toString();
+    if ( !reason.isEmpty() ) tooltip += QLatin1Char( '\n' ) + reason;
+    modelInfo->setText( info );
+    modelInfo->setToolTip( tooltip );
+    modelInfo->setVisible( true );
+    m_evaluationInferenceInfo = info;
+    m_evaluationInferenceTooltip = tooltip;
     if ( !regression.warningMessage.isEmpty() )
     {
       resultLabel->setText( resultLabel->text() + QLatin1Char( '\n' ) + regression.warningMessage );
@@ -367,18 +427,22 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
 
   const auto loadAndAlign = [&]() -> bool {
     resultLabel->setText( tr( "Loading and aligning..." ) );
-    if ( m_isUpdating || BuildMesh::build( ui->comboPrimitive->currentText(), this ).isEmpty() )
+    if ( !continueOperation() ) return false;
+    if ( m_isUpdating || BuildMesh::build( this->primitiveType(), this ).isEmpty() )
     {
       QMessageBox::warning( &dialog, tr( "Load failed" ), tr( "Current parameters cannot generate a valid model." ) );
       return false;
     }
     onLoadToQGIS3D( false );
+    if ( !continueOperation() ) return false;
     if ( !m_realtimeModelLoaded )
     {
       QMessageBox::warning( &dialog, tr( "Load failed" ), tr( "Could not load the model into QGIS 3D." ) );
       return false;
     }
-    if ( !loadPointCloudToQGIS3D( m_inputDataPath, false ) )
+    const bool cloudLoaded = loadPointCloudToQGIS3D( m_inputDataPath, false );
+    if ( !continueOperation() ) return false;
+    if ( !cloudLoaded )
     {
       QMessageBox::warning( &dialog, tr( "Point cloud load failed" ), tr( "The model was loaded, but the point cloud was not loaded into QGIS 3D." ) );
       return false;
@@ -392,17 +456,25 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       QMessageBox::warning( &dialog, tr( "Alignment unavailable" ), tr( "No point-cloud alignment reference is available. Use manual alignment." ) );
       return false;
     }
-    alignModelToPointCloud( BuildMesh::build( ui->comboPrimitive->currentText(), this ),
-                            alignTarget, ui->comboPrimitive->currentText(),
+    if ( !continueOperation() ) return false;
+    alignModelToPointCloud( BuildMesh::build( this->primitiveType(), this ),
+                            alignTarget, this->primitiveType(),
                             QStringLiteral( "dialog" ), semanticUpper );
+    m_fitBaseline.clear();
     onUpdatePreview();
-    return true;
+    return continueOperation();
   };
   const auto run = [&]( const auto &operation ) -> bool {
     if ( dialog.busy || !inputReady ) return false;
+    cancelRequested = false;
     setBusy( true );
     const bool ok = operation();
     setBusy( false );
+    if ( cancelRequested )
+    {
+      resultLabel->setText( tr( "Stopped. Completed steps are kept. You can retry or return to fine tuning." ) );
+      return false;
+    }
     if ( !ok && parametersApplied )
       resultLabel->setText( tr( "Loading or alignment failed. You can retry or return to fine tuning." ) );
     return ok;
@@ -430,6 +502,16 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   } );
 
   updateInputInfo();
+  if ( inputReady && !m_evaluationInferenceInfo.isEmpty()
+       && m_evaluationInput == QFileInfo( m_inputDataPath ).absoluteFilePath()
+       && m_evaluationPrimitive == primitiveType()
+       && m_evaluationModel == comboModel->currentText() )
+  {
+    resultLabel->setText( tr( "Last result: %1" ).arg( ParamModelerPrimitiveNames::display( m_evaluationPrimitive ) ) );
+    modelInfo->setText( m_evaluationInferenceInfo );
+    modelInfo->setToolTip( m_evaluationInferenceTooltip );
+    modelInfo->setVisible( true );
+  }
   dialog.exec();
 }
 
@@ -443,6 +525,8 @@ void ParamModelerDock::onLoadInputData()
     return;
 
   m_inputDataPath = filePath;
+  m_evaluationInferenceInfo.clear();
+  m_evaluationInferenceTooltip.clear();
   QFileInfo fi( filePath );
 
   // 缓存元数据：center（质心）用于反归一化，bbox 极值/底面用于模型对齐 —— 两者语义不同，别混用
@@ -461,6 +545,8 @@ void ParamModelerDock::onLoadInputData()
 
 void ParamModelerDock::onPointNetClassify()
 {
+  m_evaluationInferenceInfo.clear();
+  m_evaluationInferenceTooltip.clear();
   if ( m_inputDataPath.isEmpty() )
     return;
 
@@ -492,15 +578,15 @@ void ParamModelerDock::onPointNetClassify()
   const PointNetPrediction top1 = result.predictions.first();
   ui->labelPrimitiveType->setText(
     tr( "Result: %1 (%2%)" )
-      .arg( top1.className )
+      .arg( ParamModelerPrimitiveNames::display( top1.className ) )
       .arg( top1.probability * 100.0, 0, 'f', 1 )
   );
 
-  ui->comboPrimitive->setCurrentText( top1.className );
+  setPrimitiveType( top1.className );
   ui->btnInverseParams->setEnabled( true );
 
   DEBUG_LOG( QString( "[PointNet] top1: %1, prob: %2\n" )
-               .arg( top1.className )
+               .arg( ParamModelerPrimitiveNames::display( top1.className ) )
                .arg( top1.probability )
                .toStdWString()
                .c_str() );
@@ -510,13 +596,15 @@ void ParamModelerDock::onPointNetClassify()
 // ========================================================================
 void ParamModelerDock::onInverseParams()
 {
+  m_evaluationInferenceInfo.clear();
+  m_evaluationInferenceTooltip.clear();
   if ( m_inputDataPath.isEmpty() )
     return;
 
   ui->progressInversion->setVisible( true );
   ui->progressInversion->setValue( 0 );
 
-  QString prim = ui->comboPrimitive->currentText();
+  QString prim = this->primitiveType();
 
   DEBUG_LOG( QString( "[PointNet] parameter regression input: primitive: %1, file: %2\n" ).arg( prim ).arg( m_inputDataPath ).toStdWString().c_str() );
   const PointNetRegressionResult regression = PointNetRunner::predictParams( m_inputDataPath, prim, 2048 );
@@ -591,12 +679,13 @@ void ParamModelerDock::onInverseParams()
   QVector3D alignTarget;
   bool semanticUpper = false;
   if ( pointCloudAlignTarget( alignTarget, &semanticUpper ) )
-    alignModelToPointCloud( BuildMesh::build( ui->comboPrimitive->currentText(), this ),
-                            alignTarget, ui->comboPrimitive->currentText(),
+    alignModelToPointCloud( BuildMesh::build( this->primitiveType(), this ),
+                            alignTarget, this->primitiveType(),
                             QStringLiteral( "onInverseParams" ), semanticUpper );
   else
     DEBUG_LOG( QString( "[Align] no point cloud bbox for %1, skipping\n" ).arg( m_inputDataPath ).toStdWString().c_str() );
 
+  m_fitBaseline.clear();
   onUpdatePreview();
 }
 

@@ -33,7 +33,7 @@ def prepare(args):
     functions = source_functions()
     samples, audit = [], []
     for name, short, _, _ in RECIPES:
-        tag = "v5_normals" if name == "FourStageRoundTower" else "v4_normals"
+        tag = "v5_normals" if name == "CurvedRoofRoundHouse" else "v4_normals"
         log = args.logs / f"ptv3_reg_{short}_{tag}"
         config_path = log / "regression_config.json"
         predictions_path = log / "regression_predictions_test.csv"
@@ -118,7 +118,7 @@ def summarize(args):
         summary = {"class": name, "group": group, "count": len(rows), "valid": len(valid),
                    "failed": len(rows) - len(valid)}
         metrics = ["xy_error", "z_error", "rmse", "p95", "inlier_0_2", "inlier_1pct"]
-        if name == "IndentedCuboid":
+        if name == "RecessedRoofHouse":
             metrics += ["inner_xy_error", "inner_top_z_error"]
         for metric in metrics:
             values = [r[metric] for r in valid]
@@ -200,7 +200,7 @@ def compare(args):
         for group in ("alignment", "combined"):
             selected = sorted(k for k in old if k[:2] == (name, group))
             metrics = ["xy_error", "z_error", "rmse", "p95"]
-            if name == "IndentedCuboid":
+            if name == "RecessedRoofHouse":
                 metrics += ["inner_xy_error", "inner_top_z_error"]
             for metric in metrics:
                 x = np.array([old[k][metric] for k in selected])

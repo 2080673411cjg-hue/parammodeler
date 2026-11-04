@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("incremental_augmentation", ROOT / "scripts/augment_added_samples.py")
 augmentation = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(augmentation)
-CLASS = "TruncatedPyramidRoof"
+CLASS = "FlatTopHipRoofHouse"
 
 
 class AppendAugmentationTests(unittest.TestCase):
@@ -32,7 +32,7 @@ class AppendAugmentationTests(unittest.TestCase):
         self.old.append({"type": "TriPrismPyramid", "split": "train", "file": "train/TriPrismPyramid/old.txt"})
         self.new = [{"type": CLASS, "split": split, "file": f"{split}/{CLASS}/new.txt", "params": {"height": 2}}
                     for split in ("train", "val", "test")]
-        self.records = self.old + self.new + [{"type": "Cuboid", "split": "train", "file": "train/Cuboid/new.txt"}]
+        self.records = self.old + self.new + [{"type": "FlatRoofHouse", "split": "train", "file": "train/FlatRoofHouse/new.txt"}]
         for record in self.records:
             path = self.raw / record["file"]
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -98,7 +98,7 @@ class AppendAugmentationTests(unittest.TestCase):
             self.assertFalse((self.out / record["file"]).exists())
         for relative, content in old_before.items():
             self.assertEqual((self.out / relative).read_bytes(), content)
-        self.assertFalse((self.out / "train/Cuboid/new.txt").exists())
+        self.assertFalse((self.out / "train/FlatRoofHouse/new.txt").exists())
 
     def test_selected_class_check_does_not_require_unselected_clouds(self):
         self.run_script()
@@ -110,7 +110,7 @@ class AppendAugmentationTests(unittest.TestCase):
     def test_default_classes_skip_fourteenth_class(self):
         self.run_script(classes=None)
         self.assertFalse((self.out / "train/TriPrismPyramid/old.txt").exists())
-        self.assertTrue((self.out / "train/Cuboid/new.txt").exists())
+        self.assertTrue((self.out / "train/FlatRoofHouse/new.txt").exists())
 
     def test_dry_run_changes_nothing(self):
         before = {path.relative_to(self.out): path.read_bytes() for path in self.out.rglob("*") if path.is_file()}
@@ -138,7 +138,7 @@ class AppendAugmentationTests(unittest.TestCase):
         self.assertEqual(self.aug_meta.read_bytes(), before)
 
     def test_duplicate_and_unsafe_paths_are_rejected(self):
-        for record in ({**self.old[0]}, {**self.new[0], "file": "train/TruncatedPyramidRoof/../../escape.txt"}):
+        for record in ({**self.old[0]}, {**self.new[0], "file": "train/FlatTopHipRoofHouse/../../escape.txt"}):
             with self.subTest(record=record), self.assertRaises(ValueError):
                 augmentation.records_by_path(self.old + [record])
 

@@ -29,6 +29,7 @@
 #include <QVector>
 #include <QVector3D>
 #include <QPointer>
+#include <QSharedPointer>
 #include <qgspointxy.h>
 
 class QCheckBox;
@@ -39,6 +40,7 @@ class QPushButton;
 class QToolButton;
 class QJsonArray;
 struct MeshData;
+namespace ParamModelerFit { class Baseline; }
 
 class QgisInterface;
 class QgsMapLayer;
@@ -75,6 +77,9 @@ class ParamModelerDock : public QDockWidget
 public:
   explicit ParamModelerDock( QgisInterface *iface, QWidget *parent = nullptr );
   ~ParamModelerDock();
+
+  QString primitiveType() const;
+  void setPrimitiveType( const QString &name );
 
   // ===== 位姿参数访问接口 =====
   double poseTranslateX() const;
@@ -258,6 +263,7 @@ private:
   bool             m_previewUpdateInProgress = false;
   QTimer *m_fitTimer = nullptr;
   QVector<QVector3D> m_fitCloudPoints;
+  QSharedPointer<ParamModelerFit::Baseline> m_fitBaseline;
   double m_fitTolerance = 0.10;
   QPointer<QDialog> m_fitDetailsDialog;
   QPointer<QLabel> m_fitDetailsLabel;
@@ -274,6 +280,7 @@ private:
   bool m_hasDlAnchor = false;
   QMap<QString, double> m_evaluationRaw, m_evaluationCorrected;
   QString m_evaluationInput, m_evaluationPrimitive, m_evaluationModel, m_evaluationCheckpoint;
+  QString m_evaluationInferenceInfo, m_evaluationInferenceTooltip;
   bool m_evaluationCorrectionEnabled = false;
   double m_evaluationCorrectionStrength = 0.0;
   QVector3D m_evaluationCloudMin, m_evaluationCloudMax;

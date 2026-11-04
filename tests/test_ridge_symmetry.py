@@ -1,5 +1,7 @@
 """CPU loss/selection checks without importing the CUDA model implementation."""
 
+from test_primitive_names import canonical_class_name
+
 import ast
 from pathlib import Path
 import unittest
@@ -15,7 +17,7 @@ names = {"encode_targets", "decode_targets", "weighted_regression_loss",
          "symmetry_weighted_regression_loss", "symmetry_standardized_mae_score",
          "asym_ridge_180_index", "roof_ridge_180_index", "indented_180_permutation"}
 nodes = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
-scope = {"np": np, "torch": torch,
+scope = {"canonical_class_name": canonical_class_name, "np": np, "torch": torch,
          "INDENTED_180_MARGIN_PAIRS": (("geom_long_start_margin_ratio", "geom_long_end_margin_ratio"),
                                         ("geom_short_start_margin_ratio", "geom_short_end_margin_ratio"))}
 exec(compile(ast.Module(body=nodes, type_ignores=[]), str(source), "exec"), scope)
@@ -49,10 +51,10 @@ class RidgeSymmetryTests(unittest.TestCase):
 
     def test_other_classes_and_missing_target_are_rejected(self):
         check = scope["asym_ridge_180_index"]
-        self.assertEqual(check("AsymmetricGableHouse", ["length", "ridgeRatio"]), 1)
-        for name, targets in (("TwoGableHouses", ["ridgeRatio"]),
-                              ("AsymmetricGableHouse", ["length"]),
-                              ("AsymmetricGableHouse", ["ridgeRatio", "ridgeRatio"])):
+        self.assertEqual(check("ShortRidgeHipRoofHouse", ["length", "ridgeRatio"]), 1)
+        for name, targets in (("AngledGableHouse", ["ridgeRatio"]),
+                              ("ShortRidgeHipRoofHouse", ["length"]),
+                              ("ShortRidgeHipRoofHouse", ["ridgeRatio", "ridgeRatio"])):
             with self.assertRaises(ValueError):
                 check(name, targets)
 
@@ -63,9 +65,9 @@ class RidgeSymmetryTests(unittest.TestCase):
         self.assertEqual(score, 0.)
 
     def test_gabled_ridge_uses_same_valid_symmetry(self):
-        self.assertEqual(scope["roof_ridge_180_index"]("GabledRoof", ["length", "ridgeRatio"]), 1)
+        self.assertEqual(scope["roof_ridge_180_index"]("GableRoofHouse", ["length", "ridgeRatio"]), 1)
         with self.assertRaises(ValueError):
-            scope["roof_ridge_180_index"]("TwoGableHouses", ["ridgeRatio"])
+            scope["roof_ridge_180_index"]("AngledGableHouse", ["ridgeRatio"])
 
 
 if __name__ == "__main__":

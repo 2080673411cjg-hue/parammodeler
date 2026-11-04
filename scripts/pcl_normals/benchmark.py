@@ -14,12 +14,13 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from pcl_normals import PCLNormals
+from primitive_names import class_directory
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-CLASSES = ('Cuboid', 'Cylinder', 'LHouse', 'ConeCylinder', 'GabledRoof',
-           'PyramidRoof', 'TruncatedPyramidRoof', 'HalfCylinderRoof', 'CylinderDome',
-           'IndentedCuboid', 'AsymmetricGableHouse', 'FourStageRoundTower', 'TwoGableHouses')
+CLASSES = ('FlatRoofHouse', 'RoundFlatRoofHouse', 'LShapedHouse', 'ConicalRoofHouse', 'GableRoofHouse',
+           'PyramidalRoofHouse', 'FlatTopHipRoofHouse', 'BarrelRoofHouse', 'DomeRoofHouse',
+           'RecessedRoofHouse', 'ShortRidgeHipRoofHouse', 'CurvedRoofRoundHouse', 'AngledGableHouse')
 
 
 def production_functions():
@@ -89,7 +90,7 @@ def main():
     clouds = []
     started = time.perf_counter()
     for name in CLASSES:
-        paths = sorted((args.data_root / 'test' / name).glob('*.txt'))
+        paths = sorted(class_directory(args.data_root, 'test', name).glob('*.txt'))
         if len(paths) < args.per_class:
             raise ValueError(f'{name}: not enough test clouds')
         indices = np.linspace(0, len(paths)-1, args.per_class, dtype=int)

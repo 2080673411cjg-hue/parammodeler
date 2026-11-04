@@ -25,7 +25,7 @@ sys.path.pop(0)
 
 class CanonicalPipelineTests(unittest.TestCase):
     def dataset(self, source, reliable=True):
-        record = {"type": "GabledRoof", "split": "test", "file": "test/GabledRoof/a.txt",
+        record = {"type": "GableRoofHouse", "split": "test", "file": "test/GableRoofHouse/a.txt",
                   "params": {"length": 12, "width": 10, "totalHeight": 8,
                              "wallRatio": 0.6, "ridgeRatio": 0.3, "rz": 120},
                   "pointCloudInfo": {"bboxSize": [12, 10, 8], "scale": 7}}
@@ -36,7 +36,7 @@ class CanonicalPipelineTests(unittest.TestCase):
              patch.object(regression, "canonical_orientation", return_value=result), \
              patch.object(Path, "exists", return_value=True):
             dataset = regression.ParamRegressionDataset(
-                "data", "metadata.json", "GabledRoof", "test",
+                "data", "metadata.json", "GableRoofHouse", "test",
                 ["length", "width", "totalHeight", "wallRatio", "ridgeRatio"], 4,
                 aux_names=["bbox_x", "bbox_y", "bbox_z", "scale"],
                 canonical_align=True, orientation_source=source)
@@ -70,7 +70,7 @@ class CanonicalPipelineTests(unittest.TestCase):
 
     def test_geometry_reports_do_not_overwrite_metadata_reports(self):
         dataset = self.dataset("geometry")
-        checkpoint = {"class_name": "GabledRoof", "canonical_align": True}
+        checkpoint = {"class_name": "GableRoofHouse", "canonical_align": True}
         args = SimpleNamespace(log_dir="existing-weights", cpu=True, class_name=None,
                                metadata="metadata.json", data_root="data", num_points=4,
                                test_orientation="geometry", split="test", batch_size=1,
@@ -93,9 +93,9 @@ class CanonicalPipelineTests(unittest.TestCase):
 
     def test_separate_evaluation_preserves_checkpoint_reports(self):
         dataset = self.dataset("geometry")
-        checkpoint = {"class_name": "GabledRoof", "canonical_align": True}
+        checkpoint = {"class_name": "GableRoofHouse", "canonical_align": True}
         truth = np.array([dataset.samples[0][1]])
-        metrics = {"paths": ["test/GabledRoof/a.txt"], "true": truth, "pred": truth.copy(),
+        metrics = {"paths": ["test/GableRoofHouse/a.txt"], "true": truth, "pred": truth.copy(),
                    "mae": np.zeros(5), "rmse": np.zeros(5), "mape": np.zeros(5), "r2": np.ones(5)}
         loaded = (None, checkpoint, dataset.targets, None, None, None, None)
         with tempfile.TemporaryDirectory(dir=SCRIPTS.parent / "tests") as temp:
@@ -140,7 +140,7 @@ class CanonicalPipelineTests(unittest.TestCase):
 
     def lhouse_dataset(self, enabled, source="metadata", estimated=120.0):
         targets = ["outerLength", "outerWidth", "cutoutLengthRatio", "cutoutWidthRatio", "height"]
-        record = {"type": "LHouse", "split": "test", "file": "test/LHouse/a.txt",
+        record = {"type": "LShapedHouse", "split": "test", "file": "test/LShapedHouse/a.txt",
                   "params": dict(zip(targets, [20, 10, .4, .6, 5])),
                   "pointCloudInfo": {"bboxSize": [20, 10, 5], "scale": 10}}
         record["params"]["rz"] = 120
@@ -151,7 +151,7 @@ class CanonicalPipelineTests(unittest.TestCase):
              patch.object(regression, "canonical_orientation", return_value=orientation), \
              patch.object(Path, "exists", return_value=True):
             dataset = regression.ParamRegressionDataset(
-                "data", "metadata.json", "LHouse", "test", targets, 4,
+                "data", "metadata.json", "LShapedHouse", "test", targets, 4,
                 canonical_align=True, lhouse_canonical=enabled, orientation_source=source)
         return dataset
 
@@ -179,7 +179,7 @@ class CanonicalPipelineTests(unittest.TestCase):
 
     def test_lhouse_config_persists_the_opt_in_frame(self):
         targets = ["outerLength", "outerWidth", "cutoutLengthRatio", "cutoutWidthRatio", "height"]
-        argv = ["main_reg.py", "--mode", "train", "--class_name", "LHouse", "--targets", *targets,
+        argv = ["main_reg.py", "--mode", "train", "--class_name", "LShapedHouse", "--targets", *targets,
                 "--canonical_align", "--lhouse_canonical"]
         with patch.object(sys, "argv", argv):
             args = regression.parse_args()
@@ -197,7 +197,7 @@ class CanonicalPipelineTests(unittest.TestCase):
 
     def predict_lhouse(self, enabled, reliable=True):
         targets = ["outerLength", "outerWidth", "cutoutLengthRatio", "cutoutWidthRatio", "height"]
-        checkpoint = {"class_name": "LHouse", "canonical_align": True, "normalize_points": False,
+        checkpoint = {"class_name": "LShapedHouse", "canonical_align": True, "normalize_points": False,
                       "lhouse_canonical": enabled}
         points = np.zeros((4, 3), dtype=np.float32)
         orientation = {"reliable": enabled and reliable, "status": "GEOMETRY_UNCERTAIN" if enabled else "SKIPPED_CLASS",
@@ -232,7 +232,7 @@ class LHouseCornerTrainingTests(unittest.TestCase):
     targets = ["outerLength", "outerWidth", "cutoutLengthRatio", "cutoutWidthRatio", "height"]
 
     def args(self, *extra):
-        argv = ["main_reg.py", "--mode", "train", "--class_name", "LHouse", "--targets", *self.targets,
+        argv = ["main_reg.py", "--mode", "train", "--class_name", "LShapedHouse", "--targets", *self.targets,
                 "--canonical_align", "--lhouse_canonical", "--canonical_aux_units", "physical", *extra]
         with patch.object(sys, "argv", argv):
             return regression.parse_args()
@@ -278,7 +278,7 @@ class LHouseCornerTrainingTests(unittest.TestCase):
         self.assertEqual(self.args("--lhouse_corner_loss_weight", ".2").lhouse_corner_loss_weight, .2)
         invalid = [("--lhouse_corner_loss_weight", value) for value in ("-.1", "nan", "inf")]
         invalid += [("--lhouse_corner_loss_weight", ".2", *option) for option in
-                    [("--class_name", "Cuboid"), ("--canonical_aux_units", "legacy"),
+                    [("--class_name", "FlatRoofHouse"), ("--canonical_aux_units", "legacy"),
                      ("--target_mode", "bbox_residual"), ("--targets", "outerLength")]]
         for option in invalid:
             with self.subTest(option=option), self.assertRaises(SystemExit):
@@ -287,7 +287,7 @@ class LHouseCornerTrainingTests(unittest.TestCase):
     def test_robust_bbox_is_opt_in_and_cannot_mix_experiments(self):
         self.assertFalse(self.args().lhouse_robust_bbox)
         self.assertTrue(self.args("--lhouse_robust_bbox").lhouse_robust_bbox)
-        for option in (("--canonical_aux_units", "legacy"), ("--class_name", "Cuboid"),
+        for option in (("--canonical_aux_units", "legacy"), ("--class_name", "FlatRoofHouse"),
                        ("--lhouse_corner_loss_weight", ".2")):
             with self.subTest(option=option), self.assertRaises(SystemExit):
                 self.args("--lhouse_robust_bbox", *option)

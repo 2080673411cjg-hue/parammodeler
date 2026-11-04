@@ -11,6 +11,8 @@ small classification head for this dataset layout:
   data_root/test/<ClassName>/*.txt
 """
 
+from primitive_names import canonical_class_name, class_directory
+
 import argparse
 import csv
 import json
@@ -48,9 +50,11 @@ def set_seed(seed: Optional[int]) -> None:
 def discover_class_names(data_root: Path) -> List[str]:
     class_file = data_root / "metadata" / "class_names.txt"
     if class_file.is_file():
-        names = [line.strip() for line in class_file.read_text(encoding="utf-8").splitlines()
+        names = [canonical_class_name(line.strip()) for line in class_file.read_text(encoding="utf-8").splitlines()
                  if line.strip() and line.strip() != "TriPrismPyramid"]
         if names:
+            if len(names) != len(set(names)):
+                raise ValueError("Duplicate old/new class aliases in class_names.txt")
             return names
 
     seen = []
@@ -59,8 +63,8 @@ def discover_class_names(data_root: Path) -> List[str]:
         if not split_dir.is_dir():
             continue
         for child in sorted(split_dir.iterdir(), key=lambda p: p.name.lower()):
-            if child.is_dir() and child.name != "TriPrismPyramid" and child.name not in seen:
-                seen.append(child.name)
+            if child.is_dir() and child.name != "TriPrismPyramid" and canonical_class_name(child.name) not in seen:
+                seen.append(canonical_class_name(child.name))
     if len(seen) < 2:
         raise RuntimeError(f"Need at least two class folders under {data_root}/train|val|test")
     return seen
@@ -69,7 +73,7 @@ def discover_class_names(data_root: Path) -> List[str]:
 def split_files(data_root: Path, split: str, class_names: List[str]) -> List[Tuple[Path, int]]:
     items: List[Tuple[Path, int]] = []
     for label, class_name in enumerate(class_names):
-        class_dir = data_root / split / class_name
+        class_dir = class_directory(data_root, split, class_name)
         if not class_dir.is_dir():
             continue
         files = sorted(class_dir.glob("*.txt"), key=lambda p: p.name)
@@ -412,7 +416,7 @@ def test(args) -> None:
     log_dir = Path(args.log_dir)
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
     ckpt = load_checkpoint(log_dir, device)
-    class_names = list(ckpt["class_names"])
+    class_names = [canonical_class_name(name) for name in ckpt["class_names"]]
     args.num_points = int(ckpt.get("num_points", args.num_points))
     args.normalize_points = bool(ckpt.get("normalize_points", args.normalize_points))
     args.use_normals = bool(ckpt.get("use_normals", args.use_normals))
@@ -442,7 +446,7 @@ def predict(args) -> None:
     log_dir = Path(args.log_dir)
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
     ckpt = load_checkpoint(log_dir, device)
-    class_names = list(ckpt["class_names"])
+    class_names = [canonical_class_name(name) for name in ckpt["class_names"]]
     args.num_points = int(ckpt.get("num_points", args.num_points))
     args.normalize_points = bool(ckpt.get("normalize_points", args.normalize_points))
     args.use_normals = bool(ckpt.get("use_normals", args.use_normals))

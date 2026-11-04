@@ -15,6 +15,7 @@
  *   (at your option) any later version.                                   *
  *                                                                         *
  ***************************************************************************/
+#include "parammodeler_primitive_names.h"
 #include "buildmesh.h"
 #include "parammodeler_dock.h"
 #include <QtMath>
@@ -67,39 +68,41 @@ static void centerMeshOnBaseFace( MeshData &m )
 // （LHouse 缺口在右上；HalfCylinderRoof 的弧在竖向、底部仍是完整矩形；
 //   IndentedCuboid 外底是完整矩形；TwoGableHouses 从 A(0,0) 起沿 +X/+Y 展开）。
 // ============================================================
-bool BuildMesh::usesCornerAnchor( const QString &primitiveType )
+bool BuildMesh::usesCornerAnchor( const QString &primitiveTypeInput )
 {
-    return primitiveType == "Cuboid"
-        || primitiveType == "GabledRoof"
-        || primitiveType == "PyramidRoof"
-        || primitiveType == "TruncatedPyramidRoof"
-        || primitiveType == "HalfCylinderRoof"
-        || primitiveType == "IndentedCuboid"
-        || primitiveType == "AsymmetricGableHouse"
-        || primitiveType == "LHouse"
-        || primitiveType == "TwoGableHouses";
+    const QString primitiveType = ParamModelerPrimitiveNames::canonical( primitiveTypeInput );
+    return primitiveType == "FlatRoofHouse"
+        || primitiveType == "GableRoofHouse"
+        || primitiveType == "PyramidalRoofHouse"
+        || primitiveType == "FlatTopHipRoofHouse"
+        || primitiveType == "BarrelRoofHouse"
+        || primitiveType == "RecessedRoofHouse"
+        || primitiveType == "ShortRidgeHipRoofHouse"
+        || primitiveType == "LShapedHouse"
+        || primitiveType == "AngledGableHouse";
 }
 
 // ============================================================
 // 统一入口
 // ============================================================
-MeshData BuildMesh::build( const QString &primitiveType, ParamModelerDock *dock )
+MeshData BuildMesh::build( const QString &primitiveTypeInput, ParamModelerDock *dock )
 {
+    const QString primitiveType = ParamModelerPrimitiveNames::canonical( primitiveTypeInput );
     MeshData m;
-    if      ( primitiveType == "Cuboid" )              m = buildCuboid( dock );
-    else if ( primitiveType == "Cylinder" )            m = buildCylinder( dock );
-    else if ( primitiveType == "LHouse" )              m = buildLHouse( dock );
-    else if ( primitiveType == "ConeCylinder" )        m = buildConeCylinder( dock );
-    else if ( primitiveType == "GabledRoof" )          m = buildGabledRoof( dock );
-    else if ( primitiveType == "PyramidRoof" )         m = buildPyramidRoof( dock );
-    else if ( primitiveType == "TruncatedPyramidRoof") m = buildTruncatedPyramidRoof( dock );
-    else if ( primitiveType == "HalfCylinderRoof" )    m = buildHalfCylinderRoof( dock );
-    else if ( primitiveType == "CylinderDome" ||
+    if      ( primitiveType == "FlatRoofHouse" )              m = buildCuboid( dock );
+    else if ( primitiveType == "RoundFlatRoofHouse" )            m = buildCylinder( dock );
+    else if ( primitiveType == "LShapedHouse" )              m = buildLHouse( dock );
+    else if ( primitiveType == "ConicalRoofHouse" )        m = buildConeCylinder( dock );
+    else if ( primitiveType == "GableRoofHouse" )          m = buildGabledRoof( dock );
+    else if ( primitiveType == "PyramidalRoofHouse" )         m = buildPyramidRoof( dock );
+    else if ( primitiveType == "FlatTopHipRoofHouse") m = buildTruncatedPyramidRoof( dock );
+    else if ( primitiveType == "BarrelRoofHouse" )    m = buildHalfCylinderRoof( dock );
+    else if ( primitiveType == "DomeRoofHouse" ||
               primitiveType == "CylinderHemisphere" )     m = buildCylinderHemisphere( dock );
-    else if ( primitiveType == "IndentedCuboid" )        m = buildIndentedCuboid( dock );
-    else if ( primitiveType == "AsymmetricGableHouse" )  m = buildAsymmetricGableHouse( dock );
-    else if ( primitiveType == "FourStageRoundTower" )   m = buildFourStageRoundTower( dock );
-    else if ( primitiveType == "TwoGableHouses" )        m = buildTwoGableHouses( dock );
+    else if ( primitiveType == "RecessedRoofHouse" )        m = buildIndentedCuboid( dock );
+    else if ( primitiveType == "ShortRidgeHipRoofHouse" )  m = buildAsymmetricGableHouse( dock );
+    else if ( primitiveType == "CurvedRoofRoundHouse" )   m = buildFourStageRoundTower( dock );
+    else if ( primitiveType == "AngledGableHouse" )        m = buildTwoGableHouses( dock );
     else if ( primitiveType == "TriPrismPyramid" )     m = buildTriPrismPyramid( dock );
 
     // 锚点保持构建时的原点：

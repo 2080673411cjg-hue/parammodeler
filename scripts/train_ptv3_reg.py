@@ -1,4 +1,6 @@
-﻿"""Run per-class PTv3 regression with the existing v6 targets/loss recipe."""
+"""Run per-class PTv3 regression with the existing v6 targets/loss recipe."""
+
+from primitive_names import canonical_class_name, regression_slug
 
 import argparse
 import json
@@ -12,19 +14,19 @@ import time
 
 # Stable-footprint targets avoid length/width swaps for rectangular primitives.
 RECIPES = [
-    ("Cuboid", "cuboid", "geom_footprint_long geom_footprint_short geom_total_height", "1.5 1.5 1.4"),
-    ("Cylinder", "cylinder", "radius height", "1.5 1.4"),
-    ("LHouse", "lhouse", "outerLength outerWidth cutoutLengthRatio cutoutWidthRatio height", "1.5 1.5 1 1 1.4"),
-    ("ConeCylinder", "conecylinder", "radius totalHeight cylinderRatio", "1.5 1.4 1"),
-    ("GabledRoof", "gabledroof", "length width totalHeight wallRatio ridgeRatio", "1.5 1.5 1.4 0.9 0.9"),
-    ("PyramidRoof", "pyramidroof", "geom_footprint_long geom_footprint_short geom_total_height wallRatio", "1.5 1.5 1.4 0.9"),
-    ("TruncatedPyramidRoof", "truncatedpyramid", "geom_footprint_long geom_footprint_short geom_top_long_ratio geom_top_short_ratio geom_total_height wallRatio", "1.5 1.5 1 1 1.4 0.9"),
-    ("HalfCylinderRoof", "halfcylinder", "length width wallHeight", "1.5 1.5 1.3"),
-    ("CylinderDome", "cylinderdome", "radius totalHeight cylinderRatio bulge", "1.5 1.4 1 0.8"),
-    ("IndentedCuboid", "indentedcuboid", "geom_footprint_long geom_footprint_short geom_total_height innerHeight geom_long_start_margin_ratio geom_long_end_margin_ratio geom_short_start_margin_ratio geom_short_end_margin_ratio", "1.5 1.5 1.4 1.2 0.9 0.9 0.9 0.9"),
-    ("AsymmetricGableHouse", "asymgable", "length width totalHeight wallRatio ridgeLength ridgeRatio", "1.5 1.5 1.4 0.9 1 0.9"),
-    ("FourStageRoundTower", "fourstage", "baseRadius baseHeight middleHeight middleTopRadius middleRise coneHeight eaveRadius eaveHeight", "1.5 1.3 1.2 1.1 0.8 1.2 1.0 1.0"),
-    ("TwoGableHouses", "twogable", "length1 length2 width totalHeight wallRatio angle ridgeRatio", "1.4 1.4 1.5 1.4 0.9 0.8 0.9"),
+    ("FlatRoofHouse", "flatroof", "geom_footprint_long geom_footprint_short geom_total_height", "1.5 1.5 1.4"),
+    ("RoundFlatRoofHouse", "roundflat", "radius height", "1.5 1.4"),
+    ("LShapedHouse", "lshaped", "outerLength outerWidth cutoutLengthRatio cutoutWidthRatio height", "1.5 1.5 1 1 1.4"),
+    ("ConicalRoofHouse", "conicalroof", "radius totalHeight cylinderRatio", "1.5 1.4 1"),
+    ("GableRoofHouse", "gableroof", "length width totalHeight wallRatio ridgeRatio", "1.5 1.5 1.4 0.9 0.9"),
+    ("PyramidalRoofHouse", "pyramidalroof", "geom_footprint_long geom_footprint_short geom_total_height wallRatio", "1.5 1.5 1.4 0.9"),
+    ("FlatTopHipRoofHouse", "flattophip", "geom_footprint_long geom_footprint_short geom_top_long_ratio geom_top_short_ratio geom_total_height wallRatio", "1.5 1.5 1 1 1.4 0.9"),
+    ("BarrelRoofHouse", "barrelroof", "length width wallHeight", "1.5 1.5 1.3"),
+    ("DomeRoofHouse", "domeroof", "radius totalHeight cylinderRatio bulge", "1.5 1.4 1 0.8"),
+    ("RecessedRoofHouse", "recessedroof", "geom_footprint_long geom_footprint_short geom_total_height innerHeight geom_long_start_margin_ratio geom_long_end_margin_ratio geom_short_start_margin_ratio geom_short_end_margin_ratio", "1.5 1.5 1.4 1.2 0.9 0.9 0.9 0.9"),
+    ("ShortRidgeHipRoofHouse", "shortridgehip", "length width totalHeight wallRatio ridgeLength ridgeRatio", "1.5 1.5 1.4 0.9 1 0.9"),
+    ("CurvedRoofRoundHouse", "curvedround", "baseRadius baseHeight middleHeight middleTopRadius middleRise coneHeight eaveRadius eaveHeight", "1.5 1.3 1.2 1.1 0.8 1.2 1.0 1.0"),
+    ("AngledGableHouse", "angledgable", "length1 length2 width totalHeight wallRatio angle ridgeRatio", "1.4 1.4 1.5 1.4 0.9 0.8 0.9"),
 ]
 
 
@@ -37,7 +39,7 @@ def validate_split_counts(data_root, recipes, expected):
     counts = {name: {split: 0 for split in ("train", "val", "test")} for name in classes}
     paths = set()
     for record in records:
-        name = record.get("type")
+        name = canonical_class_name(record.get("type"))
         if name not in classes:
             continue
         split = record.get("split")
@@ -45,7 +47,7 @@ def validate_split_counts(data_root, recipes, expected):
         if split not in counts[name] or not isinstance(rel, str) or not rel or rel in paths:
             raise ValueError(f"Invalid or duplicate metadata record for {name}: {rel}")
         parts = Path(rel).parts
-        if len(parts) < 3 or parts[0] != split or parts[1] != name:
+        if len(parts) < 3 or parts[0] != split or canonical_class_name(parts[1]) != name:
             raise ValueError(f"Metadata path does not match class/split: {rel}")
         paths.add(rel)
         counts[name][split] += 1
@@ -59,13 +61,13 @@ def validate_split_counts(data_root, recipes, expected):
 
 
 def validate_tower_targets(data_root, recipes):
-    if not any(recipe[0] == "FourStageRoundTower" for recipe in recipes):
+    if not any(recipe[0] == "CurvedRoofRoundHouse" for recipe in recipes):
         return
     records = json.loads((Path(data_root) / "metadata/sample_params.json").read_text(encoding="utf-8"))
-    required = next(recipe[2].split() for recipe in recipes if recipe[0] == "FourStageRoundTower")
+    required = next(recipe[2].split() for recipe in recipes if recipe[0] == "CurvedRoofRoundHouse")
     found = 0
     for record in records:
-        if record.get("type") != "FourStageRoundTower":
+        if canonical_class_name(record.get("type")) != "CurvedRoofRoundHouse":
             continue
         found += 1
         params = record.get("params", {})
@@ -90,12 +92,12 @@ def validate_tower_targets(data_root, recipes):
 
 
 def validate_gabled_targets(data_root, recipes):
-    if not any(recipe[0] == "GabledRoof" for recipe in recipes):
+    if not any(recipe[0] == "GableRoofHouse" for recipe in recipes):
         return
     records = json.loads((Path(data_root) / "metadata/sample_params.json").read_text(encoding="utf-8-sig"))
     found = 0
     for record in records:
-        if record.get("type") != "GabledRoof":
+        if canonical_class_name(record.get("type")) != "GableRoofHouse":
             continue
         found += 1
         ratio = record.get("params", {}).get("ridgeRatio")
@@ -109,13 +111,14 @@ def validate_truncated_scale_bands(data_root):
     records = json.loads((Path(data_root) / "metadata/sample_params.json").read_text(encoding="utf-8-sig"))
     for split in ("train", "val"):
         bands = [record.get("horizontalScaleBand") for record in records
-                 if record.get("type") == "TruncatedPyramidRoof" and record.get("split") == split]
+                 if canonical_class_name(record.get("type")) == "FlatTopHipRoofHouse" and record.get("split") == split]
         if any(type(band) is not int or band not in (0, 1, 2) for band in bands) or set(bands) != {0, 1, 2}:
             raise ValueError(f"TruncatedPyramidRoof/{split}: require horizontalScaleBand 0/1/2 from the v7 dataset")
 
 
 def commands(args, recipe):
     name, slug, targets, weights = recipe
+    slug = regression_slug(name, args.run_tag)
     log = Path(args.log_root) / f"ptv3_reg_{slug}_{args.run_tag}_normals"
     common = [sys.executable, "-u", str(Path(__file__).with_name("main_reg.py")),
               "--backbone", "ptv3", "--data_root", str(args.data_root),
@@ -131,7 +134,7 @@ def commands(args, recipe):
         common += ["--ptv3_repo", args.ptv3_repo]
     if getattr(args, "canonical_align", False):
         common += ["--canonical_align"]
-    if getattr(args, "lhouse_canonical", False) and name == "LHouse":
+    if getattr(args, "lhouse_canonical", False) and name == "LShapedHouse":
         common += ["--lhouse_canonical"]
     target_names = targets.split()
     uses_stable_geometry_targets = any(t.startswith("geom_") for t in target_names)
@@ -147,21 +150,21 @@ def commands(args, recipe):
                      "--aux_features", "bbox_x", "bbox_y", "bbox_z", "scale", "bbox_volume",
                      "aspect_ratio_xy", "--use_normals", "--ptv3_grid_size", str(args.grid_size),
                      "--ptv3_patch_size", str(args.patch_size)]
-    if name == "TwoGableHouses":
+    if name == "AngledGableHouse":
         train += ["--circular_targets", "angle"]
-    if name == "LHouse" and getattr(args, "lhouse_canonical", False):
+    if name == "LShapedHouse" and getattr(args, "lhouse_canonical", False):
         train += ["--canonical_aux_units", "physical"]
         if getattr(args, "lhouse_robust_bbox", False):
             train += ["--lhouse_robust_bbox"]
         if getattr(args, "lhouse_corner_loss_weight", 0.0) > 0:
             train += ["--lhouse_corner_loss_weight", str(args.lhouse_corner_loss_weight)]
-    if name == "IndentedCuboid" and getattr(args, "indented_symmetry_180", False):
+    if name == "RecessedRoofHouse" and getattr(args, "indented_symmetry_180", False):
         train += ["--indented_symmetry_180"]
-    if name == "AsymmetricGableHouse" and getattr(args, "asym_ridge_symmetry_180", False):
+    if name == "ShortRidgeHipRoofHouse" and getattr(args, "asym_ridge_symmetry_180", False):
         train += ["--asym_ridge_symmetry_180"]
-    if name == "GabledRoof" and getattr(args, "gabled_ridge_symmetry_180", False):
+    if name == "GableRoofHouse" and getattr(args, "gabled_ridge_symmetry_180", False):
         train += ["--gabled_ridge_symmetry_180"]
-    if name == "TruncatedPyramidRoof" and getattr(args, "truncated_scale_balanced", False):
+    if name == "FlatTopHipRoofHouse" and getattr(args, "truncated_scale_balanced", False):
         train += ["--truncated_scale_balanced"]
     if args.flash:
         train += ["--ptv3_flash"]
@@ -177,16 +180,16 @@ def format_duration(seconds):
 
 
 def needs_geometry_test(args, recipe):
-    return ((args.lhouse_canonical and recipe[0] == "LHouse")
-            or (args.truncated_scale_balanced and recipe[0] == "TruncatedPyramidRoof"))
+    return ((args.lhouse_canonical and recipe[0] == "LShapedHouse")
+            or (args.truncated_scale_balanced and recipe[0] == "FlatTopHipRoofHouse"))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--classes", nargs="+", choices=[r[0] for r in RECIPES])
+    parser.add_argument("--classes", nargs="+", type=canonical_class_name, choices=[r[0] for r in RECIPES])
     parser.add_argument("--data_root", default=os.environ.get("DATA_ROOT", str(Path(__file__).resolve().parent.parent / "datasets_aug")))
     parser.add_argument("--log_root", default="logs")
-    parser.add_argument("--run_tag", default="v6")
+    parser.add_argument("--run_tag", default="v10")
     parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--seed", type=int, default=42)
@@ -224,9 +227,9 @@ def main():
     if args.normal_threads < 1:
         parser.error("--normal_threads must be positive")
     selected = [r for r in RECIPES if args.classes is None or r[0] in args.classes]
-    if args.truncated_scale_balanced and (not args.canonical_align or not any(r[0] == "TruncatedPyramidRoof" for r in selected)):
+    if args.truncated_scale_balanced and (not args.canonical_align or not any(r[0] == "FlatTopHipRoofHouse" for r in selected)):
         parser.error("--truncated_scale_balanced requires TruncatedPyramidRoof in --classes and canonical alignment")
-    if args.lhouse_canonical and (not args.canonical_align or not any(r[0] == "LHouse" for r in selected)):
+    if args.lhouse_canonical and (not args.canonical_align or not any(r[0] == "LShapedHouse" for r in selected)):
         parser.error("--lhouse_canonical requires LHouse in --classes and canonical alignment")
     if not math.isfinite(args.lhouse_corner_loss_weight) or args.lhouse_corner_loss_weight < 0:
         parser.error("--lhouse_corner_loss_weight must be finite and non-negative")
@@ -234,9 +237,9 @@ def main():
         parser.error("--lhouse_corner_loss_weight requires --lhouse_canonical")
     if args.lhouse_robust_bbox and (not args.lhouse_canonical or args.lhouse_corner_loss_weight != 0):
         parser.error("--lhouse_robust_bbox requires --lhouse_canonical and no corner loss")
-    if args.asym_ridge_symmetry_180 and not any(r[0] == "AsymmetricGableHouse" for r in selected):
+    if args.asym_ridge_symmetry_180 and not any(r[0] == "ShortRidgeHipRoofHouse" for r in selected):
         parser.error("--asym_ridge_symmetry_180 requires AsymmetricGableHouse in --classes")
-    if args.gabled_ridge_symmetry_180 and not any(r[0] == "GabledRoof" for r in selected):
+    if args.gabled_ridge_symmetry_180 and not any(r[0] == "GableRoofHouse" for r in selected):
         parser.error("--gabled_ridge_symmetry_180 requires GabledRoof in --classes")
     if args.canonical_align and (args.indented_symmetry_180
                                  or args.asym_ridge_symmetry_180

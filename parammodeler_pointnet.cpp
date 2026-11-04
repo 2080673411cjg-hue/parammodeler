@@ -1,3 +1,4 @@
+#include "parammodeler_primitive_names.h"
 #include "parammodeler_pointnet.h"
 #include "parammodeler_config.h"
 #include "parammodeler_pcdloader.h"
@@ -108,8 +109,14 @@ bool postJson( const QString &url,
                const QJsonObject &payload,
                const QString &name,
                QJsonDocument &responseDoc,
-               QString &errorMessage )
+               QString &errorMessage,
+               const std::function<bool()> &shouldCancel )
 {
+  if ( shouldCancel && shouldCancel() )
+  {
+    errorMessage = QCoreApplication::translate( "PointNetRunner", "Prediction stopped." );
+    return false;
+  }
   if ( url.isEmpty() )
     return false;
 
@@ -124,8 +131,29 @@ bool postJson( const QString &url,
   QNetworkReply *reply = manager.post( request, QJsonDocument( payload ).toJson( QJsonDocument::Compact ) );
   QObject::connect( reply, &QNetworkReply::finished, &loop, &QEventLoop::quit );
   QObject::connect( &timer, &QTimer::timeout, &loop, &QEventLoop::quit );
+  QTimer cancelTimer;
+  if ( shouldCancel )
+  {
+    QObject::connect( &cancelTimer, &QTimer::timeout, &loop, [&] {
+      if ( shouldCancel() )
+      {
+        reply->abort();
+        loop.quit();
+      }
+    } );
+    cancelTimer.start( 50 );
+  }
   timer.start( 240000 );
   loop.exec();
+  cancelTimer.stop();
+
+  if ( shouldCancel && shouldCancel() )
+  {
+    reply->abort();
+    reply->deleteLater();
+    errorMessage = QCoreApplication::translate( "PointNetRunner", "Prediction stopped." );
+    return false;
+  }
 
   if ( !timer.isActive() )
   {
@@ -210,9 +238,7 @@ PointNetBackendConfig backendConfig( PointNetBackend backend )
 
 QString normalizedPrimitiveType( const QString &primitiveType )
 {
-  if ( primitiveType == QStringLiteral( "CylinderHemisphere" ) )
-    return QStringLiteral( "CylinderDome" );
-  return primitiveType;
+  return ParamModelerPrimitiveNames::canonical( primitiveType );
 }
 
 PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QString &primitiveType )
@@ -234,19 +260,19 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
   // Stem names (class → directory-safe short name).  These are stable
   // across model versions; only the prefix/suffix change between runs.
   static const QMap<QString, QString> stemNames = {
-    { QStringLiteral( "Cuboid" ),               QStringLiteral( "cuboid" ) },
-    { QStringLiteral( "Cylinder" ),             QStringLiteral( "cylinder" ) },
-    { QStringLiteral( "LHouse" ),               QStringLiteral( "lhouse" ) },
-    { QStringLiteral( "ConeCylinder" ),         QStringLiteral( "conecylinder" ) },
-    { QStringLiteral( "GabledRoof" ),           QStringLiteral( "gabledroof" ) },
-    { QStringLiteral( "PyramidRoof" ),          QStringLiteral( "pyramidroof" ) },
-    { QStringLiteral( "TruncatedPyramidRoof" ), QStringLiteral( "truncatedpyramid" ) },
-    { QStringLiteral( "HalfCylinderRoof" ),     QStringLiteral( "halfcylinder" ) },
-    { QStringLiteral( "CylinderDome" ),         QStringLiteral( "cylinderdome" ) },
-    { QStringLiteral( "IndentedCuboid" ),       QStringLiteral( "indentedcuboid" ) },
-    { QStringLiteral( "AsymmetricGableHouse" ), QStringLiteral( "asymgable" ) },
-    { QStringLiteral( "FourStageRoundTower" ),  QStringLiteral( "fourstage" ) },
-    { QStringLiteral( "TwoGableHouses" ),       QStringLiteral( "twogable" ) }
+    { QStringLiteral( "FlatRoofHouse" ),               QStringLiteral( "cuboid" ) },
+    { QStringLiteral( "RoundFlatRoofHouse" ),             QStringLiteral( "cylinder" ) },
+    { QStringLiteral( "LShapedHouse" ),               QStringLiteral( "lhouse" ) },
+    { QStringLiteral( "ConicalRoofHouse" ),         QStringLiteral( "conecylinder" ) },
+    { QStringLiteral( "GableRoofHouse" ),           QStringLiteral( "gabledroof" ) },
+    { QStringLiteral( "PyramidalRoofHouse" ),          QStringLiteral( "pyramidroof" ) },
+    { QStringLiteral( "FlatTopHipRoofHouse" ), QStringLiteral( "truncatedpyramid" ) },
+    { QStringLiteral( "BarrelRoofHouse" ),     QStringLiteral( "halfcylinder" ) },
+    { QStringLiteral( "DomeRoofHouse" ),         QStringLiteral( "cylinderdome" ) },
+    { QStringLiteral( "RecessedRoofHouse" ),       QStringLiteral( "indentedcuboid" ) },
+    { QStringLiteral( "ShortRidgeHipRoofHouse" ), QStringLiteral( "asymgable" ) },
+    { QStringLiteral( "CurvedRoofRoundHouse" ),  QStringLiteral( "fourstage" ) },
+    { QStringLiteral( "AngledGableHouse" ),       QStringLiteral( "twogable" ) }
   };
 
   if ( !stemNames.contains( prim ) )
@@ -256,19 +282,19 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
   // best for all primitives.  Prefer the per-class test winner when it exists,
   // then fall back to the user-configured default suffix.
   static const QMap<QString, QString> pctBestSuffix = {
-    { QStringLiteral( "AsymmetricGableHouse" ), QStringLiteral( "_v6_normals" ) },
-    { QStringLiteral( "ConeCylinder" ),         QStringLiteral( "_v6_normals" ) },
-    { QStringLiteral( "Cuboid" ),               QStringLiteral( "_v6_normals" ) },
-    { QStringLiteral( "Cylinder" ),             QStringLiteral( "_v6_normals" ) },
-    { QStringLiteral( "CylinderDome" ),         QStringLiteral( "_v4_normals" ) },
-    { QStringLiteral( "FourStageRoundTower" ),  QStringLiteral( "_v4_normals" ) },
-    { QStringLiteral( "GabledRoof" ),           QStringLiteral( "_v5_normals" ) },
-    { QStringLiteral( "HalfCylinderRoof" ),     QStringLiteral( "_v5_normals" ) },
-    { QStringLiteral( "IndentedCuboid" ),       QStringLiteral( "_v6_normals" ) },
-    { QStringLiteral( "LHouse" ),               QStringLiteral( "_v6_normals" ) },
-    { QStringLiteral( "PyramidRoof" ),          QStringLiteral( "_v4_normals" ) },
-    { QStringLiteral( "TruncatedPyramidRoof" ), QStringLiteral( "_v6_normals" ) },
-    { QStringLiteral( "TwoGableHouses" ),       QStringLiteral( "_v4_normals" ) }
+    { QStringLiteral( "ShortRidgeHipRoofHouse" ), QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "ConicalRoofHouse" ),         QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "FlatRoofHouse" ),               QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "RoundFlatRoofHouse" ),             QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "DomeRoofHouse" ),         QStringLiteral( "_v4_normals" ) },
+    { QStringLiteral( "CurvedRoofRoundHouse" ),  QStringLiteral( "_v4_normals" ) },
+    { QStringLiteral( "GableRoofHouse" ),           QStringLiteral( "_v5_normals" ) },
+    { QStringLiteral( "BarrelRoofHouse" ),     QStringLiteral( "_v5_normals" ) },
+    { QStringLiteral( "RecessedRoofHouse" ),       QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "LShapedHouse" ),               QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "PyramidalRoofHouse" ),          QStringLiteral( "_v4_normals" ) },
+    { QStringLiteral( "FlatTopHipRoofHouse" ), QStringLiteral( "_v6_normals" ) },
+    { QStringLiteral( "AngledGableHouse" ),       QStringLiteral( "_v4_normals" ) }
   };
 
   const QString prefix = isPCT
@@ -293,9 +319,11 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
     if ( !QFileInfo::exists( preferredModel ) )
       suffix = ParamModelerConfig::pctRegressionSuffix();
   }
-  const QString dirName = prefix + stemNames.value( prim ) + suffix;
+  const QString selectedStem = ParamModelerPrimitiveNames::slug( prim,
+    !isPTv3 || ParamModelerPrimitiveNames::legacySuffix( suffix ) );
+  const QString dirName = prefix + selectedStem + suffix;
 
-  return { modelName, prim, script, base + dirName };
+  return { modelName, isPTv3 ? prim : ParamModelerPrimitiveNames::legacy( prim ), script, base + dirName };
 }
 
 bool vectorFromJsonArray( const QJsonValue &value, QVector3D &out )
@@ -435,8 +463,14 @@ bool runPythonProcess( const QString &scriptPath,
                        const QStringList &args,
                        const QString &name,
                        QString &stdoutText,
-                       QString &errorMessage )
+                       QString &errorMessage,
+                       const std::function<bool()> &shouldCancel )
 {
+  if ( shouldCancel && shouldCancel() )
+  {
+    errorMessage = QCoreApplication::translate( "PointNetRunner", "Prediction stopped." );
+    return false;
+  }
   QProcess process;
   process.setWorkingDirectory( QFileInfo( scriptPath ).absolutePath() );
   process.start( pythonExe, args );
@@ -452,7 +486,19 @@ bool runPythonProcess( const QString &scriptPath,
   {
     process.waitForFinished( 100 );
     QCoreApplication::processEvents();
+    if ( shouldCancel && shouldCancel() ) break;
     elapsedMs += 100;
+  }
+
+  if ( shouldCancel && shouldCancel() )
+  {
+    if ( process.state() != QProcess::NotRunning )
+    {
+      process.kill();
+      process.waitForFinished( 3000 );
+    }
+    errorMessage = QCoreApplication::translate( "PointNetRunner", "Prediction stopped." );
+    return false;
   }
 
   if ( process.state() != QProcess::NotRunning )
@@ -475,18 +521,23 @@ bool runPythonProcess( const QString &scriptPath,
 }
 }
 
-PointNetPredictResult PointNetRunner::predict ( const QString &inputTxt, int numPoints, int topK )
+PointNetPredictResult PointNetRunner::predict ( const QString &inputTxt, int numPoints, int topK,
+                                               const std::function<bool()> &shouldCancel )
 {
-  return predict( inputTxt, PointNetBackend::PTv3, numPoints, topK );
+  return predict( inputTxt, PointNetBackend::PTv3, numPoints, topK, shouldCancel );
 }
 
 PointNetPredictResult PointNetRunner::predict( const QString &inputTxt,
                                                PointNetBackend backend,
                                                int numPoints,
-                                               int topK )
+                                               int topK,
+                                               const std::function<bool()> &shouldCancel )
 {
   PointNetPredictResult result;
+  result.canceled = shouldCancel && shouldCancel();
+  if ( result.canceled ) return result;
   const PointNetBackendConfig config = backendConfig( backend );
+  result.modelName = config.name;
   const QString pythonExe = pythonExeForBackend( backend );
 
   if ( !QFileInfo::exists( inputTxt ) )
@@ -517,16 +568,22 @@ PointNetPredictResult PointNetRunner::predict( const QString &inputTxt,
     payload.insert( QStringLiteral( "num_points" ), numPoints );
 
     QJsonDocument responseDoc;
-    if ( !postJson( remoteUrl, payload, config.name, responseDoc, result.errorMessage ) )
+    if ( !postJson( remoteUrl, payload, config.name, responseDoc, result.errorMessage, shouldCancel ) )
+    {
+      result.canceled = shouldCancel && shouldCancel();
       return result;
+    }
 
     result.rawOutput = QString::fromUtf8( responseDoc.toJson( QJsonDocument::Compact ) );
+    const QString remoteModelDir = responseDoc.object().value( QStringLiteral( "model_log_dir" ) ).toString();
+    if ( !remoteModelDir.isEmpty() )
+      result.checkpointPath = remoteModelDir + QStringLiteral( "/best_model.pth" );
     const QJsonArray array = responseDoc.object().value( QStringLiteral( "result" ) ).toArray();
     for ( const QJsonValue &value : array )
     {
       const QJsonObject obj = value.toObject();
       PointNetPrediction pred;
-      pred.className = obj.value( QStringLiteral( "class" ) ).toString();
+      pred.className = normalizedPrimitiveType( obj.value( QStringLiteral( "class" ) ).toString() );
       pred.probability = obj.value( QStringLiteral( "prob" ) ).toDouble();
       if ( !pred.className.isEmpty() )
         result.predictions.append( pred );
@@ -563,9 +620,14 @@ PointNetPredictResult PointNetRunner::predict( const QString &inputTxt,
        << QStringLiteral( "--cpu" );
 
   QString stdoutText;
-  if ( !runPythonProcess( config.scriptPath, pythonExe, args, config.name, stdoutText, result.errorMessage ) )
+  if ( !runPythonProcess( config.scriptPath, pythonExe, args, config.name, stdoutText, result.errorMessage, shouldCancel ) )
+  {
+    result.canceled = shouldCancel && shouldCancel();
     return result;
+  }
   result.rawOutput = stdoutText;
+
+  result.checkpointPath = QDir( config.logDir ).absoluteFilePath( QStringLiteral( "best_model.pth" ) );
 
   QJsonParseError parseError;
   const QJsonDocument doc = QJsonDocument::fromJson( stdoutText.toUtf8(), &parseError );
@@ -582,7 +644,7 @@ PointNetPredictResult PointNetRunner::predict( const QString &inputTxt,
   {
     const QJsonObject obj = value.toObject();
     PointNetPrediction pred;
-    pred.className = obj.value( QStringLiteral( "class" ) ).toString();
+    pred.className = normalizedPrimitiveType( obj.value( QStringLiteral( "class" ) ).toString() );
     pred.probability = obj.value( QStringLiteral( "prob" ) ).toDouble();
     if ( !pred.className.isEmpty() )
       result.predictions.append( pred );
@@ -596,17 +658,21 @@ PointNetPredictResult PointNetRunner::predict( const QString &inputTxt,
 
 PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
                                                         const QString &primitiveType,
-                                                        int numPoints )
+                                                        int numPoints,
+                                                        const std::function<bool()> &shouldCancel )
 {
-  return predictParams( inputTxt, PointNetBackend::PTv3, primitiveType, numPoints );
+  return predictParams( inputTxt, PointNetBackend::PTv3, primitiveType, numPoints, shouldCancel );
 }
 
 PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
                                                         PointNetBackend backend,
                                                         const QString &primitiveType,
-                                                        int numPoints )
+                                                        int numPoints,
+                                                        const std::function<bool()> &shouldCancel )
 {
   PointNetRegressionResult result;
+  result.canceled = shouldCancel && shouldCancel();
+  if ( result.canceled ) return result;
   const PointNetRegressionConfig config = regressionConfig( backend, primitiveType );
   const QString pythonExe = pythonExeForBackend( backend );
   result.modelName = config.modelName;
@@ -645,7 +711,7 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
 
     QJsonObject payload;
     payload.insert( QStringLiteral( "points_text" ), pointsText );
-    payload.insert( QStringLiteral( "primitive_type" ), config.className );
+    payload.insert( QStringLiteral( "primitive_type" ), ParamModelerPrimitiveNames::legacy( config.className ) );
     payload.insert( QStringLiteral( "bbox_x" ), bboxSize.x() );
     payload.insert( QStringLiteral( "bbox_y" ), bboxSize.y() );
     payload.insert( QStringLiteral( "bbox_z" ), bboxSize.z() );
@@ -657,8 +723,11 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
                       ParamModelerConfig::ptv3RegressionSuffix() );
 
     QJsonDocument responseDoc;
-    if ( !postJson( remoteUrl, payload, config.modelName + QStringLiteral( " parameter regression" ), responseDoc, result.errorMessage ) )
+    if ( !postJson( remoteUrl, payload, config.modelName + QStringLiteral( " parameter regression" ), responseDoc, result.errorMessage, shouldCancel ) )
+    {
+      result.canceled = shouldCancel && shouldCancel();
       return result;
+    }
 
     result.rawOutput = QString::fromUtf8( responseDoc.toJson( QJsonDocument::Compact ) );
     const QJsonObject responseObj = responseDoc.object();
@@ -669,7 +738,8 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
       result.warningMessage = QStringLiteral( "远程模型版本未确认，请更新推理服务并重启。" );
 
     const QJsonObject obj = responseObj.value( QStringLiteral( "result" ) ).toObject();
-    result.className = obj.value( QStringLiteral( "class" ) ).toString( config.className );
+    result.canonicalAlignment = obj.value( QStringLiteral( "canonical_alignment" ) ).toObject();
+    result.className = normalizedPrimitiveType( obj.value( QStringLiteral( "class" ) ).toString( config.className ) );
     const QJsonObject paramsObj = obj.value( QStringLiteral( "params" ) ).toObject();
     for ( auto it = paramsObj.constBegin(); it != paramsObj.constEnd(); ++it )
       result.params.insert( it.key(), it.value().toDouble() );
@@ -719,8 +789,11 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
     args << QStringLiteral( "--input_coordinates" ) << inputCoordinates;
 
   QString stdoutText;
-  if ( !runPythonProcess( config.scriptPath, pythonExe, args, config.modelName + QStringLiteral( " parameter regression" ), stdoutText, result.errorMessage ) )
+  if ( !runPythonProcess( config.scriptPath, pythonExe, args, config.modelName + QStringLiteral( " parameter regression" ), stdoutText, result.errorMessage, shouldCancel ) )
+  {
+    result.canceled = shouldCancel && shouldCancel();
     return result;
+  }
   result.rawOutput = stdoutText;
 
   QJsonParseError parseError;
@@ -734,7 +807,8 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
   }
 
   const QJsonObject obj = doc.object();
-  result.className = obj.value( QStringLiteral( "class" ) ).toString( config.className );
+  result.canonicalAlignment = obj.value( QStringLiteral( "canonical_alignment" ) ).toObject();
+  result.className = normalizedPrimitiveType( obj.value( QStringLiteral( "class" ) ).toString( config.className ) );
   const QJsonObject paramsObj = obj.value( QStringLiteral( "params" ) ).toObject();
   for ( auto it = paramsObj.constBegin(); it != paramsObj.constEnd(); ++it )
     result.params.insert( it.key(), it.value().toDouble() );

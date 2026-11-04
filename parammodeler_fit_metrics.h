@@ -286,6 +286,32 @@ inline Metrics evaluate( const MeshData &mesh, const QVector<QVector3D> &points,
   }
   return result;
 }
+
+// Freeze geometry, pose and the point sample; only a tolerance change needs
+// another evaluation of the initial model.
+class Baseline
+{
+public:
+  Baseline( const MeshData &mesh, const QVector<QVector3D> &points, const QMatrix4x4 &pose )
+    : m_mesh( mesh ), m_points( points ), m_pose( pose ) {}
+
+  const Metrics &metrics( double tolerance )
+  {
+    if ( tolerance != m_tolerance )
+    {
+      m_metrics = evaluate( m_mesh, m_points, m_pose, tolerance );
+      m_tolerance = tolerance;
+    }
+    return m_metrics;
+  }
+
+private:
+  MeshData m_mesh;
+  QVector<QVector3D> m_points;
+  QMatrix4x4 m_pose;
+  Metrics m_metrics;
+  double m_tolerance = std::numeric_limits<double>::quiet_NaN();
+};
 }
 
 #endif

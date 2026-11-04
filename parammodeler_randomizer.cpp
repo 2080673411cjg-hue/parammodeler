@@ -34,20 +34,20 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
       spin->setValue( value );
   };
 
-  const QString prim = dock->ui->comboPrimitive->currentText();
+  const QString prim = dock->primitiveType();
 
-  if ( prim == "Cuboid" )
+  if ( prim == "FlatRoofHouse" )
   {
     set( dock->ui->spinBoxCLength, rnd( 6.0, 18.0 ) );
     set( dock->ui->spinBoxCWidth, rnd( 4.0, 12.0 ) );
     set( dock->ui->spinBoxCHeight, rnd( 2.5, 8.0 ) );
   }
-  else if ( prim == "Cylinder" )
+  else if ( prim == "RoundFlatRoofHouse" )
   {
     set( dock->ui->spinBoxCylRadius, rnd( 2.0, 8.0 ) );
     set( dock->ui->spinBoxCylHeight, rnd( 3.0, 14.0 ) );
   }
-  else if ( prim == "LHouse" )
+  else if ( prim == "LShapedHouse" )
   {
     const double totalLength = QRandomGenerator::global()->bounded( 150, 401 ) / 10.0;
     const double totalWidth = QRandomGenerator::global()->bounded( 60, 401 ) / 10.0;
@@ -67,13 +67,13 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
     set( dock->ui->spinBoxLWingWidthRatio, wingWidthRatio );
     set( dock->ui->spinBoxLHeight, rnd( 2.5, 7.0 ) );
   }
-  else if ( prim == "ConeCylinder" )
+  else if ( prim == "ConicalRoofHouse" )
   {
     set( dock->ui->spinBoxConeCylRadius, rnd( 2.0, 8.0 ) );
     set( dock->ui->spinBoxConeCylCylHeight, rnd( 4.5, 14.0 ) );
     set( dock->ui->spinBoxConeCylConeHeight, rnd( 0.45, 0.80, 0.01 ) );
   }
-  else if ( prim == "GabledRoof" )
+  else if ( prim == "GableRoofHouse" )
   {
     set( dock->ui->spinBoxGRLength, rnd( 8.0, 24.0 ) );
     set( dock->ui->spinBoxGRWidth, rnd( 5.0, 14.0 ) );
@@ -83,14 +83,14 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
                                         + QRandomGenerator::global()->generateDouble() );
     set( dock->ui->spinBoxGRRidgeRatio, std::round( ridgeRatio * 100.0 ) / 100.0 );
   }
-  else if ( prim == "PyramidRoof" )
+  else if ( prim == "PyramidalRoofHouse" )
   {
     set( dock->ui->spinBoxPRLength, rnd( 7.0, 20.0 ) );
     set( dock->ui->spinBoxPRWidth, rnd( 5.0, 16.0 ) );
     set( dock->ui->spinBoxPRHeightWall, rnd( 4.5, 12.0 ) );
     set( dock->ui->spinBoxPRHeightRoof, rnd( 0.55, 0.82, 0.01 ) );
   }
-  else if ( prim == "TruncatedPyramidRoof" )
+  else if ( prim == "FlatTopHipRoofHouse" )
   {
     const double bottomLength = rnd( 10.0, 24.0 );
     const double bottomWidth = rnd( 8.0, 18.0 );
@@ -101,20 +101,20 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
     set( dock->ui->spinBoxTPRHeightWall, rnd( 4.5, 12.0 ) );
     set( dock->ui->spinBoxTPRHeightRoof, rnd( 0.55, 0.82, 0.01 ) );
   }
-  else if ( prim == "HalfCylinderRoof" )
+  else if ( prim == "BarrelRoofHouse" )
   {
     set( dock->ui->spinBoxHCRLength, rnd( 8.0, 24.0 ) );
     set( dock->ui->spinBoxHCRWidth, rnd( 4.0, 14.0 ) );
     set( dock->ui->spinBoxHCRHeightWall, rnd( 2.5, 7.0 ) );
   }
-  else if ( prim == "CylinderDome" || prim == "CylinderHemisphere" )
+  else if ( prim == "DomeRoofHouse" || prim == "CylinderHemisphere" )
   {
     set( dock->ui->spinBoxCylHemiRadius, rnd( 3.0, 9.0 ) );
     set( dock->ui->spinBoxCylHemiHeight, rnd( 4.5, 13.0 ) );
     set( dock->ui->spinBoxCylHemiDomeHeight, rnd( 0.50, 0.85, 0.01 ) );
     set( dock->ui->spinBoxCylHemiBulge, rnd( 0.15, 0.65, 0.01 ) );
   }
-  else if ( prim == "IndentedCuboid" )
+  else if ( prim == "RecessedRoofHouse" )
   {
     const double outerLength = rnd( 10.0, 24.0 );
     const double outerWidth = rnd( 8.0, 18.0 );
@@ -143,7 +143,7 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
     set( dock->ui->spinBoxICOffsetX, insetOffsetRatio( outerLength, innerLength ) );
     set( dock->ui->spinBoxICOffsetY, insetOffsetRatio( outerWidth, innerWidth ) );
   }
-  else if ( prim == "AsymmetricGableHouse" )
+  else if ( prim == "ShortRidgeHipRoofHouse" )
   {
     const double length = rnd( 10.0, 24.0 );
     const double width = rnd( 5.0, 14.0 );
@@ -157,7 +157,7 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
                                         + QRandomGenerator::global()->generateDouble() );
     set( dock->ui->spinBoxAGHRidgeOffset, std::round( ridgeRatio * 100.0 ) / 100.0 );
   }
-  else if ( prim == "FourStageRoundTower" )
+  else if ( prim == "CurvedRoofRoundHouse" )
   {
     const double baseRadius = rnd( 5.0, 12.0 );
     const double baseHeight = rnd( 1.2, 3.5 );
@@ -178,7 +178,7 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
     set( dock->ui->spinBoxFTMiddleRise, middleRise * scale );
     set( dock->ui->spinBoxFTConeHeight, coneHeight * scale );
   }
-  else if ( prim == "TwoGableHouses" )
+  else if ( prim == "AngledGableHouse" )
   {
     set( dock->ui->spinBoxTGLength1, rnd( 10.0, 24.0 ) );
     set( dock->ui->spinBoxTGLength2, rnd( 7.0, 18.0 ) );
@@ -202,35 +202,35 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
 
   // Scale the whole footprint, including dependent horizontal dimensions.
   QVector<QDoubleSpinBox *> horizontalControls;
-  if ( prim == "Cuboid" )
+  if ( prim == "FlatRoofHouse" )
     horizontalControls = { dock->ui->spinBoxCLength, dock->ui->spinBoxCWidth };
-  else if ( prim == "Cylinder" )
+  else if ( prim == "RoundFlatRoofHouse" )
     horizontalControls = { dock->ui->spinBoxCylRadius };
-  else if ( prim == "LHouse" )
+  else if ( prim == "LShapedHouse" )
     horizontalControls = { dock->ui->spinBoxLTotalLength, dock->ui->spinBoxLTotalWidth };
-  else if ( prim == "ConeCylinder" )
+  else if ( prim == "ConicalRoofHouse" )
     horizontalControls = { dock->ui->spinBoxConeCylRadius };
-  else if ( prim == "GabledRoof" )
+  else if ( prim == "GableRoofHouse" )
     horizontalControls = { dock->ui->spinBoxGRLength, dock->ui->spinBoxGRWidth };
-  else if ( prim == "PyramidRoof" )
+  else if ( prim == "PyramidalRoofHouse" )
     horizontalControls = { dock->ui->spinBoxPRLength, dock->ui->spinBoxPRWidth };
-  else if ( prim == "TruncatedPyramidRoof" )
+  else if ( prim == "FlatTopHipRoofHouse" )
     horizontalControls = { dock->ui->spinBoxTPRBottomLength, dock->ui->spinBoxTPRBottomWidth,
                            dock->ui->spinBoxTPRTopLength, dock->ui->spinBoxTPRTopWidth };
-  else if ( prim == "HalfCylinderRoof" )
+  else if ( prim == "BarrelRoofHouse" )
     horizontalControls = { dock->ui->spinBoxHCRLength, dock->ui->spinBoxHCRWidth };
-  else if ( prim == "CylinderDome" || prim == "CylinderHemisphere" )
+  else if ( prim == "DomeRoofHouse" || prim == "CylinderHemisphere" )
     horizontalControls = { dock->ui->spinBoxCylHemiRadius };
-  else if ( prim == "IndentedCuboid" )
+  else if ( prim == "RecessedRoofHouse" )
     horizontalControls = { dock->ui->spinBoxICLength, dock->ui->spinBoxICWidth,
                            dock->ui->spinBoxICInnerLength, dock->ui->spinBoxICInnerWidth };
-  else if ( prim == "AsymmetricGableHouse" )
+  else if ( prim == "ShortRidgeHipRoofHouse" )
     horizontalControls = { dock->ui->spinBoxAGHLength, dock->ui->spinBoxAGHWidth,
                            dock->ui->spinBoxAGHRidgeLength };
-  else if ( prim == "FourStageRoundTower" )
+  else if ( prim == "CurvedRoofRoundHouse" )
     horizontalControls = { dock->ui->spinBoxFTBaseRadius, dock->ui->spinBoxFTEaveRadius,
                            dock->ui->spinBoxFTMiddleTopRadius };
-  else if ( prim == "TwoGableHouses" )
+  else if ( prim == "AngledGableHouse" )
     horizontalControls = { dock->ui->spinBoxTGLength1, dock->ui->spinBoxTGLength2, dock->ui->spinBoxTGWidth };
 
   if ( !horizontalControls.isEmpty() )

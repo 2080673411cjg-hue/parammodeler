@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from primitive_names import canonical_class_name, regression_slug
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from pathlib import Path
 import subprocess
@@ -8,45 +9,47 @@ import math
 import os
 import re
 import sys
+import time
 from typing import Literal, Optional
 
 PTV3_DIR = Path(__file__).resolve().parent
-CLS_LOG = PTV3_DIR / os.environ.get("PTV3_CLS_LOG", "logs/ptv3_cls_v9")
-REG_SUFFIX = os.environ.get("PTV3_REG_SUFFIX", "_v9_normals").strip()
+CLS_LOG = PTV3_DIR / os.environ.get("PTV3_CLS_LOG", "logs/ptv3_cls_v10")
+REG_SUFFIX = os.environ.get("PTV3_REG_SUFFIX", "_v10_normals").strip()
 if not REG_SUFFIX:
-    REG_SUFFIX = "_v9_normals"
+    REG_SUFFIX = "_v10_normals"
 TOWER_LOG = os.environ.get("PTV3_TOWER_LOG", "").strip()
 GABLED_LOG = os.environ.get("PTV3_GABLED_LOG", "").strip()
 
 STEM_NAMES = {
-    "Cuboid": "cuboid",
-    "Cylinder": "cylinder",
-    "LHouse": "lhouse",
-    "ConeCylinder": "conecylinder",
-    "GabledRoof": "gabledroof",
-    "PyramidRoof": "pyramidroof",
-    "TruncatedPyramidRoof": "truncatedpyramid",
-    "HalfCylinderRoof": "halfcylinder",
-    "CylinderDome": "cylinderdome",
+    "FlatRoofHouse": "cuboid",
+    "RoundFlatRoofHouse": "cylinder",
+    "LShapedHouse": "lhouse",
+    "ConicalRoofHouse": "conecylinder",
+    "GableRoofHouse": "gabledroof",
+    "PyramidalRoofHouse": "pyramidroof",
+    "FlatTopHipRoofHouse": "truncatedpyramid",
+    "BarrelRoofHouse": "halfcylinder",
+    "DomeRoofHouse": "cylinderdome",
     "CylinderHemisphere": "cylinderdome",
-    "IndentedCuboid": "indentedcuboid",
-    "AsymmetricGableHouse": "asymgable",
-    "FourStageRoundTower": "fourstage",
-    "TwoGableHouses": "twogable",
+    "RecessedRoofHouse": "indentedcuboid",
+    "ShortRidgeHipRoofHouse": "asymgable",
+    "CurvedRoofRoundHouse": "fourstage",
+    "AngledGableHouse": "twogable",
 }
 
 app = FastAPI()
 
 
 def regression_log_dir( primitive_type, model_suffix=None ):
-    override = TOWER_LOG if primitive_type == "FourStageRoundTower" else GABLED_LOG if primitive_type == "GabledRoof" else ""
+    primitive_type = canonical_class_name(primitive_type)
+    override = TOWER_LOG if primitive_type == "CurvedRoofRoundHouse" else GABLED_LOG if primitive_type == "GableRoofHouse" else ""
     if override and not model_suffix:
         path = Path(override).expanduser()
         return path if path.is_absolute() else PTV3_DIR / path
     suffix = model_suffix or REG_SUFFIX
     if not re.fullmatch(r"_[A-Za-z0-9_.-]+", suffix):
         raise ValueError("Invalid model_suffix")
-    return PTV3_DIR / "logs" / f"ptv3_reg_{STEM_NAMES[primitive_type]}{suffix}"
+    return PTV3_DIR / "logs" / f"ptv3_reg_{regression_slug(primitive_type, suffix)}{suffix}"
 
 class ClassifyReq(BaseModel):
     points_text: str
@@ -71,24 +74,41 @@ def health():
         "ptv3_dir": str(PTV3_DIR),
         "cls_log": str(CLS_LOG),
         "reg_suffix": REG_SUFFIX,
-        "tower_reg_log": str(regression_log_dir("FourStageRoundTower")),
-        "gabled_reg_log": str(regression_log_dir("GabledRoof")),
+        "tower_reg_log": str(regression_log_dir("CurvedRoofRoundHouse")),
+        "gabled_reg_log": str(regression_log_dir("GableRoofHouse")),
     }
 
-def run_json_command(cmd, timeout=180):
-    p = subprocess.run(
-        cmd,
-        cwd=str(PTV3_DIR),
-        text=True,
-        capture_output=True,
-        timeout=timeout,
-    )
-    if p.returncode != 0:
-        return {"ok": False, "error": p.stderr}
+def run_json_command(cmd, timeout=180, request=None):
+    if request is not None:
+        from anyio import from_thread
+
+    p = subprocess.Popen(cmd, cwd=str(PTV3_DIR), text=True,
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    deadline = time.monotonic() + timeout
     try:
-        return {"ok": True, "result": json.loads(p.stdout)}
+        while True:
+            # Sync FastAPI routes run in an AnyIO worker; inspect the ASGI
+            # connection on its event loop, not from the worker itself.
+            if request is not None and from_thread.run(request.is_disconnected):
+                return {"ok": False, "canceled": True, "error": "Prediction canceled by client."}
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return {"ok": False, "error": "Prediction timed out."}
+            try:
+                stdout, stderr = p.communicate(timeout=min(.1, remaining))
+                break
+            except subprocess.TimeoutExpired:
+                pass
+    finally:
+        if p.poll() is None:
+            p.kill()
+        p.communicate()
+    if p.returncode != 0:
+        return {"ok": False, "error": stderr}
+    try:
+        return {"ok": True, "result": json.loads(stdout)}
     except json.JSONDecodeError:
-        return {"ok": False, "error": "Failed to parse JSON output", "stdout": p.stdout, "stderr": p.stderr}
+        return {"ok": False, "error": "Failed to parse JSON output", "stdout": stdout, "stderr": stderr}
 
 def write_temp_points(points_text: str):
     f = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
@@ -99,7 +119,7 @@ def write_temp_points(points_text: str):
         f.close()
 
 @app.post("/classify")
-def classify(req: ClassifyReq):
+def classify(req: ClassifyReq, request: Request = None):
     input_path = write_temp_points(req.points_text)
     try:
         cmd = [
@@ -110,13 +130,16 @@ def classify(req: ClassifyReq):
             "--num_points", str(req.num_points),
             "--topk", str(req.topk),
         ]
-        return run_json_command(cmd)
+        response = run_json_command(cmd, request=request)
+        if response.get("ok"):
+            response["model_log_dir"] = str(CLS_LOG)
+        return response
     finally:
         os.remove(input_path)
 
 @app.post("/regress")
-def regress(req: RegressReq):
-    prim = "CylinderDome" if req.primitive_type == "CylinderHemisphere" else req.primitive_type
+def regress(req: RegressReq, request: Request = None):
+    prim = canonical_class_name(req.primitive_type)
     stem = STEM_NAMES.get(prim)
     if not stem:
         return {"ok": False, "error": f"Unsupported primitive_type: {req.primitive_type}"}
@@ -143,9 +166,9 @@ def regress(req: RegressReq):
         ]
         if getattr(req, "input_coordinates", None) is not None:
             cmd += ["--input_coordinates", req.input_coordinates]
-        response = run_json_command(cmd)
+        response = run_json_command(cmd, request=request)
         if response.get("ok"):
-            if prim == "FourStageRoundTower":
+            if prim == "CurvedRoofRoundHouse":
                 params = response.get("result", {}).get("params", {})
                 rise = params.get("middleRise")
                 if "middleBulge" in params or isinstance(rise, bool) or not isinstance(rise, (int, float)) or not math.isfinite(rise):

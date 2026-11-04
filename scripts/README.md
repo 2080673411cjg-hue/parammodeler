@@ -1,5 +1,37 @@
 # ParamModeler 深度学习完整流程
 
+## v10 部署（2026-11-03）
+
+“一键完成”新增“终止”：插件取消当前 HTTP 请求，更新后的服务检测到该连接断开便停止对应推理子进程并清理临时输入，服务及其他请求保持运行。仅编译插件也能结束界面等待；同步本节的 `ptv3_server.py` 并重启后，服务器才能同时停止本次计算，无需重新传权重或训练。本机 Python 推理同样支持终止。场景加载等同步步骤在步骤结束后响应终止。
+
+参数估计窗口现可显示实际分类/回归模型版本及方向预处理状态。请同步本节所列服务脚本并重启：新分类响应增加 `model_log_dir`，旧服务缺少字段时会显示“版本未确认”；方向未返回时同样显示未确认。“一键完成”后重新打开同一输入、基元及后端的窗口，可查看最近推理信息；悬停可查看权重全路径。该状态只说明回归输入方向处理，不代表位置或尺寸已经准确。
+
+v10 已完成训练并接入插件源码：分类默认及恢复默认值使用 `ptv3_cls_v10`，十三类回归使用 `_v10_normals`。已有设置一次性迁移到 v10，之后手动修改继续生效。用户自行编译插件并重启 QGIS，在“PointNet 路径设置”核对上述两项；未编译前也可在该窗口手动切换。
+
+Windows 实际脚本目录 `E:\pointnet\ptv3_simple` 的服务入口和串联推理入口已经更新。Ubuntu 沿用本轮训练时的 `main.py`、`main_reg.py`、`canonical_orientation.py` 和 PCL 库，权重也已在 Ubuntu 上，无需重新传模型或计算法向。Windows CMD 同步：
+
+```cmd
+scp "E:\pointnet\ptv3_simple\ptv3_server.py" "E:\pointnet\ptv3_simple\predict_ptv3_pipeline_v2.py" "E:\pointnet\ptv3_simple\primitive_names.py" xubo@100.70.215.84:/home/xubo/pointnet/ptv3_simple/
+```
+
+在原服务终端按 Ctrl+C 停止旧服务，然后在 Ubuntu 执行这一行。显式指定 v10，同时清空旧圆塔/人字形的单类环境覆盖：
+
+```bash
+conda activate ptv3_train && cd /home/xubo/pointnet/ptv3_simple && PTV3_CLS_LOG=logs/ptv3_cls_v10 PTV3_REG_SUFFIX=_v10_normals PTV3_TOWER_LOG= PTV3_GABLED_LOG= python -m uvicorn ptv3_server:app --host 0.0.0.0 --port 8008
+```
+
+Windows CMD 检查：
+
+```cmd
+curl http://100.70.215.84:8008/health
+```
+
+`cls_log` 应以 `ptv3_cls_v10` 结尾，`reg_suffix` 为 `_v10_normals`；`tower_reg_log` 应以 `ptv3_reg_curvedround_v10_normals` 结尾，`gabled_reg_log` 应以 `ptv3_reg_gableroof_v10_normals` 结尾。单次回归响应的 `model_log_dir` 用于确认实际选中的权重。41 项模型选择与名称兼容测试、配置源文件 MSVC 语法检查通过，并核对本地分类及十三类回归权重和配置齐全；尚未代用户重启 Ubuntu 或完成 QGIS 端到端验证。以下旧版本记录保留其实施时的条件。
+
+## 建筑类别改名与 v10（2026-11-02）
+
+新类别表、Windows CMD 增强、Ubuntu PCL 缓存、完整训练和同步清单见 [v10 操作流程](renaming-v10.md)。训练已经完成，当前部署步骤见文首。
+
 ## 分类与十三类回归v9部署（2026-11-02）
 
 本机分类目录及“恢复默认值”切到`ptv3_cls_v9`，十三类回归后缀为`_v9_normals`。新配置首次使用会将已有分类目录和回归后缀一次性切到v9，之后用户的手动修改继续生效。用户自行编译`plugin_parammodeler`，重启QGIS后在“PointNet路径设置”确认这两项。

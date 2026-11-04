@@ -32,12 +32,12 @@ sys.path.pop(0)
 
 class PointLoadingTests(unittest.TestCase):
     def dataset(self, cache, canonical, normalize, normals, source="metadata"):
-        record = {"type": "GabledRoof", "split": "train", "file": "train/GabledRoof/a.txt",
+        record = {"type": "GableRoofHouse", "split": "train", "file": "train/GableRoofHouse/a.txt",
                   "params": {"length": 12, "width": 10, "totalHeight": 8,
                              "wallRatio": .6, "ridgeRatio": .3, "rz": 120},
                   "pointCloudInfo": {"bboxSize": [12, 10, 8], "scale": 7}}
         return regression.ParamRegressionDataset(
-            "data", "metadata.json", "GabledRoof", "train",
+            "data", "metadata.json", "GableRoofHouse", "train",
             ["length", "width", "totalHeight", "wallRatio", "ridgeRatio"], 8,
             train=True, normalize=normalize, jitter_sigma=.003, random_rotate=not canonical,
             aux_names=["bbox_x", "bbox_y", "bbox_z", "scale"], use_normals=normals,
@@ -45,7 +45,7 @@ class PointLoadingTests(unittest.TestCase):
 
     def patches(self):
         points = np.random.default_rng(123).normal(size=(12, 3)).astype(np.float32)
-        record = {"type": "GabledRoof", "split": "train", "file": "train/GabledRoof/a.txt",
+        record = {"type": "GableRoofHouse", "split": "train", "file": "train/GableRoofHouse/a.txt",
                   "params": {"length": 12, "width": 10, "totalHeight": 8,
                              "wallRatio": .6, "ridgeRatio": .3, "rz": 120},
                   "pointCloudInfo": {"bboxSize": [12, 10, 8], "scale": 7}}
@@ -161,15 +161,15 @@ class PointLoadingTests(unittest.TestCase):
             settings, recipe = call.args
             log, train, test = runner.commands(settings, recipe)
             self.assertTrue(str(log).endswith("_v9_normals"))
-            self.assertEqual("--lhouse_canonical" in train, recipe[0] == "LHouse")
-            self.assertEqual("--lhouse_robust_bbox" in train, recipe[0] == "LHouse")
-            self.assertEqual("--truncated_scale_balanced" in train, recipe[0] == "TruncatedPyramidRoof")
-            self.assertEqual(runner.needs_geometry_test(settings, recipe), recipe[0] in ("LHouse", "TruncatedPyramidRoof"))
+            self.assertEqual("--lhouse_canonical" in train, recipe[0] == "LShapedHouse")
+            self.assertEqual("--lhouse_robust_bbox" in train, recipe[0] == "LShapedHouse")
+            self.assertEqual("--truncated_scale_balanced" in train, recipe[0] == "FlatTopHipRoofHouse")
+            self.assertEqual(runner.needs_geometry_test(settings, recipe), recipe[0] in ("LShapedHouse", "FlatTopHipRoofHouse"))
             self.assertEqual(train[train.index("--normal_backend") + 1], "pcl")
             self.assertNotIn("--truncated_scale_balanced", test)
         self.assertEqual(stream.getvalue().count("--test_orientation geometry"), 2)
         self.assertNotIn("TriPrismPyramid", stream.getvalue())
-        for extra in (["--classes", "Cuboid"], ["--no-canonical_align"]):
+        for extra in (["--classes", "FlatRoofHouse"], ["--no-canonical_align"]):
             with patch.object(sys, "argv", ["train_ptv3_reg.py", "--lhouse_canonical", "--dry_run", *extra]), \
                  patch("sys.stderr"), self.assertRaises(SystemExit):
                 runner.main()
@@ -182,11 +182,11 @@ class PointLoadingTests(unittest.TestCase):
             (root / "model_ptv3.py").write_text("class PTv3Regressor: pass\n", encoding="utf-8")
             records = []
             for i in range(4):
-                relative = f"train/Cylinder/sample_{i}.txt"
+                relative = f"train/RoundFlatRoofHouse/sample_{i}.txt"
                 path = root / relative
                 path.parent.mkdir(parents=True, exist_ok=True)
                 np.savetxt(path, np.random.default_rng(i).normal(size=(12, 3)))
-                records.append({"type": "Cylinder", "split": "train", "file": relative,
+                records.append({"type": "RoundFlatRoofHouse", "split": "train", "file": relative,
                                 "params": {"radius": 1, "height": 2}})
             (root / "metadata.json").write_text(json.dumps(records), encoding="utf-8")
             harness = root / "smoke.py"
@@ -197,7 +197,7 @@ from main_reg import ParamRegressionDataset, make_data_loader
 
 def run(cache):
     root = Path(__file__).parent
-    ds = ParamRegressionDataset(root, root / "metadata.json", "Cylinder", "train",
+    ds = ParamRegressionDataset(root, root / "metadata.json", "RoundFlatRoofHouse", "train",
         ["radius", "height"], 8, train=True, jitter_sigma=.003, random_rotate=True, cache_points=cache)
     loader = make_data_loader(ds, 2, True, torch.device("cpu"), 2, 42)
     result = []

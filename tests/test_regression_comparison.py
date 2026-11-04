@@ -94,7 +94,7 @@ class RegressionComparisonTests(unittest.TestCase):
             if change == "duplicate":
                 records.append(records[0])
             elif change == "path":
-                records[0]["file"] = "test/Cuboid/../../escape.txt"
+                records[0]["file"] = "test/FlatRoofHouse/../../escape.txt"
             else:
                 records[0].pop("horizontalScaleBand")
             metadata.write_text(json.dumps(records), encoding="utf-8")
@@ -105,7 +105,7 @@ class RegressionComparisonTests(unittest.TestCase):
     def test_both_models_use_identical_test_options_and_never_train(self):
         for tag in ("v4", "v7"):
             command = comparison.test_command(self.root / "dataset", self.root / tag,
-                                              self.root / f"out-{tag}", "Cuboid", "metadata")
+                                              self.root / f"out-{tag}", "FlatRoofHouse", "metadata")
             self.assertEqual(command[command.index("--mode") + 1], "test")
             self.assertEqual(command[command.index("--seed") + 1], "42")
             self.assertEqual(command[command.index("--num_points") + 1], "2048")
@@ -114,14 +114,14 @@ class RegressionComparisonTests(unittest.TestCase):
             self.assertNotIn("--epochs", command)
 
     def paired_fixture(self):
-        expected = {f"test/Cuboid/{i}.txt": {"horizontalScaleBand": i % 3} for i in range(4)}
+        expected = {f"test/FlatRoofHouse/{i}.txt": {"horizontalScaleBand": i % 3} for i in range(4)}
         old = {file: {"size": (10., 12.)} for file in expected}
         new = {file: {"size": (10., 11.)} for file in expected}
         return expected, old, new
 
     def test_paired_metrics_win_rate_and_scale_groups(self):
         expected, old, new = self.paired_fixture()
-        rows, failures = comparison.compare_predictions("Cuboid", "metadata", ["size"], expected, old, new)
+        rows, failures = comparison.compare_predictions("FlatRoofHouse", "metadata", ["size"], expected, old, new)
         overall = rows[0]
         self.assertEqual(overall["old_mae"], 2.)
         self.assertEqual(overall["v7_p95"], 1.)
@@ -132,10 +132,10 @@ class RegressionComparisonTests(unittest.TestCase):
 
     def test_geometry_failures_are_visible_and_only_common_clouds_are_paired(self):
         expected, old, new = self.paired_fixture()
-        old.pop("test/Cuboid/0.txt")
-        new.pop("test/Cuboid/1.txt")
-        new["test/Cuboid/2.txt"] = old["test/Cuboid/2.txt"]
-        rows, failures = comparison.compare_predictions("Cuboid", "geometry", ["size"], expected, old, new)
+        old.pop("test/FlatRoofHouse/0.txt")
+        new.pop("test/FlatRoofHouse/1.txt")
+        new["test/FlatRoofHouse/2.txt"] = old["test/FlatRoofHouse/2.txt"]
+        rows, failures = comparison.compare_predictions("FlatRoofHouse", "geometry", ["size"], expected, old, new)
         self.assertEqual(rows[0]["paired"], 2)
         self.assertEqual(rows[0]["old_failed"], 1)
         self.assertEqual(rows[0]["v7_failed"], 1)
@@ -144,11 +144,11 @@ class RegressionComparisonTests(unittest.TestCase):
         self.assertEqual(len(failures), 2)
         self.assertEqual(rows[1]["paired"], 1)
         with self.assertRaisesRegex(ValueError, "must predict every cloud"):
-            comparison.compare_predictions("Cuboid", "metadata", ["size"], expected, old, new)
+            comparison.compare_predictions("FlatRoofHouse", "metadata", ["size"], expected, old, new)
 
     def test_zero_paired_group_is_not_reported_as_zero_error(self):
         expected, _, _ = self.paired_fixture()
-        rows, failures = comparison.compare_predictions("Cuboid", "geometry", ["size"], expected, {}, {})
+        rows, failures = comparison.compare_predictions("FlatRoofHouse", "geometry", ["size"], expected, {}, {})
         self.assertIsNone(rows[0]["v7_mae"])
         self.assertIsNone(rows[0]["v7_win_percent"])
         self.assertEqual(rows[0]["paired"], 0)
@@ -156,14 +156,14 @@ class RegressionComparisonTests(unittest.TestCase):
 
     def test_different_ground_truth_or_duplicate_predictions_are_rejected(self):
         expected, old, new = self.paired_fixture()
-        new["test/Cuboid/0.txt"]["size"] = (11., 12.)
+        new["test/FlatRoofHouse/0.txt"]["size"] = (11., 12.)
         with self.assertRaisesRegex(ValueError, "Ground truth differs"):
-            comparison.compare_predictions("Cuboid", "metadata", ["size"], expected, old, new)
+            comparison.compare_predictions("FlatRoofHouse", "metadata", ["size"], expected, old, new)
         path = self.root / "predictions.csv"
         with path.open("w", encoding="utf-8", newline="") as stream:
             writer = csv.writer(stream)
             writer.writerow(["file", "true_size", "pred_size"])
-            writer.writerows([["/data/test/Cuboid/0.txt", 10, 11]] * 2)
+            writer.writerows([["/data/test/FlatRoofHouse/0.txt", 10, 11]] * 2)
         with self.assertRaisesRegex(ValueError, "duplicate prediction"):
             comparison.load_predictions(path, ["size"], expected)
 

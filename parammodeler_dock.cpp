@@ -15,6 +15,7 @@
  *                                                                         *
  ***************************************************************************/
 
+#include "parammodeler_primitive_names.h"
 #include "parammodeler_dock.h"
 #include "ui_parammodeler_dock.h"
 #include "buildmesh.h"
@@ -253,7 +254,13 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   , mIface( iface )
 {
   ui->setupUi( this );
-  m_currentPrimitive = ui->comboPrimitive->currentText();
+  for ( int i = 0; i < ui->comboPrimitive->count(); ++i )
+  {
+    const QString type = ParamModelerPrimitiveNames::canonical( ui->comboPrimitive->itemText( i ) );
+    ui->comboPrimitive->setItemData( i, type );
+    ui->comboPrimitive->setItemText( i, ParamModelerPrimitiveNames::display( type ) );
+  }
+  m_currentPrimitive = this->primitiveType();
   setWindowTitle( tr( "Parametric Modeler" ) );
 
   ui->widgetInversionPanel->setVisible( false );
@@ -277,6 +284,17 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   DEBUG_LOG( L"\n[ParamModelerDock] initialization complete\n" );
   DEBUG_LOG( m_currentPrimitive.toStdWString().c_str() );
   DEBUG_LOG( L"\n" );
+}
+
+QString ParamModelerDock::primitiveType() const
+{
+  return ui->comboPrimitive->currentData().toString();
+}
+
+void ParamModelerDock::setPrimitiveType( const QString &name )
+{
+  const int index = ui->comboPrimitive->findData( ParamModelerPrimitiveNames::canonical( name ) );
+  if ( index >= 0 ) ui->comboPrimitive->setCurrentIndex( index );
 }
 
 ParamModelerDock::~ParamModelerDock()
@@ -845,7 +863,7 @@ void ParamModelerDock::initConnections()
   connect( ui->sliderTPPHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTPPRatio, &QSlider::valueChanged, this, schedulePreview );
 
-  connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, &ParamModelerDock::onPrimitiveChanged );
+  connect( ui->comboPrimitive, QOverload<int>::of( &QComboBox::currentIndexChanged ), this, [this]( int ) { onPrimitiveChanged( this->primitiveType() ); } );
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, [this]( const QString & ) { onUpdatePreview(); } );
   connect( ui->btnRandomParams, &QPushButton::clicked, this, &ParamModelerDock::onRandomizeCurrentPrimitive );
   connect( ui->btnWorkflowEstimate, &QPushButton::clicked, this, &ParamModelerDock::onOpenPointCloudEstimateDialog );
@@ -985,11 +1003,11 @@ void ParamModelerDock::initPointNet()
   alignMenu->setToolTipsVisible( true );
   align3DMenuBtn->setMenu( alignMenu );
   connect( alignMenu, &QMenu::aboutToShow, this, [this, fitCornerAction] {
-    const QString type = ui->comboPrimitive->currentText();
-    fitCornerAction->setEnabled( type == QStringLiteral( "Cuboid" ) ||
-                                 type == QStringLiteral( "TruncatedPyramidRoof" ) ||
-                                 type == QStringLiteral( "LHouse" ) ||
-                                 type == QStringLiteral( "IndentedCuboid" ) );
+    const QString type = this->primitiveType();
+    fitCornerAction->setEnabled( type == QStringLiteral( "FlatRoofHouse" ) ||
+                                 type == QStringLiteral( "FlatTopHipRoofHouse" ) ||
+                                 type == QStringLiteral( "LShapedHouse" ) ||
+                                 type == QStringLiteral( "RecessedRoofHouse" ) );
   } );
   connect( fitCornerAction, &QAction::triggered, this, [this] {
     stopManualTranslate3D();
@@ -1002,6 +1020,8 @@ void ParamModelerDock::initPointNet()
 
 void ParamModelerDock::onPrimitiveChanged( const QString &prim )
 {
+  if ( prim != m_currentPrimitive )
+    m_fitBaseline.clear();
   stopManualTranslate3D();
   clearAnchorLock();
   QString dbg = QString( "[ParamModeler] primitive changed: %1 -> %2\n" ).arg( m_currentPrimitive ).arg( prim );
@@ -1022,20 +1042,20 @@ void ParamModelerDock::onPrimitiveChanged( const QString &prim )
 
 
   static const QHash<QString, QWidget *( Ui::ParamModelerDock::* )> pageMap = {
-    { "Cuboid", &Ui::ParamModelerDock::pageCuboid },
-    { "Cylinder", &Ui::ParamModelerDock::pageCylinder },
-    { "LHouse", &Ui::ParamModelerDock::pageLHouse },
-    { "ConeCylinder", &Ui::ParamModelerDock::pageConeCylinder },
-    { "GabledRoof", &Ui::ParamModelerDock::pageGabledRoof },
-    { "PyramidRoof", &Ui::ParamModelerDock::pagePyramidRoof },
-    { "TruncatedPyramidRoof", &Ui::ParamModelerDock::pageTPRoof },
-    { "HalfCylinderRoof", &Ui::ParamModelerDock::pageHalfCylinderRoof },
-    { "CylinderDome", &Ui::ParamModelerDock::pageCylinderHemisphere },
+    { "FlatRoofHouse", &Ui::ParamModelerDock::pageCuboid },
+    { "RoundFlatRoofHouse", &Ui::ParamModelerDock::pageCylinder },
+    { "LShapedHouse", &Ui::ParamModelerDock::pageLHouse },
+    { "ConicalRoofHouse", &Ui::ParamModelerDock::pageConeCylinder },
+    { "GableRoofHouse", &Ui::ParamModelerDock::pageGabledRoof },
+    { "PyramidalRoofHouse", &Ui::ParamModelerDock::pagePyramidRoof },
+    { "FlatTopHipRoofHouse", &Ui::ParamModelerDock::pageTPRoof },
+    { "BarrelRoofHouse", &Ui::ParamModelerDock::pageHalfCylinderRoof },
+    { "DomeRoofHouse", &Ui::ParamModelerDock::pageCylinderHemisphere },
     { "CylinderHemisphere", &Ui::ParamModelerDock::pageCylinderHemisphere },
-    { "IndentedCuboid", &Ui::ParamModelerDock::pageIndentedCuboid },
-    { "AsymmetricGableHouse", &Ui::ParamModelerDock::pageAsymmetricGableHouse },
-    { "FourStageRoundTower", &Ui::ParamModelerDock::pageFourStageRoundTower },
-    { "TwoGableHouses", &Ui::ParamModelerDock::pageTwoGableHouses },
+    { "RecessedRoofHouse", &Ui::ParamModelerDock::pageIndentedCuboid },
+    { "ShortRidgeHipRoofHouse", &Ui::ParamModelerDock::pageAsymmetricGableHouse },
+    { "CurvedRoofRoundHouse", &Ui::ParamModelerDock::pageFourStageRoundTower },
+    { "AngledGableHouse", &Ui::ParamModelerDock::pageTwoGableHouses },
     { "TriPrismPyramid", &Ui::ParamModelerDock::pageTriPrismPyramid },
   };
 
@@ -1112,7 +1132,7 @@ static bool checkMeshValid( const QString &primitiveType, ParamModelerDock *dock
 
 void ParamModelerDock::onExportOBJClicked()
 {
-  QString primitiveType = ui->comboPrimitive->currentText();
+  QString primitiveType = this->primitiveType();
   DEBUG_LOG( QString( "[Export] OBJ export start, primitive: %1\n" ).arg( primitiveType ).toStdWString().c_str() );
   if ( !checkMeshValid( primitiveType, this ) )
     return;
@@ -1149,7 +1169,7 @@ void ParamModelerDock::onExportOBJClicked()
 
 void ParamModelerDock::onExportEvaluationCsv()
 {
-  const QString primitive = ui->comboPrimitive->currentText();
+  const QString primitive = this->primitiveType();
   if ( !checkMeshValid( primitive, this ) )
     return;
   const bool hasPrediction = !m_evaluationRaw.isEmpty()
@@ -1165,12 +1185,12 @@ void ParamModelerDock::onExportEvaluationCsv()
 
   // Reuse physical parameter getters; widget values can be ratios instead of lengths.
   QJsonObject physical = ExportJSON::buildParams( this, primitive );
-  if ( primitive == QStringLiteral( "TruncatedPyramidRoof" ) )
+  if ( primitive == QStringLiteral( "FlatTopHipRoofHouse" ) )
   {
     physical.insert( QStringLiteral( "bottomLength" ), tpBottomLength() );
     physical.insert( QStringLiteral( "bottomWidth" ), tpBottomWidth() );
   }
-  if ( primitive == QStringLiteral( "CylinderDome" ) || primitive == QStringLiteral( "CylinderHemisphere" ) )
+  if ( primitive == QStringLiteral( "DomeRoofHouse" ) || primitive == QStringLiteral( "CylinderHemisphere" ) )
     physical.insert( QStringLiteral( "bulge" ), cylHemiBulge() );
   QMap<QString, double> physicalMap;
   for ( auto it = physical.constBegin(); it != physical.constEnd(); ++it )
@@ -1280,7 +1300,7 @@ void ParamModelerDock::onExportEvaluationCsv()
 
 void ParamModelerDock::onExportJSONClicked()
 {
-  QString primitiveType = ui->comboPrimitive->currentText();
+  QString primitiveType = this->primitiveType();
   DEBUG_LOG( QString( "[Export] JSON export start, primitive: %1\n" ).arg( primitiveType ).toStdWString().c_str() );
   if ( !checkMeshValid( primitiveType, this ) )
     return;
@@ -1290,7 +1310,7 @@ void ParamModelerDock::onExportJSONClicked()
 
 void ParamModelerDock::onExportPLYClicked()
 {
-  QString primitiveType = ui->comboPrimitive->currentText();
+  QString primitiveType = this->primitiveType();
   DEBUG_LOG( QString( "[Export] PLY export start, primitive: %1\n" ).arg( primitiveType ).toStdWString().c_str() );
   if ( !checkMeshValid( primitiveType, this ) )
     return;
@@ -1306,7 +1326,7 @@ void ParamModelerDock::onExportPLYClicked()
 
 void ParamModelerDock::onExportDLPointCloudClicked()
 {
-  QString primitiveType = ui->comboPrimitive->currentText();
+  QString primitiveType = this->primitiveType();
   DEBUG_LOG( QString( "[Export] DL TXT export start, primitive: %1\n" ).arg( primitiveType ).toStdWString().c_str() );
   if ( !checkMeshValid( primitiveType, this ) )
     return;
@@ -1443,7 +1463,7 @@ void ParamModelerDock::onExportMeshClicked()
   if ( fileName.isEmpty() )
     return;
 
-  QString prim = ui->comboPrimitive->currentText();
+  QString prim = this->primitiveType();
 
   MeshData mesh = BuildMesh::build( prim, this );
   if ( mesh.isEmpty() )
@@ -1494,7 +1514,7 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
   m_isUpdating = true;
 
 
-  QString primitiveType = ui->comboPrimitive->currentText();
+  QString primitiveType = this->primitiveType();
   DEBUG_LOG( QString( "[3D] load current model to QGIS 3D, primitive: %1\n" ).arg( primitiveType ).toStdWString().c_str() );
   MeshData mesh = BuildMesh::build( primitiveType, this );
   if ( mesh.isEmpty() )
@@ -1545,6 +1565,7 @@ void ParamModelerDock::onLoadToQGIS3D( bool zoomToLayer )
     return;
   }
 
+  m_fitBaseline.clear();
   m_realtimeModelLoaded = true;
   scheduleFitEvaluation();
 
@@ -1571,7 +1592,7 @@ void ParamModelerDock::onUpdatePreview()
   m_previewUpdatePending = false;
   m_previewUpdateInProgress = true;
 
-  QString prim = ui->comboPrimitive->currentText();
+  QString prim = this->primitiveType();
   MeshData mesh = BuildMesh::build( prim, this );
   applyAnchorLockCompensation( mesh );
 

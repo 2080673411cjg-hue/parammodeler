@@ -6,6 +6,7 @@ param(
     [switch]$WithHeightControl,
     [switch]$WithSurfaces,
     [switch]$WithFit,
+    [switch]$WithInference,
     [string[]]$SurfaceClouds = @(),
     [string]$ScreenshotDirectory
 )
@@ -42,7 +43,10 @@ if ($WithSurfaces) {
 if ($WithFit) {
     $targets += @('test_fit_metrics', 'test_fit_solids', 'test_fit_overlay')
 }
-if ($WithPicking -or $WithWireframe -or $WithAlignment -or $WithHeightControl -or $WithSurfaces -or $WithFit) {
+if ($WithInference) {
+    $targets += 'test_inference_transport'
+}
+if ($WithPicking -or $WithWireframe -or $WithAlignment -or $WithHeightControl -or $WithSurfaces -or $WithFit -or $WithInference) {
     $qt = 'E:/mambaforge/envs/qgis_dev/Library'
     $env:PATH = (Join-Path $qt 'bin') + ';' + $env:PATH
     $env:QT_QPA_PLATFORM_PLUGIN_PATH = Join-Path $qt 'plugins/platforms'
@@ -52,12 +56,35 @@ if ($WithPicking -or $WithWireframe -or $WithAlignment -or $WithHeightControl -o
         $link += Join-Path $qt ('lib/Qt5' + $module + '_conda.lib')
     }
     $link += 'opengl32.lib'
+    if ($WithInference) {
+        $arguments += '/I' + (Join-Path $qt 'include/qt/QtNetwork')
+        $link += Join-Path $qt 'lib/Qt5Network_conda.lib'
+    }
     if ($WithHeightControl) {
         $arguments += '/I' + (Join-Path $qt 'include/qt/QtWidgets')
         $link += Join-Path $qt 'lib/Qt5Widgets_conda.lib'
     }
 }
 try {
+    if ($WithInference) {
+        # Exercise the actual transport functions without linking the QGIS dock.
+        $transportText = [IO.File]::ReadAllText((Join-Path $root 'parammodeler_pointnet.cpp'))
+        $transportParts = @('#include <QtCore>', '#include <QtNetwork>', '#include <functional>')
+        foreach ($signature in @('QString friendlyProcessError(', 'bool postJson(', 'bool runPythonProcess(')) {
+            $start = $transportText.IndexOf($signature, [StringComparison]::Ordinal)
+            if ($start -lt 0) { throw "Transport function not found: $signature" }
+            $position = $transportText.IndexOf('{', $start)
+            $depth = 1
+            while ($depth -gt 0) {
+                $position++
+                if ($transportText[$position] -eq '{') { $depth++ }
+                elseif ($transportText[$position] -eq '}') { $depth-- }
+            }
+            $transportParts += $transportText.Substring($start, $position - $start + 1)
+        }
+        $transportUnit = Join-Path $temp 'inference_transport.cpp'
+        [IO.File]::WriteAllText($transportUnit, ($transportParts -join "`n"), [Text.UTF8Encoding]::new($false))
+    }
     if ($WithFit) {
         # Compile the actual pure mesh builders without linking the QGIS plugin.
         $meshText = [IO.File]::ReadAllText((Join-Path $root 'buildmesh.cpp'))
@@ -99,10 +126,15 @@ try {
             $compileArgs = $arguments + @((Join-Path $root 'tests/test_fit_solids.cpp'), $meshUnit,
                                           ('/Fe:' + $exe), ('/Fo:' + $temp + '\')) + $link
         }
+        if ($target -eq 'test_inference_transport') {
+            $compileArgs = $arguments + @((Join-Path $root 'tests/test_inference_transport.cpp'), $transportUnit,
+                                          ('/Fe:' + $exe), ('/Fo:' + $temp + '\')) + $link
+        }
         & (Join-Path $msvc.FullName 'bin/Hostx64/x64/cl.exe') @compileArgs
         if ($LASTEXITCODE -ne 0) { throw ($target + ' compilation failed') }
         if ($target -eq 'test_surface_classification') { & $exe @SurfaceClouds }
         elseif ($target -eq 'test_pick3d_overlay' -and $ScreenshotDirectory) { & $exe $ScreenshotDirectory }
+        elseif ($target -eq 'test_inference_transport') { & $exe 'E:/mambaforge/envs/qgis_dev/python.exe' }
         else { & $exe }
         if ($LASTEXITCODE -ne 0) { throw ($target + ' failed') }
     }
@@ -117,6 +149,12 @@ try {
     }
     if ($WithFit) {
         foreach ($name in @('fit_meshes.cpp', 'fit_meshes.obj')) {
+            $file = Join-Path $temp $name
+            if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file }
+        }
+    }
+    if ($WithInference) {
+        foreach ($name in @('inference_transport.cpp', 'inference_transport.obj')) {
             $file = Join-Path $temp $name
             if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file }
         }

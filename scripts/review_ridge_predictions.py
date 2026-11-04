@@ -1,5 +1,7 @@
 """Audit ridge position and magnitude without treating TwoGableHouses as symmetric."""
 
+from primitive_names import regression_slug
+
 import argparse
 import csv
 import json
@@ -36,7 +38,8 @@ def main():
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     report = {}
-    for name, slug in (("AsymmetricGableHouse", "asymgable"), ("TwoGableHouses", "twogable"), ("GabledRoof", "gabledroof")):
+    for name, slug in (("ShortRidgeHipRoofHouse", "asymgable"), ("AngledGableHouse", "twogable"), ("GableRoofHouse", "gabledroof")):
+        slug = regression_slug(name, args.run_tag)
         for split in ("val", "test"):
             path = args.log_root / f"ptv3_reg_{slug}_{args.run_tag}_normals" / f"regression_predictions_{split}.csv"
             if path.is_file():
@@ -44,7 +47,7 @@ def main():
                 with path.open(encoding="utf-8-sig", newline="") as source:
                     if "true_ridgeRatio" not in next(csv.reader(source)):
                         continue
-                report[f"{name}/{split}"] = review(path, name in ("AsymmetricGableHouse", "GabledRoof"))
+                report[f"{name}/{split}"] = review(path, name in ("ShortRidgeHipRoofHouse", "GableRoofHouse"))
     if not report:
         parser.error("No matching ridge prediction files found")
     text = json.dumps(report, indent=2)

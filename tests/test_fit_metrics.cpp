@@ -47,6 +47,32 @@ int main()
   shifted.translate( 0, 0, 1 );
   near( evaluate( mesh, { { .2f, .2f, 0 } }, shifted ).rmse, 1 );
 
+  // Initial geometry/pose/sample stay frozen during fine tuning and when the
+  // caller changes its data. A new tolerance re-evaluates that same snapshot.
+  MeshData initialMesh = mesh;
+  QVector<QVector3D> initialPoints { { .2f, .2f, 0 }, { .2f, .2f, .125f }, { .2f, .2f, .25f } };
+  QMatrix4x4 initialPose;
+  Baseline baseline( initialMesh, initialPoints, initialPose );
+  const auto initial = baseline.metrics( .125 );
+  assert( initial.count == 3 && initial.surfaceCount == 2 );
+  QMatrix4x4 adjustedPose;
+  adjustedPose.translate( 0, 0, .125 );
+  const auto adjusted = evaluate( initialMesh, initialPoints, adjustedPose, .125 );
+  assert( adjusted.surfaceCount == 3 && adjusted.rmse < initial.rmse );
+  initialMesh.vertices[0].setZ( 10 );
+  initialPoints[0].setZ( 10 );
+  initialPose.translate( 0, 0, 10 );
+  near( baseline.metrics( .125 ).rmse, initial.rmse );
+  assert( baseline.metrics( .25 ).surfaceCount == 3 );
+  near( baseline.metrics( .25 ).rmse, initial.rmse );
+  assert( baseline.metrics( .125 ).surfaceCount == 2 );
+  assert( baseline.metrics( 0 ).surfaceCount == 1 );
+  baseline = Baseline( mesh, { { .2f, .2f, 0 } }, identity );
+  assert( baseline.metrics( .125 ).count == 1 );
+  near( baseline.metrics( .125 ).rmse, 0 );
+  assert( baseline.metrics( .125 ).surfaceCount == 1 );
+  std::cout << "Fit comparison PASS: frozen geometry, pose/sample, shared tolerance, new baseline\n";
+
   moved.append( { std::numeric_limits<float>::quiet_NaN(), 0, 0 } );
   assert( evaluate( mesh, moved, pose ).count == 3 );
   QVector<QVector3D> outliers( 100, { .2f, .2f, 0 } );

@@ -7,19 +7,19 @@
 int main()
 {
   const std::vector<std::pair<const char *, MeshData>> models {
-    { "Cuboid", BuildMesh::buildCuboid( CuboidParams() ) },
-    { "Cylinder", BuildMesh::buildCylinder( CylinderParams() ) },
-    { "LHouse", BuildMesh::buildLHouse( LHouseParams() ) },
-    { "ConeCylinder", BuildMesh::buildConeCylinder( ConeCylinderParams() ) },
-    { "GabledRoof", BuildMesh::buildGabledRoof( GabledRoofParams() ) },
-    { "PyramidRoof", BuildMesh::buildPyramidRoof( PyramidRoofParams() ) },
-    { "TruncatedPyramidRoof", BuildMesh::buildTruncatedPyramidRoof( TruncatedPyramidRoofParams() ) },
-    { "HalfCylinderRoof", BuildMesh::buildHalfCylinderRoof( HalfCylinderRoofParams() ) },
-    { "CylinderDome", BuildMesh::buildCylinderHemisphere( CylinderHemisphereParams() ) },
-    { "IndentedCuboid", BuildMesh::buildIndentedCuboid( IndentedCuboidParams() ) },
-    { "AsymmetricGableHouse", BuildMesh::buildAsymmetricGableHouse( AsymmetricGableHouseParams() ) },
-    { "FourStageRoundTower", BuildMesh::buildFourStageRoundTower( FourStageRoundTowerParams() ) },
-    { "TwoGableHouses", BuildMesh::buildTwoGableHouses( TwoGableHousesParams() ) }
+    { "FlatRoofHouse", BuildMesh::buildCuboid( CuboidParams() ) },
+    { "RoundFlatRoofHouse", BuildMesh::buildCylinder( CylinderParams() ) },
+    { "LShapedHouse", BuildMesh::buildLHouse( LHouseParams() ) },
+    { "ConicalRoofHouse", BuildMesh::buildConeCylinder( ConeCylinderParams() ) },
+    { "GableRoofHouse", BuildMesh::buildGabledRoof( GabledRoofParams() ) },
+    { "PyramidalRoofHouse", BuildMesh::buildPyramidRoof( PyramidRoofParams() ) },
+    { "FlatTopHipRoofHouse", BuildMesh::buildTruncatedPyramidRoof( TruncatedPyramidRoofParams() ) },
+    { "BarrelRoofHouse", BuildMesh::buildHalfCylinderRoof( HalfCylinderRoofParams() ) },
+    { "DomeRoofHouse", BuildMesh::buildCylinderHemisphere( CylinderHemisphereParams() ) },
+    { "RecessedRoofHouse", BuildMesh::buildIndentedCuboid( IndentedCuboidParams() ) },
+    { "ShortRidgeHipRoofHouse", BuildMesh::buildAsymmetricGableHouse( AsymmetricGableHouseParams() ) },
+    { "CurvedRoofRoundHouse", BuildMesh::buildFourStageRoundTower( FourStageRoundTowerParams() ) },
+    { "AngledGableHouse", BuildMesh::buildTwoGableHouses( TwoGableHousesParams() ) }
   };
   QMatrix4x4 identity, pose;
   pose.translate( 100, -50, 30 );
