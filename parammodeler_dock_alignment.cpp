@@ -831,7 +831,7 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
         displayMin.setY( center.y() - halfSize.y() );
         displayMax.setX( center.x() + halfSize.x() );
         displayMax.setY( center.y() + halfSize.y() );
-        sliceReason = tower ? QStringLiteral( "tower-section-consensus" ) : QStringLiteral( "round-wall-circle" );
+        sliceReason = tower ? QStringLiteral( "tower-circle-center" ) : QStringLiteral( "round-wall-circle" );
       }
     }
     hasDisplayBBox = true;

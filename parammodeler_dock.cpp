@@ -273,7 +273,7 @@ ParamModelerDock::ParamModelerDock( QgisInterface *iface, QWidget *parent )
   ui->stackedWidgetParams->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Preferred );
 
   initUiControls();
-  initHeightDirectionControls();
+  initDimensionDirectionControls();
   initConnections();
   initPreview();
   initPointNet();
@@ -617,22 +617,28 @@ void ParamModelerDock::initUiControls()
   applyParameterGroups( ui );
 }
 
-void ParamModelerDock::initHeightDirectionControls()
+void ParamModelerDock::initDimensionDirectionControls()
 {
-  auto add = [this]( QDoubleSpinBox *spin, QSlider *slider, const QString &upper,
-                    bool recess = false ) {
+  auto addDirection = [this]( QDoubleSpinBox *spin, QSlider *slider, const QString &lower,
+                             const QString &upper, const QVector3D &axis, bool recess = false ) {
     QHBoxLayout *row = nullptr;
     for ( QHBoxLayout *candidate : spin->parentWidget()->findChildren<QHBoxLayout *>() )
       if ( candidate->indexOf( spin ) >= 0 ) { row = candidate; break; }
     if ( !row ) return;
-    new ParamModelerHeightControl( spin, slider, row, recess ? -1.0 : 0.0, recess ? 0.0 : 1.0,
-      recess, recess ? tr( "recess floor" ) : tr( "lower end" ), upper,
+    const bool horizontal = axis.z() == 0;
+    new ParamModelerDimensionDirectionControl( spin, slider, row, recess ? -1.0 : 0.0, recess ? 0.0 : 1.0,
+      recess, lower, upper,
       [this, spin] {
         return !m_suspendHeightCompensation && !m_isUpdating &&
                ui->stackedWidgetParams->currentWidget()->isAncestorOf( spin );
       },
-      [this]( double localZ ) {
-        const QVector3D delta = modelRotationMatrix( this ).mapVector( QVector3D( 0, 0, localZ ) );
+      [this, axis, horizontal]( double offset ) {
+        if ( offset == 0 )
+        {
+          retargetAnchorLockToCurrentPosition();
+          return true;
+        }
+        const QVector3D delta = modelRotationMatrix( this ).mapVector( axis * offset ) + m_dimensionTranslationRemainder;
         const double x = poseTranslateX() + delta.x();
         const double y = poseTranslateY() + delta.y();
         const double z = poseTranslateZ() + delta.z();
@@ -640,8 +646,30 @@ void ParamModelerDock::initHeightDirectionControls()
              y < ui->spinBoxTY->minimum() || y > ui->spinBoxTY->maximum() ||
              z < ui->spinBoxTZ->minimum() || z > ui->spinBoxTZ->maximum() ) return false;
         setPoseTranslate( x, y, z );
+        // Preserve sub-centimetre offsets across edits to the rounded position fields.
+        m_dimensionTranslationRemainder = QVector3D( x - poseTranslateX(), y - poseTranslateY(), z - poseTranslateZ() );
+        if ( horizontal ) retargetAnchorLockToCurrentPosition();
         return true;
-      } );
+      }, horizontal ? Qt::Horizontal : Qt::Vertical );
+  };
+  const auto addFootprint = [this, &addDirection]( QDoubleSpinBox *length, QSlider *lengthSlider,
+                                                  QDoubleSpinBox *width, QSlider *widthSlider ) {
+    const QString side = tr( "the local %1 side" );
+    addDirection( length, lengthSlider, side.arg( QStringLiteral( "−X" ) ), side.arg( QStringLiteral( "+X" ) ), QVector3D( 1, 0, 0 ) );
+    addDirection( width, widthSlider, side.arg( QStringLiteral( "−Y" ) ), side.arg( QStringLiteral( "+Y" ) ), QVector3D( 0, 1, 0 ) );
+  };
+  addFootprint( ui->spinBoxCLength, ui->sliderCLength, ui->spinBoxCWidth, ui->sliderCWidth );
+  addFootprint( ui->spinBoxLTotalLength, ui->sliderLTotalLength, ui->spinBoxLTotalWidth, ui->sliderLTotalWidth );
+  addFootprint( ui->spinBoxGRLength, ui->sliderGRLength, ui->spinBoxGRWidth, ui->sliderGRWidth );
+  addFootprint( ui->spinBoxPRLength, ui->sliderPRLength, ui->spinBoxPRWidth, ui->sliderPRWidth );
+  addFootprint( ui->spinBoxTPRBottomLength, ui->sliderTPRBottomLength, ui->spinBoxTPRBottomWidth, ui->sliderTPRBottomWidth );
+  addFootprint( ui->spinBoxHCRLength, ui->sliderHCRLength, ui->spinBoxHCRWidth, ui->sliderHCRWidth );
+  addFootprint( ui->spinBoxAGHLength, ui->sliderAGHLength, ui->spinBoxAGHWidth, ui->sliderAGHWidth );
+
+  const auto add = [this, &addDirection]( QDoubleSpinBox *spin, QSlider *slider, const QString &upper,
+                                         bool recess = false ) {
+    addDirection( spin, slider, recess ? tr( "recess floor" ) : tr( "lower end" ), upper,
+                  QVector3D( 0, 0, 1 ), recess );
   };
   add( ui->spinBoxCHeight, ui->sliderCHeight, tr( "top face" ) );
   add( ui->spinBoxCylHeight, ui->sliderCylHeight, tr( "top face" ) );
@@ -781,6 +809,7 @@ void ParamModelerDock::initConnections()
   auto schedulePreview = [this]( int ) { schedulePreviewUpdate(); };
   auto schedulePreviewD = [this]( double ) { schedulePreviewUpdate(); };
   auto schedulePoseTranslationPreview = [this]( double ) {
+    m_dimensionTranslationRemainder = QVector3D();
     if ( !m_anchorLockCompensating )
       retargetAnchorLockToCurrentPosition();
     schedulePreviewUpdate();

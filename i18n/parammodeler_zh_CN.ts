@@ -17,6 +17,10 @@
 </context>
 <context>
     <name>ParamModelerDock</name>
+    <message>
+        <source>the local %1 side</source>
+        <translation>模型局部 %1 侧</translation>
+    </message>
     <message><source>FlatRoofHouse</source><translation>矩形平顶房屋</translation></message>
     <message><source>RoundFlatRoofHouse</source><translation>圆形平顶房屋</translation></message>
     <message><source>LShapedHouse</source><translation>L形平顶房屋</translation></message>
@@ -1443,6 +1447,14 @@ You can view and adjust it in the 3D scene.</source>
 </context>
 <context>
     <name>ParamModelerHeightControl</name>
+    <message>
+        <source>Keep %1 fixed; increasing the dimension moves %2 outward.</source>
+        <translation>固定%1。增大尺寸时，%2向外移动。</translation>
+    </message>
+    <message>
+        <source>Dimension unchanged: translation limit reached.</source>
+        <translation>已达平移范围限制，尺寸未改变。</translation>
+    </message>
     <message>
         <location filename="../parammodeler_heightcontrol.h" line="36"/>
         <source>Keep %1 fixed; increasing height moves the lower end down.</source>

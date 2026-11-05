@@ -1193,7 +1193,11 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
     return false;
   const bool flatCornerModel = primitiveType == QStringLiteral( "FlatRoofHouse" ) ||
                                primitiveType == QStringLiteral( "LShapedHouse" );
-  if ( flatCornerModel && footprintSource == QStringLiteral( "bottom" ) )
+  const bool gabled = primitiveType == QStringLiteral( "GableRoofHouse" ) ||
+                      primitiveType == QStringLiteral( "ShortRidgeHipRoofHouse" );
+  const bool shrinkingRoof = primitiveType == QStringLiteral( "PyramidalRoofHouse" ) ||
+                             primitiveType == QStringLiteral( "FlatTopHipRoofHouse" );
+  if ( ( flatCornerModel || gabled || shrinkingRoof ) && footprintSource == QStringLiteral( "bottom" ) )
   {
     QVector3D fullMin, fullMax;
     robustBBoxFromPoints( canonicalPoints, fullMin, fullMax );
@@ -1244,12 +1248,8 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
     }
   }
 
-  const bool gabled = primitiveType == QStringLiteral( "GableRoofHouse" ) ||
-                      primitiveType == QStringLiteral( "ShortRidgeHipRoofHouse" );
   const bool twoGableHouses = primitiveType == QStringLiteral( "AngledGableHouse" );
   const bool halfCylinderRoof = primitiveType == QStringLiteral( "BarrelRoofHouse" );
-  const bool shrinkingRoof = primitiveType == QStringLiteral( "PyramidalRoofHouse" ) ||
-                             primitiveType == QStringLiteral( "FlatTopHipRoofHouse" );
   if ( gabled || shrinkingRoof || twoGableHouses || halfCylinderRoof )
   {
     if ( hasHalfSection ) targetZ = sectionEave;

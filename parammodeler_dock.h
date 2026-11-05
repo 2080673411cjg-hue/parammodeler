@@ -192,7 +192,7 @@ private slots:
 
 private:
   void initUiControls();
-  void initHeightDirectionControls();
+  void initDimensionDirectionControls();
   void initConnections();
   void initPreview();
   void initPointNet();
@@ -289,6 +289,7 @@ private:
   bool m_geometryCorrectionEnabled = false;
   double m_geometryCorrectionStrength = 0.70;
   bool m_suspendHeightCompensation = false;
+  QVector3D m_dimensionTranslationRemainder;
   void resetToDlAnchor();
 
   enum class AnchorPointMode

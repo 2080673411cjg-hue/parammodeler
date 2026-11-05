@@ -28,7 +28,7 @@ int main( int argc, char **argv )
   } );
   bool suspended = false, allowed = true;
   double z = 2;
-  auto *control = new ParamModelerHeightControl( spin, slider, row, 0, 1, false,
+  auto *control = new ParamModelerDimensionDirectionControl( spin, slider, row, 0, 1, false,
     QStringLiteral( "base" ), QStringLiteral( "top" ), [&] { return !suspended; },
     [&]( double dz ) { if ( !allowed ) return false; z += dz; return true; } );
   spin->setValue( 12 );
@@ -54,6 +54,44 @@ int main( int argc, char **argv )
   spin->setValue( 22 );
   check( z == beforeLimit && spin->value() == 21 && slider->value() == 2100, "translation limit rollback" );
 
+  auto *widthRow = new QHBoxLayout;
+  layout->addLayout( widthRow );
+  auto *width = new QDoubleSpinBox( &panel );
+  auto *widthSlider = new QSlider( Qt::Horizontal, &panel );
+  width->setRange( 1, 50 );
+  width->setValue( 10 );
+  widthSlider->setRange( 100, 5000 );
+  widthRow->addWidget( widthSlider );
+  widthRow->addWidget( width );
+  QObject::connect( widthSlider, &QSlider::valueChanged, width, [width]( int v ) { width->setValue( v / 100.0 ); } );
+  QMatrix4x4 widthRotation;
+  widthRotation.rotate( 37, 0, 0, 1 );
+  QVector3D widthPose( 5, -3, 0 );
+  bool widthAllowed = true;
+  auto *widthDirection = new ParamModelerDimensionDirectionControl( width, widthSlider, widthRow, 0, 1, false,
+    QStringLiteral( "near wall" ), QStringLiteral( "far wall" ), [&] { return !suspended; },
+    [&]( double offset ) {
+      if ( !widthAllowed ) return false;
+      widthPose += widthRotation.mapVector( QVector3D( 0, offset, 0 ) );
+      return true;
+    }, Qt::Horizontal );
+  const QVector3D originalPose = widthPose;
+  widthSlider->setValue( 1200 );
+  check( widthPose == originalPose && widthDirection->button()->arrowType() == Qt::RightArrow, "default near wall fixed" );
+  widthDirection->button()->click();
+  check( widthPose == originalPose && width->value() == 12 &&
+         widthDirection->button()->arrowType() == Qt::LeftArrow, "width toggle leaves model in place" );
+  const QVector3D farWall = widthPose + widthRotation.mapVector( QVector3D( 0, 12, 0 ) );
+  widthSlider->setValue( 1100 );
+  width->setValue( 10.92 );
+  check( ( widthPose + widthRotation.mapVector( QVector3D( 0, width->value(), 0 ) ) - farWall ).length() < 1e-5,
+         "slider and spin edits keep the rotated far wall fixed" );
+  const QVector3D lastWidthPose = widthPose;
+  widthAllowed = false;
+  widthSlider->setValue( 1000 );
+  check( width->value() == 10.92 && widthSlider->value() == 1092 && widthPose == lastWidthPose,
+         "width and slider roll back when compensation exceeds translation range" );
+
   auto *depthRow = new QHBoxLayout;
   layout->addLayout( depthRow );
   auto *depth = new QDoubleSpinBox( &panel );
@@ -61,7 +99,7 @@ int main( int argc, char **argv )
   depth->setRange( 0, 50 ); depth->setValue( 3 ); depthSlider->setRange( 0, 5000 );
   depthRow->addWidget( depth ); depthRow->addWidget( depthSlider );
   double recessZ = 0;
-  auto *recess = new ParamModelerHeightControl( depth, depthSlider, depthRow, -1, 0, true,
+  auto *recess = new ParamModelerDimensionDirectionControl( depth, depthSlider, depthRow, -1, 0, true,
     QStringLiteral( "floor" ), QStringLiteral( "rim" ), [&] { return !suspended; },
     [&]( double dz ) { recessZ += dz; return true; } );
   depth->setValue( 5 );
@@ -107,7 +145,7 @@ int main( int argc, char **argv )
   auto *outerHeightRow = new QHBoxLayout;
   layout->addLayout( outerHeightRow );
   double outerZ = 0;
-  new ParamModelerHeightControl( &outerHeight, &outerHeightSlider, outerHeightRow, 0, 1, true,
+  new ParamModelerDimensionDirectionControl( &outerHeight, &outerHeightSlider, outerHeightRow, 0, 1, true,
     QStringLiteral( "base" ), QStringLiteral( "top" ), [&] { return !suspended; },
     [&]( double dz ) { outerZ += dz; return true; } );
   outerHeightSlider.setValue( 200 );
@@ -314,7 +352,7 @@ int main( int argc, char **argv )
   layout->addLayout( manualRow );
   manualRow->addWidget( &manualMidH ); manualRow->addWidget( &manualMidHSlider );
   double manualZ = 0;
-  new ParamModelerHeightControl( &manualMidH, &manualMidHSlider, manualRow, 0, 1, true,
+  new ParamModelerDimensionDirectionControl( &manualMidH, &manualMidHSlider, manualRow, 0, 1, true,
     QStringLiteral( "bottom" ), QStringLiteral( "top" ), manualEdit,
     [&]( double dz ) { manualZ += dz; return true; } );
   manualMidHSlider.setValue( 100 );

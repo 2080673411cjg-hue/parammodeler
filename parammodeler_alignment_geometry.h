@@ -253,6 +253,58 @@ inline bool roundBaseCenter( const QVector<QVector3D> &points,
   return true;
 }
 
+inline bool towerEaveOutlineCenter( const QVector<QVector3D> &points, const QVector3D &minimum,
+                                    const QVector3D &maximum, double span, QPointF &center )
+{
+  // The eave is the widest part. Projecting the outline keeps its support
+  // together when vertical noise spreads a thin eave across several slices.
+  const QPointF boxCenter( (minimum.x()+maximum.x())*.5, (minimum.y()+maximum.y())*.5 );
+  constexpr double pi = 3.14159265358979323846;
+  constexpr int sectors = 36;
+  struct OutlinePoint { QPointF xy; double radius; };
+  QVector<OutlinePoint> bins[sectors];
+  const double padding = span*.05;
+  for ( const auto &p : points )
+  {
+    if ( !std::isfinite(p.x()) || !std::isfinite(p.y()) ||
+         p.x() < minimum.x()-padding || p.x() > maximum.x()+padding ||
+         p.y() < minimum.y()-padding || p.y() > maximum.y()+padding ) continue;
+    const double x = p.x()-boxCenter.x(), y = p.y()-boxCenter.y();
+    const int sector = std::min( sectors-1, static_cast<int>( (std::atan2(y,x)+pi)*sectors/(2*pi) ) );
+    bins[sector].append( {QPointF(p.x(),p.y()), std::hypot(x,y)} );
+  }
+  QVector<QPointF> outline;
+  for ( auto &bin : bins )
+  {
+    if ( bin.size() < 5 ) continue;
+    // Use one near-edge point per direction so dense arcs and isolated maxima
+    // do not dominate the fit.
+    const int edge = static_cast<int>( (bin.size()-1)*.98 );
+    std::nth_element( bin.begin(), bin.begin()+edge, bin.end(),
+                      []( const OutlinePoint &a, const OutlinePoint &b ) { return a.radius < b.radius; } );
+    outline.append( bin[edge].xy );
+  }
+  Circle circle;
+  if ( !fitCircle(outline, circle) || circle.radius < span*.4 || circle.radius > span*.65 ||
+       circle.rms > circle.radius*.025 ||
+       std::hypot(circle.center.x()-boxCenter.x(), circle.center.y()-boxCenter.y()) > span*.2 ) return false;
+  QVector<double> angles;
+  const double radialTolerance = std::max( 3*circle.rms, circle.radius*.01 );
+  for ( const auto &p : outline )
+  {
+    const double x = p.x()-circle.center.x(), y = p.y()-circle.center.y();
+    if ( std::abs(std::hypot(x,y)-circle.radius) <= radialTolerance ) angles.append( std::atan2(y,x) );
+  }
+  if ( angles.size() < 24 ) return false;
+  std::sort( angles.begin(), angles.end() );
+  // At least 270 degrees of angular coverage, measured by the largest gap.
+  if ( angles.first()+2*pi-angles.last() > pi/2 ) return false;
+  for ( int i = 1; i < angles.size(); ++i )
+    if ( angles[i]-angles[i-1] > pi/2 ) return false;
+  center = circle.center;
+  return true;
+}
+
 inline bool towerCenter( const QVector<QVector3D> &points,
                          const QVector3D &minimum, const QVector3D &maximum, QPointF &center )
 {
@@ -289,7 +341,8 @@ inline bool towerCenter( const QVector<QVector3D> &points,
       if ( std::hypot( ring.center.x()-rings[i].center.x(), ring.center.y()-rings[i].center.y() ) <= tolerance ) ++count;
     if ( count > support ) { support = count; best = i; }
   }
-  if ( support < 3 || support*2 <= rings.size() ) return false;
+  if ( support < 3 || support*2 <= rings.size() )
+    return towerEaveOutlineCenter( points, minimum, maximum, span, center );
   QVector<double> xs, ys;
   for ( const auto &ring : rings )
     if ( std::hypot( ring.center.x()-rings[best].center.x(), ring.center.y()-rings[best].center.y() ) <= tolerance )

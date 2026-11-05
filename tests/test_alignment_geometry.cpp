@@ -185,6 +185,28 @@ int main()
     }
   assert( !towerCenter(unrelatedRings, {-4,-4,0}, {8.5f,4,15}, center) );
 
+  QVector<QVector3D> thinEave, partialEave;
+  for ( int i = 0; i < 180; ++i )
+  {
+    const double t = (i+0.5)*2*pi/180;
+    for ( int layer = 1; layer <= 10; ++layer )
+    {
+      const double r = layer*3;
+      const QVector3D p(100+r*std::cos(t), -50+r*std::sin(t), 22);
+      thinEave.append(p);
+      if ( i < 80 ) partialEave.append(p);
+    }
+    if ( i < 80 )
+    {
+      const QVector3D p(100+20*std::cos(t), -50+20*std::sin(t), 20);
+      thinEave.append(p);
+      partialEave.append(p);
+    }
+  }
+  assert( towerCenter(thinEave, {70,-80,20}, {130,-20,22}, center) );
+  assert( std::hypot(center.x()-100,center.y()+50) < .10 );
+  assert( !towerCenter(partialEave, {70,-80,20}, {130,-20,22}, center) );
+
   QVector<QVector3D> walls;
   for ( int a = 0; a <= 50; ++a )
     for ( int z = 0; z <= 20; ++z )
