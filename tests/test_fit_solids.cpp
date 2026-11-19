@@ -62,6 +62,57 @@ int main()
   bent.angle = 150;
   check( BuildMesh::buildTwoGableHouses( bent ), { 18, 5, 2 }, true );
   check( BuildMesh::buildTwoGableHouses( bent ), { 2, 10, 2 }, false );
+
+  const auto occluded = []( const MeshData &mesh, const Eigen::Vector3d &camera, const Eigen::Vector3d &point ) {
+    using ParamModelerFit::Triangle;
+    using ParamModelerFit::vector;
+    std::vector<Triangle> triangles;
+    for ( int i = 0; i < mesh.indices.size(); i += 3 )
+      triangles.push_back( { vector( mesh.vertices[mesh.indices[i]] ), vector( mesh.vertices[mesh.indices[i + 1]] ),
+                             vector( mesh.vertices[mesh.indices[i + 2]] ) } );
+    const Eigen::KdBVH<double, 3, Triangle> tree( triangles.begin(), triangles.end() );
+    ParamModelerFit::RayQuery ray{ camera, point - camera, {}, 1.0 - 1e-6, true };
+    Eigen::BVIntersect( tree, ray );
+    return ray.hit;
+  };
+  LHouseParams l;
+  l.totalLength = 10;
+  l.totalWidth = 8;
+  l.wingRatio = .6;
+  l.wingWidthRatio = .375;
+  l.height = 5;
+  const auto lMesh = BuildMesh::buildLHouse( l );
+  assert( occluded( lMesh, { 15, -1, 9 }, { 4, 4, .75 } ) );
+  assert( !occluded( lMesh, { 15, -1, 9 }, { 4, 4, 4.8 } ) );
+  assert( !occluded( lMesh, { 15, 12, 10 }, { 7, 3, 1 } ) );
+  assert( occluded( lMesh, { -8, -8, 12 }, { 7, 3, 1 } ) );
+
+  IndentedCuboidParams pit;
+  pit.outerLength = 10;
+  pit.outerWidth = 8;
+  pit.outerHeight = 6;
+  pit.innerLength = 4;
+  pit.innerWidth = 3;
+  pit.innerHeight = 3;
+  pit.offsetX = 2;
+  pit.offsetY = 2;
+  const auto pitMesh = BuildMesh::buildIndentedCuboid( pit );
+  assert( !occluded( pitMesh, { 4, 3.5, 17 }, { 4, 3.5, 3 } ) );
+  assert( occluded( pitMesh, { 30, 3.5, 14 }, { 4, 3.5, 3 } ) );
+
+  TwoGableHousesParams turned;
+  turned.length1 = 8;
+  turned.length2 = 10;
+  turned.width = 6;
+  turned.wallHeight = 4;
+  turned.roofHeight = 2;
+  turned.angle = 135;
+  const auto turnedMesh = BuildMesh::buildTwoGableHouses( turned );
+  const double end = 10 / std::sqrt( 2.0 );
+  const Eigen::Vector3d endWall( static_cast<float>( 8 + end ), static_cast<float>( 3 + end ), 2 );
+  assert( occluded( turnedMesh, { -3, 3, 7 }, endWall ) );
+  assert( !occluded( turnedMesh, { 22, 10, 8 }, endWall ) );
+  std::cout << "Camera segments: L notch, recess floor, and turned gable wall PASS\n";
   // Changing radii/roof proportions exercises floating-point seam welding and T-junctions.
   for ( int i = 0; i < 8; ++i )
   {

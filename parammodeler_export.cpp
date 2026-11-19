@@ -245,6 +245,11 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
       p["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
       p["topLength"] = dock->tpTopLength();
       p["topWidth"] = dock->tpTopWidth();
+      if ( dock->tpTopPosition() != QPointF( 0.5, 0.5 ) )
+      {
+        p["topPositionX"] = dock->tpTopPosition().x();
+        p["topPositionY"] = dock->tpTopPosition().y();
+      }
     }
     else if ( type == "BarrelRoofHouse" )
     {
@@ -286,6 +291,8 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
       p["ridgeLength"] = dock->aghRidgeLength();
       p["ridgeOffset"] = dock->aghRidgeOffset();
       p["ridgeRatio"]  = dock->aghRidgeRatio();
+      if ( dock->aghRidgePositionX() != 0.5 )
+        p["ridgePositionX"] = dock->aghRidgePositionX();
     }
     else if ( type == "CurvedRoofRoundHouse" )
     {
@@ -310,13 +317,6 @@ QJsonObject ExportJSON::buildParams( ParamModelerDock *dock, const QString &type
       p["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
       p["angle"]      = dock->tgAngle();
       p["ridgeRatio"] = dock->tgRidgeRatio();
-    }
-    else if ( type == "TriPrismPyramid" )
-    {
-      p["leg"]          = dock->triPrismPyramidLeg();
-      p["baseSide"]     = dock->triPrismPyramidBase();
-      p["totalHeight"]  = dock->triPrismPyramidHeight();
-      p["pyramidRatio"] = dock->triPrismPyramidRatio();
     }
 
     return p;

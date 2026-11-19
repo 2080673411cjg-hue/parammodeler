@@ -26,14 +26,18 @@
 #include <QDockWidget>
 #include <QTimer>
 #include <QMap>
+#include <QPointF>
 #include <QVector>
 #include <QVector3D>
 #include <QPointer>
 #include <QSharedPointer>
-#include <qgspointxy.h>
 
 class QCheckBox;
+class QComboBox;
 class QDialog;
+class QDoubleSpinBox;
+class QMatrix4x4;
+class ParamModelerFaceFitView;
 class QLabel;
 class QProgressDialog;
 class QPushButton;
@@ -44,9 +48,6 @@ namespace ParamModelerFit { class Baseline; }
 
 class QgisInterface;
 class QgsMapLayer;
-class QgsMapTool;
-class QgsMapToolEmitPoint;
-class QgsRubberBand;
 class QgsVectorLayer;
 class Qgs3DMapCanvas;
 class Qgs3DMapTool;
@@ -117,6 +118,7 @@ public:
   double tpBottomWidth() const;
   double tpTopLength() const;
   double tpTopWidth() const;
+  QPointF tpTopPosition() const { return m_tpTopPosition; }
   double tpWallHeight() const;
   double tpRoofHeight() const;
   double hcrLength() const;
@@ -138,6 +140,7 @@ public:
   double aghRidgeLength() const;
   double aghRidgeOffset() const;
   double aghRidgeRatio() const;
+  double aghRidgePositionX() const { return m_aghRidgePositionX; }
   double cylHemiRadius() const;
   double cylHemiHeight() const;
   double cylHemiDomeHeight() const;
@@ -157,10 +160,6 @@ public:
   double tgRoofHeight() const;
   double tgAngle() const;
   double tgRidgeRatio() const;
-  double triPrismPyramidLeg() const;
-  double triPrismPyramidBase() const;
-  double triPrismPyramidHeight() const;
-  double triPrismPyramidRatio() const;
 
 private slots:
   void onPrimitiveChanged(const QString &prim); // 基元切换槽函数
@@ -183,9 +182,7 @@ private slots:
   void onInverseParams();
   void onOpenPointCloudEstimateDialog();
   void onRandomizeCurrentPrimitive();
-  void startManualTranslateByClick();
   void startManualTranslate3D();
-  void handleManualTranslateClick( const QgsPointXY &point, Qt::MouseButton button );
 		
   void onUpdatePreview();//主刷新入口
 
@@ -201,6 +198,8 @@ private:
   void scheduleFitEvaluation();
   void updateFitEvaluation();
   void showFitEvaluationDetails();
+  void showFaceFitView();
+  void updateFaceFitView( const QMatrix4x4 &pose, const QVector<bool> &surfaceFit );
   void resetFitEvaluation();
   void randomizeCurrentPrimitiveParams( bool refreshPreview, bool randomizePose = false, int scaleBand = -1 );
   bool loadPointCloudToQGIS3D( const QString &filePath, bool showMessage );
@@ -263,10 +262,15 @@ private:
   bool             m_previewUpdateInProgress = false;
   QTimer *m_fitTimer = nullptr;
   QVector<QVector3D> m_fitCloudPoints;
+  QVector<QVector3D> m_displayFitPoints;
   QSharedPointer<ParamModelerFit::Baseline> m_fitBaseline;
   double m_fitTolerance = 0.10;
   QPointer<QDialog> m_fitDetailsDialog;
   QPointer<QLabel> m_fitDetailsLabel;
+  QPointer<ParamModelerFaceFitView> m_faceFitView;
+  QPointer<QComboBox> m_faceFitSelection;
+  QPointer<QDoubleSpinBox> m_faceFitBand;
+  QPointer<QLabel> m_faceFitStatus;
 		
   QgsVectorLayer *m_modelLayer = nullptr;//新增一个成员变量，缓存图层指针
   QPointer<QgsMapLayer> m_pointCloudLayer;    // 缓存外部点云图层，用于清除
@@ -289,6 +293,8 @@ private:
   bool m_geometryCorrectionEnabled = false;
   double m_geometryCorrectionStrength = 0.70;
   bool m_suspendHeightCompensation = false;
+  QPointF m_tpTopPosition{ 0.5, 0.5 };
+  double m_aghRidgePositionX = 0.5;
   QVector3D m_dimensionTranslationRemainder;
   void resetToDlAnchor();
 
@@ -313,16 +319,6 @@ private:
   bool anchorLockLocalPoint( const MeshData &mesh, QVector3D &localPoint ) const;
   void retargetAnchorLockToCurrentPosition();
   void applyAnchorLockCompensation( const MeshData &mesh );
-
-  // ===== 手动目标点平移对齐（2D canvas 拾取） =====
-  QPushButton *m_manualTranslateBtn = nullptr;
-  QgsMapToolEmitPoint *m_manualTranslateTool = nullptr;
-  QgsMapTool *m_previousMapTool = nullptr;
-  QgsRubberBand *m_manualTranslateSourceMarker = nullptr;
-  QgsRubberBand *m_manualTranslateXAxisMarker = nullptr;
-  QgsRubberBand *m_manualTranslateYAxisMarker = nullptr;
-  bool m_manualTranslateHasSource = false;
-  QgsPointXY m_manualTranslateSource;
 
   QPushButton *m_manualTranslate3DBtn = nullptr;
   QPointer<ParamModelerPick3D> m_manualTranslate3DTool;

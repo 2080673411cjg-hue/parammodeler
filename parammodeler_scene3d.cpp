@@ -1,6 +1,5 @@
 #include "parammodeler_scene3d.h"
 #include "parammodeler_pcdloader.h"
-#include "parammodeler_surface_classification.h"
 #include "parammodeler_wireframe_guides.h"
 #include "parammodeler_fit_overlay.h"
 #include "qgsframegraph.h"
@@ -37,6 +36,7 @@
 #include <QgsProject.h>
 #include <qgscoordinatereferencesystem.h>
 #include <QgsFeature.h>
+#include <qgsfeaturerequest.h>
 #include <QgsGeometry.h>
 #include <qgsmaplayer.h>
 #include <QgsLineString.h>
@@ -48,7 +48,10 @@
 #include <qgsline3dsymbol.h>
 #include <QgsPolygon3DSymbol.h>
 #include <QgsPoint3DSymbol.h>
+#include <qgsmarkersymbol.h>
+#include <qgsnullsymbolrenderer.h>
 #include <QgsVectorLayer3DRenderer.h>
+#include <qgsrulebased3drenderer.h>
 #include <Qgs3DMapCanvas.h>
 #include <qgs3dmapscene.h>
 #include <qgs3dmapsettings.h>
@@ -115,23 +118,17 @@ struct RealtimePreviewState
   QString fitText;
 };
 
-struct ClassifiedPointCloud
-{
-  QVector<QVector3D> top;
-  QVector<QVector3D> side;
-  QVector<QVector3D> other;
-};
-
 QHash<Qgs3DMapScene *, RealtimePreviewState> sRealtimePreviewMeshes;
 bool sWireframeMode = false;
 const QString REALTIME_ANCHOR_LAYER_NAME = QStringLiteral( "ParamModeler_3D_Anchor" );
+const QString EXTERNAL_CLOUD_PREFIX = QStringLiteral( "External point cloud - " );
 
 void applyParamModeler3DSceneStyle( Qgs3DMapSettings *settings )
 {
   if ( !settings )
     return;
   settings->setTerrainRenderingEnabled( false );
-  settings->setBackgroundColor( QColor( 0, 0, 0 ) );
+  settings->setBackgroundColor( Qt::white );
 }
 
 QString meshPointKey( const QVector3D &p )
@@ -754,6 +751,10 @@ void ensureRealtimeAnchorLayer( QgisInterface *iface, const QgsRectangle &extent
   if ( iface && iface->mapCanvas() )
   {
     QList<QgsMapLayer *> layers = iface->mapCanvas()->layers();
+    // QGIS replaces the 3D layer list when the main canvas layers change.
+    for ( QgsMapLayer *layer : QgsProject::instance()->mapLayers() )
+      if ( layer->name().startsWith( EXTERNAL_CLOUD_PREFIX ) && !layers.contains( layer ) )
+        layers.append( layer );
     if ( !layers.contains( anchorLayer ) )
       layers.append( anchorLayer );
     iface->mapCanvas()->setLayers( layers );
@@ -797,13 +798,24 @@ Qgs3DMapCanvas *ensureRealtimePreviewCanvas( QgisInterface *iface, const QgsRect
   return nullptr;
 }
 
-QgsVectorLayer *makePointCloudLayer( const QString &layerName,
-                                     const QVector<QVector3D> &points,
-                                     double radius,
-                                     const QColor &color,
-                                     bool visibleIn3D )
+QgsPoint3DSymbol *pointCloudSymbol( const QColor &color )
 {
-  QgsVectorLayer *vl = new QgsVectorLayer( "PointZ?crs=EPSG:3857", layerName, "memory" );
+  auto *symbol = new QgsPoint3DSymbol();
+  symbol->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
+  symbol->setShape( Qgis::Point3DShape::Billboard );
+  auto marker = QgsMarkerSymbol::createSimple( { { QStringLiteral( "name" ), QStringLiteral( "circle" ) },
+                                                 { QStringLiteral( "outline_style" ), QStringLiteral( "no" ) } } );
+  marker->setColor( color );
+  marker->setSizeUnit( Qgis::RenderUnit::Pixels );
+  marker->setSize( 4 );
+  symbol->setBillboardSymbol( marker.release() );
+  return symbol;
+}
+
+QgsVectorLayer *makePointCloudLayer( const QString &layerName,
+                                     const QVector<QVector3D> &points )
+{
+  QgsVectorLayer *vl = new QgsVectorLayer( "PointZ?crs=EPSG:3857&field=point_index:integer&field=surface_fit:integer", layerName, "memory" );
   if ( !vl || !vl->isValid() )
   {
     delete vl;
@@ -812,9 +824,11 @@ QgsVectorLayer *makePointCloudLayer( const QString &layerName,
 
   QgsFeatureList features;
   features.reserve( std::min( points.size(), 1000 ) );
-  for ( const QVector3D &p : points )
+  for ( int i = 0; i < points.size(); ++i )
   {
+    const auto &p = points[i];
     QgsFeature feat;
+    feat.setAttributes( QVector<QVariant>{ i, QVariant() } );
     feat.setGeometry( QgsGeometry( new QgsPoint( p.x(), p.y(), p.z() ) ) );
     features.append( feat );
     if ( features.size() >= 1000 )
@@ -826,42 +840,16 @@ QgsVectorLayer *makePointCloudLayer( const QString &layerName,
   if ( !features.isEmpty() )
     vl->dataProvider()->addFeatures( features );
   vl->updateExtents();
+  vl->setRenderer( new QgsNullSymbolRenderer() );
 
-  if ( visibleIn3D )
-  {
-    QgsPoint3DSymbol *symbol3D = new QgsPoint3DSymbol();
-    symbol3D->setAltitudeClamping( Qgis::AltitudeClamping::Absolute );
-    symbol3D->setShape( Qgis::Point3DShape::Sphere );
-    QVariantMap props;
-    props["radius"] = radius;
-    symbol3D->setShapeProperties( props );
-
-    QgsPhongMaterialSettings material;
-    material.setAmbient( color );
-    material.setDiffuse( color );
-    material.setSpecular( Qt::black );
-    material.setShininess( 0 );
-    symbol3D->setMaterialSettings( material.clone() );
-
-    QgsVectorLayer3DRenderer *renderer3D = new QgsVectorLayer3DRenderer();
-    renderer3D->setSymbol( symbol3D );
-    vl->setRenderer3D( renderer3D );
-  }
+  using Rule = QgsRuleBased3DRenderer::Rule;
+  auto *rules = new Rule( nullptr );
+  rules->appendChild( new Rule( pointCloudSymbol( ParamModelerScene3D::pointCloudFitColor( true ) ), QStringLiteral( "\"surface_fit\" = 1" ) ) );
+  rules->appendChild( new Rule( pointCloudSymbol( ParamModelerScene3D::pointCloudFitColor( false ) ), QStringLiteral( "\"surface_fit\" = 0" ) ) );
+  rules->appendChild( new Rule( pointCloudSymbol( QColor( 0, 210, 220 ) ), QStringLiteral( "\"surface_fit\" IS NULL" ) ) );
+  vl->setRenderer3D( new QgsRuleBased3DRenderer( rules ) );
 
   return vl;
-}
-
-ClassifiedPointCloud classifyPointCloudSurfaces( const PointCloud &pc )
-{
-  ClassifiedPointCloud classified;
-  const QVector<ParamModelerSurfaces::Surface> labels = ParamModelerSurfaces::classify( pc.points );
-  for ( int i = 0; i < pc.points.size(); ++i )
-  {
-    if ( labels[i] == ParamModelerSurfaces::Surface::Top ) classified.top.push_back( pc.points[i] );
-    else if ( labels[i] == ParamModelerSurfaces::Surface::Side ) classified.side.push_back( pc.points[i] );
-    else classified.other.push_back( pc.points[i] );
-  }
-  return classified;
 }
 }
 
@@ -1406,6 +1394,37 @@ void ParamModelerScene3D::setFitMetricText( QgisInterface *iface, const QString 
   }
 }
 
+QColor ParamModelerScene3D::pointCloudFitColor( bool withinTolerance )
+{
+  return withinTolerance ? QColor( 30, 230, 35 ) : QColor( 179, 30, 60 );
+}
+
+void ParamModelerScene3D::setPointCloudFitColors( QgsMapLayer *cloudLayer, const QVector<bool> &surfaceFit )
+{
+  auto *layer = qobject_cast<QgsVectorLayer *>( cloudLayer );
+  if ( !layer ) return;
+
+  const int fitField = layer->fields().indexFromName( QStringLiteral( "surface_fit" ) );
+  const int indexField = layer->fields().indexFromName( QStringLiteral( "point_index" ) );
+  if ( fitField < 0 || indexField < 0 ) return;
+
+  QgsChangedAttributesMap changes;
+  QgsFeatureRequest request;
+  request.setFlags( Qgis::FeatureRequestFlag::NoGeometry );
+  auto features = layer->getFeatures( request );
+  QgsFeature feature;
+  while ( features.nextFeature( feature ) )
+  {
+    const int index = feature.attribute( indexField ).toInt();
+    const QVariant value = index >= 0 && index < surfaceFit.size() ? QVariant( int( surfaceFit[index] ) ) : QVariant();
+    if ( feature.attribute( fitField ) != value )
+      changes[feature.id()].insert( fitField, value );
+  }
+  features.close();
+  if ( !changes.isEmpty() && layer->dataProvider()->changeAttributeValues( changes ) )
+    layer->trigger3DUpdate();
+}
+
 void ParamModelerScene3D::clearRealtimePreviewMesh( QgisInterface *iface )
 {
   if ( !iface )
@@ -1441,7 +1460,8 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
                                                           const QString &filePath,
                                                           const QString &layerName,
                                                           QWidget *parent,
-                                                          QString *errorMessage )
+                                                          QString *errorMessage,
+                                                          QVector<QVector3D> &displayPoints )
 {
   if ( !iface )
   {
@@ -1467,12 +1487,7 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
     return nullptr;
   }
 
-  const QVector3D bboxSize = pc.bboxMax - pc.bboxMin;
-  const double maxDim = std::max( { std::abs( static_cast<double>( bboxSize.x() ) ),
-                                    std::abs( static_cast<double>( bboxSize.y() ) ),
-                                    std::abs( static_cast<double>( bboxSize.z() ) ) } );
-  const double pointRadius = std::max( maxDim / 350.0, 0.003 );
-  QgsVectorLayer *vl = makePointCloudLayer( layerName, pc.points, pointRadius, QColor( 30, 100, 255, 255 ), false );
+  QgsVectorLayer *vl = makePointCloudLayer( layerName, pc.points );
 
   if ( !vl || !vl->isValid() )
   {
@@ -1497,56 +1512,23 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
     layers.erase(
       std::remove_if( layers.begin(), layers.end(),
                       [&]( QgsMapLayer *l ) {
-                        return l && l->name().startsWith( QStringLiteral( "External point cloud - " ) );
+                        return l && l->name().startsWith( EXTERNAL_CLOUD_PREFIX );
                       } ),
       layers.end() );
     settings->setLayers( layers );
   }
 
-  removeLayersByNamePrefix( QStringLiteral( "External point cloud - " ) );
+  removeLayersByNamePrefix( EXTERNAL_CLOUD_PREFIX );
   removeLayerByName( layerName );
   QgsProject::instance()->addMapLayer( vl, false );
-
-  const ClassifiedPointCloud classified = classifyPointCloudSurfaces( pc );
-  DEBUG_LOG( QString( "[PointCloudSurface] pick=%1 top=%2 side=%3 other=%4\n" )
-               .arg( pc.points.size() )
-               .arg( classified.top.size() )
-               .arg( classified.side.size() )
-               .arg( classified.other.size() )
-               .toStdWString().c_str() );
-  QVector<QgsVectorLayer *> displayLayers;
-  QgsVectorLayer *topLayer = makePointCloudLayer( layerName + QStringLiteral( " [top]" ),
-                                                  classified.top,
-                                                  pointRadius,
-                                                  QColor( 0, 210, 220, 255 ),
-                                                  true );
-  QgsVectorLayer *sideLayer = makePointCloudLayer( layerName + QStringLiteral( " [side]" ),
-                                                   classified.side,
-                                                   pointRadius,
-                                                   QColor( 255, 170, 45, 255 ),
-                                                   true );
-  QgsVectorLayer *otherLayer = makePointCloudLayer( layerName + QStringLiteral( " [other]" ),
-                                                    classified.other,
-                                                    pointRadius,
-                                                    QColor( 145, 150, 155, 180 ),
-                                                    true );
-  for ( QgsVectorLayer *displayLayer : { topLayer, sideLayer, otherLayer } )
-  {
-    if ( displayLayer && displayLayer->isValid() && displayLayer->featureCount() > 0 )
-    {
-      QgsProject::instance()->addMapLayer( displayLayer );
-      displayLayers.push_back( displayLayer );
-    }
-    else
-    {
-      delete displayLayer;
-    }
-  }
 
   QgsRectangle viewExtent = padded3DViewExtent( vl->extent() );
 
   if ( iface->mapCanvas() )
   {
+    auto layers = iface->mapCanvas()->layers();
+    layers.append( vl );
+    iface->mapCanvas()->setLayers( layers );
     iface->mapCanvas()->setExtent( viewExtent );
     iface->mapCanvas()->refresh();
   }
@@ -1582,20 +1564,14 @@ QgsMapLayer *ParamModelerScene3D::loadExternalPointCloud( QgisInterface *iface,
     // 旧 layer 已在上面从 settings 移除，这里只需追加新 layer，避免再遍历已删除指针。
     if ( !curLayers.contains( vl ) )
       curLayers.append( vl );
-    for ( QgsVectorLayer *displayLayer : displayLayers )
-    {
-      if ( displayLayer && !curLayers.contains( displayLayer ) )
-        curLayers.append( displayLayer );
-    }
     settings->setLayers( curLayers );
     if ( !viewExtent.isNull() )
       canvas3D->setViewFrom2DExtent( viewExtent );
   }
 
   vl->triggerRepaint();
-  for ( QgsVectorLayer *displayLayer : displayLayers )
-    displayLayer->triggerRepaint();
 
+  displayPoints.swap( pc.points );
   Q_UNUSED( parent );
   return vl;
 }

@@ -24,7 +24,8 @@ class PrimitiveNamesTests(unittest.TestCase):
             self.assertIn(f'{{ "{old}", "{new}", "{old_slug}", "{new_slug}" }}', header)
         tree = ET.parse(root / 'parammodeler_dock.ui')
         items = tree.findall(".//widget[@name='comboPrimitive']/item/property/string")
-        self.assertEqual([item.text for item in items][:13], [r[1] for r in PRIMITIVES])
+        self.assertEqual([item.text for item in items], [r[1] for r in PRIMITIVES])
+        self.assertIsNone(tree.find(".//widget[@name='pageTriPrismPyramid']"))
 
     def test_all_v9_and_v10_directory_names(self):
         for old, new, old_slug, new_slug, _ in PRIMITIVES:

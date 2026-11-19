@@ -210,10 +210,18 @@ def predict_normals(source_points, prepared_points, args, checkpoint, angle_deg=
 
 def sample_points(points: np.ndarray, num_points: int, train: bool,
                   jitter_sigma: float, random_rotate: bool,
-                  normals: Optional[np.ndarray] = None) -> np.ndarray:
+                  normals: Optional[np.ndarray] = None, *,
+                  preserve_input_points: bool = False,
+                  use_actual_point_count: bool = False) -> np.ndarray:
     n = len(points)
     replace = n < num_points
-    if train:
+    if use_actual_point_count and n <= num_points:
+        idx = np.arange(n)
+    elif preserve_input_points and replace:
+        rng = np.random if train else np.random.default_rng(0)
+        extra = rng.choice(n, num_points - n, replace=True)
+        idx = np.concatenate((np.arange(n), extra))
+    elif train:
         idx = np.random.choice(n, num_points, replace=replace)
     elif n == num_points:
         idx = np.arange(n)
@@ -782,8 +790,8 @@ def seed_data_worker(_worker_id):
     random.seed(seed)
 
 
-def make_data_loader(dataset, batch_size, shuffle, device, num_workers=0, seed=None):
-    options = {"num_workers": num_workers, "pin_memory": device.type == "cuda"}
+def make_data_loader(dataset, batch_size, shuffle, device, num_workers=0, seed=None, *, collate_fn=None):
+    options = {"num_workers": num_workers, "pin_memory": device.type == "cuda", "collate_fn": collate_fn}
     if num_workers > 0:
         options.update(persistent_workers=True, prefetch_factor=2,
                        multiprocessing_context="spawn", worker_init_fn=seed_data_worker)
@@ -1062,6 +1070,91 @@ def symmetry_standardized_mae_score(metrics, target_std, target_weights, permuta
     return float(np.minimum(direct, flipped).mean() / weights.sum())
 
 # ============================================================================
+# Tower profile supervision (same physical geometry as BuildMesh::buildFourStageRoundTower)
+# ============================================================================
+
+TOWER_PROFILE_TARGETS = ("baseRadius", "baseHeight", "middleHeight", "middleTopRadius",
+                         "middleRise", "coneHeight", "eaveRadius", "eaveHeight")
+TOWER_PROFILE_VERSION = "tower_profile17_train_std_v1"
+TOWER_PROFILE_POINTS = {"eave": 4, "roof": 17, "cone": 2}
+
+
+def validate_tower_profile(class_name, targets, target_mode, weight):
+    if not np.isfinite(weight) or weight < 0:
+        raise ValueError("--tower_profile_loss_weight must be finite and non-negative")
+    if weight > 0 and (canonical_class_name(class_name) != "CurvedRoofRoundHouse"
+                       or target_mode != "raw" or len(targets or []) != 8
+                       or set(targets or []) != set(TOWER_PROFILE_TARGETS)):
+        raise ValueError("Tower profile loss requires CurvedRoofRoundHouse with the eight raw physical targets")
+
+
+def tower_profile_points(values, targets):
+    index = {name: i for i, name in enumerate(targets)}
+    base_r, base_h, roof_h, cap_r, rise, cone_h, eave_r, eave_h = (
+        values[:, index[name]] for name in TOWER_PROFILE_TARGETS)
+    body_top = base_h - eave_h
+    eave = torch.stack((torch.stack((base_r, body_top), -1), torch.stack((eave_r, body_top), -1),
+                        torch.stack((eave_r, base_h), -1), torch.stack((base_r, base_h), -1)), 1)
+    t = torch.linspace(0, 1, 17, dtype=values.dtype, device=values.device).view(1, -1)
+    radius = eave_r[:, None] * (1-t) + cap_r[:, None] * t
+    height = base_h[:, None] + roof_h[:, None] * t + 4 * rise[:, None] * t * (1-t)
+    roof = torch.stack((radius, height), -1)
+    cone = torch.stack((torch.stack((cap_r, base_h+roof_h), -1),
+                        torch.stack((torch.zeros_like(cap_r), base_h+roof_h+cone_h), -1)), 1)
+    return {"eave": eave, "roof": roof, "cone": cone}
+
+
+def compute_tower_profile_std(dataset, targets):
+    # Only the training split contributes statistics. No point resampling or RNG changes.
+    values = torch.as_tensor(np.stack([sample[1] for sample in dataset.samples]), dtype=torch.float64)
+    return {name: part.std(dim=0, unbiased=False).clamp_min(1e-6).tolist()
+            for name, part in tower_profile_points(values, targets).items()}
+
+
+def tower_profile_loss(predicted, true, targets, profile_std, beta=1.0):
+    predicted_parts, true_parts = tower_profile_points(predicted, targets), tower_profile_points(true, targets)
+    losses = {}
+    for name in TOWER_PROFILE_POINTS:
+        scale = torch.as_tensor(profile_std[name], dtype=predicted.dtype, device=predicted.device)
+        delta = (predicted_parts[name] - true_parts[name]) / scale
+        losses[name] = nn.functional.smooth_l1_loss(delta, torch.zeros_like(delta), beta=beta)
+    # Equal segment weights; 17 roof points must not outweigh four eave or two cone points.
+    return torch.stack(list(losses.values())).mean(), losses
+
+
+def tower_profile_metadata(weight, profile_std):
+    result = {"tower_profile_loss_weight": float(weight)}
+    if weight > 0:
+        result.update(tower_profile_version=TOWER_PROFILE_VERSION, tower_profile_std=profile_std)
+    return result
+
+
+def tower_profile_distances(metrics, targets):
+    predicted = tower_profile_points(torch.as_tensor(metrics["pred"], dtype=torch.float64), targets)
+    true = tower_profile_points(torch.as_tensor(metrics["true"], dtype=torch.float64), targets)
+    distances = {name: torch.linalg.vector_norm(predicted[name] - true[name], dim=-1).numpy()
+                 for name in TOWER_PROFILE_POINTS}
+    distances["equal_segment_mean"] = np.stack([d.mean(axis=1) for d in distances.values()], axis=1).mean(axis=1)
+    return distances
+
+
+def save_tower_profile_report(log_dir, split, targets, metrics):
+    distances = tower_profile_distances(metrics, targets)
+    with (log_dir / f"regression_profile_report_{split}.csv").open("w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerow(["segment", "mean_distance", "rmse_distance", "p95_distance", "num_samples", "num_distances"])
+        for name, values in distances.items():
+            writer.writerow([name, float(values.mean()), float(np.sqrt(np.mean(values**2))),
+                             float(np.percentile(values, 95)), len(metrics["paths"]), values.size])
+    with (log_dir / f"regression_profile_errors_{split}.csv").open("w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerow(["file", "eave_mean_distance", "roof_mean_distance", "cone_mean_distance", "equal_segment_mean_distance"])
+        means = [distances[name].mean(axis=1) for name in TOWER_PROFILE_POINTS]
+        for path, *values in zip(metrics["paths"], *means, distances["equal_segment_mean"]):
+            writer.writerow([path, *[float(value) for value in values]])
+
+
+# ============================================================================
 # Evaluation
 # ============================================================================
 
@@ -1164,7 +1257,8 @@ def save_regression_errors(log_dir, split, class_name, targets, metrics):
                             float(abs(err[i])), float(abs(err[i]) / max(float(abs(true[i])), 1e-6) * 100)])
 
 
-def save_config(log_dir, args, targets, mean, std, aux_names, aux_mean, aux_std, circular_targets=None):
+def save_config(log_dir, args, targets, mean, std, aux_names, aux_mean, aux_std, circular_targets=None,
+                tower_profile_std=None):
     payload = {
         "model": "ptv3",
         "backbone": args.backbone,
@@ -1201,7 +1295,10 @@ def save_config(log_dir, args, targets, mean, std, aux_names, aux_mean, aux_std,
         "asym_ridge_symmetry_180": getattr(args, "asym_ridge_symmetry_180", False),
         "gabled_ridge_symmetry_180": getattr(args, "gabled_ridge_symmetry_180", False),
         "target_weights": parse_target_weight_specs(targets, args.target_weights).tolist(),
-        "loss_recipe": ("standardized_wrapped_smooth_l1_indented_180_v1"
+        **tower_profile_metadata(getattr(args, "tower_profile_loss_weight", 0.0), tower_profile_std),
+        "loss_recipe": ("standardized_wrapped_smooth_l1_tower_profile_v1"
+                        if getattr(args, "tower_profile_loss_weight", 0.0) > 0
+                        else "standardized_wrapped_smooth_l1_indented_180_v1"
                         if getattr(args, "indented_symmetry_180", False)
                         else "standardized_wrapped_smooth_l1_gabled_ridge_180_v1"
                         if getattr(args, "gabled_ridge_symmetry_180", False)
@@ -1256,6 +1353,8 @@ def train(args):
         symmetry_perm = list(range(len(targets)))
     target_mode = args.target_mode
     corner_weight = args.lhouse_corner_loss_weight
+    profile_weight = getattr(args, "tower_profile_loss_weight", 0.0)
+    validate_tower_profile(args.class_name, targets, target_mode, profile_weight)
     scale_balanced = getattr(args, "truncated_scale_balanced", False)
     bbox_mode = LHOUSE_ROBUST_BBOX_MODE if args.lhouse_robust_bbox else "full"
     aux_names = [] if args.no_aux else args.aux_features
@@ -1304,10 +1403,13 @@ def train(args):
     mean_np, std_np = compute_target_stats(train_ds)
     aux_mean_np, aux_std_np = compute_aux_stats(train_ds, len(aux_names))
     geom_mean_np, geom_std_np = compute_geometry_aux_stats(train_ds)
+    profile_std = compute_tower_profile_std(train_ds, targets) if profile_weight > 0 else None
     save_config(log_dir, args, targets, mean_np, std_np, aux_names, aux_mean_np, aux_std_np,
-                args.circular_targets)
+                args.circular_targets, tower_profile_std=profile_std)
     mean = torch.tensor(mean_np, dtype=torch.float32, device=device).view(1, -1)
     std = torch.tensor(std_np, dtype=torch.float32, device=device).view(1, -1)
+    profile_scales = ({name: torch.tensor(values, dtype=torch.float32, device=device)
+                       for name, values in profile_std.items()} if profile_std is not None else None)
     aux_mean = torch.tensor(aux_mean_np, dtype=torch.float32, device=device).view(1, -1)
     aux_std = torch.tensor(aux_std_np, dtype=torch.float32, device=device).view(1, -1)
     geom_mean = torch.tensor(geom_mean_np, dtype=torch.float32, device=device).view(1, -1)
@@ -1337,6 +1439,9 @@ def train(args):
               f"relative_loss_weight={args.relative_loss_weight}")
     if corner_weight > 0:
         print(f"LHouse corner loss: weight={corner_weight} | origin=outer_lower_left | scale=train_length_width_std")
+    if profile_weight > 0:
+        print(f"Tower profile loss: weight={profile_weight} | eave=4 roof=17 cone=2 | "
+              "scale=train_profile_coordinate_std | equal segment weights | selection=unchanged")
     if scale_balanced:
         print("Truncated scale experiment: dimension relative weight=0.05 | ratios=original loss | "
               "selection=equal mean of small/medium/large dimensionless validation MAE")
@@ -1357,12 +1462,16 @@ def train(args):
             history_columns += ["val_local_notch_mean", "val_local_notch_p95"]
         if scale_balanced:
             history_columns += ["train_dimension_relative_loss", "val_scale_small", "val_scale_medium", "val_scale_large"]
+        if profile_weight > 0:
+            history_columns += ["train_tower_profile_loss", "train_profile_eave_loss", "train_profile_roof_loss",
+                                "train_profile_cone_loss", "val_profile_mean_distance", "val_profile_p95_mean_distance"]
         writer.writerow(history_columns)
 
         for epoch in range(1, args.epochs + 1):
             model.train()
             total_loss, total_count = 0.0, 0
             total_dimension_relative = 0.0
+            total_profile = np.zeros(4, dtype=np.float64)
             for points, aux, y, geom_y, _ in train_loader:
                 points = points.to(device, non_blocking=device.type == "cuda")
                 aux = aux.to(device, non_blocking=device.type == "cuda")
@@ -1408,6 +1517,11 @@ def train(args):
                 if args.geom_aux_targets and args.geom_loss_weight > 0:
                     geom_loss = criterion(pred_geom_norm, geom_norm)
                     loss_total = loss_total + args.geom_loss_weight * geom_loss
+                if profile_weight > 0:
+                    profile_loss, profile_parts = tower_profile_loss(
+                        decode_targets(pred_norm, mean, std), y, targets, profile_scales, args.smooth_l1_beta)
+                    loss_total = loss_total + profile_weight * profile_loss
+                    total_profile += np.asarray([profile_loss.item(), *[v.item() for v in profile_parts.values()]]) * points.size(0)
 
                 loss_total.backward()
                 optimizer.step()
@@ -1440,6 +1554,13 @@ def train(args):
                 corner_message += (f" | val_scale_small {band_scores[0]:.4f}"
                                    f" | val_scale_medium {band_scores[1]:.4f}"
                                    f" | val_scale_large {band_scores[2]:.4f}")
+            if profile_weight > 0:
+                profile_errors = tower_profile_distances(val_metrics, targets)["equal_segment_mean"]
+                profile_mean, profile_p95 = float(profile_errors.mean()), float(np.percentile(profile_errors, 95))
+                profile_averages = total_profile / max(total_count, 1)
+                history_row += [*profile_averages.tolist(), profile_mean, profile_p95]
+                corner_message += (f" | train_profile_loss {profile_averages[0]:.5f}"
+                                   f" | val_profile_mean {profile_mean:.4f} | val_profile_p95 {profile_p95:.4f}")
             writer.writerow(history_row)
             f.flush()
 
@@ -1482,7 +1603,10 @@ def train(args):
                     "asym_ridge_symmetry_180": args.asym_ridge_symmetry_180,
                     "gabled_ridge_symmetry_180": args.gabled_ridge_symmetry_180,
                     "target_weights": target_weight_np.tolist(),
-                    "loss_recipe": ("standardized_wrapped_smooth_l1_indented_180_v1"
+                    **tower_profile_metadata(profile_weight, profile_std),
+                    "loss_recipe": ("standardized_wrapped_smooth_l1_tower_profile_v1"
+                                    if profile_weight > 0
+                                    else "standardized_wrapped_smooth_l1_indented_180_v1"
                                     if args.indented_symmetry_180
                                     else "standardized_wrapped_smooth_l1_gabled_ridge_180_v1"
                                     if args.gabled_ridge_symmetry_180
@@ -1498,6 +1622,8 @@ def train(args):
                 save_predictions(log_dir, val_split, targets, val_metrics)
                 save_regression_report(log_dir, val_split, args.class_name, targets, val_metrics)
                 save_regression_errors(log_dir, val_split, args.class_name, targets, val_metrics)
+                if profile_weight > 0:
+                    save_tower_profile_report(log_dir, val_split, targets, val_metrics)
                 print(f"  -> saved best_model.pth (val_selection_score={best_score:.4f})")
 
     print(f"Training done. Best validation selection score: {best_score:.4f}")
@@ -1661,6 +1787,8 @@ def test(args):
     save_predictions(output_dir, output_split, targets, metrics)
     save_regression_report(output_dir, output_split, class_name, targets, metrics)
     save_regression_errors(output_dir, output_split, class_name, targets, metrics)
+    if class_name == "CurvedRoofRoundHouse" and len(targets) == 8 and set(targets) == set(TOWER_PROFILE_TARGETS):
+        save_tower_profile_report(output_dir, output_split, targets, metrics)
     if geometry_test or ckpt.get("lhouse_canonical", False):
         orientation_report.update(centered_geometry_errors(ds, targets, metrics))
         (output_dir / f"orientation_{output_split}.json").write_text(
@@ -1742,15 +1870,23 @@ def predict(args):
 
     if canonical_applied:
         bbox = np.ptp(points, axis=0)
-        if aux_names and ckpt.get("canonical_aux_units", "legacy") == "physical":
+        if aux_names:
             coordinates = getattr(args, "input_coordinates", None)
             info = record.get("pointCloudInfo", {}) if record is not None else {}
             if coordinates is None and record is not None:
                 coordinates = ("normalized" if info.get("normalization") ==
                                "centered_by_mean_and_scaled_by_max_radius" else "physical")
-            scale = (float(aux[aux_names.index("scale")]) if "scale" in aux_names
-                     else info.get("scale", getattr(args, "scale", None)))
-            bbox = physical_bbox_size(points, coordinates, scale, ckpt.get("canonical_bbox_mode", "full"))
+            scale = info.get("scale", getattr(args, "scale", None))
+            if scale is None and "scale" in aux_names:
+                scale = float(aux[aux_names.index("scale")])
+            if ckpt.get("canonical_aux_units", "legacy") == "physical":
+                bbox = physical_bbox_size(points, coordinates, scale, ckpt.get("canonical_bbox_mode", "full"))
+            elif coordinates == "physical":
+                # Legacy canonical weights learned spans from normalized dataset TXT.
+                # Keep scale physical, but derive bbox/volume in that training frame.
+                if scale is None or not np.isfinite(scale) or scale <= 0:
+                    raise ValueError("Physical input requires a finite positive physical scale for legacy auxiliary features")
+                bbox = bbox / float(scale)
         aux = aux_vector_for_bbox(aux, aux_names, bbox)
 
     if normalize:
@@ -1855,6 +1991,8 @@ def parse_args():
                         help="Weight for optional geometry auxiliary regression loss.")
     parser.add_argument("--lhouse_corner_loss_weight", type=float, default=0.0,
                         help="Optional LHouse primary-output notch-position loss; 0 preserves the existing recipe.")
+    parser.add_argument("--tower_profile_loss_weight", type=float, default=0.0,
+                        help="CurvedRoofRoundHouse-only physical profile loss; 0 preserves the existing training recipe.")
     parser.add_argument("--truncated_scale_balanced", action="store_true",
                         help="TruncatedPyramidRoof-only experiment: physical-dimension relative loss and equal-band validation selection.")
     parser.add_argument("--train_jitter_sigma", type=float, default=0.003)
@@ -1895,6 +2033,12 @@ def parse_args():
 
     args = parser.parse_args()
 
+    try:
+        validate_tower_profile(args.class_name, args.targets, args.target_mode, args.tower_profile_loss_weight)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    if args.tower_profile_loss_weight > 0 and args.mode != "train":
+        raise SystemExit("--tower_profile_loss_weight is a train-only option")
     if args.num_workers < 0:
         raise SystemExit("--num_workers must be non-negative")
     if args.normal_workers < 0:

@@ -5,6 +5,7 @@
 
 #include <QString>
 
+class QColor;
 class QgisInterface;
 class QWidget;
 class QgsMapLayer;
@@ -48,6 +49,8 @@ public:
 
   static void clearRealtimePreviewMesh( QgisInterface *iface );
   static void setFitMetricText( QgisInterface *iface, const QString &text );
+  static QColor pointCloudFitColor( bool withinTolerance );
+  static void setPointCloudFitColors( QgsMapLayer *cloudLayer, const QVector<bool> &surfaceFit = {} );
 
   static void clearAll3DEntities( QgisInterface *iface );
 
@@ -55,7 +58,8 @@ public:
                                               const QString &filePath,
                                               const QString &layerName,
                                               QWidget *parent,
-                                              QString *errorMessage = nullptr );
+                                              QString *errorMessage,
+                                              QVector<QVector3D> &displayPoints );
 
   static void setWireframeMode( bool on );
   static bool isWireframeMode();

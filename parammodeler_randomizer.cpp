@@ -92,6 +92,7 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
   }
   else if ( prim == "FlatTopHipRoofHouse" )
   {
+    dock->m_tpTopPosition = QPointF( 0.5, 0.5 );
     const double bottomLength = rnd( 10.0, 24.0 );
     const double bottomWidth = rnd( 8.0, 18.0 );
     set( dock->ui->spinBoxTPRBottomLength, bottomLength );
@@ -145,6 +146,7 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
   }
   else if ( prim == "ShortRidgeHipRoofHouse" )
   {
+    dock->m_aghRidgePositionX = 0.5;
     const double length = rnd( 10.0, 24.0 );
     const double width = rnd( 5.0, 14.0 );
     set( dock->ui->spinBoxAGHLength, length );
@@ -187,17 +189,6 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
     set( dock->ui->spinBoxTGRoofHeight, rnd( 0.55, 0.82, 0.01 ) );
     set( dock->ui->spinBoxTGAngle, rnd( 135.0, 165.0, 1.0 ) );
     set( dock->ui->spinBoxTGRidgeRatio, rnd( 0.3, 0.7, 0.01 ) );
-  }
-  else if ( prim == "TriPrismPyramid" )
-  {
-    // 先随机底边和腰长，确保等腰三角形存在（腰 > 底边/2）
-    const double baseSide = rnd( 4.0, 14.0 );
-    const double minLeg = baseSide / 2.0 + 0.5;
-    const double leg = rnd( minLeg, minLeg + 12.0 );
-    set( dock->ui->spinBoxTPPBase, baseSide );
-    set( dock->ui->spinBoxTPPLeg, leg );
-    set( dock->ui->spinBoxTPPHeight, rnd( 4.5, 14.0 ) );
-    set( dock->ui->spinBoxTPPRatio, rnd( 0.25, 0.70, 0.01 ) );
   }
 
   // Scale the whole footprint, including dependent horizontal dimensions.
@@ -254,8 +245,13 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
         const int limits[][2] = { { 61, 149 }, { 151, 249 }, { 251, 399 } };
         const double targetSpan = QRandomGenerator::global()->bounded( limits[band][0], limits[band][1] + 1 ) / 10.0;
         const double factor = targetSpan / span;
+        // Snapshot targets before linked spin boxes can clamp dependent dimensions.
+        QVector<double> scaledValues;
+        scaledValues.reserve( horizontalControls.size() );
         for ( QDoubleSpinBox *spin : horizontalControls )
-          set( spin, spin->value() * factor );
+          scaledValues.push_back( spin->value() * factor );
+        for ( int i = 0; i < horizontalControls.size(); ++i )
+          set( horizontalControls[i], scaledValues[i] );
       }
     }
   }

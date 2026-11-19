@@ -113,10 +113,6 @@
 #include "qgscoordinatereferencesystem.h"
 #include "qgspointcloud3dsymbol.h"
 #include "qgspointcloudlayer3drenderer.h"
-#include "qgsmapcanvas.h"
-#include "qgsmaptoolemitpoint.h"
-#include "qgsmaptool.h"
-#include "qgsrubberband.h"
 #include "qgspointcloudindex.h"
 #include "qgspointcloudblock.h"
 #include "qgspointcloudattribute.h"
@@ -301,30 +297,6 @@ ParamModelerDock::~ParamModelerDock()
 {
   resetFitEvaluation();
   stopManualTranslate3D();
-  QgsMapCanvas *canvas = mIface ? mIface->mapCanvas() : nullptr;
-  if ( canvas && m_manualTranslateTool && canvas->mapTool() == m_manualTranslateTool )
-  {
-    if ( m_previousMapTool )
-      canvas->setMapTool( m_previousMapTool );
-    else
-      canvas->unsetMapTool( m_manualTranslateTool );
-  }
-  if ( m_manualTranslateSourceMarker )
-  {
-    delete m_manualTranslateSourceMarker;
-    m_manualTranslateSourceMarker = nullptr;
-  }
-  if ( m_manualTranslateXAxisMarker )
-  {
-    delete m_manualTranslateXAxisMarker;
-    m_manualTranslateXAxisMarker = nullptr;
-  }
-  if ( m_manualTranslateYAxisMarker )
-  {
-    delete m_manualTranslateYAxisMarker;
-    m_manualTranslateYAxisMarker = nullptr;
-  }
-  m_manualTranslateHasSource = false;
   ParamModelerScene3D::clearRealtimePreviewMesh( mIface );
   m_modelLayer = nullptr;
   delete ui;
@@ -373,13 +345,6 @@ static void applyParameterGroups( Ui::ParamModelerDock *ui )
     {
         insertSectionHeader( f, 3, ParamModelerDock::tr( "Dome" ) );
         insertSectionHeader( f, 0, ParamModelerDock::tr( "Cylinder" ) );
-    }
-
-    // TriPrismPyramid (4 rows): Prism(Leg, Base) → Pyramid(Total H, Pyramid ratio)
-    if ( QFormLayout *f = fmt( ui->pageTriPrismPyramid ) )
-    {
-        insertSectionHeader( f, 2, ParamModelerDock::tr( "Pyramid" ) );
-        insertSectionHeader( f, 0, ParamModelerDock::tr( "Prism" ) );
     }
 
     // LHouse (5 rows)：不插分组标题，因为 Height 横跨 Body/Wing 两组语义
@@ -435,6 +400,8 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderCylHeight, ui->spinBoxCylHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderLTotalLength, ui->spinBoxLTotalLength, 100.0, 50.0 );
   bindSliderSpin( ui->sliderLTotalWidth, ui->spinBoxLTotalWidth, 100.0, 50.0 );
+  ui->spinBoxLWingRatio->setDecimals( 6 );
+  ui->spinBoxLWingWidthRatio->setDecimals( 6 );
   bindSliderSpin( ui->sliderLWingRatio, ui->spinBoxLWingRatio, 100.0, 0.9, 0.2 );
   bindSliderSpin( ui->sliderLWingWidthRatio, ui->spinBoxLWingWidthRatio, 100.0, 0.9, 0.2 );
   bindSliderSpin( ui->sliderLHeight, ui->spinBoxLHeight, 100.0, 50.0 );
@@ -444,11 +411,13 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderGRLength, ui->spinBoxGRLength, 100, 50 );
   bindSliderSpin( ui->sliderGRWidth, ui->spinBoxGRWidth, 100, 50 );
   bindSliderSpin( ui->sliderGRHeightWall, ui->spinBoxGRHeightWall, 100.0, 50.0 );
+  ui->spinBoxGRHeightRoof->setDecimals( 6 );
   bindSliderSpin( ui->sliderGRHeightRoof, ui->spinBoxGRHeightRoof, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderGRRidgeRatio, ui->spinBoxGRRidgeRatio, 100.0, 0.80, 0.20 );
   bindSliderSpin( ui->sliderPRLength, ui->spinBoxPRLength, 100, 50 );
   bindSliderSpin( ui->sliderPRWidth, ui->spinBoxPRWidth, 100, 50 );
   bindSliderSpin( ui->sliderPRHeightWall, ui->spinBoxPRHeightWall, 100.0, 50.0 );
+  ui->spinBoxPRHeightRoof->setDecimals( 6 );
   bindSliderSpin( ui->sliderPRHeightRoof, ui->spinBoxPRHeightRoof, 100.0, 0.90, 0.20 );
   ui->labelPRHeightWall->setText( tr( "Total height:" ) );
   ui->labelPRHeightRoof->setText( tr( "Wall ratio:" ) );
@@ -457,6 +426,7 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderTPRTopLength, ui->spinBoxTPRTopLength, 100, 50 );
   bindSliderSpin( ui->sliderTPRTopWidth, ui->spinBoxTPRTopWidth, 100, 50 );
   bindSliderSpin( ui->sliderTPRHeightWall, ui->spinBoxTPRHeightWall, 100, 50 );
+  ui->spinBoxTPRHeightRoof->setDecimals( 6 );
   bindSliderSpin( ui->sliderTPRHeightRoof, ui->spinBoxTPRHeightRoof, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderHCRLength, ui->spinBoxHCRLength, 100, 50 );
   bindSliderSpin( ui->sliderHCRWidth, ui->spinBoxHCRWidth, 100, 50 );
@@ -478,6 +448,7 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderAGHLength, ui->spinBoxAGHLength, 100, 50 );
   bindSliderSpin( ui->sliderAGHWidth, ui->spinBoxAGHWidth, 100, 50 );
   bindSliderSpin( ui->sliderAGHHeightWall, ui->spinBoxAGHHeightWall, 100, 50 );
+  ui->spinBoxAGHRoofHeight->setDecimals( 6 );
   bindSliderSpin( ui->sliderAGHRoofHeight, ui->spinBoxAGHRoofHeight, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderAGHRidgeLength, ui->spinBoxAGHRidgeLength, 100.0, 50.0 );
   bindSliderSpin( ui->sliderAGHRidgeOffset, ui->spinBoxAGHRidgeOffset, 100.0, 0.8, 0.2 );
@@ -500,11 +471,6 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderTGRoofHeight, ui->spinBoxTGRoofHeight, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderTGAngle, ui->spinBoxTGAngle, 10.0, 180.0, 135.0 );
   bindSliderSpin( ui->sliderTGRidgeRatio, ui->spinBoxTGRidgeRatio, 100.0, 0.8, 0.2 );
-
-  bindSliderSpin( ui->sliderTPPLeg, ui->spinBoxTPPLeg, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderTPPBase, ui->spinBoxTPPBase, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderTPPHeight, ui->spinBoxTPPHeight, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderTPPRatio, ui->spinBoxTPPRatio, 100.0, 0.90, 0.20 );
 
   bindSliderSpin( ui->sliderROmega, ui->spinBoxROmega, 10.0, 180.0, -180.0 );
   bindSliderSpin( ui->sliderRPhi, ui->spinBoxRPhi, 10.0, 180.0, -180.0 );
@@ -607,11 +573,6 @@ void ParamModelerDock::initUiControls()
   ui->labelTGRoofHeight->setText( tr( "Wall ratio:" ) );
   ui->labelTGAngle->setText( tr( "Angle:" ) );
   ui->labelTGRidgeRatio->setText( tr( "Ridge ratio:" ) );
-
-  ui->labelTPPLeg->setText( tr( "Leg length:" ) );
-  ui->labelTPPBase->setText( tr( "Base length:" ) );
-  ui->labelTPPHeight->setText( tr( "Total height:" ) );
-  ui->labelTPPRatio->setText( tr( "Pyramid ratio:" ) );
 
   // ---- 参数分组标题：在复杂基元（4+ 参数）的 QFormLayout 中插入加粗分隔线 ----
   applyParameterGroups( ui );
@@ -738,8 +699,8 @@ void ParamModelerDock::initConnections()
       tr( "Plugin usage" ),
       tr( "Basic workflow:\n"
           "1. Load an input point cloud.\n"
-          "2. Use Classify and estimate parameters... or Complete all.\n"
-          "3. Complete all loads the model and point cloud into 3D and applies automatic alignment.\n"
+          "2. Open Classify and estimate parameters... and classify the point cloud. Choose a building type from the candidates.\n"
+          "3. Use Estimate and align to load the model and point cloud into 3D and apply automatic alignment.\n"
           "4. Use Align in 3D for point picking, or Fit corner from three faces... for missing-corner cases.\n"
           "5. Fine-tune parameters, position and rotation in the main panel.\n"
           "6. Export model files or Current evaluation CSV from the Export menu.\n\n"
@@ -887,11 +848,6 @@ void ParamModelerDock::initConnections()
   connect( ui->sliderTGAngle, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderTGRidgeRatio, &QSlider::valueChanged, this, schedulePreview );
 
-  connect( ui->sliderTPPLeg, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderTPPBase, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderTPPHeight, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderTPPRatio, &QSlider::valueChanged, this, schedulePreview );
-
   connect( ui->comboPrimitive, QOverload<int>::of( &QComboBox::currentIndexChanged ), this, [this]( int ) { onPrimitiveChanged( this->primitiveType() ); } );
   connect( ui->comboPrimitive, &QComboBox::currentTextChanged, this, [this]( const QString & ) { onUpdatePreview(); } );
   connect( ui->btnRandomParams, &QPushButton::clicked, this, &ParamModelerDock::onRandomizeCurrentPrimitive );
@@ -926,6 +882,7 @@ void ParamModelerDock::initPointNet()
   ui->menuLoad3D->addSeparator();
   QAction *fitStatisticsAction = ui->menuLoad3D->addAction( tr( "Fit statistics and tolerance..." ) );
   connect( fitStatisticsAction, &QAction::triggered, this, &ParamModelerDock::showFitEvaluationDetails );
+  connect( ui->btnFaceFit, &QPushButton::clicked, this, &ParamModelerDock::showFaceFitView );
 
   ui->widgetInversionPanel->setVisible( false );
   ui->widgetInversionPanel->setMinimumWidth( 0 );
@@ -982,12 +939,7 @@ void ParamModelerDock::initPointNet()
   fitParameterPage( ui->stackedWidgetParams->currentIndex() );
   connect( m_resetAnchorBtn, &QPushButton::clicked, this, &ParamModelerDock::resetToDlAnchor );
 
-  m_manualTranslateBtn = ui->btnAlign2D;
-  m_manualTranslateBtn->setText( tr( "Align in 2D" ) );
-  m_manualTranslateBtn->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
-  m_manualTranslateBtn->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/mActionIdentify.svg" ) ) );
-  m_manualTranslateBtn->setToolTip( tr( "Shows the current model anchor as a red X in the 2D map canvas. Click the point-cloud target position to translate the model there. Only TX/TY are changed." ) );
-  connect( m_manualTranslateBtn, &QPushButton::clicked, this, &ParamModelerDock::startManualTranslateByClick );
+  ui->btnFaceFit->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
 
   ui->widgetAlign3DControls->setSizePolicy( QSizePolicy::Expanding, QSizePolicy::Fixed );
   ui->layoutAlignmentButtons->setStretch( 0, 1 );
@@ -1085,7 +1037,6 @@ void ParamModelerDock::onPrimitiveChanged( const QString &prim )
     { "ShortRidgeHipRoofHouse", &Ui::ParamModelerDock::pageAsymmetricGableHouse },
     { "CurvedRoofRoundHouse", &Ui::ParamModelerDock::pageFourStageRoundTower },
     { "AngledGableHouse", &Ui::ParamModelerDock::pageTwoGableHouses },
-    { "TriPrismPyramid", &Ui::ParamModelerDock::pageTriPrismPyramid },
   };
 
   auto it = pageMap.find( prim );

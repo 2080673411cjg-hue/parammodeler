@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>真实建筑点云 · 验证样本筛选</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f5f8;color:#233047;font:15px/1.55 "Segoe UI","Microsoft YaHei",sans-serif}header,main{max-width:1440px;margin:auto;padding:24px}header{padding-bottom:12px}h1{margin:0 0 8px;font-size:27px}p{margin:6px 0}.muted{color:#66758a}.summary{display:flex;gap:24px;flex-wrap:wrap;margin:18px 0;font-size:17px}.summary strong{font-size:24px;color:#185f91}.controls{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:16px 0}label{display:flex;flex-direction:column;gap:4px;font-size:13px}input,select,button{font:inherit;border:1px solid #bec8d5;border-radius:6px;padding:8px;background:white;color:inherit}input[type=search]{width:220px}button{cursor:pointer}button.primary{background:#175f91;color:white;border-color:#175f91}button:disabled{opacity:.45;cursor:default}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr));gap:18px}.cloud{background:white;border:1px solid #d9e0e8;border-radius:10px;overflow:hidden}.cloud.chosen{border:2px solid #247b5a}.cardhead{padding:14px 16px 0;display:flex;justify-content:space-between;gap:12px}.cardhead h2{font-size:18px;margin:0;overflow-wrap:anywhere}.tag{font-size:12px;background:#eaf1f8;border-radius:4px;padding:3px 7px;white-space:nowrap}.preview{display:block;width:100%;padding:0;border:0;border-radius:0;background:white}.preview img{width:100%;display:block}.viewlabels{display:grid;grid-template-columns:repeat(3,1fr);text-align:center;color:#64738b;font-size:12px;margin-top:-6px}.cardbody{padding:12px 16px 16px}.facts{display:flex;gap:16px;flex-wrap:wrap;font-size:13px}.suggestion{margin:8px 0;font-size:14px}.warning{color:#8b5818;font-size:12px;margin:7px 0}.review{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.review label:first-child{grid-column:1/-1}.review select{width:100%;font-size:13px}.pager{display:flex;gap:16px;align-items:center;justify-content:center;margin:24px 0}details{margin-top:10px}details input{width:100%;font-size:12px;margin:4px 0}dialog{border:0;border-radius:10px;width:min(1300px,95vw);padding:20px}dialog::backdrop{background:#17253bc9}dialog img{width:100%}.dialoghead{display:flex;justify-content:space-between;gap:10px;align-items:center}.empty{padding:50px;text-align:center;color:#66758a}.notice{border-left:3px solid #72a2c2;padding-left:12px;font-size:13px}.status{font-size:12px;color:#64738b}button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #6ba3d4;outline-offset:2px}@media(max-width:600px){header,main{padding:16px}.controls>label{flex:1 1 45%}input[type=search]{width:100%}.review{grid-template-columns:1fr}.summary{gap:14px}h1{font-size:23px}}
+</style>
+</head>
+<body>
+<header>
+ <h1>真实建筑点云 · 验证样本筛选</h1>
+ <p class="muted">v10提供类别建议，你确认哪些建筑适合验证。点云不会加入训练，原文件保持原样。</p>
+ <div class="summary" id="summary"></div>
+ <p class="notice">颜色表示观测高度。预览为便于观察做了水平转向，仅影响图片；推理输入只去重和平移，保持源单位。最低观测点不等于地面。分类置信度不代表重建质量，复杂建筑也可能得到很高的分类分数。</p>
+ <div class="controls">
+  <label>编号 / 文件名<input id="search" type="search" placeholder="例如 1000.xyz"></label>
+  <label>v10建议类别<select id="classFilter"><option value="">全部建议类别</option><option value="pending">尚未分类 / 分类失败</option></select></label>
+  <label>审核状态<select id="stateFilter"><option value="">全部状态</option><option value="pending">待确认</option><option value="selected">选入验证集</option><option value="excluded">暂不使用</option></select></label>
+  <label>质量提示<select id="flagFilter"><option value="">全部样本</option><option value="flagged">有自动检查提示</option><option value="sparse">不足2048点</option><option value="error">读取失败</option></select></label>
+  <label>排序<select id="sort"><option value="sample">随机抽样顺序</option><option value="confidence">分类置信度</option><option value="points">点数从多到少</option><option value="name">文件名</option></select></label>
+  <button id="reload" type="button">刷新分类进度</button>
+  <button id="export" class="primary" type="button">导出入选清单</button>
+ </div>
+ <p id="saveStatus" class="status" role="status"></p>
+ <p class="status">每份样本需自行确认类别和可见结构；“高度跨度”是观测值，不是建筑高度真值。建议按结构与数据质量选样，并保留困难样本，不按预测结果是否好看筛选。</p>
+</header>
+<main><p id="count" class="muted"></p><div id="grid" class="grid"></div><div class="pager"><button id="previous" type="button">上一页</button><span id="page"></span><button id="next" type="button">下一页</button></div></main>
+<dialog id="detail"><div class="dialoghead"><h2 id="detailTitle"></h2><button id="closeDetail" type="button">关闭</button></div><img id="detailImage" alt="放大查看俯视、斜视及侧视点云"><p id="detailText" class="muted"></p></dialog>
+<script id="gallery-data" type="application/json">__GALLERY_DATA__</script>
+<script>
+"use strict";
+const data=JSON.parse(document.getElementById('gallery-data').textContent);
+const byId=id=>document.getElementById(id);
+const names=Object.fromEntries(data.classes.map(c=>[c.id,c.name]));
+const key='real-cloud-review:'+data.dataset_key;
+let reviews={};let persistent=true;
+try{reviews=JSON.parse(localStorage.getItem(key)||'{}')}catch(e){persistent=false}
+let page=0;const pageSize=24;
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const review=r=>reviews[r.review_id]||{state:'pending',human_class:'',quality:''};
+const prediction=r=>r.classification?.status==='ok'?r.classification.predictions[0]:null;
+const selectedCount=()=>data.records.filter(r=>review(r).state==='selected').length;
+const stateOptions=[['pending','待确认'],['selected','选入验证集'],['excluded','暂不使用']];
+const qualityOptions=[['','尚未检查'],['facades_present','屋顶清楚，侧墙较完整'],['facades_missing','屋顶清楚，侧墙缺失'],['complex','结构复杂或杂物较多']];
+const classOptions=[['','尚未确认类别'],...data.classes.map(c=>[c.id,c.name]),['outside_library','复杂建筑 / 十三类之外']];
+const options=(items,value)=>items.map(([v,t])=>`<option value="${esc(v)}" ${v===value?'selected':''}>${esc(t)}</option>`).join('');
+for(const c of data.classes){const option=document.createElement('option');option.value=c.id;option.textContent=c.name;byId('classFilter').append(option)}
+function summary(){
+ const classified=data.records.filter(r=>prediction(r)).length;
+ byId('summary').innerHTML=`<span>源目录 <strong>${data.selection.available_files.toLocaleString()}</strong> 份</span><span>本次抽样 <strong>${data.selection.files.length}</strong> 份</span><span>已准备 <strong>${data.records.length}</strong> 份</span><span>已分类 <strong>${classified}</strong> 份</span><span>已入选 <strong>${selectedCount()}</strong> 份</span>`;
+ byId('saveStatus').textContent=persistent?'审核选择保存在当前浏览器；建议及时导出入选清单。':'浏览器自动保存不可用，请在关闭页面前导出入选清单。';
+}
+function filtered(){
+ const query=byId('search').value.toLowerCase().trim(),cls=byId('classFilter').value,state=byId('stateFilter').value,flag=byId('flagFilter').value;
+ const rows=data.records.filter(r=>{
+  const pred=prediction(r),rv=review(r);
+  return (!query||r.relative_path.toLowerCase().includes(query))&&(!cls||(cls==='pending'?!pred:pred?.class===cls))&&(!state||rv.state===state)&&(!flag||(flag==='flagged'?(r.flags||[]).length>0:flag==='sparse'?(r.unique_points||0)<2048:r.status!=='ready'));
+ });
+ if(byId('sort').value==='confidence')rows.sort((a,b)=>(prediction(b)?.prob??-1)-(prediction(a)?.prob??-1));
+ if(byId('sort').value==='points')rows.sort((a,b)=>(b.unique_points||0)-(a.unique_points||0));
+ if(byId('sort').value==='name')rows.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+ return rows;
+}
+function render(){
+ summary();const rows=filtered(),pages=Math.max(1,Math.ceil(rows.length/pageSize));page=Math.min(page,pages-1);
+ byId('count').textContent=`当前筛选 ${rows.length} 份 · 抽样种子 ${data.selection.settings.seed} · 点数与跨度均来自去重后的可见点云`;
+ byId('grid').innerHTML=rows.slice(page*pageSize,(page+1)*pageSize).map(r=>{
+  const rv=review(r),pred=prediction(r),span=r.bbox_span?.map(v=>v.toFixed(2)).join(' × ')||'—';
+  const suggestion=pred?`模型建议：${esc(names[pred.class]||pred.class)} · ${(100*pred.prob).toFixed(1)}%`:(r.classification?.status==='error'?'分类失败，可重跑脚本重试':'等待v10分类');
+  const alternatives=pred?r.classification.predictions.slice(1).map(p=>`${names[p.class]||p.class} ${(p.prob*100).toFixed(1)}%`).join('；'):r.classification?.error||'';
+  return `<article class="cloud ${rv.state==='selected'?'chosen':''}" data-id="${esc(r.review_id)}"><div class="cardhead"><h2>${esc(r.name)}</h2><span class="tag">${esc(stateOptions.find(x=>x[0]===rv.state)?.[1]||'待确认')}</span></div>${r.status==='ready'&&r.image?`<button type="button" class="preview" data-detail="${esc(r.id)}" aria-label="放大 ${esc(r.name)}"><img loading="lazy" src="${esc(r.image)}" alt="${esc(r.name)} 的三视图"></button><div class="viewlabels"><span>俯视</span><span>斜视</span><span>侧视</span></div>`:`<p class="warning cardbody">读取失败：${esc(r.error)}</p>`}<div class="cardbody"><div class="facts"><span>有效唯一点：${(r.unique_points||0).toLocaleString()}</span><span>范围：${esc(span)}（源单位）</span></div><div class="suggestion">${suggestion}</div><div class="status">${esc(alternatives)}</div>${(r.flags||[]).map(f=>`<p class="warning">${esc(f)}</p>`).join('')}<div class="review"><label>审核决定<select data-field="state">${options(stateOptions,rv.state)}</select></label><label>你确认的类别<select data-field="human_class">${options(classOptions,rv.human_class)}</select></label><label>你确认的数据质量<select data-field="quality">${options(qualityOptions,rv.quality)}</select></label></div><details><summary>文件位置与处理记录</summary><label>原文件<input readonly value="${esc(r.source_path)}"></label><label>插件可用的局部XYZ<input readonly value="${esc(r.input_path||'未生成')}"></label><p class="status">原始 ${r.original_points??'—'} 点；重复 ${r.duplicate_points??'—'} 点。局部坐标=原坐标−(${r.origin?.map(v=>v.toFixed(5)).join(', ')||'—'})，未缩放、未补洞。${esc(r.classification?.model_dir||'模型版本尚未确认')}</p></details></div></article>`;
+ }).join('')||'<p class="empty">没有符合当前筛选条件的样本。</p>';
+ byId('page').textContent=`${page+1} / ${pages}`;byId('previous').disabled=page===0;byId('next').disabled=page>=pages-1;
+}
+for(const id of ['search','classFilter','stateFilter','flagFilter','sort'])byId(id).addEventListener(id==='search'?'input':'change',()=>{page=0;render()});
+byId('previous').onclick=()=>{page--;render()};byId('next').onclick=()=>{page++;render()};byId('reload').onclick=()=>location.reload();
+byId('grid').addEventListener('change',event=>{
+ const field=event.target.dataset.field;if(!field)return;
+ const id=event.target.closest('[data-id]').dataset.id;
+ reviews[id]={state:'pending',human_class:'',quality:'',...reviews[id],[field]:event.target.value,updated_utc:new Date().toISOString()};
+ try{localStorage.setItem(key,JSON.stringify(reviews))}catch(e){persistent=false}
+ render();
+});
+byId('grid').addEventListener('click',event=>{
+ const button=event.target.closest('[data-detail]');if(!button)return;
+ const r=data.records.find(r=>r.id===button.dataset.detail);byId('detailTitle').textContent=r.name;byId('detailImage').src=r.image;
+ byId('detailText').textContent=`${r.relative_path} · 高度颜色和预览转向只用于观察，不表示已有参数真值。`;byId('detail').showModal();
+});
+byId('grid').addEventListener('focusin',event=>{if(event.target.matches('input[readonly]'))event.target.select()});
+byId('closeDetail').onclick=()=>byId('detail').close();
+byId('export').onclick=()=>{
+ const selected=data.records.filter(r=>review(r).state==='selected').map(r=>({...r,human_review:review(r)}));
+ if(!selected.length){alert('请先将至少一份样本设为“选入验证集”。');return}
+ const incomplete=selected.filter(r=>r.status!=='ready'||!r.human_review.human_class||!r.human_review.quality);
+ if(incomplete.length){alert('以下入选样本读取失败，或尚未确认类别和数据质量，请先完善后导出：\n'+incomplete.map(r=>r.name).slice(0,12).join('\n'));return}
+ const payload={purpose:'real_validation_only_not_training',exported_utc:new Date().toISOString(),source_root:data.selection.settings.source_root,seed:data.selection.settings.seed,selection_created_utc:data.selection.created_utc,count:selected.length,records:selected};
+ const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'}));
+ const link=document.createElement('a');link.href=url;link.download='真实验证入选清单_'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+render();
+</script>
+</body>
+</html>

@@ -9,12 +9,13 @@
 #include "exportpointcloud.h"
 #include "buildmesh.h"
 #include "parammodeler_dock.h"
+#include "parammodeler_fit_metrics.h"
 
 #include <QDir>
 #include <QFile>
 #include <QMatrix4x4>
 #include <QMessageBox>
-#include <QSet>
+#include <QRandomGenerator>
 #include <QTextStream>
 #include <QVector3D>
 #include <QtMath>
@@ -48,7 +49,8 @@ static QVector3D applyPose( const QVector3D &v, double tx, double ty, double tz,
   return mat.map( v );
 }
 
-static QVector<QVector3D> sampleGroup( const MeshData &mesh, const QVector<int> &tris, int n )
+static QVector<QVector3D> sampleGroup( const MeshData &mesh, const QVector<int> &tris, int n,
+                                     QVector<bool> *roofSamples = nullptr )
 {
   QVector<QVector3D> pts;
   if ( tris.isEmpty() || n <= 0 )
@@ -88,27 +90,10 @@ static QVector<QVector3D> sampleGroup( const MeshData &mesh, const QVector<int> 
     QVector3D B = mesh.vertices[mesh.indices[i * 3 + 1]];
     QVector3D C = mesh.vertices[mesh.indices[i * 3 + 2]];
     pts << sampleTriangle( A, B, C );
+    if ( roofSamples )
+      roofSamples->append( QVector3D::crossProduct( B - A, C - A ).normalized().z() > 1e-5f );
   }
   return pts;
-}
-
-static void resampleToFixedCount( QVector<QVector3D> &points, int targetCount )
-{
-  if ( targetCount <= 0 || points.isEmpty() )
-    return;
-
-  while ( points.size() > targetCount )
-  {
-    const int idx = qrand() % points.size();
-    points.removeAt( idx );
-  }
-
-  const int sourceCount = points.size();
-  while ( points.size() < targetCount && sourceCount > 0 )
-  {
-    const int idx = qrand() % sourceCount;
-    points.append( points.at( idx ) );
-  }
 }
 
 static QVector<QVector3D> sampleCurrentPrimitive( const QString &primitiveType,
@@ -449,134 +434,6 @@ bool ExportPointCloud::exportLabeledTXT( const QString &fileName,
   return true;
 }
 
-// ====================================================================
-// 侧面遮挡辅助函数
-// ====================================================================
-
-static bool isBoxLike( const QString &primType )
-{
-  static const QSet<QString> s = {
-    "FlatRoofHouse", "GableRoofHouse", "PyramidalRoofHouse", "FlatTopHipRoofHouse",
-    "BarrelRoofHouse", "ShortRidgeHipRoofHouse",
-    "LShapedHouse", "RecessedRoofHouse"
-  };
-  return s.contains( primType );
-}
-
-static bool isCylinderLike( const QString &primType )
-{
-  static const QSet<QString> s = {
-    "RoundFlatRoofHouse", "DomeRoofHouse", "ConicalRoofHouse", "CurvedRoofRoundHouse"
-  };
-  return s.contains( primType );
-}
-
-// Face index (CCW): 0=x_min, 1=y_min, 2=x_max, 3=y_max
-// Adjacent pairs: (0,1), (1,2), (2,3), (3,0)
-static QVector<int> classifyBoxWallFaces( const QVector<QVector3D> &wallPts, double rzDeg )
-{
-  const double rzRad = qDegreesToRadians( rzDeg );
-  const double cosR = std::cos( rzRad ), sinR = std::sin( rzRad );
-  const int n = wallPts.size();
-  QVector<int> labels( n );
-  if ( n < 8 ) return labels;
-
-  // Un-rotate to local building frame
-  QVector<double> xLoc( n ), yLoc( n );
-  for ( int i = 0; i < n; i++ )
-  {
-    xLoc[i] =  wallPts[i].x() * cosR + wallPts[i].y() * sinR;
-    yLoc[i] = -wallPts[i].x() * sinR + wallPts[i].y() * cosR;
-  }
-
-  // Estimate 4 face-plane positions from outer-quartile means
-  QVector<double> xSorted = xLoc, ySorted = yLoc;
-  std::sort( xSorted.begin(), xSorted.end() );
-  std::sort( ySorted.begin(), ySorted.end() );
-  const int k = qMax( n / 4, 4 );
-  double xMinP = 0, xMaxP = 0, yMinP = 0, yMaxP = 0;
-  for ( int i = 0; i < k; i++ )
-  {
-    xMinP += xSorted[i];        xMaxP += xSorted[n - 1 - i];
-    yMinP += ySorted[i];        yMaxP += ySorted[n - 1 - i];
-  }
-  xMinP /= k;  xMaxP /= k;  yMinP /= k;  yMaxP /= k;
-
-  // Assign each point to nearest face plane
-  for ( int i = 0; i < n; i++ )
-  {
-    double d[] = { std::abs( xLoc[i] - xMinP ),  // 0: x_min
-                   std::abs( yLoc[i] - yMinP ),  // 1: y_min
-                   std::abs( xLoc[i] - xMaxP ),  // 2: x_max
-                   std::abs( yLoc[i] - yMaxP ) };// 3: y_max
-    double dMin = std::min( { d[0], d[1], d[2], d[3] } );
-    if ( dMin == d[0] )      labels[i] = 0;
-    else if ( dMin == d[1] ) labels[i] = 1;
-    else if ( dMin == d[2] ) labels[i] = 2;
-    else                     labels[i] = 3;
-  }
-  return labels;
-}
-
-static QVector<QVector3D> applyBoxOcclusion( const QVector<QVector3D> &wallPts,
-                                              double rzDeg, double singleFaceProb )
-{
-  if ( wallPts.size() < 16 )
-    return wallPts;
-
-  QVector<int> faceLabels = classifyBoxWallFaces( wallPts, rzDeg );
-
-  // Select 1 or 2 adjacent faces (CCW: 0,1,2,3)
-  QSet<int> keepFaces;
-  if ( static_cast<double>( qrand() ) / RAND_MAX < singleFaceProb )
-    keepFaces.insert( qrand() % 4 );
-  else
-  {
-    int start = qrand() % 4;
-    keepFaces.insert( start );
-    keepFaces.insert( ( start + 1 ) % 4 );
-  }
-
-  QVector<QVector3D> kept;
-  kept.reserve( wallPts.size() / 2 );
-  for ( int i = 0; i < wallPts.size(); i++ )
-    if ( keepFaces.contains( faceLabels[i] ) )
-      kept << wallPts[i];
-  return kept.isEmpty() ? wallPts : kept;
-}
-
-static QVector<QVector3D> applyCylinderOcclusion( const QVector<QVector3D> &wallPts )
-{
-  if ( wallPts.size() < 16 )
-    return wallPts;
-
-  // Random 150°–210° continuous arc
-  const double keepDeg = 150.0 + static_cast<double>( qrand() ) / RAND_MAX * 60.0;
-  const double keepRatio = keepDeg / 360.0;
-  const double halfSpan = keepRatio * M_PI;
-
-  QVector<double> angles( wallPts.size() );
-  double cx = 0, cy = 0;
-  for ( const QVector3D &p : wallPts ) { cx += p.x(); cy += p.y(); }
-  cx /= wallPts.size();  cy /= wallPts.size();
-  for ( int i = 0; i < wallPts.size(); i++ )
-    angles[i] = std::atan2( wallPts[i].y() - cy, wallPts[i].x() - cx );
-
-  const double start = static_cast<double>( qrand() ) / RAND_MAX * 2.0 * M_PI;
-  const double mid = start + halfSpan;
-
-  QVector<QVector3D> kept;
-  kept.reserve( wallPts.size() / 2 );
-  for ( int i = 0; i < wallPts.size(); i++ )
-  {
-    double diff = angles[i] - mid;
-    diff = std::atan2( std::sin( diff ), std::cos( diff ) );  // wrap to [-pi,pi]
-    if ( std::abs( diff ) <= halfSpan )
-      kept << wallPts[i];
-  }
-  return kept.isEmpty() ? wallPts : kept;
-}
-
 static QVector<QVector3D> sampleIndentedRimPoints( ParamModelerDock *dock, int n )
 {
   QVector<QVector3D> pts;
@@ -668,60 +525,6 @@ static void classifyIndentedCuboidTriangles( const MeshData &mesh,
   }
 }
 
-static void classifyLHouseTriangles( const MeshData &mesh,
-                                     QVector<int> &topTris,
-                                     QVector<int> &outerWallTris,
-                                     QVector<int> &notchWallTris )
-{
-  if ( mesh.vertices.isEmpty() || mesh.indices.isEmpty() )
-    return;
-
-  QVector3D bboxMin = mesh.vertices.first();
-  QVector3D bboxMax = mesh.vertices.first();
-  for ( const QVector3D &v : mesh.vertices )
-  {
-    bboxMin.setX( qMin( bboxMin.x(), v.x() ) );
-    bboxMin.setY( qMin( bboxMin.y(), v.y() ) );
-    bboxMin.setZ( qMin( bboxMin.z(), v.z() ) );
-    bboxMax.setX( qMax( bboxMax.x(), v.x() ) );
-    bboxMax.setY( qMax( bboxMax.y(), v.y() ) );
-    bboxMax.setZ( qMax( bboxMax.z(), v.z() ) );
-  }
-
-  const double maxDim = std::max( { static_cast<double>( bboxMax.x() - bboxMin.x() ),
-                                    static_cast<double>( bboxMax.y() - bboxMin.y() ),
-                                    static_cast<double>( bboxMax.z() - bboxMin.z() ),
-                                    1.0 } );
-  const double eps = maxDim * 1e-5;
-  const int triCount = mesh.indices.size() / 3;
-  for ( int i = 0; i < triCount; ++i )
-  {
-    const QVector3D A = mesh.vertices[mesh.indices[i * 3]];
-    const QVector3D B = mesh.vertices[mesh.indices[i * 3 + 1]];
-    const QVector3D C = mesh.vertices[mesh.indices[i * 3 + 2]];
-    const QVector3D n = QVector3D::crossProduct( B - A, C - A ).normalized();
-    const QVector3D c = ( A + B + C ) / 3.0f;
-
-    if ( n.z() < -0.7f )
-      continue;
-    if ( n.z() > 0.7f )
-    {
-      topTris << i;
-      continue;
-    }
-
-    const bool onOuterFace =
-      std::abs( static_cast<double>( c.x() - bboxMin.x() ) ) <= eps ||
-      std::abs( static_cast<double>( c.x() - bboxMax.x() ) ) <= eps ||
-      std::abs( static_cast<double>( c.y() - bboxMin.y() ) ) <= eps ||
-      std::abs( static_cast<double>( c.y() - bboxMax.y() ) ) <= eps;
-    if ( onOuterFace )
-      outerWallTris << i;
-    else
-      notchWallTris << i;
-  }
-}
-
 static QVector<QVector3D> sampleTruncatedPyramidRoofEdgePoints( ParamModelerDock *dock, int n )
 {
   QVector<QVector3D> pts;
@@ -738,8 +541,8 @@ static QVector<QVector3D> sampleTruncatedPyramidRoofEdgePoints( ParamModelerDock
        topWidth <= 0.0 || wallHeight <= 0.0 || topZ <= wallHeight )
     return pts;
 
-  const double ox = ( bottomLength - topLength ) * 0.5;
-  const double oy = ( bottomWidth - topWidth ) * 0.5;
+  const double ox = ( bottomLength - topLength ) * dock->tpTopPosition().x();
+  const double oy = ( bottomWidth - topWidth ) * dock->tpTopPosition().y();
   const QVector<QVector3D> lower = {
     QVector3D( 0.0f, 0.0f, static_cast<float>( wallHeight ) ),
     QVector3D( static_cast<float>( bottomLength ), 0.0f, static_cast<float>( wallHeight ) ),
@@ -842,8 +645,8 @@ static QVector<QVector3D> sampleGableHouseEdgePoints( ParamModelerDock *dock, in
        roofZ <= wallHeight || ridgeLength <= 0.0 )
     return pts;
 
-  const double rs = length * 0.5 - ridgeLength * 0.5;
-  const double re = length * 0.5 + ridgeLength * 0.5;
+  const double rs = fullRidge ? 0.0 : ( length - ridgeLength ) * dock->aghRidgePositionX();
+  const double re = rs + ridgeLength;
   const double ry = width * ridgeRatio;
   const QVector3D r0( static_cast<float>( rs ), static_cast<float>( ry ), static_cast<float>( roofZ ) );
   const QVector3D r1( static_cast<float>( re ), static_cast<float>( ry ), static_cast<float>( roofZ ) );
@@ -1011,6 +814,114 @@ static void classifyWallAndRoofByHeight( const MeshData &mesh,
   }
 }
 
+static QVector<bool> roofPatchMask( const QVector<QVector3D> &points, int centerIndex, double fraction )
+{
+  const QVector3D center = points[centerIndex];
+  float minX = center.x(), maxX = center.x(), minY = center.y(), maxY = center.y();
+  for ( const auto &point : points )
+  {
+    minX = std::min( minX, point.x() );
+    maxX = std::max( maxX, point.x() );
+    minY = std::min( minY, point.y() );
+    maxY = std::max( maxY, point.y() );
+  }
+  const double spanX = std::max( 1e-6f, maxX - minX );
+  const double spanY = std::max( 1e-6f, maxY - minY );
+  QVector<double> distances;
+  distances.reserve( points.size() );
+  for ( const auto &point : points )
+  {
+    const double x = ( point.x() - center.x() ) / spanX;
+    const double y = ( point.y() - center.y() ) / spanY;
+    distances.append( x * x + y * y );
+  }
+  const int count = static_cast<int>( points.size() * fraction );
+  auto ranked = distances;
+  std::nth_element( ranked.begin(), ranked.begin() + count, ranked.end() );
+  const double cutoff = ranked[count];
+  QVector<bool> mask;
+  mask.reserve( points.size() );
+  for ( double distance : distances )
+    mask.append( distance < cutoff );
+  return mask;
+}
+
+static void removeRoofPatch( QVector<QVector3D> &roof, const QVector<bool> &roofSamples,
+                            QVector<QVector3D> &walls, const QVector<bool> &wallSamples )
+{
+  QVector<QVector3D> points;
+  QVector<int> roofIndices, wallIndices;
+  for ( int i = 0; i < roof.size(); ++i )
+    if ( i >= roofSamples.size() || roofSamples[i] )
+    {
+      points.append( roof[i] );
+      roofIndices.append( i );
+    }
+  for ( int i = 0; i < wallSamples.size(); ++i )
+    if ( wallSamples[i] )
+    {
+      points.append( walls[i] );
+      wallIndices.append( i );
+    }
+  if ( points.size() < 32 ) return;
+
+  auto *random = QRandomGenerator::global();
+  const auto drop = roofPatchMask( points, random->bounded( points.size() ), 0.05 + 0.10 * random->generateDouble() );
+  for ( int i = wallIndices.size() - 1; i >= 0; --i )
+    if ( drop[roofIndices.size() + i] ) walls.removeAt( wallIndices[i] );
+  for ( int i = roofIndices.size() - 1; i >= 0; --i )
+    if ( drop[i] ) roof.removeAt( roofIndices[i] );
+}
+
+static void applyCameraVisibility( const MeshData &mesh,
+                                   QVector<QVector3D> &roof, QVector<bool> &roofSamples,
+                                   QVector<QVector3D> &walls, QVector<bool> &wallSamples,
+                                   QVector<QVector3D> &recess )
+{
+  using ParamModelerFit::Triangle;
+  using ParamModelerFit::vector;
+  std::vector<Triangle> triangles;
+  triangles.reserve( mesh.indices.size() / 3 );
+  Eigen::AlignedBox3d bounds;
+  for ( int i = 0; i < mesh.indices.size(); i += 3 )
+  {
+    const Triangle triangle{ vector( mesh.vertices[mesh.indices[i]] ),
+                             vector( mesh.vertices[mesh.indices[i + 1]] ),
+                             vector( mesh.vertices[mesh.indices[i + 2]] ) };
+    bounds.extend( triangle.a );
+    bounds.extend( triangle.b );
+    bounds.extend( triangle.c );
+    triangles.push_back( triangle );
+  }
+  const Eigen::KdBVH<double, 3, Triangle> tree( triangles.begin(), triangles.end() );
+
+  auto *random = QRandomGenerator::global();
+  const double azimuth = 2 * M_PI * random->generateDouble();
+  const double elevation = qDegreesToRadians( 25 + 35 * random->generateDouble() );
+  const double distance = 1.25 * bounds.sizes().head<2>().norm();
+  const Eigen::Vector3d camera( bounds.center().x() + distance * std::cos( azimuth ),
+                                bounds.center().y() + distance * std::sin( azimuth ),
+                                bounds.max().z() + distance * std::tan( elevation ) );
+
+  const auto keepVisible = [&]( QVector<QVector3D> &points, QVector<bool> *roofTags ) {
+    int kept = 0, keptTags = 0;
+    for ( int i = 0; i < points.size(); ++i )
+    {
+      // End just before the candidate point to avoid treating its own face as an occluder.
+      ParamModelerFit::RayQuery ray{ camera, vector( points[i] ) - camera, {}, 1.0 - 1e-6, true };
+      Eigen::BVIntersect( tree, ray );
+      if ( ray.hit ) continue;
+      points[kept++] = points[i];
+      if ( roofTags && i < roofTags->size() ) ( *roofTags )[keptTags++] = ( *roofTags )[i];
+    }
+    points.resize( kept );
+    if ( roofTags ) roofTags->resize( keptTags );
+  };
+  keepVisible( roof, &roofSamples );
+  keepVisible( walls, &wallSamples );
+  keepVisible( recess, nullptr );
+}
+
 // ====================================================================
 // 遮挡导出：在采样阶段直接模拟摄影测量缺失，输出纯 xyz
 // ====================================================================
@@ -1019,7 +930,8 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
                                            const QString &primitiveType,
                                            ParamModelerDock *dock,
                                            int pointCount,
-                                           DLPointCloudInfo *info )
+                                           DLPointCloudInfo *info,
+                                           int *writtenCount )
 {
   MeshData mesh = BuildMesh::build( primitiveType, dock );
   if ( mesh.isEmpty() )
@@ -1038,6 +950,9 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
 
   QVector<QVector3D> roofPts;
   QVector<QVector3D> wallPts;
+  QVector<QVector3D> recessPts;
+  const bool roofGap = QRandomGenerator::global()->generateDouble() < 0.05;
+  QVector<bool> roofSamples, wallSamples;
 
   if ( primitiveType == QStringLiteral( "RecessedRoofHouse" ) )
   {
@@ -1051,35 +966,9 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
     const int outerTopCount = qMax( 0, pointCount - rimCount - recessWallCount - recessFloorCount - outerWallCount );
 
     roofPts << sampleGroup( mesh, outerTopTris, outerTopCount );
-    roofPts << sampleGroup( mesh, recessFloorTris, recessFloorCount );
-    roofPts << sampleGroup( mesh, recessWallTris, recessWallCount );
-    roofPts << sampleIndentedRimPoints( dock, rimCount );
-    wallPts << sampleGroup( mesh, outerWallTris, outerWallCount );
-  }
-  else if ( primitiveType == QStringLiteral( "LShapedHouse" ) )
-  {
-    QVector<int> topTris, outerWallTris, notchWallTris;
-    classifyLHouseTriangles( mesh, topTris, outerWallTris, notchWallTris );
-
-    auto surfaceArea = [&mesh]( const QVector<int> &tris ) {
-      double area = 0.0;
-      for ( int i : tris )
-        area += triangleArea( mesh.vertices[mesh.indices[i * 3]],
-                              mesh.vertices[mesh.indices[i * 3 + 1]],
-                              mesh.vertices[mesh.indices[i * 3 + 2]] );
-      return area;
-    };
-    const double outerArea = surfaceArea( outerWallTris );
-    const double notchArea = surfaceArea( notchWallTris );
-    const int wallCount = int( pointCount * 0.40 );
-    const int notchWallCount = outerArea + notchArea > 0.0
-      ? qRound( wallCount * notchArea / ( outerArea + notchArea ) ) : 0;
-    const int outerWallCount = wallCount - notchWallCount;
-    const int topCount = pointCount - wallCount;
-
-    roofPts << sampleGroup( mesh, topTris, topCount );
-    // Preserve the existing exterior-only occlusion policy for inner walls.
-    roofPts << sampleGroup( mesh, notchWallTris, notchWallCount );
+    recessPts << sampleGroup( mesh, recessFloorTris, recessFloorCount );
+    recessPts << sampleGroup( mesh, recessWallTris, recessWallCount );
+    recessPts << sampleIndentedRimPoints( dock, rimCount );
     wallPts << sampleGroup( mesh, outerWallTris, outerWallCount );
   }
   else if ( primitiveType == QStringLiteral( "FlatTopHipRoofHouse" ) )
@@ -1108,7 +997,7 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
     const int roofCount = int( pointCount * 0.46 );
     const int wallCount = qMax( 0, pointCount - edgeCount - roofCount );
 
-    roofPts << sampleGroup( mesh, roofTris, roofCount );
+    roofPts << sampleGroup( mesh, roofTris, roofCount, roofGap ? &roofSamples : nullptr );
     roofPts << sampleGableHouseEdgePoints( dock, edgeCount, fullRidge );
     wallPts << sampleGroup( mesh, wallTris, wallCount );
   }
@@ -1121,7 +1010,7 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
     const int roofCount = int( pointCount * 0.46 );
     const int wallCount = qMax( 0, pointCount - edgeCount - roofCount );
 
-    roofPts << sampleGroup( mesh, roofTris, roofCount );
+    roofPts << sampleGroup( mesh, roofTris, roofCount, roofGap ? &roofSamples : nullptr );
     roofPts << sampleTwoGableHousesEdgePoints( dock, edgeCount );
     wallPts << sampleGroup( mesh, wallTris, wallCount );
   }
@@ -1152,8 +1041,13 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
     }
 
     roofPts = sampleGroup( mesh, horzTris, horzCount );
-    wallPts = sampleGroup( mesh, sideTris, sideCount );
+    wallPts = sampleGroup( mesh, sideTris, sideCount, roofGap ? &wallSamples : nullptr );
   }
+
+  applyCameraVisibility( mesh, roofPts, roofSamples, wallPts, wallSamples, recessPts );
+  if ( roofGap )
+    removeRoofPatch( roofPts, roofSamples, wallPts, wallSamples );
+  roofPts << recessPts;
 
   // ── Apply pose ──
   double tx = dock->poseTranslateX(), ty = dock->poseTranslateY(), tz = dock->poseTranslateZ();
@@ -1164,14 +1058,6 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
     for ( QVector3D &p : roofPts ) p = applyPose( p, tx, ty, tz, rx, ry, rz );
     for ( QVector3D &p : wallPts ) p = applyPose( p, tx, ty, tz, rx, ry, rz );
   }
-
-  // ── ★ 在导出时直接应用遮挡 ──
-  if ( primitiveType == QStringLiteral( "RecessedRoofHouse" ) )
-    wallPts = applyBoxOcclusion( wallPts, rz, 0.3 );
-  else if ( isBoxLike( primitiveType ) )
-    wallPts = applyBoxOcclusion( wallPts, rz, 0.3 );
-  else if ( isCylinderLike( primitiveType ) )
-    wallPts = applyCylinderOcclusion( wallPts );
 
   if ( roofPts.isEmpty() && wallPts.isEmpty() )
   {
@@ -1224,7 +1110,8 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
     return false;
   }
 
-  resampleToFixedCount( combined, pointCount );
+  while ( pointCount > 0 && combined.size() > pointCount )
+    combined.removeAt( qrand() % combined.size() );
 
   // ── Write plain xyz (occlusion is baked in, no labels needed) ──
   QFile file( fileName );
@@ -1240,6 +1127,11 @@ bool ExportPointCloud::exportOccludedTXT( const QString &fileName,
   for ( const QVector3D &p : combined )
     out << p.x() << " " << p.y() << " " << p.z() << "\n";
 
+  out.flush();
+  if ( out.status() != QTextStream::Ok )
+    return false;
   file.close();
+  if ( writtenCount )
+    *writtenCount = combined.size();
   return true;
 }

@@ -23,6 +23,7 @@
 #include <QMessageBox>
 #include <QProgressBar>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QTableWidgetItem>
@@ -111,6 +112,17 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   resultLabel->setWordWrap( true );
   resultLabel->setStyleSheet( QStringLiteral( "font-weight: bold; padding: 4px 0;" ) );
 
+  auto *candidatePanel = new QWidget( &dialog );
+  candidatePanel->setObjectName( QStringLiteral( "classificationCandidates" ) );
+  auto *candidateLayout = new QVBoxLayout( candidatePanel );
+  candidateLayout->setContentsMargins( 0, 0, 0, 0 );
+  candidateLayout->setSpacing( 4 );
+  candidateLayout->addWidget( new QLabel( tr( "Classification candidates" ), candidatePanel ) );
+  QRadioButton *candidateButtons[] = { new QRadioButton( candidatePanel ), new QRadioButton( candidatePanel ) };
+  for ( auto *button : candidateButtons )
+    candidateLayout->addWidget( button );
+  candidatePanel->hide();
+
   auto *modelInfo = new QLabel( &dialog );
   modelInfo->setTextFormat( Qt::PlainText );
   modelInfo->setWordWrap( true );
@@ -154,8 +166,8 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   table->setMinimumHeight( 160 );
   bool parametersApplied = false;
   bool inputReady = false;
-  bool classified = false;
   bool cancelRequested = false;
+  QVector<PointNetPrediction> candidates;
   QString classificationSummary;
   QString classificationModel;
   QString classificationCheckpoint;
@@ -178,11 +190,13 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     btnLoad->setEnabled( !busy );
     btnSettings->setEnabled( !busy );
     comboModel->setEnabled( !busy );
+    candidatePanel->setEnabled( !busy );
     chkGeometryCorrection->setEnabled( !busy );
     spinGeometryStrength->setEnabled( !busy && chkGeometryCorrection->isChecked() );
     btnClassify->setEnabled( !busy && inputReady );
-    btnInverse->setEnabled( !busy && inputReady && classified );
+    btnInverse->setEnabled( !busy && inputReady && !candidates.isEmpty() );
     btnComplete->setEnabled( !busy && inputReady );
+    btnComplete->setText( candidates.isEmpty() ? tr( "Complete all" ) : tr( "Estimate and align" ) );
     btnFinish->setEnabled( !busy );
     btnStop->setVisible( busy );
     btnStop->setEnabled( busy && !cancelRequested );
@@ -198,14 +212,23 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   mainLayout->addWidget( chkGeometryCorrection );
   mainLayout->addLayout( correctionStrengthLayout );
   mainLayout->addWidget( resultLabel );
+  mainLayout->addWidget( candidatePanel );
   mainLayout->addWidget( modelInfo );
   mainLayout->addLayout( progressLayout );
   mainLayout->addLayout( buttonLayout );
   mainLayout->addWidget( table );
 
+  const auto clearCandidates = [&]() {
+    candidates.clear();
+    candidatePanel->hide();
+    classificationSummary.clear();
+    classificationModel.clear();
+    classificationCheckpoint.clear();
+  };
+
   auto updateInputInfo = [&]() {
     inputReady = false;
-    classified = false;
+    clearCandidates();
     parametersApplied = false;
     table->setRowCount( 0 );
     resultLabel->setText( tr( "Result: -" ) );
@@ -281,6 +304,13 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     return PointNetBackend::PCT;
   };
 
+  connect( comboModel, QOverload<int>::of( &QComboBox::currentIndexChanged ), &dialog, [&] {
+    clearCandidates();
+    clearEstimate();
+    resultLabel->setText( tr( "Result: -" ) );
+    setBusy( false );
+  } );
+
   const auto shouldCancel = [&]() { return cancelRequested; };
   const auto continueOperation = [&]() {
     QApplication::processEvents();
@@ -293,16 +323,39 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     resultLabel->setText( tr( "Stopping..." ) );
   } );
 
+  const auto selectCandidate = [&]( const PointNetPrediction &candidate ) {
+    setPrimitiveType( candidate.className );
+    classificationSummary = tr( "Result: %1 (%2%)" )
+      .arg( ParamModelerPrimitiveNames::display( candidate.className ) )
+      .arg( candidate.probability * 100.0, 0, 'f', 1 );
+    resultLabel->setText( classificationSummary );
+    modelInfo->setText( tr( "Classification model: %1\nRegression model: %2\nDirection preprocessing: %3" )
+      .arg( classificationModel, tr( "Pending parameter estimation" ), tr( "Pending parameter estimation" ) ) );
+    modelInfo->setToolTip( classificationCheckpoint.isEmpty()
+      ? tr( "The service did not report the actual model path. Update ptv3_server.py and restart the service to confirm its version." )
+      : classificationCheckpoint );
+    modelInfo->setVisible( true );
+  };
+  for ( int i = 0; i < 2; ++i )
+  {
+    connect( candidateButtons[i], &QRadioButton::clicked, &dialog, [&, i] {
+      if ( i >= candidates.size() || candidates.at( i ).className == primitiveType() ) return;
+      clearEstimate();
+      selectCandidate( candidates.at( i ) );
+    } );
+  }
+
   const auto classify = [&]() -> bool {
     if ( m_inputDataPath.isEmpty() )
       return false;
 
-    classified = false;
+    clearCandidates();
     clearEstimate();
     resultLabel->setText( tr( "Classifying..." ) );
     if ( !continueOperation() ) return false;
 
-    PointNetPredictResult result = PointNetRunner::predict( m_inputDataPath, selectedBackend(), 2048, 3, shouldCancel );
+    const auto backend = selectedBackend();
+    const PointNetPredictResult result = PointNetRunner::predict( m_inputDataPath, backend, 2048, 2, shouldCancel );
     if ( result.canceled || !continueOperation() ) return false;
 
     if ( !result.errorMessage.isEmpty() )
@@ -325,22 +378,27 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       resultLabel->setText( tr( "Result: -" ) );
       return false;
     }
-    resultLabel->setText(
-      tr( "Result: %1\nConfidence: %2%" )
-        .arg( ParamModelerPrimitiveNames::display( top1.className ) )
-        .arg( top1.probability * 100.0, 0, 'f', 1 )
-    );
-    setPrimitiveType( top1.className );
-    classificationSummary = resultLabel->text();
+
+    candidates.append( top1 );
+    if ( result.predictions.size() >= 2 )
+    {
+      const PointNetPrediction &top2 = result.predictions.at( 1 );
+      if ( top2.className != top1.className && ui->comboPrimitive->findData( top2.className ) >= 0 )
+        candidates.append( top2 );
+    }
+    for ( int i = 0; i < candidates.size(); ++i )
+    {
+      const auto &candidate = candidates.at( i );
+      candidateButtons[i]->setText( QStringLiteral( "%1. %2 (%3%)" ).arg( i + 1 )
+        .arg( ParamModelerPrimitiveNames::display( candidate.className ) )
+        .arg( candidate.probability * 100.0, 0, 'f', 1 ) );
+    }
+    candidateButtons[1]->setVisible( candidates.size() == 2 );
+    candidateButtons[0]->setChecked( true );
+    candidatePanel->show();
     classificationModel = inferenceModelDescription( result.modelName, result.checkpointPath );
     classificationCheckpoint = result.checkpointPath;
-    modelInfo->setText( tr( "Classification model: %1\nRegression model: %2\nDirection preprocessing: %3" )
-      .arg( classificationModel, tr( "Pending parameter estimation" ), tr( "Pending parameter estimation" ) ) );
-    modelInfo->setToolTip( result.checkpointPath.isEmpty()
-      ? tr( "The service did not report the actual model path. Update ptv3_server.py and restart the service to confirm its version." )
-      : result.checkpointPath );
-    modelInfo->setVisible( true );
-    classified = true;
+    selectCandidate( candidates.first() );
     return true;
   };
 
@@ -461,7 +519,10 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
                             alignTarget, this->primitiveType(),
                             QStringLiteral( "dialog" ), semanticUpper );
     m_fitBaseline.clear();
+    mWireframeModeCheckBox->setChecked( true );
     onUpdatePreview();
+    m_fitTimer->stop();
+    updateFitEvaluation();
     return continueOperation();
   };
   const auto run = [&]( const auto &operation ) -> bool {
@@ -482,7 +543,8 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   connect( btnClassify, &QPushButton::clicked, &dialog, [&] { run( classify ); } );
   connect( btnInverse, &QPushButton::clicked, &dialog, [&] { run( estimate ); } );
   connect( btnComplete, &QPushButton::clicked, &dialog, [&] {
-    if ( run( [&] { return classify() && estimate() && loadAndAlign(); } ) ) dialog.accept();
+    if ( candidates.isEmpty() && ( !run( classify ) || candidates.size() > 1 ) ) return;
+    if ( run( [&] { return estimate() && loadAndAlign(); } ) ) dialog.accept();
   } );
 
   connect( btnFinish, &QPushButton::clicked, &dialog, [&]() {

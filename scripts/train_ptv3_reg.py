@@ -166,6 +166,8 @@ def commands(args, recipe):
         train += ["--gabled_ridge_symmetry_180"]
     if name == "FlatTopHipRoofHouse" and getattr(args, "truncated_scale_balanced", False):
         train += ["--truncated_scale_balanced"]
+    if name == "CurvedRoofRoundHouse" and getattr(args, "tower_profile_loss_weight", 0.0) > 0:
+        train += ["--tower_profile_loss_weight", str(args.tower_profile_loss_weight)]
     if args.flash:
         train += ["--ptv3_flash"]
     return log, train, common + ["--mode", "test", "--split", "test"]
@@ -209,6 +211,8 @@ def main():
                         help="Apply LHouse full-yaw canonical training to that class only; requires canonical alignment.")
     parser.add_argument("--lhouse_corner_loss_weight", type=float, default=0.0,
                         help="Add a primary-output notch-position loss to the LHouse experiment only (default: 0).")
+    parser.add_argument("--tower_profile_loss_weight", type=float, default=0.0,
+                        help="Opt-in tower profile trial; select only CurvedRoofRoundHouse (default: 0).")
     parser.add_argument("--lhouse_robust_bbox", action="store_true",
                         help="Independent LHouse XY-quantile auxiliary-feature experiment; requires --lhouse_canonical.")
     parser.add_argument("--truncated_scale_balanced", action="store_true",
@@ -227,6 +231,10 @@ def main():
     if args.normal_threads < 1:
         parser.error("--normal_threads must be positive")
     selected = [r for r in RECIPES if args.classes is None or r[0] in args.classes]
+    if not math.isfinite(args.tower_profile_loss_weight) or args.tower_profile_loss_weight < 0:
+        parser.error("--tower_profile_loss_weight must be finite and non-negative")
+    if args.tower_profile_loss_weight > 0 and [r[0] for r in selected] != ["CurvedRoofRoundHouse"]:
+        parser.error("Tower profile trial requires --classes CurvedRoofRoundHouse only")
     if args.truncated_scale_balanced and (not args.canonical_align or not any(r[0] == "FlatTopHipRoofHouse" for r in selected)):
         parser.error("--truncated_scale_balanced requires TruncatedPyramidRoof in --classes and canonical alignment")
     if args.lhouse_canonical and (not args.canonical_align or not any(r[0] == "LShapedHouse" for r in selected)):

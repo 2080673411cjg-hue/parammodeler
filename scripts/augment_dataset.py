@@ -43,11 +43,12 @@ def normalize_points(points: np.ndarray) -> np.ndarray:
     return points.astype(np.float32)
 
 
-def fixed_sample(points: np.ndarray, num_points: int) -> np.ndarray:
+def limit_point_count(points: np.ndarray, num_points: int) -> np.ndarray:
     if len(points) == 0:
         raise ValueError("Cannot sample empty point cloud")
-    replace = len(points) < num_points
-    idx = np.random.choice(len(points), num_points, replace=replace)
+    if len(points) <= num_points:
+        return points.astype(np.float32)
+    idx = np.random.choice(len(points), num_points, replace=False)
     return points[idx].astype(np.float32)
 
 
@@ -153,7 +154,7 @@ def add_outliers(points: np.ndarray, ratio: float = 0.01, extent: float = 0.08) 
 # ====================================================================
 
 def augment_points(points: np.ndarray, args) -> np.ndarray:
-    """归一化 → drop_bottom → holes → noise → outliers → fixed_sample.
+    """归一化 → drop_bottom → holes → noise → outliers → 采样。
 
     增强在「自归一化坐标系」（mean=0, max|p|=1）里做 —— 这样 extent /
     hole_radius / bottom_height 这些常数才真是「占建筑跨度的比例」，符合直觉。
@@ -168,7 +169,7 @@ def augment_points(points: np.ndarray, args) -> np.ndarray:
     m = points.mean(axis=0, keepdims=True)
     r = float(np.linalg.norm(points - m, axis=1).max())
     if r <= 1e-6:
-        return fixed_sample(points.astype(np.float32), args.num_points)
+        return limit_point_count(points, args.num_points)
 
     pts = ((points - m) / r).astype(np.float32)   # 进自归一化坐标系
 
@@ -184,7 +185,7 @@ def augment_points(points: np.ndarray, args) -> np.ndarray:
         pts = add_outliers(pts, args.outlier_ratio, args.outlier_extent)
 
     pts = (pts.astype(np.float32) * r + m).astype(np.float32)   # 回导出坐标系
-    return fixed_sample(pts, args.num_points)
+    return limit_point_count(pts, args.num_points)
 
 
 # ====================================================================
@@ -328,12 +329,12 @@ def augment_dataset(args):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Lightweight augmentation: noise + outliers + fixed sampling. "
+        description="Lightweight augmentation with a cap on the number of saved points. "
                     "Occlusion is baked in by the QGIS plugin during export.")
 
     parser.add_argument("--input", default="E:/pointnet/datasets")
     parser.add_argument("--output", default="E:/pointnet/datasets_aug")
-    parser.add_argument("--num_points", type=int, default=2048)
+    parser.add_argument("--num_points", type=int, default=2048, help="Maximum saved points per cloud")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--classes", nargs="+", default=None)

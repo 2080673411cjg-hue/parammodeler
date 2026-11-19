@@ -112,10 +112,10 @@ class TowerTrainingTest(unittest.TestCase):
     def test_manual_sizes_outside_sampling_range_are_valid(self):
         self.validate({**self.params, "eaveRadius": 12, "eaveHeight": 1})
 
-    def test_unconfigured_server_uses_v10_default(self):
+    def test_unconfigured_server_uses_v13_default(self):
         with patch.object(server, "TOWER_LOG", ""):
             self.assertEqual(server.regression_log_dir("CurvedRoofRoundHouse").name,
-                             "ptv3_reg_curvedround_v10_normals")
+                             "ptv3_reg_curvedround_v13_normals")
 
     def test_only_tower_uses_override(self):
         with patch.object(server, "TOWER_LOG", "logs/ptv3_reg_fourstage_v4_eaves_normals"):
@@ -124,7 +124,7 @@ class TowerTrainingTest(unittest.TestCase):
             self.assertEqual(server.regression_log_dir("CurvedRoofRoundHouse", "_v3_normals"),
                              server.PTV3_DIR / "logs/ptv3_reg_fourstage_v3_normals")
             self.assertEqual(server.regression_log_dir("FlatRoofHouse").name,
-                             "ptv3_reg_flatroof_v10_normals")
+                             "ptv3_reg_flatroof_v13_normals")
             self.assertEqual(server.health()["tower_reg_log"], str(server.regression_log_dir("CurvedRoofRoundHouse")))
 
     def test_explicit_missing_override_does_not_fall_back(self):
@@ -211,6 +211,33 @@ class TowerTrainingTest(unittest.TestCase):
         self.assertIn("ptv3_reg_lshaped_v10_normals", response["error"])
         run.assert_not_called()
 
+    def test_v12_tower_baseline_is_selected_explicitly_without_changing_other_defaults(self):
+        suffix = "_v12_tower_baseline_normals"
+        expected = server.PTV3_DIR / "logs/ptv3_reg_curvedround_v12_tower_baseline_normals"
+        for alias in ("CurvedRoofRoundHouse", "FourStageRoundTower"):
+            request = SimpleNamespace(primitive_type=alias, model_suffix=suffix,
+                                      input_coordinates="normalized", points_text="0 0 0\n",
+                                      num_points=2048, bbox_x=20, bbox_y=20, bbox_z=5, scale=12)
+            with self.subTest(alias=alias), patch.object(Path, "is_file", return_value=True), \
+                 patch.object(server, "TOWER_LOG", "logs/old_tower"), \
+                 patch.object(server, "run_json_command", return_value={"ok": True, "result": {
+                     "params": {"middleRise": .2}}}) as run:
+                response = server.regress(request)
+            self.assertTrue(response["ok"])
+            command = run.call_args.args[0]
+            self.assertEqual(command[command.index("--log_dir") + 1], str(expected))
+            self.assertEqual(response["model_log_dir"], str(expected))
+        self.assertEqual(server.regression_log_dir("FlatRoofHouse").name, "ptv3_reg_flatroof_v13_normals")
+
+    def test_missing_v12_tower_baseline_does_not_silently_use_v10(self):
+        with patch.object(Path, "is_file", return_value=False), \
+             patch.object(server, "run_json_command") as run:
+            response = server.regress(SimpleNamespace(primitive_type="CurvedRoofRoundHouse",
+                                                     model_suffix="_v12_tower_baseline_normals"))
+        self.assertFalse(response["ok"])
+        self.assertIn("ptv3_reg_curvedround_v12_tower_baseline_normals", response["error"])
+        run.assert_not_called()
+
     def test_classifier_override_keeps_regression_default(self):
         with patch.dict(sys.modules, {"fastapi": SimpleNamespace(FastAPI=AppStub, Request=object),
                                       "pydantic": SimpleNamespace(BaseModel=object)}), \
@@ -220,20 +247,20 @@ class TowerTrainingTest(unittest.TestCase):
         self.assertEqual(configured.CLS_LOG, configured.PTV3_DIR / "logs/ptv3_cls_v6")
         self.assertEqual(configured.regression_log_dir("FlatRoofHouse").name, "ptv3_reg_cuboid_v3_normals")
 
-    def test_default_classifier_and_regression_are_v10(self):
+    def test_default_classifier_is_v14_and_regression_is_v13(self):
         with patch.dict(sys.modules, {"fastapi": SimpleNamespace(FastAPI=AppStub, Request=object),
                                       "pydantic": SimpleNamespace(BaseModel=object)}), \
              patch.dict("os.environ", {}, clear=True):
             configured = load_script("ptv3_server")
-        self.assertEqual(configured.CLS_LOG, configured.PTV3_DIR / "logs/ptv3_cls_v10")
+        self.assertEqual(configured.CLS_LOG, configured.PTV3_DIR / "logs/ptv3_cls_v14_actual_points")
         self.assertEqual(configured.health()["cls_log"], str(configured.CLS_LOG))
-        self.assertEqual(configured.REG_SUFFIX, "_v10_normals")
+        self.assertEqual(configured.REG_SUFFIX, "_v13_normals")
         for old, new, _, slug, _ in PRIMITIVES:
             for alias in (old, new):
                 self.assertEqual(configured.regression_log_dir(alias).name,
-                                 f"ptv3_reg_{slug}_v10_normals")
+                                 f"ptv3_reg_{slug}_v13_normals")
 
-    def test_classifier_request_uses_v10_and_removes_temporary_input(self):
+    def test_classifier_request_uses_v14_and_removes_temporary_input(self):
         with patch.dict(sys.modules, {"fastapi": SimpleNamespace(FastAPI=AppStub, Request=object),
                                       "pydantic": SimpleNamespace(BaseModel=object)}), \
              patch.dict("os.environ", {}, clear=True):
@@ -246,7 +273,7 @@ class TowerTrainingTest(unittest.TestCase):
         self.assertEqual(response["model_log_dir"], str(configured.CLS_LOG))
         command = run.call_args.args[0]
         self.assertEqual(command[command.index("--log_dir") + 1],
-                         str(configured.PTV3_DIR / "logs/ptv3_cls_v10"))
+                         str(configured.PTV3_DIR / "logs/ptv3_cls_v14_actual_points"))
         self.assertEqual(command[command.index("--topk") + 1], "3")
         self.assertFalse(Path(command[command.index("--input") + 1]).exists())
 
@@ -265,12 +292,12 @@ class TowerTrainingTest(unittest.TestCase):
         self.assertFalse(response["ok"])
         self.assertNotIn("model_log_dir", response)
 
-    def test_blank_regression_suffix_uses_v10_default(self):
+    def test_blank_regression_suffix_uses_v13_default(self):
         with patch.dict(sys.modules, {"fastapi": SimpleNamespace(FastAPI=AppStub, Request=object),
                                       "pydantic": SimpleNamespace(BaseModel=object)}), \
              patch.dict("os.environ", {"PTV3_REG_SUFFIX": "  "}, clear=True):
             configured = load_script("ptv3_server")
-        self.assertEqual(configured.REG_SUFFIX, "_v10_normals")
+        self.assertEqual(configured.REG_SUFFIX, "_v13_normals")
 
     def test_v4_directory_name_keeps_canonical_training(self):
         args = SimpleNamespace(log_root="logs", run_tag="v4", data_root="data", batch_size=4,
@@ -358,7 +385,7 @@ class TowerTrainingTest(unittest.TestCase):
         suffix = "_axis_scale_trial_normals"
         expected = server.PTV3_DIR / "logs/ptv3_reg_lshaped_axis_scale_trial_normals"
         self.assertEqual(server.regression_log_dir("LShapedHouse", suffix), expected)
-        self.assertEqual(server.regression_log_dir("FlatRoofHouse").name, "ptv3_reg_flatroof_v10_normals")
+        self.assertEqual(server.regression_log_dir("FlatRoofHouse").name, "ptv3_reg_flatroof_v13_normals")
         request = SimpleNamespace(primitive_type="LShapedHouse", model_suffix=suffix, input_coordinates="normalized",
                                   points_text="0 0 0\n", num_points=2048,
                                   bbox_x=20, bbox_y=10, bbox_z=5, scale=12)
@@ -384,7 +411,7 @@ class TowerTrainingTest(unittest.TestCase):
         self.assertEqual(command[command.index("--log_dir") + 1], str(expected))
         self.assertEqual(command[command.index("--input_coordinates") + 1], "normalized")
         self.assertEqual(response["model_log_dir"], str(expected))
-        self.assertEqual(server.REG_SUFFIX, "_v10_normals")
+        self.assertEqual(server.REG_SUFFIX, "_v13_normals")
 
     def test_missing_lhouse_robust_checkpoint_does_not_fall_back(self):
         request = SimpleNamespace(primitive_type="LShapedHouse", model_suffix="_robust_bbox_trial_normals")

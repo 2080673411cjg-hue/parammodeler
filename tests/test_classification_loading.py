@@ -1,6 +1,7 @@
 """Verify classifier caching, live augmentation, and real worker loading."""
 
 import contextlib
+import csv
 import importlib.util
 import io
 import json
@@ -21,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 spec = importlib.util.spec_from_file_location("classification_loading", ROOT / "scripts/main.py")
 classification = importlib.util.module_from_spec(spec)
+from model_ptv3 import voxelize_batch
 with patch.dict(sys.modules, {"model_ptv3": SimpleNamespace(PTv3Regressor=object, PTv3Classifier=object)}):
     spec.loader.exec_module(classification)
 sys.path.pop(0)
@@ -31,8 +33,9 @@ class TinyClassifier(torch.nn.Module):
         super().__init__()
         self.head = torch.nn.Linear(3, 2)
 
-    def forward(self, points):
-        return self.head(points.mean(dim=1))
+    def forward(self, points, counts=None):
+        means = points.mean(dim=1) if counts is None else torch.stack([p.mean(dim=0) for p in points.split(counts)])
+        return self.head(means)
 
 
 class ClassificationLoadingTests(unittest.TestCase):
@@ -49,7 +52,7 @@ class ClassificationLoadingTests(unittest.TestCase):
                 folder.mkdir(parents=True)
                 for index in range(count):
                     np.savetxt(folder / f"{index}.txt",
-                               np.random.default_rng(index).normal(size=(12, 3)))
+                               np.random.default_rng(index).normal(size=(5 if index == 0 else 12, 3)))
 
     def dataset(self, cache, normalize=True, normals=True):
         return classification.PointCloudClassificationDataset(
@@ -96,6 +99,66 @@ class ClassificationLoadingTests(unittest.TestCase):
             dataset[0]
             dataset[0]
             self.assertEqual(read.call_count, 2)
+
+    def test_short_cloud_keeps_every_point_with_its_normal_without_padding(self):
+        points = np.random.default_rng(3).normal(size=(5, 3)).astype(np.float32)
+        normals = np.arange(15, dtype=np.float32).reshape(5, 3)
+        expected = np.concatenate((points, normals), axis=1)
+        path = self.root / "train/FlatRoofHouse/0.txt"
+        np.savetxt(path, points)
+        for training in (False, True):
+            dataset = classification.PointCloudClassificationDataset(
+                self.root, "train", ["FlatRoofHouse"], 8,
+                train=training, normalize=False, cache_points=False)
+            dataset.use_normals = True
+            dataset._normals_cache[str(path)] = normals
+            dataset._normals_cache[str(path.with_name("1.txt"))] = np.zeros((12, 3), np.float32)
+            sampled = dataset[0][0].numpy()
+            np.testing.assert_array_equal(sampled, expected)
+            (packed, counts), labels, _ = next(iter(classification.make_loader(
+                dataset, 2, False, 0, torch.device("cpu"))))
+            self.assertEqual(counts, (5, 8))
+            self.assertEqual(packed.shape, (13, 6))
+            self.assertEqual(labels.tolist(), [0, 0])
+
+    def test_packed_voxels_match_individual_clouds(self):
+        base = torch.tensor([[10., 20., 30., 1.], [10.1, 20., 30., 3.], [12., 20., 30., 5.]])
+        other = torch.tensor([[-5., -6., -7., 2.], [-5., -3., -7., 4.]])
+        packed = torch.cat((base, other)).requires_grad_()
+        batch = voxelize_batch(packed, 0.5, (len(base), len(other)))
+        for index, cloud in enumerate((base, other)):
+            expected = voxelize_batch(cloud.unsqueeze(0), 0.5)
+            mask = batch["batch"] == index
+            for key in ("feat", "coord", "grid_coord"):
+                torch.testing.assert_close(batch[key][mask], expected[key], atol=0, rtol=0)
+        batch["feat"].sum().backward()
+        torch.testing.assert_close(packed.grad[:, 3], torch.tensor([.5, .5, 1., 1., 1.]))
+
+    def test_top2_report_tracks_recovered_misses_and_score_gaps(self):
+        scores = torch.tensor([[3., 2., 0.], [1., 2., 3.], [2., 2., 0.]])
+
+        class FixedClassifier(torch.nn.Module):
+            def forward(self, points):
+                return scores
+
+        labels = torch.tensor([1, 0, 0])
+        batch = (torch.zeros(3, 5, 3), labels, ["first.txt", "second.txt", "tie.txt"])
+        _, accuracy, truth, guesses, paths, top2 = classification.evaluate(
+            FixedClassifier(), [batch], torch.device("cpu"), torch.nn.CrossEntropyLoss(), include_top2=True)
+        self.assertAlmostEqual(accuracy, 1 / 3)
+        self.assertEqual(classification.write_metrics(self.root, "val", ["A", "B", "C"],
+                                                      truth, guesses, paths, top2), 2)
+        with (self.root / "predictions_val.csv").open(newline="", encoding="utf-8") as stream:
+            recovered, missed, tie = list(csv.DictReader(stream))
+        self.assertEqual((recovered["pred"], recovered["top2"], recovered["correct"], recovered["top2_correct"]),
+                         ("A", "B", "0", "1"))
+        self.assertEqual(missed["top2_correct"], "0")
+        self.assertEqual((tie["pred"], tie["top2"], float(tie["prob_gap"])), ("A", "B", 0.))
+        probability = scores.softmax(dim=1)[0]
+        self.assertAlmostEqual(float(recovered["prob_gap"]), float(probability[0] - probability[1]))
+        with (self.root / "classification_report_val.csv").open(newline="", encoding="utf-8") as stream:
+            rows = list(csv.DictReader(stream))
+        self.assertEqual([float(row["top2_recall"]) for row in rows], [0.5, 1.0, 0.0])
 
     def test_triangular_prism_is_excluded_from_metadata_and_folder_discovery(self):
         self.assertEqual(classification.discover_class_names(self.root), ["FlatRoofHouse", "RoundFlatRoofHouse"])
@@ -162,6 +225,8 @@ class ClassificationLoadingTests(unittest.TestCase):
         checkpoint = classification.load_checkpoint(output, torch.device("cpu"))
         self.assertEqual(config["class_names"], ["FlatRoofHouse", "RoundFlatRoofHouse"])
         self.assertEqual(checkpoint["class_names"], config["class_names"])
+        self.assertEqual(config["sampling_mode"], "actual_point_count")
+        self.assertEqual(checkpoint["sampling_mode"], "actual_point_count")
         self.assertEqual(checkpoint["data_loading"], config["data_loading"])
         self.assertTrue(config["data_loading"]["cache_points"])
         self.assertFalse(config["train"]["amp"])
@@ -173,6 +238,14 @@ class ClassificationLoadingTests(unittest.TestCase):
         self.assertIn("Training precision: FP32 | validation: FP32", stream.getvalue())
         self.assertEqual(stream.getvalue().count("epoch_time="), 2)
         self.assertIn("peak_gpu_allocated=N/A", stream.getvalue())
+
+        argv = ["main.py", "--mode", "test", "--split", "val", "--data_root", str(self.root),
+                "--log_dir", str(output), "--cpu", "--no-preserve_input_points"]
+        with patch.object(sys, "argv", argv), patch.object(classification, "build_model", return_value=TinyClassifier()), \
+             contextlib.redirect_stdout(io.StringIO()):
+            classification.main()
+        self.assertTrue((output / "predictions_val_legacy_sampling.csv").is_file())
+        self.assertFalse((output / "predictions_val.csv").exists())
 
     @unittest.skipUnless(torch.cuda.is_available(), "CUDA is required for real FP16/GradScaler verification")
     def test_cuda_amp_unscales_before_clip_and_keeps_validation_and_weights_fp32(self):
@@ -224,7 +297,7 @@ class ClassificationLoadingTests(unittest.TestCase):
         self.assertFalse((Path(args.log_dir) / "best_model.pth").exists())
 
     def test_real_spawn_two_epochs_matches_uncached_loading(self):
-        for name in ("main.py", "main_reg.py", "canonical_orientation.py"):
+        for name in ("main.py", "main_reg.py", "canonical_orientation.py", "primitive_names.py"):
             shutil.copy2(ROOT / "scripts" / name, self.root / name)
         (self.root / "model_ptv3.py").write_text(
             "class PTv3Regressor: pass\nclass PTv3Classifier: pass\n", encoding="utf-8")
@@ -239,17 +312,18 @@ def run(cache):
     ds = PointCloudClassificationDataset(root, "train", ["FlatRoofHouse", "RoundFlatRoofHouse"], 8,
         train=True, jitter_sigma=.003, random_rotate=True, cache_points=cache)
     loader = make_loader(ds, 2, True, 2, torch.device("cpu"), 42)
-    return [[(points.clone(), labels.clone(), paths) for points, labels, paths in loader]
-            for _ in range(2)]
+    return [list(loader) for _ in range(2)]
 
 if __name__ == "__main__":
     old, new = run(False), run(True)
     for a_epoch, b_epoch in zip(old, new):
-        for (a, labels_a, paths_a), (b, labels_b, paths_b) in zip(a_epoch, b_epoch):
+        for ((a, counts_a), labels_a, paths_a), ((b, counts_b), labels_b, paths_b) in zip(a_epoch, b_epoch):
             assert paths_a == paths_b
+            assert counts_a == counts_b
             torch.testing.assert_close(labels_a, labels_b, rtol=0, atol=0)
             torch.testing.assert_close(a, b, rtol=0, atol=0)
-    assert not torch.equal(new[0][0][0], new[1][0][0])
+    assert any(5 in counts for (_, counts), _, _ in new[0])
+    assert not torch.equal(new[0][0][0][0], new[1][0][0][0])
     print("CLASSIFICATION_SPAWN_PASS")
 ''', encoding="utf-8")
         result = subprocess.run([sys.executable, "-B", str(harness)], cwd=self.root,
@@ -294,6 +368,35 @@ if __name__ == "__main__":
             classification.main()
         self.assertEqual(dtypes, [torch.float32])
         self.assertEqual(len(json.loads(stream.getvalue())), 2)
+
+    def test_predict_samples_by_checkpoint_unless_overridden(self):
+        path = self.root / "train/FlatRoofHouse/0.txt"
+        points = np.arange(21, dtype=np.float32).reshape(7, 3)
+        np.savetxt(path, points)
+        model = TinyClassifier()
+        seen = []
+        model.register_forward_pre_hook(lambda module, inputs: seen.append(inputs[0][0].numpy()))
+        checkpoint = {"state_dict": model.state_dict(), "class_names": ["FlatRoofHouse", "RoundFlatRoofHouse"],
+                      "num_points": 8, "normalize_points": False, "use_normals": False}
+        argv = ["main.py", "--mode", "predict", "--input", str(path), "--cpu"]
+        for settings, flags, expected in (
+                ({}, [], "legacy"), ({}, ["--preserve_input_points"], "padded"),
+                ({"preserve_input_points": True}, [], "padded"),
+                ({}, ["--use_actual_point_count"], "actual"),
+                ({"sampling_mode": "actual_point_count"}, [], "actual")):
+            with patch.object(sys, "argv", argv + flags), \
+                 patch.object(classification, "load_checkpoint", return_value={**checkpoint, **settings}), \
+                 patch.object(classification, "build_model", return_value=model), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                classification.main()
+            if expected == "actual":
+                np.testing.assert_array_equal(seen[-1], points)
+            elif expected == "padded":
+                self.assertEqual(seen[-1].shape, (8, 3))
+                self.assertEqual(set(map(tuple, seen[-1])), set(map(tuple, points)))
+            else:
+                old_indices = np.random.default_rng(0).choice(len(points), 8, replace=True)
+                np.testing.assert_array_equal(seen[-1], points[old_indices])
 
 
 if __name__ == "__main__":

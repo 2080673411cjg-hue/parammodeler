@@ -15,7 +15,7 @@ QT_BIN = Path(os.environ.get("PARAMMODELER_QT_BIN", "E:/mambaforge/envs/qgis_dev
 PRIMITIVES = ["FlatRoofHouse", "RoundFlatRoofHouse", "LShapedHouse", "ConicalRoofHouse", "GableRoofHouse",
               "PyramidalRoofHouse", "FlatTopHipRoofHouse", "BarrelRoofHouse", "DomeRoofHouse",
               "RecessedRoofHouse", "ShortRidgeHipRoofHouse", "CurvedRoofRoundHouse",
-              "AngledGableHouse", "TriPrismPyramid"]
+              "AngledGableHouse"]
 
 
 class TranslationsTest(unittest.TestCase):

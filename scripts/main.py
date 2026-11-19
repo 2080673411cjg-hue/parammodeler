@@ -88,7 +88,8 @@ class PointCloudClassificationDataset(Dataset):
                  num_points: int, train: bool = False, normalize: bool = True,
                  jitter_sigma: float = 0.0, random_rotate: bool = False,
                  use_normals: bool = False, cache_points: bool = True, normal_workers: int = 0,
-                 normal_backend: str = "numpy", normal_threads: int = 4):
+                 normal_backend: str = "numpy", normal_threads: int = 4,
+                 sampling_mode: str = "actual_point_count"):
         self.data_root = Path(data_root)
         self.split = split
         self.class_names = list(class_names)
@@ -99,6 +100,7 @@ class PointCloudClassificationDataset(Dataset):
         self.random_rotate = bool(random_rotate)
         self.use_normals = bool(use_normals)
         self.cache_points = bool(cache_points)
+        self.sampling_mode = sampling_mode
         self.samples = split_files(self.data_root, split, self.class_names)
         self._points_cache: Dict[str, np.ndarray] = {}
         self._normals_cache: Dict[str, np.ndarray] = {}
@@ -129,8 +131,9 @@ class PointCloudClassificationDataset(Dataset):
         if points is None:
             points = self._prepare_points(path)
         normals = self._normals_cache.get(str(path)) if self.use_normals else None
-        points = sample_points(points, self.num_points, self.train,
-                               self.jitter_sigma, self.random_rotate, normals)
+        points = sample_classification_points(points, self.num_points, self.train,
+                                              self.jitter_sigma, self.random_rotate, normals,
+                                              self.sampling_mode)
         return torch.from_numpy(points), torch.tensor(label, dtype=torch.long), str(path)
 
     def _prepare_points(self, path: Path) -> np.ndarray:
@@ -138,9 +141,28 @@ class PointCloudClassificationDataset(Dataset):
         return normalize_points(points) if self.normalize else points
 
 
+def sample_classification_points(points, num_points, train, jitter_sigma, random_rotate, normals, sampling_mode):
+    return sample_points(points, num_points, train, jitter_sigma, random_rotate, normals,
+                         preserve_input_points=sampling_mode == "preserve_input_points",
+                         use_actual_point_count=sampling_mode == "actual_point_count")
+
+
+def collate_actual_point_counts(samples):
+    clouds, labels, paths = zip(*samples)
+    return (torch.cat(clouds), tuple(len(cloud) for cloud in clouds)), torch.stack(labels), paths
+
+
 def make_loader(dataset: Dataset, batch_size: int, shuffle: bool, num_workers: int,
                 device: torch.device, seed: Optional[int] = None) -> DataLoader:
-    return make_data_loader(dataset, batch_size, shuffle, device, num_workers, seed)
+    collate_fn = collate_actual_point_counts if getattr(dataset, "sampling_mode", None) == "actual_point_count" else None
+    return make_data_loader(dataset, batch_size, shuffle, device, num_workers, seed, collate_fn=collate_fn)
+
+
+def batch_logits(model, points, device):
+    if isinstance(points, (tuple, list)):
+        packed, counts = points
+        return model(packed.to(device, non_blocking=True).float(), tuple(counts))
+    return model(points.to(device, non_blocking=True).float())
 
 
 def build_model(args, num_classes: int) -> PTv3Classifier:
@@ -162,7 +184,7 @@ def accuracy_from_logits(logits: torch.Tensor, labels: torch.Tensor) -> Tuple[in
 
 
 def evaluate(model: nn.Module, loader: DataLoader, device: torch.device,
-             criterion: nn.Module) -> Tuple[float, float, List[int], List[int], List[str]]:
+             criterion: nn.Module, *, include_top2: bool = False):
     model.eval()
     total_loss = 0.0
     total_correct = 0
@@ -170,22 +192,29 @@ def evaluate(model: nn.Module, loader: DataLoader, device: torch.device,
     y_true: List[int] = []
     y_pred: List[int] = []
     paths: List[str] = []
+    top2 = []
     with torch.no_grad():
         for points, labels, batch_paths in loader:
-            points = points.to(device, non_blocking=True).float()
             labels = labels.to(device, non_blocking=True)
-            logits = model(points)
+            logits = batch_logits(model, points, device)
             loss = criterion(logits, labels)
-            correct, count = accuracy_from_logits(logits, labels)
+            predicted = logits.argmax(dim=1, keepdim=True)
+            count = labels.numel()
             total_loss += float(loss.item()) * count
-            total_correct += correct
+            total_correct += int((predicted[:, 0] == labels).sum().item())
             total_count += count
             y_true.extend(labels.cpu().tolist())
-            y_pred.extend(logits.argmax(dim=1).cpu().tolist())
+            y_pred.extend(predicted[:, 0].cpu().tolist())
             paths.extend(list(batch_paths))
+            if include_top2:
+                runner_up = logits.scatter(1, predicted, float("-inf")).argmax(dim=1, keepdim=True)
+                scores = logits.softmax(dim=1)
+                top2.extend(zip(runner_up[:, 0].cpu().tolist(),
+                                scores.gather(1, predicted)[:, 0].cpu().tolist(),
+                                scores.gather(1, runner_up)[:, 0].cpu().tolist()))
     avg_loss = total_loss / max(total_count, 1)
     acc = total_correct / max(total_count, 1)
-    return avg_loss, acc, y_true, y_pred, paths
+    return avg_loss, acc, y_true, y_pred, paths, top2
 
 
 def classification_report(class_names: List[str], y_true: List[int], y_pred: List[int]):
@@ -216,11 +245,17 @@ def confusion_matrix(num_classes: int, y_true: List[int], y_pred: List[int]) -> 
 
 
 def write_metrics(log_dir: Path, split: str, class_names: List[str],
-                  y_true: List[int], y_pred: List[int], paths: List[str]) -> None:
+                  y_true: List[int], y_pred: List[int], paths: List[str],
+                  top2: List[Tuple[int, float, float]]) -> int:
     report_rows = classification_report(class_names, y_true, y_pred)
+    top2_hits = [0] * len(class_names)
+    for true_i, pred_i, (second_i, _, _) in zip(y_true, y_pred, top2):
+        top2_hits[true_i] += int(true_i in (pred_i, second_i))
+    for row, hits in zip(report_rows, top2_hits):
+        row["top2_recall"] = hits / max(1, row["support"])
     report_path = log_dir / f"classification_report_{split}.csv"
     with report_path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["class", "precision", "recall", "f1", "support"])
+        writer = csv.DictWriter(f, fieldnames=["class", "precision", "recall", "f1", "support", "top2_recall"])
         writer.writeheader()
         writer.writerows(report_rows)
 
@@ -235,15 +270,19 @@ def write_metrics(log_dir: Path, split: str, class_names: List[str],
     pred_path = log_dir / f"predictions_{split}.csv"
     with pred_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["file", "true", "pred", "correct"])
-        for path, true_i, pred_i in zip(paths, y_true, y_pred):
-            writer.writerow([path, class_names[true_i], class_names[pred_i], int(true_i == pred_i)])
+        writer.writerow(["file", "true", "pred", "correct", "top1_prob", "top2", "top2_prob", "prob_gap", "top2_correct"])
+        for path, true_i, pred_i, (second_i, first_prob, second_prob) in zip(paths, y_true, y_pred, top2):
+            writer.writerow([path, class_names[true_i], class_names[pred_i], int(true_i == pred_i),
+                             first_prob, class_names[second_i], second_prob, first_prob - second_prob,
+                             int(true_i in (pred_i, second_i))])
+    return sum(top2_hits)
 
 
 def save_config(log_dir: Path, args, class_names: List[str]) -> None:
     config = {
         "class_names": class_names,
         "num_points": args.num_points,
+        "sampling_mode": args.sampling_mode,
         "normalize_points": args.normalize_points,
         "use_normals": args.use_normals,
         "normal_backend": getattr(args, "normal_backend", "numpy"),
@@ -282,7 +321,22 @@ def load_checkpoint(log_dir: Path, device: torch.device):
         return torch.load(ckpt_path, map_location=device)
 
 
+def checkpoint_sampling_mode(checkpoint):
+    if "sampling_mode" in checkpoint:
+        return checkpoint["sampling_mode"]
+    return "preserve_input_points" if checkpoint.get("preserve_input_points", False) else "legacy_sampling"
+
+
+def resolve_sampling_mode(args, checkpoint=None):
+    if args.use_actual_point_count:
+        return "actual_point_count"
+    if args.preserve_input_points is not None:
+        return "preserve_input_points" if args.preserve_input_points else "legacy_sampling"
+    return "actual_point_count" if checkpoint is None else checkpoint_sampling_mode(checkpoint)
+
+
 def train(args) -> None:
+    args.sampling_mode = resolve_sampling_mode(args)
     data_root = Path(args.data_root)
     log_dir = Path(args.log_dir)
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
@@ -298,11 +352,13 @@ def train(args) -> None:
         data_root, "train", class_names, args.num_points, train=True,
         normalize=args.normalize_points, jitter_sigma=args.train_jitter_sigma,
         random_rotate=args.random_rotate, use_normals=args.use_normals, cache_points=args.cache_points,
-        normal_workers=args.normal_workers, **normal_kwargs(args))
+        normal_workers=args.normal_workers, sampling_mode=args.sampling_mode,
+        **normal_kwargs(args))
     val_set = PointCloudClassificationDataset(
         data_root, "val", class_names, args.num_points, train=False,
         normalize=args.normalize_points, use_normals=args.use_normals, cache_points=args.cache_points,
-        normal_workers=args.normal_workers, **normal_kwargs(args))
+        normal_workers=args.normal_workers, sampling_mode=args.sampling_mode,
+        **normal_kwargs(args))
 
     train_loader = make_loader(train_set, args.batch_size, True, args.num_workers, device, args.seed)
     val_loader = make_loader(val_set, args.batch_size, False, args.num_workers, device,
@@ -321,6 +377,7 @@ def train(args) -> None:
     print(f"=== PTv3 Classification | classes={len(class_names)} | device={device} ===", flush=True)
     print("Class order: " + ", ".join(class_names), flush=True)
     print(f"Train samples={len(train_set)} Val samples={len(val_set)}", flush=True)
+    print(f"Point sampling: {args.sampling_mode} | point limit={args.num_points}", flush=True)
     print(f"Data loading: {data_loading_config(args)} | pin_memory={device.type == 'cuda'}", flush=True)
     print(f"Training precision: {'AMP float16' if amp_enabled else 'FP32'} | validation: FP32", flush=True)
 
@@ -334,11 +391,10 @@ def train(args) -> None:
         train_correct = 0
         train_count = 0
         for points, labels, _ in train_loader:
-            points = points.to(device, non_blocking=True).float()
             labels = labels.to(device, non_blocking=True)
             optimizer.zero_grad(set_to_none=True)
             with torch.autocast(device_type="cuda", dtype=torch.float16, enabled=amp_enabled):
-                logits = model(points)
+                logits = batch_logits(model, points, device)
                 loss = criterion(logits, labels)
             if scaler is None:
                 loss.backward()
@@ -362,7 +418,7 @@ def train(args) -> None:
             train_count += count
         scheduler.step()
 
-        val_loss, val_acc, _, _, _ = evaluate(model, val_loader, device, criterion)
+        val_loss, val_acc, _, _, _, _ = evaluate(model, val_loader, device, criterion)
         if amp_enabled and not math.isfinite(val_loss):
             raise RuntimeError("Non-finite validation loss after AMP training; checkpoint not saved.")
         train_loss /= max(train_count, 1)
@@ -380,6 +436,7 @@ def train(args) -> None:
                 "state_dict": model.state_dict(),
                 "class_names": class_names,
                 "num_points": args.num_points,
+                "sampling_mode": args.sampling_mode,
                 "normalize_points": args.normalize_points,
                 "use_normals": args.use_normals,
                 "normal_backend": getattr(args, "normal_backend", "numpy"),
@@ -416,6 +473,7 @@ def test(args) -> None:
     log_dir = Path(args.log_dir)
     device = torch.device("cpu" if args.cpu or not torch.cuda.is_available() else "cuda")
     ckpt = load_checkpoint(log_dir, device)
+    sampling_mode = resolve_sampling_mode(args, ckpt)
     class_names = [canonical_class_name(name) for name in ckpt["class_names"]]
     args.num_points = int(ckpt.get("num_points", args.num_points))
     args.normalize_points = bool(ckpt.get("normalize_points", args.normalize_points))
@@ -431,15 +489,20 @@ def test(args) -> None:
     dataset = PointCloudClassificationDataset(
         Path(args.data_root), args.split, class_names, args.num_points, train=False,
         normalize=args.normalize_points, use_normals=args.use_normals, cache_points=args.cache_points,
-        normal_workers=args.normal_workers, **normal_kwargs(args, ckpt))
+        normal_workers=args.normal_workers, sampling_mode=sampling_mode,
+        **normal_kwargs(args, ckpt))
     loader = make_loader(dataset, args.batch_size, False, args.num_workers, device, args.seed)
     model = build_model(args, len(class_names)).to(device)
     model.load_state_dict(ckpt["state_dict"])
     criterion = nn.CrossEntropyLoss()
-    loss, acc, y_true, y_pred, paths = evaluate(model, loader, device, criterion)
-    write_metrics(log_dir, args.split, class_names, y_true, y_pred, paths)
-    print(f"{args.split}: loss={loss:.4f} acc={acc:.4f} samples={len(dataset)}", flush=True)
-    print(f"Wrote metrics to {log_dir}", flush=True)
+    loss, acc, y_true, y_pred, paths, top2 = evaluate(model, loader, device, criterion, include_top2=True)
+    report_split = args.split
+    if sampling_mode != checkpoint_sampling_mode(ckpt):
+        report_split = f"{args.split}_{sampling_mode}"
+    top2_correct = write_metrics(log_dir, report_split, class_names, y_true, y_pred, paths, top2)
+    print(f"{args.split}: loss={loss:.4f} acc={acc:.4f} top2_acc={top2_correct / len(dataset):.4f} "
+          f"samples={len(dataset)}", flush=True)
+    print(f"Wrote {report_split} metrics to {log_dir}", flush=True)
 
 
 def predict(args) -> None:
@@ -463,7 +526,8 @@ def predict(args) -> None:
     if args.normalize_points:
         points = normalize_points(points)
     normals = predict_normals(source_points, points, args, ckpt)
-    points = sample_points(points, args.num_points, False, 0.0, False, normals)
+    points = sample_classification_points(points, args.num_points, False, 0.0, False, normals,
+                                          resolve_sampling_mode(args, ckpt))
     tensor = torch.from_numpy(points).unsqueeze(0).to(device).float()
 
     model = build_model(args, len(class_names)).to(device)
@@ -485,6 +549,11 @@ def parse_args():
     parser.add_argument("--split", default="test", choices=list(SPLITS))
     parser.add_argument("--input", help="Input txt for predict mode")
     parser.add_argument("--num_points", type=int, default=2048)
+    sampling = parser.add_mutually_exclusive_group()
+    sampling.add_argument("--use_actual_point_count", action="store_true",
+                          help="Use up to num_points per cloud without padding (default for new training).")
+    sampling.add_argument("--preserve_input_points", action=argparse.BooleanOptionalAction, default=None,
+                          help="Use fixed-size comparison sampling; with the flag, keep every point before padding.")
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=3e-4)

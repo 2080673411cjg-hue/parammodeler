@@ -42,6 +42,7 @@ struct PointNetRegressionConfig
   QString className;
   QString scriptPath;
   QString logDir;
+  QString modelSuffix;
 };
 
 struct PreparedPointCloudInput
@@ -307,7 +308,7 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
   QString suffix = isPCT
     ? pctBestSuffix.value( prim, ParamModelerConfig::pctRegressionSuffix() )
     : isPTv3
-    ? ParamModelerConfig::ptv3RegressionSuffix()
+    ? ParamModelerConfig::ptv3RegressionSuffix( prim )
     : usePointNeXt
     ? ParamModelerConfig::regressionModelSuffix()
     : QStringLiteral( "_v2" );
@@ -323,7 +324,7 @@ PointNetRegressionConfig regressionConfig( PointNetBackend backend, const QStrin
     !isPTv3 || ParamModelerPrimitiveNames::legacySuffix( suffix ) );
   const QString dirName = prefix + selectedStem + suffix;
 
-  return { modelName, isPTv3 ? prim : ParamModelerPrimitiveNames::legacy( prim ), script, base + dirName };
+  return { modelName, isPTv3 ? prim : ParamModelerPrimitiveNames::legacy( prim ), script, base + dirName, suffix };
 }
 
 bool vectorFromJsonArray( const QJsonValue &value, QVector3D &out )
@@ -720,7 +721,7 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
     payload.insert( QStringLiteral( "num_points" ), numPoints );
     if ( backend == PointNetBackend::PTv3 )
       payload.insert( QStringLiteral( "model_suffix" ),
-                      ParamModelerConfig::ptv3RegressionSuffix() );
+                      config.modelSuffix );
 
     QJsonDocument responseDoc;
     if ( !postJson( remoteUrl, payload, config.modelName + QStringLiteral( " parameter regression" ), responseDoc, result.errorMessage, shouldCancel ) )
@@ -895,6 +896,9 @@ void PointNetRunner::applyToUI( ParamModelerDock *dock,
     set( "tpBottomWidth",  dock->ui->spinBoxTPRBottomWidth,  dock->ui->sliderTPRBottomWidth );
     set( "tpTopLength",     dock->ui->spinBoxTPRTopLength,     dock->ui->sliderTPRTopLength );
     set( "tpTopWidth",     dock->ui->spinBoxTPRTopWidth,     dock->ui->sliderTPRTopWidth );
+    if ( params.contains( QStringLiteral( "tpTopLength" ) ) || params.contains( QStringLiteral( "tpTopWidth" ) ) )
+      dock->m_tpTopPosition = QPointF( std::clamp( params.value( QStringLiteral( "tpTopPositionX" ), 0.5 ), 0.0, 1.0 ),
+                                     std::clamp( params.value( QStringLiteral( "tpTopPositionY" ), 0.5 ), 0.0, 1.0 ) );
     setTotalAndWallRatio( "tpWallHeight", "tpRoofHeight", dock->ui->spinBoxTPRHeightWall, dock->ui->sliderTPRHeightWall, dock->ui->spinBoxTPRHeightRoof, dock->ui->sliderTPRHeightRoof );
     set( "hcrLength",        dock->ui->spinBoxHCRLength,      dock->ui->sliderHCRLength );
     set( "hcrWidth",        dock->ui->spinBoxHCRWidth,      dock->ui->sliderHCRWidth );
@@ -925,6 +929,8 @@ void PointNetRunner::applyToUI( ParamModelerDock *dock,
     setTotalAndWallRatio( "aghWallHeight", "aghRoofHeight", dock->ui->spinBoxAGHHeightWall, dock->ui->sliderAGHHeightWall, dock->ui->spinBoxAGHRoofHeight, dock->ui->sliderAGHRoofHeight );
     set( "aghRidgeLen",    dock->ui->spinBoxAGHRidgeLength, dock->ui->sliderAGHRidgeLength );
     set( "aghRidgeRatio",  dock->ui->spinBoxAGHRidgeOffset, dock->ui->sliderAGHRidgeOffset );
+    if ( params.contains( QStringLiteral( "aghRidgeLen" ) ) )
+      dock->m_aghRidgePositionX = std::clamp( params.value( QStringLiteral( "aghRidgePositionX" ), 0.5 ), 0.0, 1.0 );
     set( "ftBaseR",       dock->ui->spinBoxFTBaseRadius,     dock->ui->sliderFTBaseRadius );
     set( "ftBaseH",       dock->ui->spinBoxFTBaseHeight,     dock->ui->sliderFTBaseHeight );
     set( "ftEaveRadius", dock->ui->spinBoxFTEaveRadius, dock->ui->sliderFTEaveRadius );

@@ -26,7 +26,6 @@
 // ============================================================
 // 底面中心居中后处理：**只对非左下角锚定的类生效**
 // 圆形建筑（Cylinder/Dome/Tower 等）底面中心已在 (0,0,0)，检测后自动跳过
-// TriPrismPyramid（三角形底面）也从这里居中
 // 长方体类是左下角锚定（锚点/生长原点/旋转轴三者绑定 = 左下角），
 // 由 BuildMesh::build 白名单跳过本函数，保持构建时的 (0,0,0) 原点
 // 详见 scripts/grow-anchor-design.md（方案 B）
@@ -103,11 +102,10 @@ MeshData BuildMesh::build( const QString &primitiveTypeInput, ParamModelerDock *
     else if ( primitiveType == "ShortRidgeHipRoofHouse" )  m = buildAsymmetricGableHouse( dock );
     else if ( primitiveType == "CurvedRoofRoundHouse" )   m = buildFourStageRoundTower( dock );
     else if ( primitiveType == "AngledGableHouse" )        m = buildTwoGableHouses( dock );
-    else if ( primitiveType == "TriPrismPyramid" )     m = buildTriPrismPyramid( dock );
 
     // 锚点保持构建时的原点：
     //   左下角锚定类（长方体类含 LHouse / TwoGableHouses）→ 原点就是左下角 (0,0,0)，不居中
-    //   其余（圆形类已天然居中 / TriPrismPyramid）→ 平移到 bbox 中心
+    //   其余（圆形类已天然居中）→ 平移到 bbox 中心
     // 方案 B，详见 scripts/grow-anchor-design.md
     if ( !usesCornerAnchor( primitiveType ) )
         centerMeshOnBaseFace( m );
@@ -398,8 +396,8 @@ MeshData BuildMesh::buildTruncatedPyramidRoof( const TruncatedPyramidRoofParams 
     m.addQuad( v2, v3, v7, v6 );
     m.addQuad( v3, v0, v4, v7 );
 
-    const double ox = ( W - WT ) * 0.5;
-    const double oy = ( D - DT ) * 0.5;
+    const double ox = ( W - WT ) * p.topPositionX;
+    const double oy = ( D - DT ) * p.topPositionY;
     QVector3D t0(ox, oy, Z), t1(ox + WT, oy, Z);
     QVector3D t2(ox + WT, oy + DT, Z), t3(ox, oy + DT, Z);
     m.addQuad( v4, v5, t1, t0 ); // 前坡
@@ -417,6 +415,8 @@ MeshData BuildMesh::buildTruncatedPyramidRoof( ParamModelerDock *dock )
     p.bottomWidth  = dock->tpBottomWidth();
     p.topLength    = dock->tpTopLength();
     p.topWidth     = dock->tpTopWidth();
+    p.topPositionX = dock->tpTopPosition().x();
+    p.topPositionY = dock->tpTopPosition().y();
     p.wallHeight   = dock->tpWallHeight();
     p.roofHeight   = dock->tpRoofHeight();
     return buildTruncatedPyramidRoof( p );
@@ -632,12 +632,8 @@ MeshData BuildMesh::buildAsymmetricGableHouse( const AsymmetricGableHouseParams 
   QVector3D v0( 0, 0, 0 ), v1( W, 0, 0 ), v2( W, D, 0 ), v3( 0, D, 0 );
   QVector3D v4( 0, 0, H ), v5( W, 0, H ), v6( W, D, H ), v7( 0, D, H );
 
-  // 屋脊沿 X 轴（宽度方向）
-  // ridgeOff  = 屋脊在 Y 方向的偏移（相对于 D/2）
-  // ridgeL    = 屋脊长度（沿 X 方向）
-  double rc = W / 2.0;            // 宽度中心
-  double rs = rc - ridgeL / 2.0;  // 屋脊起点 X
-  double re = rc + ridgeL / 2.0;  // 屋脊终点 X
+  double rs = ( W - ridgeL ) * p.ridgePositionX;
+  double re = rs + ridgeL;
   double ry = D * ridgeRatio;     // 屋脊 Y 位置
 
   QVector3D r0( rs, ry, H + roofH ); // 屋脊左端
@@ -679,6 +675,7 @@ MeshData BuildMesh::buildAsymmetricGableHouse( ParamModelerDock *dock )
     p.roofHeight  = dock->aghRoofHeight();
     p.ridgeLength = dock->aghRidgeLength();
     p.ridgeRatio  = dock->aghRidgeRatio();
+    p.ridgePositionX = dock->aghRidgePositionX();
     return buildAsymmetricGableHouse( p );
 }
 
@@ -945,70 +942,4 @@ MeshData BuildMesh::buildTwoGableHouses( ParamModelerDock *dock )
     p.angle       = dock->tgAngle();
     p.ridgeRatio  = dock->tgRidgeRatio();
     return buildTwoGableHouses( p );
-}
-
-// ============================================================
-// 三棱柱 + 三棱锥（等腰三角形底面）
-// 参数：腰长 leg, 底边长 baseSide, 总高度 totalH, 锥高比 pyramidRatio
-// ============================================================
-MeshData BuildMesh::buildTriPrismPyramid( const TriPrismPyramidParams &p )
-{
-    MeshData m;
-    double leg          = p.leg;
-    double baseSide     = p.baseSide;
-    double totalH       = p.totalHeight;
-    double pyramidRatio = p.pyramidRatio;
-
-    if ( leg <= 0 || baseSide <= 0 || totalH <= 0 ) return m;
-
-    // 三角形存在条件：腰长 > 底边/2
-    double halfBase = baseSide / 2.0;
-    if ( leg <= halfBase ) return m;
-
-    // 等腰三角形高（在 XY 平面内沿 Y 方向）
-    double triH = std::sqrt( leg * leg - halfBase * halfBase );
-
-    double prismZ  = totalH * ( 1.0 - pyramidRatio );
-    double pyrH    = totalH * pyramidRatio;
-
-    // ---- 底面三棱柱顶点 (Z=0) ----
-    // 等腰三角形：底边沿 X 轴，顶点 C 在 -Y 方向（脊线朝上）
-    QVector3D A( -halfBase, 0.0,  0.0 );
-    QVector3D B(  halfBase, 0.0,  0.0 );
-    QVector3D C( 0.0, -triH,     0.0 );
-
-    // ---- 棱柱顶面 / 棱锥底面 (Z=prismZ) ----
-    QVector3D A1( -halfBase, 0.0,  prismZ );
-    QVector3D B1(  halfBase, 0.0,  prismZ );
-    QVector3D C1( 0.0, -triH,     prismZ );
-
-    // ---- 棱锥顶点 ----
-    // 锥顶在等腰三角形顶点 C 的正上方（两条腰的交点）
-    QVector3D apex( 0.0, -triH, totalH );
-
-    // ---- 三棱柱网格 ----
-    // 底面（法线 -Z，从下方看 CCW）
-    m.addTriangle( A, B, C );
-
-    // 三个侧面（均为四边形，法线朝外）
-    m.addQuad( A, A1, B1, B );   // 前侧面 (底边 AB)
-    m.addQuad( B, B1, C1, C );   // 右侧面 (边 BC)
-    m.addQuad( C, C1, A1, A );   // 左侧面 (边 CA)
-
-    // ---- 三棱锥网格（三个三角面，法线朝外） ----
-    m.addTriangle( A1, apex, B1 );   // 前面
-    m.addTriangle( B1, apex, C1 );   // 右面
-    m.addTriangle( C1, apex, A1 );   // 左面
-
-    return m;
-}
-
-MeshData BuildMesh::buildTriPrismPyramid( ParamModelerDock *dock )
-{
-    TriPrismPyramidParams p;
-    p.leg          = dock->triPrismPyramidLeg();
-    p.baseSide     = dock->triPrismPyramidBase();
-    p.totalHeight  = dock->triPrismPyramidHeight();
-    p.pyramidRatio = dock->triPrismPyramidRatio();
-    return buildTriPrismPyramid( p );
 }

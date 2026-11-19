@@ -26,7 +26,6 @@ HORIZONTAL = {
     "ShortRidgeHipRoofHouse": "AGHLength AGHWidth AGHRidgeLength",
     "CurvedRoofRoundHouse": "FTBaseRadius FTEaveRadius FTMiddleTopRadius",
     "AngledGableHouse": "TGLength1 TGLength2 TGWidth",
-    "TriPrismPyramid": "",
 }
 
 
@@ -55,9 +54,10 @@ class ScaleSamplingTests(unittest.TestCase):
         harness = r"""
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <random>
-#include <stdexcept>
 #include <string>
 #include <vector>
 using QString = std::string;
@@ -74,8 +74,18 @@ struct QVector3D {
 struct MeshData { QVector<QVector3D> vertices; bool isEmpty() const { return vertices.isEmpty(); } };
 struct QDoubleSpinBox {
   double v = 0; int digits = 2;
+  double minimum = 0, maximum = 1000;
+  std::function<void()> changed;
   double value() const { return v; }
-  void setValue(double n) { const double s = std::pow(10, digits); v = std::round(n * s) / s; }
+  void setValue(double n) {
+    const double s = std::pow(10, digits);
+    n = std::max(minimum, std::min(maximum, std::round(n * s) / s));
+    if (n == v) return;
+    v = n;
+    if (changed) changed();
+  }
+  void setMinimum(double n) { minimum = n; setValue(v); }
+  void setMaximum(double n) { maximum = n; setValue(v); }
 };
 class QRandomGenerator {
   std::mt19937 engine{42};
@@ -116,14 +126,26 @@ struct BuildMesh {
 void sampleBase(Dock *dock, const QString &prim) {
 """ + helpers + base + "\n}\nvoid sampleScale(Dock *dock, const QString &prim, int scaleBand) {\n" + helpers + scaling + r"""
 }
-void require(bool condition, const QString &message) { if (!condition) throw std::runtime_error(message); }
+void require(bool condition, const QString &message) {
+  if (!condition) { std::cerr << message << '\n'; std::exit(1); }
+}
 int main() {
   Controls ui;
 """ + initialize + "\n  Dock storage{&ui};\n  Dock *dock = &storage;\n  std::vector<QDoubleSpinBox *> all{" + pointers + r"""};
+  // Match the automatic clamps in bindEaveDimension/bindTowerTopRadius.
+  // These callbacks still run while manual height compensation is suspended.
+  ui.spinBoxFTEaveRadius->setMaximum(60);
+  ui.spinBoxFTBaseRadius->changed = [&] {
+    ui.spinBoxFTEaveRadius->setMinimum(ui.spinBoxFTBaseRadius->value() + .001);
+  };
+  ui.spinBoxFTEaveRadius->changed = [&] {
+    ui.spinBoxFTMiddleTopRadius->setMaximum(ui.spinBoxFTEaveRadius->value() - .01);
+  };
   struct Case { QString prim; std::vector<QDoubleSpinBox *> horizontal; };
   const std::vector<Case> cases{
 """ + cases + r"""
   };
+  int sampleCount = 0;
   for (const auto &c : cases) {
     for (int requested = -1; requested < 3; ++requested) {
       int counts[3] = {};
@@ -135,9 +157,16 @@ int main() {
         const auto oldMesh = BuildMesh::build(c.prim, dock);
         const double oldSpan = std::max(oldMesh.vertices[1].x(), oldMesh.vertices[1].y());
         sampleScale(dock, c.prim, requested);
+        ++sampleCount;
         const auto mesh = BuildMesh::build(c.prim, dock);
         const double span = std::max(mesh.vertices[1].x(), mesh.vertices[1].y());
         const int band = span < 15 ? 0 : span < 25 ? 1 : 2;
+        if (c.prim == "CurvedRoofRoundHouse") {
+          const double ratio = ui.spinBoxFTEaveRadius->value() / ui.spinBoxFTBaseRadius->value();
+          require(ratio >= 1.045 && ratio <= 1.205, "tower eave ratio changed through linked controls");
+          require(ui.spinBoxFTMiddleTopRadius->value() < ui.spinBoxFTEaveRadius->value(),
+                  "tower top radius escaped the eave");
+        }
         if (!c.horizontal.empty()) {
           require(span >= 6 && span <= 40, c.prim + " outside scale range");
           require(requested < 0 || band == requested, c.prim + " in wrong band");
@@ -165,7 +194,7 @@ int main() {
         for (int count : spread) require(count > 225 && count < 375, c.prim + " concentrated within a band");
     }
   }
-  std::cout << "54000 randomizer cases passed\n";
+  std::cout << sampleCount << " randomizer cases passed\n";
 }
 """
         with tempfile.TemporaryDirectory(prefix="scale-sampling-", dir=ROOT / "tests") as temp:
@@ -174,7 +203,7 @@ int main() {
             subprocess.run([compiler, "-std=c++17", "-O2", str(cpp), "-o", str(exe)],
                            check=True, capture_output=True, text=True, timeout=60)
             result = subprocess.run([str(exe)], check=True, capture_output=True, text=True, timeout=30)
-        self.assertIn("54000 randomizer cases passed", result.stdout)
+        self.assertIn(f"{len(HORIZONTAL) * 4 * 900} randomizer cases passed", result.stdout)
 
     def test_batch_rotation_balances_splits_and_records_the_band(self):
         source = (ROOT / "parammodeler_datasetgen.cpp").read_text(encoding="utf-8")
@@ -183,6 +212,7 @@ int main() {
         self.assertEqual(source.count("randomizeCurrentPrimitiveParams( false, true, scaleBand )"), 2)
         self.assertEqual(source.count('item[QStringLiteral( "horizontalScaleBand" )] = scaleBand;'), 2)
         self.assertEqual(source.count('item[QStringLiteral( "scaleSamplingVersion" )]'), 2)
+        self.assertEqual(source.count('QStringLiteral( "horizontal_strata_v2" )'), 2)
         for start, count in ((0, 800), (800, 100), (900, 100), (0, 1000), (587, 213)):
             bands = Counter((start + i) % 3 for i in range(count))
             self.assertLessEqual(max(bands.values()) - min(bands.values()), 1)

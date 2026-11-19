@@ -12,30 +12,47 @@
 
 #include <qgisinterface.h>
 #include <qgsapplication.h>
-#include <qgsmapcanvas.h>
-#include <qgsmaptoolemitpoint.h>
-#include <qgsrubberband.h>
 #include <qgsvectorlayer.h>
 #include <qgs3dmapcanvas.h>
 #include <qgs3dmapsettings.h>
+#include <qgscameracontroller.h>
+#include <Qt3DRender/QCamera>
 
+#include <QAction>
 #include <QColor>
+#include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QGraphicsView>
+#include <QGraphicsScene>
+#include <QKeySequence>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QDir>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QMatrix4x4>
 #include <QMessageBox>
+#include <QMouseEvent>
+#include <QPainter>
+#include <QPushButton>
+#include <QScopedValueRollback>
+#include <QSignalBlocker>
 #include <QTemporaryFile>
 #include <QTextStream>
+#include <QToolButton>
+#include <QToolTip>
 #include <QVector3D>
+#include <QVBoxLayout>
+#include <QWheelEvent>
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <functional>
 #include <limits>
+#include <optional>
 #include <windows.h>
 
 #define DEBUG_LOG( msg ) OutputDebugStringW( msg )
@@ -89,14 +106,6 @@ static QVector3D modelAlignmentReference( const MeshData &mesh, const QString &p
       : QVector3D( ( vMin.x() + vMax.x() ) * 0.5f,
                    ( vMin.y() + vMax.y() ) * 0.5f,
                    vMin.z() );
-}
-
-static QVector3D modelGrowthAnchor( ParamModelerDock *dock )
-{
-    // BuildMesh keeps the semantic growth/rotation anchor at local origin:
-    // corner-anchored classes use the footprint corner; centered classes are
-    // shifted so the base center is at (0,0,0).
-    return modelRotationMatrix( dock ).map( QVector3D( 0.0f, 0.0f, 0.0f ) );
 }
 
 void ParamModelerDock::alignModelToPointCloud( const MeshData &mesh, const QVector3D &pcRef,
@@ -463,11 +472,6 @@ void ParamModelerDock::startTranslate3D( bool fitCorner )
     QMessageBox::warning( this, tr( "3D align" ), tr( "3D picking requires a local scene using the point cloud's CRS." ) );
     return;
   }
-  if ( m_manualTranslateHasSource )
-  {
-    // Finish the 2D interaction at its own source, with zero translation.
-    handleManualTranslateClick( m_manualTranslateSource, Qt::LeftButton );
-  }
   MeshData sourceMesh = BuildMesh::build( this->primitiveType(), this );
   m_manualTranslate3DLocalAnchor = QVector3D();
   if ( !anchorLocalPoint( m_manualAlign3DAnchorMode, sourceMesh, m_manualTranslate3DLocalAnchor ) )
@@ -540,184 +544,6 @@ void ParamModelerDock::startTranslate3D( bool fitCorner )
   canvas->setMapTool( tool );
   canvas->requestActivate();
   m_manualTranslate3DBtn->setText( tr( "Cancel 3D" ) );
-}
-
-void ParamModelerDock::startManualTranslateByClick()
-{
-  stopManualTranslate3D();
-  if ( !mIface || !mIface->mapCanvas() )
-  {
-    QMessageBox::warning( this, tr( "Manual align" ), tr( "QGIS map canvas is unavailable." ) );
-    return;
-  }
-
-  const QString prim = this->primitiveType();
-  const MeshData mesh = BuildMesh::build( prim, this );
-  if ( mesh.isEmpty() )
-  {
-    QMessageBox::warning( this, tr( "Manual align" ), tr( "Current model has no geometry data." ) );
-    return;
-  }
-
-  const QVector3D localRef = modelGrowthAnchor( this );
-  m_manualTranslateSource = QgsPointXY(
-    static_cast<double>( localRef.x() ) + poseTranslateX(),
-    static_cast<double>( localRef.y() ) + poseTranslateY()
-  );
-  m_manualTranslateHasSource = true;
-
-  const QMatrix4x4 rotMat = modelRotationMatrix( this );
-  QVector3D xDir = rotMat.mapVector( QVector3D( 1.0f, 0.0f, 0.0f ) );
-  QVector3D yDir = rotMat.mapVector( QVector3D( 0.0f, 1.0f, 0.0f ) );
-  QVector3D meshMin = mesh.vertices.first();
-  QVector3D meshMax = mesh.vertices.first();
-  for ( const QVector3D &v : mesh.vertices )
-  {
-    if ( v.x() < meshMin.x() ) meshMin.setX( v.x() );
-    if ( v.y() < meshMin.y() ) meshMin.setY( v.y() );
-    if ( v.z() < meshMin.z() ) meshMin.setZ( v.z() );
-    if ( v.x() > meshMax.x() ) meshMax.setX( v.x() );
-    if ( v.y() > meshMax.y() ) meshMax.setY( v.y() );
-    if ( v.z() > meshMax.z() ) meshMax.setZ( v.z() );
-  }
-  const QVector3D meshSize = meshMax - meshMin;
-  const double guideLength = std::max( 1.0, std::max( static_cast<double>( meshSize.x() ),
-                                                      static_cast<double>( meshSize.y() ) ) * 0.18 );
-  auto normalizeXY = []( const QVector3D &v ) -> QgsPointXY
-  {
-    const double len = std::hypot( static_cast<double>( v.x() ), static_cast<double>( v.y() ) );
-    if ( len < 1e-9 )
-      return QgsPointXY( 1.0, 0.0 );
-    return QgsPointXY( static_cast<double>( v.x() ) / len, static_cast<double>( v.y() ) / len );
-  };
-  const QgsPointXY xUnit = normalizeXY( xDir );
-  const QgsPointXY yUnit = normalizeXY( yDir );
-  const QgsPointXY xEnd( m_manualTranslateSource.x() + xUnit.x() * guideLength,
-                         m_manualTranslateSource.y() + xUnit.y() * guideLength );
-  const QgsPointXY yEnd( m_manualTranslateSource.x() + yUnit.x() * guideLength,
-                         m_manualTranslateSource.y() + yUnit.y() * guideLength );
-
-  QgsMapCanvas *canvas = mIface->mapCanvas();
-  if ( !m_manualTranslateTool )
-  {
-    m_manualTranslateTool = new QgsMapToolEmitPoint( canvas );
-    connect( m_manualTranslateTool, &QgsMapToolEmitPoint::canvasClicked,
-             this, &ParamModelerDock::handleManualTranslateClick );
-  }
-
-  if ( canvas->mapTool() != m_manualTranslateTool )
-    m_previousMapTool = canvas->mapTool();
-
-  if ( m_manualTranslateSourceMarker )
-  {
-    delete m_manualTranslateSourceMarker;
-    m_manualTranslateSourceMarker = nullptr;
-  }
-  if ( m_manualTranslateXAxisMarker )
-  {
-    delete m_manualTranslateXAxisMarker;
-    m_manualTranslateXAxisMarker = nullptr;
-  }
-  if ( m_manualTranslateYAxisMarker )
-  {
-    delete m_manualTranslateYAxisMarker;
-    m_manualTranslateYAxisMarker = nullptr;
-  }
-  m_manualTranslateSourceMarker = new QgsRubberBand( canvas, Qgis::GeometryType::Point );
-  m_manualTranslateSourceMarker->setIcon( QgsRubberBand::ICON_X );
-  m_manualTranslateSourceMarker->setIconSize( 16 );
-  m_manualTranslateSourceMarker->setWidth( 3 );
-  m_manualTranslateSourceMarker->setColor( QColor( 220, 30, 30, 220 ) );
-  m_manualTranslateSourceMarker->addPoint( m_manualTranslateSource );
-  m_manualTranslateXAxisMarker = new QgsRubberBand( canvas, Qgis::GeometryType::Line );
-  m_manualTranslateXAxisMarker->setColor( QColor( 220, 30, 30, 220 ) );
-  m_manualTranslateXAxisMarker->setWidth( 3 );
-  m_manualTranslateXAxisMarker->addPoint( m_manualTranslateSource );
-  m_manualTranslateXAxisMarker->addPoint( xEnd );
-  m_manualTranslateYAxisMarker = new QgsRubberBand( canvas, Qgis::GeometryType::Line );
-  m_manualTranslateYAxisMarker->setColor( QColor( 30, 170, 60, 220 ) );
-  m_manualTranslateYAxisMarker->setWidth( 3 );
-  m_manualTranslateYAxisMarker->addPoint( m_manualTranslateSource );
-  m_manualTranslateYAxisMarker->addPoint( yEnd );
-
-  canvas->setMapTool( m_manualTranslateTool );
-  if ( m_manualTranslateBtn )
-    m_manualTranslateBtn->setText( tr( "Pick 2D target..." ) );
-
-  DEBUG_LOG( QString( "[ManualAlign] started prim=%1 source=(%2,%3) localRef=(%4,%5,%6) +X=(%7,%8) +Y=(%9,%10); click target on the 2D map canvas\n" )
-               .arg( prim )
-               .arg( m_manualTranslateSource.x(), 0, 'f', 3 )
-               .arg( m_manualTranslateSource.y(), 0, 'f', 3 )
-               .arg( localRef.x(), 0, 'f', 3 )
-               .arg( localRef.y(), 0, 'f', 3 )
-               .arg( localRef.z(), 0, 'f', 3 )
-               .arg( xUnit.x(), 0, 'f', 3 )
-               .arg( xUnit.y(), 0, 'f', 3 )
-               .arg( yUnit.x(), 0, 'f', 3 )
-               .arg( yUnit.y(), 0, 'f', 3 )
-               .toStdWString().c_str() );
-}
-
-void ParamModelerDock::handleManualTranslateClick( const QgsPointXY &point, Qt::MouseButton button )
-{
-  if ( button != Qt::LeftButton )
-    return;
-
-  if ( !m_manualTranslateHasSource )
-  {
-    DEBUG_LOG( L"[ManualAlign] ignored click without a source anchor\n" );
-    return;
-  }
-
-  const double dx = point.x() - m_manualTranslateSource.x();
-  const double dy = point.y() - m_manualTranslateSource.y();
-  const double oldTx = poseTranslateX();
-  const double oldTy = poseTranslateY();
-  const double oldTz = poseTranslateZ();
-  setPoseTranslate( oldTx + dx, oldTy + dy, oldTz );
-  enableAnchorLock( AnchorPointMode::GrowthOrigin,
-                    QVector3D( static_cast<float>( point.x() ),
-                               static_cast<float>( point.y() ),
-                               static_cast<float>( poseTranslateZ() ) ) );
-
-  DEBUG_LOG( QString( "[ManualAlign] target=(%1,%2) delta=(%3,%4) tx=%5→%6 ty=%7→%8 tz=%9\n" )
-               .arg( point.x(), 0, 'f', 3 )
-               .arg( point.y(), 0, 'f', 3 )
-               .arg( dx, 0, 'f', 3 )
-               .arg( dy, 0, 'f', 3 )
-               .arg( oldTx, 0, 'f', 3 )
-               .arg( poseTranslateX(), 0, 'f', 3 )
-               .arg( oldTy, 0, 'f', 3 )
-               .arg( poseTranslateY(), 0, 'f', 3 )
-               .arg( oldTz, 0, 'f', 3 )
-               .toStdWString().c_str() );
-
-  m_manualTranslateHasSource = false;
-  if ( m_manualTranslateBtn )
-    m_manualTranslateBtn->setText( tr( "Align in 2D" ) );
-  if ( m_manualTranslateSourceMarker )
-  {
-    delete m_manualTranslateSourceMarker;
-    m_manualTranslateSourceMarker = nullptr;
-  }
-  if ( m_manualTranslateXAxisMarker )
-  {
-    delete m_manualTranslateXAxisMarker;
-    m_manualTranslateXAxisMarker = nullptr;
-  }
-  if ( m_manualTranslateYAxisMarker )
-  {
-    delete m_manualTranslateYAxisMarker;
-    m_manualTranslateYAxisMarker = nullptr;
-  }
-
-  QgsMapCanvas *canvas = mIface ? mIface->mapCanvas() : nullptr;
-  if ( canvas && canvas->mapTool() == m_manualTranslateTool && m_previousMapTool )
-    canvas->setMapTool( m_previousMapTool );
-  else if ( canvas && canvas->mapTool() == m_manualTranslateTool )
-    canvas->unsetMapTool( m_manualTranslateTool );
-
-  onUpdatePreview();
 }
 
 bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool showMessage )
@@ -965,7 +791,7 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
 
   QString errorMessage;
   QgsMapLayer *loadedLayer = ParamModelerScene3D::loadExternalPointCloud(
-    mIface, displayPath, layerName, this, &errorMessage
+    mIface, displayPath, layerName, this, &errorMessage, m_displayFitPoints
   );
   if ( !loadedLayer )
   {
@@ -997,11 +823,1347 @@ bool ParamModelerDock::loadPointCloudToQGIS3D( const QString &filePath, bool sho
 void ParamModelerDock::resetFitEvaluation()
 {
   m_fitCloudPoints.clear();
+  m_displayFitPoints.clear();
   m_fitBaseline.clear();
   if ( m_fitTimer )
     m_fitTimer->stop();
   ParamModelerScene3D::setFitMetricText( mIface, QString() );
+  ParamModelerScene3D::setPointCloudFitColors( m_pointCloudLayer );
+  updateFaceFitView( {}, {} );
   if ( m_fitDetailsLabel ) m_fitDetailsLabel->setText( tr( "Load a model and point cloud to evaluate." ) );
+}
+
+using FaceFitControls = std::array<QDoubleSpinBox *, 3>;
+
+static FaceFitControls faceFitControls( const QString &primitive, Ui::ParamModelerDock *ui )
+{
+  if ( primitive == QLatin1String( "FlatRoofHouse" ) )
+    return { ui->spinBoxCLength, ui->spinBoxCWidth, ui->spinBoxCHeight };
+  if ( primitive == QLatin1String( "LShapedHouse" ) )
+    return { ui->spinBoxLTotalLength, ui->spinBoxLTotalWidth, ui->spinBoxLHeight };
+  if ( primitive == QLatin1String( "RecessedRoofHouse" ) )
+    return { ui->spinBoxICLength, ui->spinBoxICWidth, ui->spinBoxICHeight };
+  if ( primitive == QLatin1String( "GableRoofHouse" ) )
+    return { ui->spinBoxGRLength, ui->spinBoxGRWidth, ui->spinBoxGRHeightWall };
+  if ( primitive == QLatin1String( "PyramidalRoofHouse" ) )
+    return { ui->spinBoxPRLength, ui->spinBoxPRWidth, ui->spinBoxPRHeightWall };
+  if ( primitive == QLatin1String( "FlatTopHipRoofHouse" ) )
+    return { ui->spinBoxTPRBottomLength, ui->spinBoxTPRBottomWidth, ui->spinBoxTPRHeightWall };
+  if ( primitive == QLatin1String( "ShortRidgeHipRoofHouse" ) )
+    return { ui->spinBoxAGHLength, ui->spinBoxAGHWidth, ui->spinBoxAGHHeightWall };
+  return {};
+}
+
+struct FaceFitState
+{
+  QString primitive;
+  std::array<double, 3> dimensions;
+  std::array<double, 3> translation;
+  std::array<double, 3> rotation;
+  double wallFraction;
+  double ridgeFraction;
+  QSizeF roofTop;
+  QPointF roofTopPosition;
+  QPointF notch;
+  double recessDepth;
+
+  bool operator==( const FaceFitState &other ) const
+  {
+    return primitive == other.primitive && dimensions == other.dimensions && translation == other.translation &&
+           rotation == other.rotation && wallFraction == other.wallFraction && ridgeFraction == other.ridgeFraction &&
+           roofTop == other.roofTop && roofTopPosition == other.roofTopPosition && notch == other.notch &&
+           recessDepth == other.recessDepth;
+  }
+};
+
+static QDoubleSpinBox *faceFitWallRatio( const QString &primitive, Ui::ParamModelerDock *ui )
+{
+  if ( primitive == QLatin1String( "GableRoofHouse" ) ) return ui->spinBoxGRHeightRoof;
+  if ( primitive == QLatin1String( "PyramidalRoofHouse" ) ) return ui->spinBoxPRHeightRoof;
+  if ( primitive == QLatin1String( "FlatTopHipRoofHouse" ) ) return ui->spinBoxTPRHeightRoof;
+  if ( primitive == QLatin1String( "ShortRidgeHipRoofHouse" ) ) return ui->spinBoxAGHRoofHeight;
+  return nullptr;
+}
+
+static FaceFitState faceFitState( const ParamModelerDock *dock, Ui::ParamModelerDock *ui, const FaceFitControls &controls )
+{
+  const QString primitive = dock->primitiveType();
+  const bool gable = primitive == QLatin1String( "GableRoofHouse" );
+  const bool shortRidge = primitive == QLatin1String( "ShortRidgeHipRoofHouse" );
+  const bool flatHip = primitive == QLatin1String( "FlatTopHipRoofHouse" );
+  const bool recessed = primitive == QLatin1String( "RecessedRoofHouse" );
+  const auto *ratio = faceFitWallRatio( primitive, ui );
+  return { primitive, { controls[0]->value(), controls[1]->value(), controls[2]->value() },
+           { dock->poseTranslateX(), dock->poseTranslateY(), dock->poseTranslateZ() },
+           { dock->poseRotateX(), dock->poseRotateY(), dock->poseRotateZ() },
+           ratio ? std::clamp( ratio->value(), 0.05, 0.95 ) : 1.0,
+           gable ? std::clamp( dock->gabledRoofRidgeRatio(), 0.2, 0.8 ) : shortRidge ? dock->aghRidgeRatio() : 0.5,
+           recessed ? QSizeF( dock->icInnerLength(), dock->icInnerWidth() ) :
+           flatHip ? QSizeF( dock->tpTopLength(), dock->tpTopWidth() ) : QSizeF( shortRidge ? dock->aghRidgeLength() : 0, 0 ),
+           recessed ? QPointF( ui->spinBoxICOffsetX->value(), ui->spinBoxICOffsetY->value() ) :
+           flatHip ? dock->tpTopPosition() : QPointF( shortRidge ? dock->aghRidgePositionX() : 0.5, 0.5 ),
+           primitive == QLatin1String( "LShapedHouse" ) ? QPointF( dock->LWingRatio(), dock->LWingWidthRatio() ) : QPointF(),
+           recessed ? dock->icInnerHeight() : 0.0 };
+}
+
+struct FaceFitDirection
+{
+  int view;
+  int side = -1;
+};
+
+static std::optional<FaceFitDirection> pickFaceFitDirection( const MeshData &mesh, const QVector3D &nearPoint,
+                                                           const QVector3D &farPoint, const std::array<double, 3> &dimensions,
+                                                           bool lShaped, bool recessed )
+{
+  const QVector3D ray = farPoint - nearPoint;
+  const QVector3D direction = ray.normalized();
+  double closest = ray.length();
+  std::optional<FaceFitDirection> result;
+  for ( int i = 0; i + 2 < mesh.indices.size(); i += 3 )
+  {
+    const QVector3D a = mesh.vertices[mesh.indices[i]];
+    const QVector3D ab = mesh.vertices[mesh.indices[i + 1]] - a;
+    const QVector3D ac = mesh.vertices[mesh.indices[i + 2]] - a;
+    const QVector3D normal = QVector3D::crossProduct( ab, ac );
+    const QVector3D cross = QVector3D::crossProduct( direction, ac );
+    const double determinant = QVector3D::dotProduct( ab, cross );
+    if ( std::abs( determinant ) <= normal.length() * 1e-6 ) continue;
+    const QVector3D fromA = nearPoint - a;
+    const double u = QVector3D::dotProduct( fromA, cross ) / determinant;
+    const QVector3D crossFromA = QVector3D::crossProduct( fromA, ab );
+    const double v = QVector3D::dotProduct( direction, crossFromA ) / determinant;
+    if ( u < -1e-6 || v < -1e-6 || u + v > 1 + 1e-6 ) continue;
+    const double distance = QVector3D::dotProduct( ac, crossFromA ) / determinant;
+    if ( distance < 0 || distance >= closest ) continue;
+    closest = distance;
+    if ( std::abs( normal.z() ) > normal.length() * 1e-6 )
+    {
+      const bool base = a.z() == 0 && ab.z() == 0 && ac.z() == 0;
+      result = base ? std::nullopt : std::make_optional( FaceFitDirection{ 0 } );
+    }
+    else
+    {
+      const int axis = std::abs( normal.x() ) > std::abs( normal.y() ) ? 0 : 1;
+      const QVector3D hit = nearPoint + direction * distance;
+      // The walls inside the L's notch face the positive model axes.
+      const bool positive = lShaped ? a[axis] > 0 : hit[axis] >= dimensions[axis] / 2;
+      const bool insideRecess = recessed && a[axis] > 1e-6 && a[axis] < dimensions[axis] - 1e-6;
+      result = insideRecess ? FaceFitDirection{ 0 } : FaceFitDirection{ 2 - axis, positive ? 1 : 0 };
+    }
+  }
+  return result;
+}
+
+static std::optional<FaceFitDirection> pickFaceFitScreen( const MeshData &mesh, const std::array<double, 3> &dimensions,
+                                                        const QMatrix4x4 &localToClip, const QSize &viewport,
+                                                        const QPoint &position, bool lShaped, bool recessed )
+{
+  if ( viewport.isEmpty() ) return std::nullopt;
+  bool invertible = false;
+  const QMatrix4x4 clipToLocal = localToClip.inverted( &invertible );
+  if ( !invertible ) return std::nullopt;
+  const double x = 2.0 * position.x() / viewport.width() - 1.0;
+  const double y = 1.0 - 2.0 * position.y() / viewport.height();
+  const auto nearPoint = clipToLocal * QVector4D( x, y, -1, 1 );
+  const auto farPoint = clipToLocal * QVector4D( x, y, 1, 1 );
+  if ( nearPoint.w() == 0 || farPoint.w() == 0 ) return std::nullopt;
+  return pickFaceFitDirection( mesh, nearPoint.toVector3DAffine(), farPoint.toVector3DAffine(), dimensions, lShaped, recessed );
+}
+
+static double faceFitTopRotation( const QMatrix4x4 &localToCamera )
+{
+  // In the 2D scene +Y is down. Use the 3D camera's screen-right direction in model XY.
+  const auto right = localToCamera.row( 0 );
+  const auto up = localToCamera.row( 1 );
+  const double radians = std::hypot( right.x(), right.y() ) > 1e-6
+                         ? std::atan2( right.y(), right.x() )
+                         : std::atan2( -up.x(), up.y() );
+  return radians * 180.0 / std::acos( -1.0 );
+}
+
+static Qgs3DMapCanvas *faceFitCanvas( QgisInterface *iface )
+{
+  if ( iface )
+    for ( Qgs3DMapCanvas *canvas : iface->mapCanvases3D() )
+      if ( canvas && canvas->scene() ) return canvas;
+  return nullptr;
+}
+
+static double currentFaceFitTopRotation( QgisInterface *iface, const ParamModelerDock *dock )
+{
+  auto *canvas = faceFitCanvas( iface );
+  if ( !canvas || !canvas->cameraController() ) return 0;
+  return faceFitTopRotation( canvas->cameraController()->camera()->viewMatrix() * modelRotationMatrix( dock ) );
+}
+
+class ParamModelerFaceFitPick : public QObject
+{
+public:
+  explicit ParamModelerFaceFitPick( QDialog *dialog ) : QObject( dialog ), m_dialog( dialog ) {}
+  ~ParamModelerFaceFitPick() override { stop(); }
+
+  void start( Qgs3DMapCanvas *canvas )
+  {
+    stop();
+    m_canvas = canvas;
+    m_cursor = canvas->cursor();
+    canvas->installEventFilter( this );
+    canvas->setCursor( Qt::CrossCursor );
+    m_canvasDestroyed = connect( canvas, &QObject::destroyed, this, [this] { finish(); } );
+    m_dialog->hide();
+    canvas->requestActivate();
+  }
+
+  std::function<bool( Qgs3DMapCanvas *, const QPoint & )> pick;
+
+protected:
+  bool eventFilter( QObject *watched, QEvent *event ) override
+  {
+    if ( watched != m_canvas ) return false;
+    if ( event->type() == QEvent::Hide )
+      finish();
+    if ( event->type() == QEvent::KeyPress && static_cast<QKeyEvent *>( event )->key() == Qt::Key_Escape )
+    {
+      finish();
+      return true;
+    }
+    if ( event->type() == QEvent::MouseButtonPress || event->type() == QEvent::MouseButtonRelease )
+    {
+      const auto *mouse = static_cast<QMouseEvent *>( event );
+      if ( mouse->button() != Qt::LeftButton && mouse->button() != Qt::RightButton ) return false;
+      if ( event->type() == QEvent::MouseButtonRelease &&
+           ( mouse->button() == Qt::RightButton || pick( m_canvas, mouse->pos() ) ) )
+        finish();
+      return true;
+    }
+    return false;
+  }
+
+private:
+  void stop()
+  {
+    disconnect( m_canvasDestroyed );
+    if ( m_canvas )
+    {
+      m_canvas->removeEventFilter( this );
+      m_canvas->setCursor( m_cursor );
+      m_canvas.clear();
+    }
+    QToolTip::hideText();
+  }
+
+  void finish()
+  {
+    stop();
+    QTimer::singleShot( 0, m_dialog, [dialog = m_dialog] {
+      dialog->show();
+      dialog->raise();
+      dialog->activateWindow();
+    } );
+  }
+
+  QDialog *m_dialog;
+  QPointer<Qgs3DMapCanvas> m_canvas;
+  QMetaObject::Connection m_canvasDestroyed;
+  QCursor m_cursor;
+};
+
+class ParamModelerFaceFitView : public QGraphicsView
+{
+public:
+  enum class ResizeTarget { Outline, Wall, RoofTop, Notch, RecessDepth };
+  std::function<void( const QRectF &, Qt::Edges, int, std::optional<double>, ResizeTarget )> resizeOutline;
+
+  explicit ParamModelerFaceFitView( QAction *undoAction, QWidget *parent )
+    : QGraphicsView( parent ), m_undoAction( undoAction )
+  {
+    setScene( new QGraphicsScene( this ) );
+    setBackgroundBrush( Qt::white );
+    setDragMode( ScrollHandDrag );
+    setTransformationAnchor( AnchorUnderMouse );
+    viewport()->setMouseTracking( true );
+  }
+
+  void syncResizeHistory( const FaceFitState &current )
+  {
+    if ( !m_resizeHistory.isEmpty() && !( current == m_lastResize ) ) clearResizeHistory();
+  }
+
+  void recordResize( const FaceFitState &before, const FaceFitState &after )
+  {
+    if ( before == after ) return;
+    syncResizeHistory( before );
+    m_resizeHistory.append( before );
+    m_lastResize = after;
+    m_undoAction->setEnabled( true );
+  }
+
+  bool undoResize( const FaceFitState &current, FaceFitState &previous )
+  {
+    syncResizeHistory( current );
+    if ( m_resizeHistory.isEmpty() ) return false;
+    previous = m_resizeHistory.takeLast();
+    m_lastResize = previous;
+    m_undoAction->setEnabled( !m_resizeHistory.isEmpty() );
+    m_dragEdges = {};
+    m_dragWallFraction.reset();
+    return true;
+  }
+
+  int selectedSide( const QString &primitive, int face ) const
+  {
+    return m_roofType == primitive && m_face == face ? m_side : -1;
+  }
+
+  void selectSide( const QString &primitive, FaceFitDirection direction )
+  {
+    if ( m_roofType != primitive || m_face != direction.view || m_side != direction.side )
+      clearFaceSample();
+    m_roofType = primitive;
+    m_face = direction.view;
+    m_side = direction.side;
+  }
+
+  bool hasFaceSample( const QString &primitive, int face, double band ) const
+  {
+    return m_faceBaseline && m_roofType == primitive && m_face == face && m_sampleBand == band;
+  }
+
+  void clearFaceSample()
+  {
+    m_faceIndices.clear();
+    m_faceSample.clear();
+    m_faceBaseline.reset();
+  }
+
+  void setFaceSample( QVector<int> indices, const QVector<QVector3D> &cloud, double band,
+                      const MeshData &mesh, const QMatrix4x4 &pose )
+  {
+    m_faceIndices = std::move( indices );
+    const int count = std::min( m_faceIndices.size(), 2048 );
+    m_faceSample.reserve( count );
+    for ( int i = 0; i < count; ++i )
+      m_faceSample.append( cloud[m_faceIndices[static_cast<qint64>( i ) * m_faceIndices.size() / count]] );
+    m_sampleBand = band;
+    m_faceBaseline = std::make_unique<ParamModelerFit::Baseline>( mesh, m_faceSample, pose );
+  }
+
+  const QVector<int> &faceIndices() const { return m_faceIndices; }
+  const QVector<QVector3D> &faceSample() const { return m_faceSample; }
+  const ParamModelerFit::Metrics &initialFaceMetrics( double tolerance ) const
+  {
+    return m_faceBaseline->metrics( tolerance );
+  }
+
+  void setProjection( const QRectF &outline, QVector<QPointF> fitted = {}, QVector<QPointF> missed = {},
+                      const QString &roofType = {}, int face = 0, double ridgeFraction = 0.5,
+                      double wallFraction = 1.0, int side = -1, double minWallFraction = 1.0, double maxWallFraction = 1.0,
+                      const QSizeF &roofTop = QSizeF( 0, 0 ), const QPointF &roofTopPosition = QPointF( 0.5, 0.5 ),
+                      const QPointF &notch = {} )
+  {
+    if ( outline.isEmpty() )
+    {
+      clearResizeHistory();
+      clearFaceSample();
+    }
+    const bool first = m_outline.isEmpty();
+    if ( outline != m_outline || roofType != m_roofType || face != m_face || side != m_side ||
+         roofTop != m_roofTop || roofTopPosition != m_roofTopPosition || notch != m_notch )
+    {
+      m_dragEdges = {};
+      m_dragWallFraction.reset();
+    }
+    m_outline = outline;
+    m_roofType = roofType;
+    m_face = face;
+    m_side = side;
+    m_ridgeFraction = ridgeFraction;
+    m_wallFraction = wallFraction;
+    m_minWallFraction = minWallFraction;
+    m_maxWallFraction = maxWallFraction;
+    m_roofTop = roofTop;
+    m_roofTopPosition = roofTopPosition;
+    m_notch = notch;
+    m_fitted = std::move( fitted );
+    m_missed = std::move( missed );
+    const double pad = std::max( 0.5, 0.15 * std::max( outline.width(), outline.height() ) );
+    m_focus = outline.adjusted( -pad, -pad, pad, pad );
+    QRectF bounds = m_focus;
+    for ( const auto &points : { &m_fitted, &m_missed } )
+      for ( const auto &point : *points )
+        bounds |= QRectF( point.x() - pad, point.y() - pad, 2 * pad, 2 * pad );
+    setSceneRect( bounds );
+    if ( first && !outline.isEmpty() ) fitOutline();
+    viewport()->update();
+  }
+
+  void fitOutline()
+  {
+    m_dragEdges = {};
+    m_dragWallFraction.reset();
+    if ( !m_outline.isEmpty() )
+    {
+      QTransform transform;
+      transform.rotate( m_viewRotation );
+      const QRectF bounds = transform.mapRect( m_focus );
+      const double scale = std::min( std::max( 1, viewport()->width() - 4 ) / bounds.width(),
+                                     std::max( 1, viewport()->height() - 4 ) / bounds.height() );
+      transform.scale( scale, scale );
+      setTransform( transform );
+      centerOn( m_focus.center() );
+    }
+    viewport()->update();
+  }
+
+  void setViewRotation( double degrees )
+  {
+    if ( std::abs( std::remainder( degrees - m_viewRotation, 360.0 ) ) < 1e-6 ) return;
+    m_viewRotation = degrees;
+    fitOutline();
+  }
+
+protected:
+  void mousePressEvent( QMouseEvent *event ) override
+  {
+    if ( event->button() == Qt::LeftButton )
+    {
+      m_dragEdges = resizeHandleAt( event->pos(), m_dragTarget );
+      if ( m_dragEdges )
+      {
+        if ( m_dragTarget == ResizeTarget::Wall || m_dragTarget == ResizeTarget::RecessDepth )
+          m_dragWallFraction = m_wallFraction;
+        m_dragStart = event->pos();
+        m_dragOutline = resizeRect( m_dragTarget );
+        event->accept();
+        return;
+      }
+    }
+    QGraphicsView::mousePressEvent( event );
+  }
+
+  void mouseMoveEvent( QMouseEvent *event ) override
+  {
+    if ( m_dragEdges )
+    {
+      previewResize( event->pos() );
+      event->accept();
+      return;
+    }
+    QGraphicsView::mouseMoveEvent( event );
+    if ( event->buttons() ) return;
+    ResizeTarget target;
+    const auto edges = resizeHandleAt( event->pos(), target );
+    const bool horizontal = bool( edges & ( Qt::LeftEdge | Qt::RightEdge ) );
+    const bool vertical = bool( edges & ( Qt::TopEdge | Qt::BottomEdge ) );
+    if ( horizontal || vertical )
+    {
+      const double x = horizontal ? 1 : 0;
+      const double y = vertical ? ( horizontal && edges.testFlag( Qt::LeftEdge ) != edges.testFlag( Qt::TopEdge ) ? -1 : 1 ) : 0;
+      const QPointF screen = transform().map( QPointF( x, y ) );
+      const int orientation = qRound( std::atan2( screen.y(), screen.x() ) * 4 / std::acos( -1.0 ) );
+      const Qt::CursorShape cursors[] = { Qt::SizeHorCursor, Qt::SizeFDiagCursor, Qt::SizeVerCursor, Qt::SizeBDiagCursor };
+      viewport()->setCursor( cursors[( orientation + 4 ) % 4] );
+    }
+    else
+      viewport()->unsetCursor();
+  }
+
+  void mouseReleaseEvent( QMouseEvent *event ) override
+  {
+    if ( m_dragEdges && event->button() == Qt::LeftButton )
+    {
+      previewResize( event->pos() );
+      const auto edges = m_dragEdges;
+      const auto wallFraction = m_dragWallFraction;
+      m_dragEdges = {};
+      m_dragWallFraction.reset();
+      const auto initial = resizeRect( m_dragTarget );
+      if ( resizeOutline && ( wallFraction || m_dragOutline != initial ) )
+        resizeOutline( m_dragOutline, edges, 0, wallFraction, m_dragTarget );
+      viewport()->update();
+      event->accept();
+      return;
+    }
+    QGraphicsView::mouseReleaseEvent( event );
+  }
+
+  void wheelEvent( QWheelEvent *event ) override
+  {
+    if ( m_dragEdges ) { event->accept(); return; }
+    if ( m_outline.isEmpty() || event->angleDelta().y() == 0 )
+    {
+      QGraphicsView::wheelEvent( event );
+      return;
+    }
+    ResizeTarget target;
+    const auto edges = resizeHandleAt( event->position().toPoint(), target );
+    if ( edges && resizeOutline )
+    {
+      if ( edges != m_wheelEdges || target != m_wheelTarget ) m_wheelDelta = 0;
+      m_wheelEdges = edges;
+      m_wheelTarget = target;
+      m_wheelDelta += event->angleDelta().y();
+      const int steps = m_wheelDelta / 120;
+      m_wheelDelta %= 120;
+      if ( steps )
+        resizeOutline( m_outline, edges, steps, std::nullopt, target );
+      event->accept();
+      return;
+    }
+    m_wheelDelta = 0;
+    const double nextScale = viewScale() * std::pow( 1.2, event->angleDelta().y() / 120.0 );
+    const double factor = std::clamp( nextScale, 1e-5, 1e6 ) / viewScale();
+    scale( factor, factor );
+    event->accept();
+  }
+
+  void drawForeground( QPainter *painter, const QRectF & ) override
+  {
+    if ( m_outline.isEmpty() ) return;
+    auto drawPoints = [painter]( const QVector<QPointF> &points, const QColor &color ) {
+      QPen pen( color, 3, Qt::SolidLine, Qt::RoundCap );
+      pen.setCosmetic( true );
+      painter->setPen( pen );
+      painter->drawPoints( points.constData(), points.size() );
+    };
+    drawPoints( m_fitted, ParamModelerScene3D::pointCloudFitColor( true ) );
+    drawPoints( m_missed, ParamModelerScene3D::pointCloudFitColor( false ) );
+    QPen outline( QColor( 34, 75, 151 ), 1, Qt::DashLine );
+    outline.setCosmetic( true );
+    painter->setPen( outline );
+    painter->setBrush( Qt::NoBrush );
+    const bool draggingRoofTop = m_dragEdges && m_dragTarget == ResizeTarget::RoofTop;
+    const auto &outlineRect = m_dragEdges && m_dragTarget == ResizeTarget::Outline ? m_dragOutline : m_outline;
+    const bool notchView = isNotchView();
+    if ( notchView )
+    {
+      const QRectF notch = m_dragEdges && m_dragTarget == ResizeTarget::Notch ? m_dragOutline : notchRect( outlineRect );
+      const QPointF start( notch.left(), notch.top() ), end( notch.right(), notch.bottom() ), elbow = notch.bottomLeft();
+      const QPointF outer[] = { start, outlineRect.topLeft(), outlineRect.bottomLeft(), outlineRect.bottomRight(), end };
+      painter->drawPolyline( outer, 5 );
+      QPen notchPen( QColor( 184, 95, 15, 210 ), 1.5 );
+      notchPen.setCosmetic( true );
+      painter->setPen( notchPen );
+      const QPointF inner[] = { start, elbow, end };
+      painter->drawPolyline( inner, 3 );
+      const double half = 3.5 / viewScale();
+      painter->drawRect( QRectF( elbow - QPointF( half, half ), QSizeF( 2 * half, 2 * half ) ) );
+      painter->setPen( outline );
+    }
+    else
+      painter->drawRect( outlineRect );
+    const QPointF corners[] = { outlineRect.topLeft(), outlineRect.topRight(),
+                                outlineRect.bottomLeft(), outlineRect.bottomRight() };
+    const bool gable = m_roofType == QLatin1String( "GableRoofHouse" );
+    const bool pyramid = m_roofType == QLatin1String( "PyramidalRoofHouse" );
+    const bool editableRoof = hasRoofTopHandle();
+    if ( m_face == 0 && gable )
+    {
+      const double y = outlineRect.bottom() - m_ridgeFraction * outlineRect.height();
+      painter->drawLine( QPointF( outlineRect.left(), y ), QPointF( outlineRect.right(), y ) );
+    }
+    else if ( ( m_face == 0 && pyramid ) || editableRoof )
+    {
+      const QRectF platform = draggingRoofTop ? m_dragOutline : roofTopRect( outlineRect );
+      if ( !isRecessed() )
+      {
+        painter->drawLine( corners[0], platform.topLeft() );
+        painter->drawLine( corners[1], platform.topRight() );
+        painter->drawLine( corners[2], platform.bottomLeft() );
+        painter->drawLine( corners[3], platform.bottomRight() );
+      }
+      if ( editableRoof )
+      {
+        QPen roofPen( QColor( 184, 95, 15, 210 ), 1.5 );
+        roofPen.setCosmetic( true );
+        painter->setPen( roofPen );
+        if ( isShortRidge() )
+        {
+          painter->drawLine( platform.topLeft(), platform.topRight() );
+          const double radius = 3.5 / viewScale();
+          painter->drawEllipse( platform.topLeft(), radius, radius );
+          painter->drawEllipse( platform.topRight(), radius, radius );
+        }
+        else
+          painter->drawRect( platform );
+      }
+    }
+    else if ( isRecessed() && m_face != 0 )
+    {
+      const auto opening = sideOpening( outlineRect );
+      const double floor = wallHandlePosition( outlineRect ).y();
+      const QPointF section[] = { QPointF( opening.x(), outlineRect.top() ), QPointF( opening.x(), floor ),
+                                  QPointF( opening.y(), floor ), QPointF( opening.y(), outlineRect.top() ) };
+      QPen recessPen( QColor( 184, 95, 15, 210 ), 1, Qt::DashLine );
+      recessPen.setCosmetic( true );
+      painter->setPen( recessPen );
+      painter->drawPolyline( section, 4 );
+    }
+    else if ( hasWallHandle() )
+    {
+      const double eave = wallHandlePosition( outlineRect ).y();
+      const QPointF leftEave( outlineRect.left(), eave ), rightEave( outlineRect.right(), eave );
+      painter->drawLine( leftEave, rightEave );
+      outline.setStyle( Qt::SolidLine );
+      painter->setPen( outline );
+      if ( gable && m_face == 1 )
+      {
+        painter->drawRect( outlineRect );
+      }
+      else
+      {
+        const double halfTop = horizontalRoofTop() / 2;
+        const double position = m_face == 2 ? m_roofTopPosition.y() : m_roofTopPosition.x();
+        const double topCenter = m_roofType == QLatin1String( "FlatTopHipRoofHouse" ) || ( isShortRidge() && m_face == 1 )
+                                 ? position * ( outlineRect.width() - 2 * halfTop ) + halfTop
+                                 : m_ridgeFraction * outlineRect.width();
+        const QPointF peak( outlineRect.left() + topCenter, outlineRect.top() );
+        const QPointF profile[] = { leftEave, peak - QPointF( halfTop, 0 ), peak + QPointF( halfTop, 0 ),
+                                    rightEave, outlineRect.bottomRight(),
+                                    outlineRect.bottomLeft(), leftEave };
+        painter->drawPolyline( profile, 7 );
+      }
+    }
+    QColor handleColor = outline.color();
+    handleColor.setAlpha( 150 );
+    QPen handles( handleColor, 1 );
+    handles.setCosmetic( true );
+    painter->setPen( handles );
+    const double halfSize = 3.5 / viewScale();
+    for ( const QPointF &corner : corners )
+      if ( !notchView || corner != outlineRect.topRight() )
+        painter->drawRect( QRectF( corner - QPointF( halfSize, halfSize ), QSizeF( 2 * halfSize, 2 * halfSize ) ) );
+    if ( hasWallHandle() )
+    {
+      QPen wallPen( QColor( 184, 95, 15, 210 ), 2 );
+      wallPen.setCosmetic( true );
+      painter->setPen( wallPen );
+      painter->drawEllipse( wallHandlePosition( outlineRect ), 1.4 * halfSize, 1.4 * halfSize );
+    }
+  }
+
+private:
+  double viewScale() const { return std::hypot( transform().m11(), transform().m12() ); }
+
+  bool isNotchView() const { return m_face == 0 && m_roofType == QLatin1String( "LShapedHouse" ); }
+
+  QRectF notchRect( const QRectF &outline ) const
+  {
+    return QRectF( outline.right() - m_notch.x() * outline.width(), outline.top(),
+                   m_notch.x() * outline.width(), ( 1 - m_notch.y() ) * outline.height() );
+  }
+
+  QRectF resizeRect( ResizeTarget target ) const
+  {
+    if ( target == ResizeTarget::RoofTop ) return roofTopRect( m_outline );
+    if ( target == ResizeTarget::Notch ) return notchRect( m_outline );
+    return m_outline;
+  }
+
+  bool isShortRidge() const { return m_roofType == QLatin1String( "ShortRidgeHipRoofHouse" ); }
+  bool isRecessed() const { return m_roofType == QLatin1String( "RecessedRoofHouse" ); }
+
+  bool hasRoofTopHandle() const
+  {
+    return m_face == 0 && ( isShortRidge() || isRecessed() || m_roofType == QLatin1String( "FlatTopHipRoofHouse" ) );
+  }
+
+  QRectF roofTopRect( const QRectF &outline ) const
+  {
+    // Project model +Y upwards in the top view.
+    const double left = outline.left() + ( outline.width() - m_roofTop.width() ) * m_roofTopPosition.x();
+    const double bottom = outline.bottom() - ( outline.height() - m_roofTop.height() ) * m_roofTopPosition.y();
+    const QRectF rect( QPointF( left, bottom - m_roofTop.height() ), m_roofTop );
+    return rect;
+  }
+
+  bool hasWallHandle() const
+  {
+    return !m_outline.isEmpty() && m_face != 0 &&
+           ( m_roofType == QLatin1String( "GableRoofHouse" ) || m_roofType == QLatin1String( "PyramidalRoofHouse" ) ||
+             m_roofType == QLatin1String( "FlatTopHipRoofHouse" ) || isShortRidge() || isRecessed() );
+  }
+
+  double horizontalRoofTop() const { return m_face == 2 ? m_roofTop.height() : m_roofTop.width(); }
+
+  QPointF sideOpening( const QRectF &rect ) const
+  {
+    const double size = horizontalRoofTop();
+    const double position = m_face == 2 ? m_roofTopPosition.y() : m_roofTopPosition.x();
+    const double start = rect.left() + ( rect.width() - size ) * position;
+    return QPointF( start, start + size );
+  }
+
+  QPointF wallHandlePosition( const QRectF &rect ) const
+  {
+    const double fraction = m_dragWallFraction.value_or( m_wallFraction );
+    const auto opening = sideOpening( rect );
+    const double x = isRecessed() ? ( opening.x() + opening.y() ) / 2 : rect.center().x();
+    const double floor = isRecessed() ? m_outline.height() * ( 1 - fraction ) : rect.height() * ( 1 - fraction );
+    return QPointF( x, rect.top() + floor );
+  }
+
+  bool wallHandleAt( const QPoint &position ) const
+  {
+    return hasWallHandle() && ( mapFromScene( wallHandlePosition( m_outline ) ) - position ).manhattanLength() <= 10;
+  }
+
+  void clearResizeHistory()
+  {
+    m_resizeHistory.clear();
+    m_undoAction->setEnabled( false );
+  }
+
+  Qt::Edges resizeHandleAt( const QPoint &position, ResizeTarget &target ) const
+  {
+    target = ResizeTarget::Outline;
+    if ( m_outline.isEmpty() ) return {};
+    if ( wallHandleAt( position ) )
+    {
+      target = isRecessed() ? ResizeTarget::RecessDepth : ResizeTarget::Wall;
+      return Qt::TopEdge;
+    }
+    const QPointF scenePosition = mapToScene( position );
+    const double hit = 7 / viewScale();
+    auto outer = edgesAt( scenePosition, m_outline, hit );
+    if ( isNotchView() )
+    {
+      const QRectF notch = notchRect( m_outline );
+      const auto inner = edgesAt( scenePosition, notch, hit ) & ( Qt::LeftEdge | Qt::BottomEdge );
+      if ( inner )
+      {
+        target = ResizeTarget::Notch;
+        return inner;
+      }
+      if ( scenePosition.x() > notch.left() + hit ) outer &= ~Qt::Edges( Qt::TopEdge );
+      if ( scenePosition.y() < notch.bottom() - hit ) outer &= ~Qt::Edges( Qt::RightEdge );
+    }
+    if ( m_face == 0 && isShortRidge() )
+    {
+      const QRectF ridge = roofTopRect( m_outline );
+      if ( std::abs( scenePosition.y() - ridge.top() ) <= hit &&
+           scenePosition.x() >= ridge.left() - hit && scenePosition.x() <= ridge.right() + hit )
+      {
+        target = ResizeTarget::RoofTop;
+        const double leftDistance = std::abs( scenePosition.x() - ridge.left() );
+        const double rightDistance = std::abs( scenePosition.x() - ridge.right() );
+        if ( std::min( leftDistance, rightDistance ) <= hit )
+          return leftDistance < rightDistance ? Qt::LeftEdge : Qt::RightEdge;
+        return Qt::TopEdge;
+      }
+    }
+    else if ( hasRoofTopHandle() )
+    {
+      const auto inner = edgesAt( scenePosition, roofTopRect( m_outline ), hit );
+      // Keep the outer corners accessible when the two frames meet.
+      if ( inner && !( ( outer & ( Qt::LeftEdge | Qt::RightEdge ) ) && ( outer & ( Qt::TopEdge | Qt::BottomEdge ) ) ) )
+      {
+        target = ResizeTarget::RoofTop;
+        return inner;
+      }
+    }
+    return outer;
+  }
+
+  static Qt::Edges edgesAt( const QPointF &position, const QRectF &outline, double hit )
+  {
+    if ( !outline.adjusted( -hit, -hit, hit, hit ).contains( position ) ) return {};
+    Qt::Edges edges;
+    const bool left = position.x() < outline.center().x();
+    const bool top = position.y() < outline.center().y();
+    if ( std::abs( position.x() - ( left ? outline.left() : outline.right() ) ) <= hit ) edges |= left ? Qt::LeftEdge : Qt::RightEdge;
+    if ( std::abs( position.y() - ( top ? outline.top() : outline.bottom() ) ) <= hit ) edges |= top ? Qt::TopEdge : Qt::BottomEdge;
+    return edges;
+  }
+
+  void previewResize( const QPoint &position )
+  {
+    const QPointF delta = mapToScene( position ) - mapToScene( m_dragStart );
+    m_dragOutline = m_outline;
+    if ( m_dragTarget == ResizeTarget::Notch )
+    {
+      m_dragOutline = notchRect( m_outline );
+      if ( m_dragEdges.testFlag( Qt::LeftEdge ) )
+        m_dragOutline.setLeft( std::clamp( m_dragOutline.left() + delta.x(), m_outline.left() + 0.1 * m_outline.width(),
+                                           m_outline.left() + 0.8 * m_outline.width() ) );
+      if ( m_dragEdges.testFlag( Qt::BottomEdge ) )
+        m_dragOutline.setBottom( std::clamp( m_dragOutline.bottom() + delta.y(), m_outline.top() + 0.1 * m_outline.height(),
+                                             m_outline.top() + 0.8 * m_outline.height() ) );
+      viewport()->update();
+      return;
+    }
+    if ( m_dragTarget == ResizeTarget::RoofTop )
+    {
+      m_dragOutline = roofTopRect( m_outline );
+      if ( isShortRidge() && m_dragEdges.testFlag( Qt::TopEdge ) )
+      {
+        m_dragOutline.moveTop( std::clamp( m_dragOutline.top() + delta.y(), m_outline.top() + 0.2 * m_outline.height(),
+                                          m_outline.bottom() - 0.2 * m_outline.height() ) );
+        viewport()->update();
+        return;
+      }
+      if ( m_dragEdges.testFlag( Qt::LeftEdge ) )
+        m_dragOutline.setLeft( std::max( m_outline.left(), std::min( m_dragOutline.left() + delta.x(), m_dragOutline.right() - 0.01 ) ) );
+      if ( m_dragEdges.testFlag( Qt::RightEdge ) )
+        m_dragOutline.setRight( std::min( m_outline.right(), std::max( m_dragOutline.right() + delta.x(), m_dragOutline.left() + 0.01 ) ) );
+      if ( m_dragEdges.testFlag( Qt::TopEdge ) )
+        m_dragOutline.setTop( std::max( m_outline.top(), std::min( m_dragOutline.top() + delta.y(), m_dragOutline.bottom() - 0.01 ) ) );
+      if ( m_dragEdges.testFlag( Qt::BottomEdge ) )
+        m_dragOutline.setBottom( std::min( m_outline.bottom(), std::max( m_dragOutline.bottom() + delta.y(), m_dragOutline.top() + 0.01 ) ) );
+      viewport()->update();
+      return;
+    }
+    if ( m_dragWallFraction )
+    {
+      m_dragWallFraction = std::clamp( m_wallFraction - delta.y() / m_outline.height(), m_minWallFraction, m_maxWallFraction );
+      viewport()->update();
+      return;
+    }
+    if ( m_dragEdges.testFlag( Qt::LeftEdge ) )
+      m_dragOutline.setLeft( std::min( m_outline.left() + delta.x(), m_outline.right() - std::max( 0.01, horizontalRoofTop() ) ) );
+    if ( m_dragEdges.testFlag( Qt::RightEdge ) )
+      m_dragOutline.setRight( std::max( m_outline.right() + delta.x(), m_outline.left() + std::max( 0.01, horizontalRoofTop() ) ) );
+    if ( m_dragEdges.testFlag( Qt::TopEdge ) )
+      m_dragOutline.setTop( std::min( m_outline.top() + delta.y(), m_outline.bottom() - minimumOutlineHeight() ) );
+    if ( m_dragEdges.testFlag( Qt::BottomEdge ) )
+      m_dragOutline.setBottom( std::max( m_outline.bottom() + delta.y(), m_outline.top() + minimumOutlineHeight() ) );
+    viewport()->update();
+  }
+
+  double minimumOutlineHeight() const
+  {
+    if ( m_face == 0 ) return std::max( 0.01, m_roofTop.height() );
+    return isRecessed() ? m_outline.height() * ( 1 - m_wallFraction ) + 0.01 : 0.01;
+  }
+
+  QRectF m_outline;
+  double m_viewRotation = 0.0;
+  QString m_roofType;
+  int m_face = 0;
+  int m_side = -1;
+  double m_ridgeFraction = 0.5;
+  double m_wallFraction = 1.0;
+  double m_minWallFraction = 1.0;
+  double m_maxWallFraction = 1.0;
+  QSizeF m_roofTop{ 0, 0 };
+  QPointF m_roofTopPosition{ 0.5, 0.5 };
+  QPointF m_notch;
+  QRectF m_dragOutline;
+  QPoint m_dragStart;
+  Qt::Edges m_dragEdges;
+  ResizeTarget m_dragTarget = ResizeTarget::Outline;
+  std::optional<double> m_dragWallFraction;
+  Qt::Edges m_wheelEdges;
+  ResizeTarget m_wheelTarget = ResizeTarget::Outline;
+  int m_wheelDelta = 0;
+  QRectF m_focus;
+  QVector<QPointF> m_fitted;
+  QVector<QPointF> m_missed;
+  QAction *m_undoAction;
+  QVector<FaceFitState> m_resizeHistory;
+  FaceFitState m_lastResize{};
+  QVector<int> m_faceIndices;
+  QVector<QVector3D> m_faceSample;
+  std::unique_ptr<ParamModelerFit::Baseline> m_faceBaseline;
+  double m_sampleBand = 0.0;
+};
+
+void ParamModelerDock::showFaceFitView()
+{
+  if ( m_faceFitView )
+  {
+    if ( m_faceFitSelection->currentIndex() == 0 )
+      m_faceFitView->setViewRotation( currentFaceFitTopRotation( mIface, this ) );
+    m_faceFitView->window()->raise();
+    m_faceFitView->window()->activateWindow();
+    return;
+  }
+  auto *dialog = new QDialog( this );
+  dialog->setAttribute( Qt::WA_DeleteOnClose );
+  dialog->setWindowTitle( tr( "2D face fit" ) );
+  auto *layout = new QVBoxLayout( dialog );
+  auto *undo = new QAction( QgsApplication::getThemeIcon( QStringLiteral( "/mActionUndo.svg" ) ),
+                           tr( "Undo last resize" ), dialog );
+  undo->setShortcut( QKeySequence::Undo );
+  undo->setShortcutContext( Qt::WidgetWithChildrenShortcut );
+  undo->setEnabled( false );
+  dialog->addAction( undo );
+  auto *undoButton = new QToolButton( dialog );
+  undoButton->setDefaultAction( undo );
+  undoButton->setToolButtonStyle( Qt::ToolButtonTextBesideIcon );
+  auto *toolbar = new QHBoxLayout;
+  toolbar->addWidget( undoButton );
+  auto *pickButton = new QPushButton( tr( "Pick face in 3D" ), dialog );
+  toolbar->addWidget( pickButton );
+  toolbar->addStretch();
+  layout->addLayout( toolbar );
+  auto *controls = new QFormLayout;
+  auto *selection = new QComboBox( dialog );
+  selection->addItem( tr( "Top (X / Y)" ) );
+  selection->addItem( tr( "Length side (X / Z)" ) );
+  selection->addItem( tr( "Width side (Y / Z)" ) );
+  controls->addRow( tr( "Face:" ), selection );
+  auto *band = new QDoubleSpinBox( dialog );
+  band->setDecimals( 3 );
+  band->setRange( 0.001, 1000000 );
+  band->setSingleStep( 0.1 );
+  band->setValue( 0.5 );
+  controls->addRow( tr( "Slice range (± scene units):" ), band );
+  layout->addLayout( controls );
+  auto *view = new ParamModelerFaceFitView( undo, dialog );
+  layout->addWidget( view, 1 );
+  auto *status = new QLabel( dialog );
+  status->setWordWrap( true );
+  layout->addWidget( status );
+  auto *dragHint = new QLabel( tr( "Drag an edge or corner to resize, or scroll over it for small steps. Scroll over empty space to zoom." ), dialog );
+  dragHint->setWordWrap( true );
+  layout->addWidget( dragHint );
+  auto *roofHint = new QLabel( dialog );
+  roofHint->setWordWrap( true );
+  layout->addWidget( roofHint );
+  const auto updateRoofHint = [this, selection, roofHint] {
+    const QString type = primitiveType();
+    const bool top = selection->currentIndex() == 0;
+    const bool shortRidge = type == QLatin1String( "ShortRidgeHipRoofHouse" );
+    const bool lShaped = type == QLatin1String( "LShapedHouse" );
+    const bool recessed = type == QLatin1String( "RecessedRoofHouse" );
+    if ( recessed )
+      roofHint->setText( top ? tr( "Drag or scroll on the orange frame to resize the recess with the opposite edge fixed." )
+                            : tr( "Drag or scroll on the orange circle to adjust recess depth." ) );
+    else if ( !top )
+      roofHint->setText( tr( "In side view, drag or scroll on the orange circle to adjust wall height with total height fixed." ) );
+    else if ( shortRidge )
+      roofHint->setText( tr( "Drag or scroll at a ridge endpoint to move it and hold the other fixed, or on the ridge line to move it sideways." ) );
+    else if ( lShaped )
+      roofHint->setText( tr( "Drag or scroll on an orange edge to adjust the L-shaped notch." ) );
+    else
+      roofHint->setText( tr( "Drag or scroll on the orange frame to resize the roof platform and hold the opposite edge fixed." ) );
+    roofHint->setVisible( recessed || ( top ? lShaped || shortRidge || type == QLatin1String( "FlatTopHipRoofHouse" )
+                                          : faceFitWallRatio( type, ui ) != nullptr ) );
+  };
+  connect( selection, qOverload<int>( &QComboBox::currentIndexChanged ), roofHint, updateRoofHint );
+  connect( ui->comboPrimitive, qOverload<int>( &QComboBox::currentIndexChanged ), roofHint, updateRoofHint );
+  updateRoofHint();
+  auto *fitButton = new QPushButton( tr( "Fit face outline" ), dialog );
+  layout->addWidget( fitButton, 0, Qt::AlignRight );
+  connect( fitButton, &QPushButton::clicked, view, [view] { view->fitOutline(); } );
+  connect( band, qOverload<double>( &QDoubleSpinBox::valueChanged ), this, [this] { scheduleFitEvaluation(); } );
+  connect( selection, qOverload<int>( &QComboBox::currentIndexChanged ), view, [this, view]( int face ) {
+    view->setViewRotation( face == 0 ? currentFaceFitTopRotation( mIface, this ) : 0.0 );
+    updateFitEvaluation();
+    view->fitOutline();
+  } );
+  auto *facePick = new ParamModelerFaceFitPick( dialog );
+  connect( pickButton, &QPushButton::clicked, facePick, [this, dialog, facePick] {
+    auto *canvas = faceFitCanvas( mIface );
+    if ( !m_realtimeModelLoaded || !m_pointCloudLayer || !faceFitControls( primitiveType(), ui )[0] ||
+         !canvas || !canvas->mapSettings() || !canvas->cameraController() ||
+         canvas->mapSettings()->sceneMode() != Qgis::SceneMode::Local || canvas->mapSettings()->crs() != m_pointCloudLayer->crs() )
+    {
+      QMessageBox::information( dialog, tr( "Pick face in 3D" ),
+                                tr( "Load a supported model and its point cloud in the local 3D view first." ) );
+      return;
+    }
+    facePick->start( canvas );
+    QToolTip::showText( canvas->mapToGlobal( QPoint( 12, 12 ) ),
+                        tr( "Click inside a model face. Press Esc to cancel." ) );
+  } );
+  facePick->pick = [this, selection, view, updateRoofHint]( Qgs3DMapCanvas *canvas, const QPoint &position ) {
+    const auto controls = faceFitControls( primitiveType(), ui );
+    if ( !m_realtimeModelLoaded || !m_pointCloudLayer || !controls[0] || !canvas->mapSettings() || !canvas->cameraController() )
+      return true;
+    const auto state = faceFitState( this, ui, controls );
+    const MeshData mesh = BuildMesh::build( state.primitive, this );
+    const auto &t = state.translation;
+    const auto origin = canvas->mapSettings()->mapToWorldCoordinates( QgsVector3D( t[0], t[1], t[2] ) );
+    QMatrix4x4 localToWorld;
+    localToWorld.translate( origin.x(), origin.y(), origin.z() );
+    localToWorld *= modelRotationMatrix( this );
+    const auto *camera = canvas->cameraController()->camera();
+    const auto picked = pickFaceFitScreen( mesh, state.dimensions, camera->projectionMatrix() * camera->viewMatrix() * localToWorld,
+                                          canvas->size(), position, state.primitive == QLatin1String( "LShapedHouse" ),
+                                          state.primitive == QLatin1String( "RecessedRoofHouse" ) );
+    if ( !picked )
+    {
+      QToolTip::showText( canvas->mapToGlobal( position ), tr( "No face here. Click inside a wall or roof. Esc cancels." ) );
+      return false;
+    }
+    const QSignalBlocker block( selection );
+    selection->setCurrentIndex( picked->view );
+    view->selectSide( state.primitive, *picked );
+    view->setViewRotation( picked->view == 0 ? currentFaceFitTopRotation( mIface, this ) : 0.0 );
+    updateRoofHint();
+    updateFitEvaluation();
+    view->fitOutline();
+    return true;
+  };
+  const auto applyResize = [this]( const FaceFitState &state, const FaceFitControls &controls ) {
+    const QScopedValueRollback<bool> suspend( m_suspendHeightCompensation, true );
+    const QScopedValueRollback<bool> anchor( m_anchorLockCompensating, true );
+    for ( int i = 0; i < 3; ++i )
+      controls[i]->setValue( state.dimensions[i] );
+    if ( auto *ratio = faceFitWallRatio( state.primitive, ui ) )
+      ratio->setValue( state.wallFraction );
+    if ( state.primitive == QLatin1String( "FlatTopHipRoofHouse" ) )
+    {
+      ui->spinBoxTPRTopLength->setValue( state.roofTop.width() );
+      ui->spinBoxTPRTopWidth->setValue( state.roofTop.height() );
+      m_tpTopPosition = state.roofTopPosition;
+    }
+    else if ( state.primitive == QLatin1String( "ShortRidgeHipRoofHouse" ) )
+    {
+      ui->spinBoxAGHRidgeLength->setValue( state.roofTop.width() );
+      ui->spinBoxAGHRidgeOffset->setValue( state.ridgeFraction );
+      m_aghRidgePositionX = state.roofTopPosition.x();
+    }
+    else if ( state.primitive == QLatin1String( "LShapedHouse" ) )
+    {
+      ui->spinBoxLWingRatio->setValue( state.notch.x() );
+      ui->spinBoxLWingWidthRatio->setValue( state.notch.y() );
+    }
+    else if ( state.primitive == QLatin1String( "RecessedRoofHouse" ) )
+    {
+      ui->spinBoxICInnerLength->setValue( state.roofTop.width() );
+      ui->spinBoxICInnerWidth->setValue( state.roofTop.height() );
+      ui->spinBoxICOffsetX->setValue( state.roofTopPosition.x() );
+      ui->spinBoxICOffsetY->setValue( state.roofTopPosition.y() );
+      ui->spinBoxICInnerHeight->setValue( state.recessDepth );
+    }
+    setPoseTranslate( state.translation[0], state.translation[1], state.translation[2] );
+  };
+  const auto refreshResize = [this] {
+    retargetAnchorLockToCurrentPosition();
+    onUpdatePreview();
+    m_fitTimer->stop();
+    updateFitEvaluation();
+  };
+  connect( undo, &QAction::triggered, view, [this, view, applyResize, refreshResize] {
+    const auto controls = faceFitControls( primitiveType(), ui );
+    if ( !m_realtimeModelLoaded || !m_pointCloudLayer || !controls[0] )
+      return;
+    FaceFitState previous;
+    if ( !view->undoResize( faceFitState( this, ui, controls ), previous ) ) return;
+    applyResize( previous, controls );
+    refreshResize();
+  } );
+  using ResizeTarget = ParamModelerFaceFitView::ResizeTarget;
+  view->resizeOutline = [this, view, selection, applyResize, refreshResize]( const QRectF &outline, Qt::Edges edges, int wheelSteps,
+                                                                        std::optional<double> wallFraction, ResizeTarget target ) {
+    const auto dimensions = faceFitControls( primitiveType(), ui );
+    if ( !m_realtimeModelLoaded || !m_pointCloudLayer || !dimensions[0] )
+      return;
+    const int face = selection->currentIndex();
+    const int horizontalAxis = face == 2 ? 1 : 0;
+    const int verticalAxis = face == 0 ? 1 : 2;
+    const auto before = faceFitState( this, ui, dimensions );
+    const bool recessed = before.primitive == QLatin1String( "RecessedRoofHouse" );
+    const auto resizeRoofAxis = [wheelSteps]( const QDoubleSpinBox *spin, double dragged, double footprint, double position, bool movesMin ) {
+      const double size = spin->value();
+      const double origin = ( footprint - size ) * position;
+      const double fixedEdge = movesMin ? origin + size : origin;
+      const double room = std::clamp( movesMin ? fixedEdge : footprint - fixedEdge, 0.0, footprint );
+      const double scale = std::pow( 10.0, spin->decimals() );
+      const double maximum = std::min( std::floor( room * scale + 1e-8 ) / scale, spin->maximum() );
+      const double minimum = std::min( maximum, std::max( spin->minimum(), spin->singleStep() ) );
+      const double requested = wheelSteps ? size + wheelSteps * spin->singleStep() : dragged;
+      const double nextSize = std::clamp( std::round( requested * scale ) / scale, minimum, maximum );
+      if ( nextSize == size ) return QPointF( size, position );
+      const double nextOrigin = movesMin ? fixedEdge - nextSize : fixedEdge;
+      const double clearance = footprint - nextSize;
+      const double nextPosition = clearance > 0 ? std::clamp( nextOrigin / clearance, 0.0, 1.0 ) : position;
+      return QPointF( nextSize, nextPosition );
+    };
+    auto after = before;
+    if ( target == ResizeTarget::Wall )
+    {
+      auto *ratio = faceFitWallRatio( before.primitive, ui );
+      if ( face == 0 || !ratio ) return;
+      const auto *total = dimensions[2];
+      const double requested = wallFraction.value_or( before.wallFraction ) + wheelSteps * total->singleStep() / total->value();
+      after.wallFraction = std::clamp( requested, ratio->minimum(), ratio->maximum() );
+    }
+    else if ( target == ResizeTarget::RecessDepth )
+    {
+      if ( face == 0 || !recessed ) return;
+      const auto *depth = ui->spinBoxICInnerHeight;
+      const double requested = wallFraction ? ( 1 - *wallFraction ) * before.dimensions[2] :
+                                             before.recessDepth + wheelSteps * depth->singleStep();
+      after.recessDepth = std::clamp( requested, std::min( depth->singleStep(), depth->maximum() ), depth->maximum() );
+    }
+    else if ( target == ResizeTarget::Notch )
+    {
+      if ( face != 0 || before.primitive != QLatin1String( "LShapedHouse" ) ) return;
+      const auto adjust = []( const QDoubleSpinBox *ratio, double notch, const QDoubleSpinBox *span, int steps ) {
+        const double requested = steps ? ratio->value() + steps * span->singleStep() / span->value()
+                                       : notch / span->value();
+        return std::clamp( requested, ratio->minimum(), ratio->maximum() );
+      };
+      if ( edges.testFlag( Qt::LeftEdge ) )
+        after.notch.setX( adjust( ui->spinBoxLWingRatio, outline.width(), dimensions[0], wheelSteps ) );
+      if ( edges.testFlag( Qt::BottomEdge ) )
+        after.notch.setY( adjust( ui->spinBoxLWingWidthRatio, -outline.bottom(), dimensions[1], -wheelSteps ) );
+    }
+    else if ( target == ResizeTarget::RoofTop && before.primitive == QLatin1String( "ShortRidgeHipRoofHouse" ) )
+    {
+      if ( face != 0 ) return;
+      if ( edges.testFlag( Qt::TopEdge ) )
+      {
+        const auto *ratio = ui->spinBoxAGHRidgeOffset;
+        const double requested = wheelSteps ? ratio->value() + wheelSteps * ratio->singleStep() :
+                                               -outline.top() / before.dimensions[1];
+        after.ridgeFraction = std::clamp( requested, ratio->minimum(), ratio->maximum() );
+      }
+      else
+      {
+        const QPointF x = resizeRoofAxis( ui->spinBoxAGHRidgeLength, outline.width(), before.dimensions[0],
+                                          before.roofTopPosition.x(), edges.testFlag( Qt::LeftEdge ) );
+        after.roofTop.setWidth( x.x() );
+        after.roofTopPosition.setX( x.y() );
+      }
+    }
+    else if ( target == ResizeTarget::RoofTop )
+    {
+      if ( face != 0 || ( !recessed && before.primitive != QLatin1String( "FlatTopHipRoofHouse" ) ) ) return;
+      if ( edges & ( Qt::LeftEdge | Qt::RightEdge ) )
+      {
+        const QPointF x = resizeRoofAxis( recessed ? ui->spinBoxICInnerLength : ui->spinBoxTPRTopLength, outline.width(), before.dimensions[0],
+                                          before.roofTopPosition.x(), edges.testFlag( Qt::LeftEdge ) );
+        after.roofTop.setWidth( x.x() );
+        after.roofTopPosition.setX( x.y() );
+      }
+      if ( edges & ( Qt::TopEdge | Qt::BottomEdge ) )
+      {
+        const QPointF y = resizeRoofAxis( recessed ? ui->spinBoxICInnerWidth : ui->spinBoxTPRTopWidth, outline.height(), before.dimensions[1],
+                                          before.roofTopPosition.y(), edges.testFlag( Qt::BottomEdge ) );
+        after.roofTop.setHeight( y.x() );
+        after.roofTopPosition.setY( y.y() );
+      }
+    }
+    if ( target != ResizeTarget::Outline )
+    {
+      if ( before == after ) return;
+      applyResize( after, dimensions );
+      const auto applied = faceFitState( this, ui, dimensions );
+      if ( before == applied ) return;
+      view->recordResize( before, applied );
+      refreshResize();
+      return;
+    }
+    auto *horizontal = dimensions[horizontalAxis];
+    auto *vertical = dimensions[verticalAxis];
+    const auto bounded = []( QDoubleSpinBox *spin, double size, double roofTop ) {
+      const double minimum = std::max( { spin->minimum(), spin->singleStep(), roofTop } );
+      return QString::number( std::clamp( size, minimum, spin->maximum() ), 'f', spin->decimals() ).toDouble();
+    };
+    const double topWidth = face == 2 ? before.roofTop.height() : before.roofTop.width();
+    const double topHeight = face == 0 ? before.roofTop.height() : recessed ? before.recessDepth + vertical->singleStep() : 0;
+    const double requestedWidth = wheelSteps ? horizontal->value() + wheelSteps * horizontal->singleStep() : outline.width();
+    const double requestedHeight = wheelSteps ? vertical->value() + wheelSteps * vertical->singleStep() : outline.height();
+    const double width = edges & ( Qt::LeftEdge | Qt::RightEdge ) ? bounded( horizontal, requestedWidth, topWidth ) : horizontal->value();
+    const double height = edges & ( Qt::TopEdge | Qt::BottomEdge ) ? bounded( vertical, requestedHeight, topHeight ) : vertical->value();
+    if ( width == horizontal->value() && height == vertical->value() ) return;
+
+    QVector3D originShift;
+    if ( edges.testFlag( Qt::LeftEdge ) ) originShift[horizontalAxis] = horizontal->value() - width;
+    if ( edges.testFlag( Qt::BottomEdge ) ) originShift[verticalAxis] = vertical->value() - height;
+    const QVector3D shift = modelRotationMatrix( this ).mapVector( originShift );
+    const double tx = poseTranslateX() + shift.x();
+    const double ty = poseTranslateY() + shift.y();
+    const double tz = poseTranslateZ() + shift.z();
+    if ( tx < ui->spinBoxTX->minimum() || tx > ui->spinBoxTX->maximum() ||
+         ty < ui->spinBoxTY->minimum() || ty > ui->spinBoxTY->maximum() ||
+         tz < ui->spinBoxTZ->minimum() || tz > ui->spinBoxTZ->maximum() )
+    {
+      QToolTip::showText( view->mapToGlobal( view->rect().center() ), tr( "Resize exceeds the model translation range." ), view );
+      return;
+    }
+    const QPointF center = view->mapToScene( view->viewport()->rect().center() );
+    after.dimensions[horizontalAxis] = width;
+    after.dimensions[verticalAxis] = height;
+    after.translation = { tx, ty, tz };
+    applyResize( after, dimensions );
+    view->recordResize( before, faceFitState( this, ui, dimensions ) );
+    refreshResize();
+    view->centerOn( center - QPointF( originShift[horizontalAxis], -originShift[verticalAxis] ) );
+  };
+  m_faceFitView = view;
+  m_faceFitSelection = selection;
+  m_faceFitBand = band;
+  m_faceFitStatus = status;
+  dialog->resize( 620, 510 );
+  dialog->show();
+  view->setViewRotation( currentFaceFitTopRotation( mIface, this ) );
+  updateFitEvaluation();
+}
+
+void ParamModelerDock::updateFaceFitView( const QMatrix4x4 &pose, const QVector<bool> &surfaceFit )
+{
+  if ( !m_faceFitView ) return;
+  const auto controls = faceFitControls( primitiveType(), ui );
+  if ( !controls[0] || surfaceFit.isEmpty() )
+  {
+    m_faceFitView->setProjection( {} );
+    m_faceFitStatus->setText( tr( "Load a supported model and its point cloud to fine-tune in 2D." ) );
+    return;
+  }
+  const auto state = faceFitState( this, ui, controls );
+  m_faceFitView->syncResizeHistory( state );
+  const QMatrix4x4 worldToModel = pose.inverted();
+  const double band = m_faceFitBand->value();
+  // Keep the selected wall during edits. Re-evaluate when the user enters another view.
+  const int face = m_faceFitSelection->currentIndex();
+  const int horizontalAxis = face == 2 ? 1 : 0;
+  const int verticalAxis = face == 0 ? 1 : 2;
+  const int normalAxis = 3 - horizontalAxis - verticalAxis;
+  const auto &dimensions = state.dimensions;
+  const double wallHeight = dimensions[2] * state.wallFraction;
+  const double verticalSpan = dimensions[verticalAxis];
+  const bool lShaped = state.primitive == QLatin1String( "LShapedHouse" );
+  const double notchX = dimensions[0] * ( 1 - state.notch.x() );
+  const double notchY = dimensions[1] * state.notch.y();
+  const bool gable = state.primitive == QLatin1String( "GableRoofHouse" );
+  const bool flatHip = state.primitive == QLatin1String( "FlatTopHipRoofHouse" );
+  const bool shortRidge = state.primitive == QLatin1String( "ShortRidgeHipRoofHouse" );
+  const bool recessed = state.primitive == QLatin1String( "RecessedRoofHouse" ) && dimensions[2] > 0;
+  const bool hip = flatHip || shortRidge || state.primitive == QLatin1String( "PyramidalRoofHouse" );
+  const QSizeF &roofTop = state.roofTop;
+  const double xMargin = hip ? 1 - roofTop.width() / dimensions[0] : 0;
+  const double yMargin = hip ? 1 - roofTop.height() / dimensions[1] : 0;
+  const QPointF topPosition = shortRidge ? QPointF( state.roofTopPosition.x(), state.ridgeFraction ) : state.roofTopPosition;
+  const double recessFloor = dimensions[2] - state.recessDepth;
+  const QRectF recess( QPointF( ( dimensions[0] - roofTop.width() ) * topPosition.x(),
+                               ( dimensions[1] - roofTop.height() ) * topPosition.y() ), roofTop );
+  const QRectF recessBand = recess.adjusted( -band, -band, band, band );
+  const std::array<double, 4> insets = { xMargin * topPosition.x(), xMargin * ( 1 - topPosition.x() ),
+                                         yMargin * topPosition.y(), yMargin * ( 1 - topPosition.y() ) };
+  const auto slopeProgress = []( double distance, double inset ) {
+    return inset > 0 ? distance / inset : std::numeric_limits<double>::infinity();
+  };
+  const int lockedSide = face == 0 ? 0 : m_faceFitView->selectedSide( state.primitive, face );
+  const bool hasSample = m_faceFitView->hasFaceSample( state.primitive, face, band );
+  if ( !hasSample ) m_faceFitView->clearFaceSample();
+  const int firstSide = std::max( 0, lockedSide );
+  const int lastSide = lockedSide < 0 ? 1 : lockedSide;
+  const double wallBand = std::min( band, dimensions[normalAxis] * 0.25 );
+  const double alongMargin = std::min( band, dimensions[horizontalAxis] * 0.15 );
+  const double wallMargin = std::min( band, wallHeight * 0.15 );
+  struct SidePoints
+  {
+    std::array<int, 3> support{}; // Wall interior, visible roof, then all displayed points.
+    QVector<int> indices;
+  };
+  SidePoints sides[2];
+  const int pointsToSlice = hasSample ? 0 : m_displayFitPoints.size();
+  for ( int i = 0; i < pointsToSlice; ++i )
+  {
+    const QVector3D local = worldToModel.map( m_displayFitPoints[i] );
+    const double x = local[horizontalAxis];
+    const double y = local[verticalAxis];
+    const double normal = local[normalAxis];
+    if ( !std::isfinite( x ) || !std::isfinite( y ) || !std::isfinite( normal ) ) continue;
+    double roofZ = dimensions[2];
+    double widthFraction = 0;
+    double hipProgress = 0;
+    std::array<double, 4> hipSlopes{};
+    if ( gable || hip )
+    {
+      widthFraction = std::clamp( local.y() / dimensions[1], 0.0, 1.0 );
+      if ( hip )
+      {
+        const double lengthFraction = std::clamp( local.x() / dimensions[0], 0.0, 1.0 );
+        hipSlopes = { slopeProgress( lengthFraction, insets[0] ), slopeProgress( 1 - lengthFraction, insets[1] ),
+                      slopeProgress( widthFraction, insets[2] ), slopeProgress( 1 - widthFraction, insets[3] ) };
+        hipProgress = *std::min_element( hipSlopes.begin(), hipSlopes.end() );
+      }
+      const double roofFraction = gable
+        ? std::min( widthFraction / state.ridgeFraction, ( 1 - widthFraction ) / ( 1 - state.ridgeFraction ) )
+        : std::min( 1.0, hipProgress );
+      roofZ = wallHeight + ( dimensions[2] - wallHeight ) * roofFraction;
+    }
+    const bool nearRoof = std::abs( local.z() - roofZ ) <= band;
+    const bool nearRecess = recessed && recessBand.contains( local.x(), local.y() ) &&
+                            local.z() >= recessFloor - band && local.z() <= dimensions[2] + band;
+    for ( int side = firstSide; side <= lastSide; ++side )
+    {
+      bool inSlice = nearRoof || nearRecess;
+      bool roofSupport = false;
+      bool wallSupport = false;
+      if ( face != 0 )
+      {
+        double wall = dimensions[normalAxis];
+        if ( lShaped && x > ( face == 1 ? notchX : notchY ) )
+          wall = face == 1 ? notchY : notchX;
+        const double wallDistance = side == 0 ? normal : wall - normal;
+        const bool nearWall = std::abs( wallDistance ) <= band;
+        wallSupport = std::abs( wallDistance ) <= wallBand && x >= alongMargin &&
+                      x <= dimensions[horizontalAxis] - alongMargin && y >= wallMargin && y <= wallHeight - wallMargin;
+        inSlice = nearWall || nearRecess;
+        if ( gable && face == 2 )
+        {
+          // The gable end includes the triangle above the eave.
+          inSlice = nearWall && y <= roofZ + band;
+          roofSupport = inSlice && y > wallHeight + wallMargin;
+        }
+        else if ( gable || hip )
+        {
+          const double normalFraction = side == 0 ? widthFraction : 1 - widthFraction;
+          const bool facingRoof = gable
+            ? normalFraction <= ( side == 0 ? state.ridgeFraction : 1 - state.ridgeFraction )
+            : hipProgress <= 1.0 && hipSlopes[2 * normalAxis + side] == hipProgress;
+          const bool verticalRoof = ( flatHip || shortRidge ) && insets[2 * normalAxis + side] == 0;
+          const bool visibleRoof = ( facingRoof && nearRoof && wallDistance >= -band ) ||
+                                   ( verticalRoof && nearWall && y <= roofZ + band );
+          inSlice = ( nearWall && y <= wallHeight + band ) || visibleRoof;
+          roofSupport = visibleRoof && y > wallHeight + wallMargin;
+        }
+      }
+      if ( !inSlice ) continue;
+      auto &points = sides[side];
+      points.support[0] += wallSupport;
+      points.support[1] += roofSupport;
+      ++points.support[2];
+      points.indices.append( i );
+    }
+  }
+  const int chosenSide = lockedSide >= 0 ? lockedSide : ( sides[1].support > sides[0].support ? 1 : 0 );
+  auto &view = *m_faceFitView;
+  QString localMetrics;
+  if ( hasSample || !sides[chosenSide].indices.isEmpty() )
+  {
+    const MeshData mesh = BuildMesh::build( state.primitive, this );
+    if ( !hasSample )
+      view.setFaceSample( std::move( sides[chosenSide].indices ), m_displayFitPoints, band, mesh, pose );
+    const auto &initial = view.initialFaceMetrics( m_fitTolerance );
+    const auto current = ParamModelerFit::evaluate( mesh, view.faceSample(), pose, m_fitTolerance );
+    localMetrics = tr( "Local fit (initial → current, %1 fixed points)\nRMSE %2 → %3 | Within tolerance %4% → %5%" )
+                     .arg( current.count ).arg( initial.rmse, 0, 'f', 3 ).arg( current.rmse, 0, 'f', 3 )
+                     .arg( initial.percentage( initial.surfaceCount ), 0, 'f', 1 )
+                     .arg( current.percentage( current.surfaceCount ), 0, 'f', 1 );
+  }
+  QVector<QPointF> fitted, missed;
+  for ( int i : view.faceIndices() )
+  {
+    const QVector3D local = worldToModel.map( m_displayFitPoints[i] );
+    ( surfaceFit[i] ? fitted : missed ).append( QPointF( local[horizontalAxis], -local[verticalAxis] ) );
+  }
+  QString status = tr( "Green within 3D fit tolerance, red outside. Face slice: %1 points." ).arg( view.faceIndices().size() );
+  if ( face != 0 )
+  {
+    const QString direction = ( chosenSide == 0 ? QStringLiteral( "−" ) : QStringLiteral( "+" ) ) +
+                              ( normalAxis == 0 ? QStringLiteral( "X" ) : QStringLiteral( "Y" ) );
+    status += QLatin1Char( ' ' ) + tr( "Viewing side: %1." ).arg( direction );
+  }
+  if ( !localMetrics.isEmpty() ) status += QLatin1Char( '\n' ) + localMetrics;
+  m_faceFitStatus->setText( status );
+  const auto *ratio = faceFitWallRatio( state.primitive, ui );
+  const double floorLimit = recessed ? std::min( 0.5, ui->spinBoxICInnerHeight->singleStep() / dimensions[2] ) : 1.0;
+  view.setProjection( QRectF( 0, -verticalSpan, dimensions[horizontalAxis], verticalSpan ),
+                      std::move( fitted ), std::move( missed ), state.primitive, face, state.ridgeFraction,
+                      recessed ? recessFloor / dimensions[2] : state.wallFraction,
+                      face != 0 && ( lockedSide >= 0 || !view.faceIndices().isEmpty() ) ? chosenSide : -1,
+                      recessed ? floorLimit : ratio ? ratio->minimum() : 1.0,
+                      recessed ? 1 - floorLimit : ratio ? ratio->maximum() : 1.0, roofTop, topPosition, state.notch );
 }
 
 void ParamModelerDock::showFitEvaluationDetails()
@@ -1051,7 +2213,9 @@ void ParamModelerDock::scheduleFitEvaluation()
   if ( !m_realtimeModelLoaded || !m_pointCloudLayer || m_fitCloudPoints.isEmpty() )
   {
     m_fitTimer->stop();
+    updateFaceFitView( {}, {} );
     ParamModelerScene3D::setFitMetricText( mIface, QString() );
+    ParamModelerScene3D::setPointCloudFitColors( m_pointCloudLayer );
     return;
   }
   if ( !m_fitBaseline )
@@ -1085,13 +2249,18 @@ void ParamModelerDock::updateFitEvaluation()
   pose.rotate( poseRotateX(), 1, 0, 0 );
   pose.rotate( poseRotateY(), 0, 1, 0 );
   pose.rotate( poseRotateZ(), 0, 0, 1 );
-  const auto metrics = ParamModelerFit::evaluate( mesh, m_fitCloudPoints, pose, m_fitTolerance );
+  QVector<bool> surfaceFit;
+  const auto metrics = ParamModelerFit::evaluate( mesh, m_fitCloudPoints, pose, m_fitTolerance,
+                                                m_displayFitPoints, &surfaceFit );
+  updateFaceFitView( pose, surfaceFit );
   if ( !metrics.count )
   {
     ParamModelerScene3D::setFitMetricText( mIface, QString() );
+    ParamModelerScene3D::setPointCloudFitColors( m_pointCloudLayer );
     if ( m_fitDetailsLabel ) m_fitDetailsLabel->setText( tr( "Load a model and point cloud to evaluate." ) );
     return;
   }
+  ParamModelerScene3D::setPointCloudFitColors( m_pointCloudLayer, surfaceFit );
   if ( !m_fitBaseline )
     m_fitBaseline = QSharedPointer<ParamModelerFit::Baseline>::create( mesh, m_fitCloudPoints, pose );
   const auto &initial = m_fitBaseline->metrics( m_fitTolerance );
@@ -1099,7 +2268,7 @@ void ParamModelerDock::updateFitEvaluation()
     ? tr( "Current outside: %1% | inside: %2%" ).arg( metrics.percentage( metrics.outsideCount ), 0, 'f', 1 )
         .arg( metrics.percentage( metrics.insideCount ), 0, 'f', 1 )
     : tr( "Inside/outside unavailable: open mesh" );
-  const QString text = initial.count
+  QString text = initial.count
     ? tr( "Initial → Current (scene units)\nRMSE %1 → %2\nSurface fit: %3% → %4%\n%5\nTolerance: %6 | N: %7" )
         .arg( initial.rmse, 0, 'f', 3 ).arg( metrics.rmse, 0, 'f', 3 )
         .arg( initial.percentage( initial.surfaceCount ), 0, 'f', 1 )
@@ -1108,6 +2277,7 @@ void ParamModelerDock::updateFitEvaluation()
     : tr( "Fit RMSE: %1\nSurface fit: %2%\n%3\nTolerance: %4 | N: %5\nScene units" )
         .arg( metrics.rmse, 0, 'f', 3 ).arg( metrics.percentage( metrics.surfaceCount ), 0, 'f', 1 )
         .arg( sides ).arg( m_fitTolerance, 0, 'g', 6 ).arg( metrics.count );
+  text += QLatin1Char( '\n' ) + tr( "Point colors: green within tolerance, red outside tolerance" );
   ParamModelerScene3D::setFitMetricText( mIface, text );
   if ( m_fitDetailsLabel )
     m_fitDetailsLabel->setText( text + tr( "\nCurrent P95: %1\nCurrent surface fit points: %2\nCurrent outside points: %3\nCurrent inside points: %4" )

@@ -1,4 +1,4 @@
-"""Physical auxiliary features must not depend on TXT coordinate normalization."""
+"""Prediction auxiliary features must match each checkpoint's training units."""
 
 import json
 from pathlib import Path
@@ -42,14 +42,15 @@ class AuxiliaryUnitTests(unittest.TestCase):
                 canonical_aux_units=units, canonical_bbox_mode=bbox_mode)
 
     def predict(self, normalized, units="physical", coordinates="declared", metadata=False,
-                bbox_mode=None, robust_flag=False):
+                bbox_mode=None, robust_flag=False, class_name="LShapedHouse",
+                canonical_align=True, target_mode="raw", input_scale=None):
         points = self.normalized if normalized else self.physical
         orientation = {"reliable": True, "status": "LHOUSE_DIRECTION_OK", "reason": "test direction",
                        "aligned_points": regression.rotate_points_z(points, -120),
                        "canonical_angle_deg": 120, "verdict": "PASS", "pca_ratio": 2,
                        "peak_concentration": 0, "n_ransac_segments": 0}
-        checkpoint = {"class_name": "LShapedHouse", "canonical_align": True, "lhouse_canonical": True,
-                      "aux_names": self.names}
+        checkpoint = {"class_name": class_name, "canonical_align": canonical_align, "lhouse_canonical": True,
+                      "aux_names": self.names, "target_mode": target_mode}
         if units is not None:
             checkpoint["canonical_aux_units"] = units
         if bbox_mode is not None:
@@ -67,7 +68,8 @@ class AuxiliaryUnitTests(unittest.TestCase):
                   torch.zeros(len(self.names)), torch.ones(len(self.names)))
         args = SimpleNamespace(log_dir="unused", cpu=True, input="a.txt", num_points=4,
                                canonical_align=False, input_coordinates=coordinates,
-                               metadata="metadata.json", data_root="data", scale=self.scale,
+                               metadata="metadata.json", data_root="data",
+                               scale=self.scale if input_scale is None else input_scale,
                                bbox_x=20, bbox_y=10, bbox_z=5, lhouse_robust_bbox=robust_flag)
         record = self.record(normalized)
         with patch.object(regression, "load_checkpoint", return_value=loaded), \
@@ -115,6 +117,53 @@ class AuxiliaryUnitTests(unittest.TestCase):
     def test_old_checkpoint_without_unit_marker_keeps_legacy_behavior(self):
         old, _ = self.predict(True, units=None, coordinates=None)
         np.testing.assert_allclose(old["aux"], self.dataset(True, units="legacy").samples[0][2], rtol=1e-5)
+
+    def test_legacy_canonical_prediction_matches_normalized_training_features(self):
+        expected = self.dataset(True, units="legacy").samples[0][2]
+        for class_name in ("GableRoofHouse", "ShortRidgeHipRoofHouse", "PyramidalRoofHouse",
+                           "FlatTopHipRoofHouse", "BarrelRoofHouse", "RecessedRoofHouse",
+                           "AngledGableHouse", "FlatRoofHouse"):
+            with self.subTest(class_name=class_name):
+                physical, actual = self.predict(False, units="legacy", class_name=class_name)
+                normalized, reference = self.predict(True, units="legacy", class_name=class_name)
+                np.testing.assert_allclose(physical["aux"], expected, rtol=1e-5)
+                np.testing.assert_allclose(physical["aux"], normalized["aux"], rtol=1e-5)
+                np.testing.assert_allclose(physical["points"], normalized["points"], atol=1e-6)
+                self.assertEqual(actual["params"], reference["params"])
+
+    def test_old_checkpoint_with_declared_physical_input_also_converts_legacy_units(self):
+        physical, _ = self.predict(False, units=None)
+        normalized, _ = self.predict(True, units=None)
+        np.testing.assert_allclose(physical["aux"], normalized["aux"], rtol=1e-5)
+
+    def test_legacy_normalized_metadata_preserves_existing_predictions(self):
+        direct, _ = self.predict(True, units="legacy")
+        metadata, _ = self.predict(True, units="legacy", coordinates=None, metadata=True)
+        np.testing.assert_array_equal(direct["aux"], metadata["aux"])
+
+    def test_legacy_metadata_physical_input_matches_normalized_training_features(self):
+        physical, _ = self.predict(False, units="legacy", coordinates=None, metadata=True)
+        normalized, _ = self.predict(True, units="legacy", coordinates=None, metadata=True)
+        np.testing.assert_allclose(physical["aux"], normalized["aux"], rtol=1e-5)
+
+    def test_legacy_bbox_residual_prediction_uses_the_same_training_baseline(self):
+        _, physical = self.predict(False, units="legacy", class_name="FlatRoofHouse",
+                                   target_mode="bbox_residual")
+        _, normalized = self.predict(True, units="legacy", class_name="FlatRoofHouse",
+                                     target_mode="bbox_residual")
+        np.testing.assert_allclose(list(physical["params"].values()),
+                                   list(normalized["params"].values()), rtol=1e-5)
+
+    def test_noncanonical_prediction_preserves_physical_metadata_auxiliary_features(self):
+        physical, _ = self.predict(False, units="legacy", canonical_align=False)
+        normalized, _ = self.predict(True, units="legacy", canonical_align=False)
+        np.testing.assert_allclose(physical["aux"], normalized["aux"], rtol=1e-5)
+        self.assertAlmostEqual(float(physical["aux"][4]), 1000, places=2)
+
+    def test_legacy_physical_input_requires_a_valid_normalization_scale(self):
+        for scale in (0, -1, float("nan"), float("inf")):
+            with self.subTest(scale=scale), self.assertRaisesRegex(ValueError, "positive physical scale"):
+                self.predict(False, units="legacy", input_scale=scale)
 
     def test_physical_checkpoint_rejects_undeclared_remote_input(self):
         with self.assertRaisesRegex(ValueError, "Declare input_coordinates"):

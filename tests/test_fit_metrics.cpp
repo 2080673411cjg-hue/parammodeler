@@ -59,6 +59,17 @@ int main()
   adjustedPose.translate( 0, 0, .125 );
   const auto adjusted = evaluate( initialMesh, initialPoints, adjustedPose, .125 );
   assert( adjusted.surfaceCount == 3 && adjusted.rmse < initial.rmse );
+  // Display coloring uses the full cloud, including points outside the statistics sample.
+  const QVector<QVector3D> displayPoints { initialPoints[1], initialPoints[2], { .2f, .2f, .375f } };
+  QVector<bool> surfaceFit;
+  evaluate( initialMesh, initialPoints, initialPose, .125, displayPoints, &surfaceFit );
+  assert( ( surfaceFit == QVector<bool>{ true, false, false } ) );
+  evaluate( initialMesh, initialPoints, adjustedPose, .125, displayPoints, &surfaceFit );
+  assert( ( surfaceFit == QVector<bool>{ true, true, false } ) );
+  evaluate( initialMesh, initialPoints, adjustedPose, .25, displayPoints, &surfaceFit );
+  assert( ( surfaceFit == QVector<bool>{ true, true, true } ) );
+  evaluate( MeshData(), initialPoints, adjustedPose, .25, displayPoints, &surfaceFit );
+  assert( surfaceFit.isEmpty() );
   initialMesh.vertices[0].setZ( 10 );
   initialPoints[0].setZ( 10 );
   initialPose.translate( 0, 0, 10 );
@@ -106,6 +117,8 @@ int main()
   metrics = evaluate( box, classified, identity, .125 );
   assert( metrics.solidAvailable && metrics.surfaceCount == 1 && metrics.outsideCount == 1 && metrics.insideCount == 1 );
   assert( metrics.surfaceCount + metrics.outsideCount + metrics.insideCount == metrics.count );
+  evaluate( box, classified, identity, .125, classified, &surfaceFit );
+  assert( ( surfaceFit == QVector<bool>{ true, false, false } ) );
   near( metrics.percentage( metrics.surfaceCount ) + metrics.percentage( metrics.outsideCount ) + metrics.percentage( metrics.insideCount ), 100 );
   // Winding is not trusted: several legacy primitive faces have reversed normals.
   for ( int i = 0; i < box.indices.size(); i += 6 ) std::swap( box.indices[i], box.indices[i + 1] );

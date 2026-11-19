@@ -168,11 +168,19 @@ struct RayQuery
 {
   Eigen::Vector3d origin, direction;
   std::vector<double> hits;
+  double maxDistance = std::numeric_limits<double>::infinity();
+  bool firstHitOnly = false;
+  bool hit = false;
   bool intersectVolume( const Eigen::AlignedBox3d &box )
   {
-    double nearT = 0, farT = std::numeric_limits<double>::infinity();
+    double nearT = 0, farT = maxDistance;
     for ( int axis = 0; axis < 3; ++axis )
     {
+      if ( direction[axis] == 0 )
+      {
+        if ( origin[axis] < box.min()[axis] || origin[axis] > box.max()[axis] ) return false;
+        continue;
+      }
       const double a = ( box.min()[axis] - origin[axis] ) / direction[axis];
       const double b = ( box.max()[axis] - origin[axis] ) / direction[axis];
       nearT = std::max( nearT, std::min( a, b ) );
@@ -191,8 +199,14 @@ struct RayQuery
     const Eigen::Vector3d q = offset.cross( ab );
     const double v = direction.dot( q ) / determinant;
     const double t = ac.dot( q ) / determinant;
-    if ( u >= -1e-10 && v >= -1e-10 && u + v <= 1 + 1e-10 && t > 0 ) hits.push_back( t );
-    return false; // Visit all intersections, rather than stop at the first hit.
+    if ( u < -1e-10 || v < -1e-10 || u + v > 1 + 1e-10 || !( t > 0 && t < maxDistance ) ) return false;
+    if ( firstHitOnly )
+    {
+      hit = true;
+      return true;
+    }
+    hits.push_back( t );
+    return false;
   }
 };
 
@@ -225,9 +239,12 @@ inline Eigen::Vector3d vector( const QVector3D &point )
 }
 
 inline Metrics evaluate( const MeshData &mesh, const QVector<QVector3D> &points,
-                         const QMatrix4x4 &modelToWorld, double tolerance = -1.0 )
+                         const QMatrix4x4 &modelToWorld, double tolerance = -1.0,
+                         const QVector<QVector3D> &displayPoints = {},
+                         QVector<bool> *displayFit = nullptr )
 {
   Metrics result;
+  if ( displayFit ) displayFit->clear();
   if ( mesh.isEmpty() || points.isEmpty() )
     return result;
 
@@ -258,6 +275,26 @@ inline Metrics evaluate( const MeshData &mesh, const QVector<QVector3D> &points,
 
   // Eigen's BVH avoids testing every cloud point against every mesh triangle.
   const Eigen::KdBVH<double, 3, Triangle> tree( triangles.begin(), triangles.end() );
+  const double toleranceSquared = tolerance * tolerance;
+  if ( displayFit && tolerance >= 0 && std::isfinite( tolerance ) )
+  {
+    // Color only needs a yes/no answer, so stop at the first face within tolerance.
+    struct SurfaceQuery
+    {
+      Eigen::Vector3d point;
+      double limit;
+      bool matched = false;
+      bool intersectVolume( const Eigen::AlignedBox3d &box ) const { return box.squaredExteriorDistance( point ) <= limit; }
+      bool intersectObject( const Triangle &triangle ) { return matched = triangleSquaredDistance( point, triangle ) <= limit; }
+    };
+    displayFit->reserve( displayPoints.size() );
+    for ( const QVector3D &point : displayPoints )
+    {
+      SurfaceQuery query { vector( point ), toleranceSquared };
+      if ( query.point.allFinite() ) Eigen::BVIntersect( tree, query );
+      displayFit->append( query.matched );
+    }
+  }
   std::vector<double> distances;
   distances.reserve( points.size() );
   double sumSquared = 0.0;
@@ -269,7 +306,7 @@ inline Metrics evaluate( const MeshData &mesh, const QVector<QVector3D> &points,
     const double squared = Eigen::BVMinimize( tree, query );
     sumSquared += squared;
     distances.push_back( std::sqrt( squared ) );
-    if ( tolerance >= 0 && squared <= tolerance * tolerance ) ++result.surfaceCount;
+    if ( tolerance >= 0 && squared <= toleranceSquared ) ++result.surfaceCount;
     else if ( result.solidAvailable )
     {
       if ( inside( tree, query.point, bounds ) ) ++result.insideCount;

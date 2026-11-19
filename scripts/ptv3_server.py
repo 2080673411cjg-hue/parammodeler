@@ -13,10 +13,10 @@ import time
 from typing import Literal, Optional
 
 PTV3_DIR = Path(__file__).resolve().parent
-CLS_LOG = PTV3_DIR / os.environ.get("PTV3_CLS_LOG", "logs/ptv3_cls_v10")
-REG_SUFFIX = os.environ.get("PTV3_REG_SUFFIX", "_v10_normals").strip()
+CLS_LOG = PTV3_DIR / os.environ.get("PTV3_CLS_LOG", "logs/ptv3_cls_v14_actual_points")
+REG_SUFFIX = os.environ.get("PTV3_REG_SUFFIX", "_v13_normals").strip()
 if not REG_SUFFIX:
-    REG_SUFFIX = "_v10_normals"
+    REG_SUFFIX = "_v13_normals"
 TOWER_LOG = os.environ.get("PTV3_TOWER_LOG", "").strip()
 GABLED_LOG = os.environ.get("PTV3_GABLED_LOG", "").strip()
 

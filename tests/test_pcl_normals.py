@@ -170,8 +170,9 @@ class NativePipelineTests(unittest.TestCase):
                 super().__init__()
                 self.head = torch.nn.Linear(6, 2)
 
-            def forward(self, points):
-                return self.head(points.mean(dim=1))
+            def forward(self, points, counts=None):
+                means = points.mean(dim=1) if counts is None else torch.stack([p.mean(dim=0) for p in points.split(counts)])
+                return self.head(means)
 
         for split in ('train', 'val', 'test'):
             for path in (self.root / split / 'GableRoofHouse').glob('*.txt'):

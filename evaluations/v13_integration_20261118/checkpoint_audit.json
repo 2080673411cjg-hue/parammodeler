@@ -1,0 +1,140 @@
+[
+  {
+    "epoch": 83,
+    "val_acc": 0.9603846153846154,
+    "val_loss": 0.44067667172505304,
+    "normal_backend": "pcl",
+    "directory": "ptv3_cls_v13",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "AngledGableHouse",
+    "epoch": 94,
+    "selection_score": 0.27347705960197216,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "legacy",
+    "canonical_bbox_mode": "full",
+    "directory": "ptv3_reg_angledgable_v13_normals",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "BarrelRoofHouse",
+    "epoch": 82,
+    "selection_score": 0.08357210656801996,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "legacy",
+    "canonical_bbox_mode": "full",
+    "directory": "ptv3_reg_barrelroof_v13_normals",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "ConicalRoofHouse",
+    "epoch": 95,
+    "selection_score": 0.04243510986012722,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "legacy",
+    "canonical_bbox_mode": "full",
+    "directory": "ptv3_reg_conicalroof_v13_normals",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "CurvedRoofRoundHouse",
+    "epoch": 93,
+    "selection_score": 0.159723201187144,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "legacy",
+    "canonical_bbox_mode": "full",
+    "directory": "ptv3_reg_curvedround_v13_normals",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "DomeRoofHouse",
+    "epoch": 96,
+    "selection_score": 0.08451435695595287,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "legacy",
+    "canonical_bbox_mode": "full",
+    "directory": "ptv3_reg_domeroof_v13_normals",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "FlatRoofHouse",
+    "epoch": 99,
+    "selection_score": 0.05848981790037291,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "legacy",
+    "canonical_bbox_mode": "full",
+    "directory": "ptv3_reg_flatroof_v13_normals",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "FlatTopHipRoofHouse",
+    "epoch": 100,
+    "selection_score": 0.023222505610594957,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "legacy",
+    "canonical_bbox_mode": "full",
+    "directory": "ptv3_reg_flattophip_v13_normals",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "GableRoofHouse",
+    "epoch": 93,
+    "selection_score": 0.08480717752340333,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "legacy",
+    "canonical_bbox_mode": "full",
+    "directory": "ptv3_reg_gableroof_v13_normals",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "LShapedHouse",
+    "epoch": 96,
+    "selection_score": 0.06911198142687668,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "physical",
+    "canonical_bbox_mode": "lhouse_xy_quantile_005_995_v1",
+    "directory": "ptv3_reg_lshaped_v13_normals",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "PyramidalRoofHouse",
+    "epoch": 90,
+    "selection_score": 0.06641084974951628,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "legacy",
+    "canonical_bbox_mode": "full",
+    "directory": "ptv3_reg_pyramidalroof_v13_normals",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "RecessedRoofHouse",
+    "epoch": 96,
+    "selection_score": 0.09900899384386987,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "legacy",
+    "canonical_bbox_mode": "full",
+    "directory": "ptv3_reg_recessedroof_v13_normals",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "RoundFlatRoofHouse",
+    "epoch": 96,
+    "selection_score": 0.01109080667610011,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "legacy",
+    "canonical_bbox_mode": "full",
+    "directory": "ptv3_reg_roundflat_v13_normals",
+    "finite_state_tensors": 296
+  },
+  {
+    "class_name": "ShortRidgeHipRoofHouse",
+    "epoch": 94,
+    "selection_score": 0.08170390723931772,
+    "normal_backend": "pcl",
+    "canonical_aux_units": "legacy",
+    "canonical_bbox_mode": "full",
+    "directory": "ptv3_reg_shortridgehip_v13_normals",
+    "finite_state_tensors": 296
+  }
+]

@@ -57,7 +57,35 @@ Tolerance: %6 | N: %7</source><translation>初始 → 当前（场景坐标单�
     <message><source>Inside/outside unavailable: open mesh</source><translation>内外比例不可用：模型未封闭</translation></message>
     <message><source>Fit statistics and tolerance...</source><translation>拟合统计与容差...</translation></message>
     <message><source>Fit statistics</source><translation>拟合统计</translation></message>
+    <message><source>2D face fit...</source><translation>二维微调…</translation></message>
+    <message><source>2D face fit</source><translation>二维微调</translation></message>
+    <message><source>Pick face in 3D</source><translation>在三维中选面</translation></message>
+    <message><source>Load a supported model and its point cloud in the local 3D view first.</source><translation>请先在局部三维视图中加载支持二维微调的模型及其点云。</translation></message>
+    <message><source>Click inside a model face. Press Esc to cancel.</source><translation>请点击模型面内部。按 Esc 取消。</translation></message>
+    <message><source>No face here. Click inside a wall or roof. Esc cancels.</source><translation>此处没有选中模型面。请点击墙面或屋面内部，按 Esc 取消。</translation></message>
+    <message><source>Face:</source><translation>视图：</translation></message>
+    <message><source>Top (X / Y)</source><translation>顶面（X / Y）</translation></message>
+    <message><source>Length side (X / Z)</source><translation>长度侧面（X / Z）</translation></message>
+    <message><source>Width side (Y / Z)</source><translation>宽度侧面（Y / Z）</translation></message>
+    <message><source>Slice range (± scene units):</source><translation>切片取点范围（± 场景单位）：</translation></message>
+    <message><source>Fit face outline</source><translation>缩放至边框</translation></message>
+    <message><source>Undo last resize</source><translation>撤销上一步</translation></message>
+    <message><source>Drag an edge or corner to resize, or scroll over it for small steps. Scroll over empty space to zoom.</source><translation>拖边或角点调整尺寸，悬停滚轮小步微调，空白处滚轮缩放。</translation></message>
+    <message><source>In side view, drag or scroll on the orange circle to adjust wall height with total height fixed.</source><translation>侧视图中，拖动檐口线上的橙色圆点或在圆点上滚轮，可调整墙高并保持总高不变。</translation></message>
+    <message><source>Drag or scroll on the orange frame to resize the roof platform and hold the opposite edge fixed.</source><translation>拖动屋顶平台的橙色内框，或在框上滚轮微调，所选边的对边保持固定。</translation></message>
+    <message><source>Drag or scroll at a ridge endpoint to move it and hold the other fixed, or on the ridge line to move it sideways.</source><translation>拖动屋脊端点或在端点上滚轮可移动该端点，另一端保持固定。在屋脊线中段操作可横移整条屋脊。</translation></message>
+    <message><source>Drag or scroll on an orange edge to adjust the L-shaped notch.</source><translation>拖动橙色边或在边上滚轮，可调整 L 形凹口。</translation></message>
+    <message><source>Drag or scroll on the orange frame to resize the recess with the opposite edge fixed.</source><translation>拖动内槽的橙色边框或用滚轮调整尺寸，对边保持固定。</translation></message>
+    <message><source>Drag or scroll on the orange circle to adjust recess depth.</source><translation>拖动橙色圆点或在圆点上滚轮，可调整内槽深度。</translation></message>
+    <message><source>Resize exceeds the model translation range.</source><translation>此次调整超出模型的平移范围。</translation></message>
+    <message><source>Load a supported model and its point cloud to fine-tune in 2D.</source><translation>请加载支持二维微调的模型及其点云。</translation></message>
+    <message><source>Green within 3D fit tolerance, red outside. Face slice: %1 points.</source><translation>绿色在三维贴合容差内，红色超出容差。当前面共 %1 个点。</translation></message>
+    <message><source>Viewing side: %1.</source><translation>当前侧面：%1。</translation></message>
+    <message><source>Local fit (initial → current, %1 fixed points)
+RMSE %2 → %3 | Within tolerance %4% → %5%</source><translation>当前视图贴合（初始 → 当前，固定样本 %1 点）
+RMSE %2 → %3 | 贴合率 %4% → %5%</translation></message>
     <message><source>Distance tolerance (scene units):</source><translation>距离容差（场景坐标单位）：</translation></message>
+    <message><source>Point colors: green within tolerance, red outside tolerance</source><translation>点云颜色：绿色在容差内，红色超出容差</translation></message>
     <message><source>Load a model and point cloud to evaluate.</source><translation>加载模型和点云后显示统计。</translation></message>
     <message><source>Surface fit: points within the distance tolerance. Outside/inside: points farther from the actual model surface. The same tolerance is used while adjusting the model. Percentages use a fixed point sample and are not parameter accuracy.</source><translation>表面贴合：距模型实际表面不超过容差的点。外侧/内侧：超出容差且位于模型实体外/内的点。微调过程中容差保持固定。百分比基于固定点样本，不表示参数预测准确率。</translation></message>
     <message><source>Initial values use the model before fine tuning and remain fixed while editing. Changing tolerance recalculates both initial and current values with the same point sample. Loading a point cloud or a model, changing primitive type, or applying a new prediction starts a new comparison. Surface fit: points within the distance tolerance. Outside/inside describe the current model. These percentages are not parameter accuracy.</source><translation>初始值取自微调前的模型，编辑时保持该模型和位置不变作为基准。修改容差会用同一批点重新计算初始值和当前值。加载点云或模型、切换基元或应用新的预测后重新开始比较。表面贴合：距模型表面不超过容差的点。外侧/内侧描述当前模型。以上百分比不表示参数预测准确率。</translation></message>
@@ -539,24 +567,6 @@ Direction preprocessing concerns the regression input; it does not confirm posit
         <translation>角度：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2326"/>
-        <location filename="../parammodeler_dock.cpp" line="775"/>
-        <source>Leg length:</source>
-        <translation>直角边长：</translation>
-    </message>
-    <message>
-        <location filename="../parammodeler_dock.ui" line="2354"/>
-        <location filename="../parammodeler_dock.cpp" line="776"/>
-        <source>Base length:</source>
-        <translation>底边长度：</translation>
-    </message>
-    <message>
-        <location filename="../parammodeler_dock.ui" line="2410"/>
-        <location filename="../parammodeler_dock.cpp" line="778"/>
-        <source>Pyramid ratio:</source>
-        <translation>棱锥高度比例：</translation>
-    </message>
-    <message>
         <location filename="../parammodeler_dock.ui" line="2473"/>
         <source>QPushButton { text-align: left; font-weight: bold; padding: 4px; border-bottom: 1px solid #aaa; }</source>
         <translation>QPushButton { text-align: left; font-weight: bold; padding: 4px; border-bottom: 1px solid #aaa; }</translation>
@@ -656,16 +666,6 @@ Direction preprocessing concerns the regression input; it does not confirm posit
         <location filename="../parammodeler_dock.cpp" line="575"/>
         <source>Dome</source>
         <translation>穹顶</translation>
-    </message>
-    <message>
-        <location filename="../parammodeler_dock.cpp" line="582"/>
-        <source>Pyramid</source>
-        <translation>棱锥</translation>
-    </message>
-    <message>
-        <location filename="../parammodeler_dock.cpp" line="583"/>
-        <source>Prism</source>
-        <translation>棱柱</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.cpp" line="591"/>
@@ -836,18 +836,6 @@ Direction preprocessing concerns the regression input; it does not confirm posit
         <translation>位置与旋转</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="373"/>
-        <location filename="../parammodeler_dock.cpp" line="1094"/>
-        <location filename="../parammodeler_dock.cpp" line="1443"/>
-        <source>Align in 2D</source>
-        <translation>2D 对齐</translation>
-    </message>
-    <message>
-        <location filename="../parammodeler_dock.cpp" line="1097"/>
-        <source>Shows the current model anchor as a red X in the 2D map canvas. Click the point-cloud target position to translate the model there. Only TX/TY are changed.</source>
-        <translation>在 2D 地图中以红色叉号显示模型锚点。点击点云目标位置即可平移模型，仅修改 TX/TY。</translation>
-    </message>
-    <message>
         <location filename="../parammodeler_dock.ui" line="344"/>
         <location filename="../parammodeler_dock.cpp" line="1105"/>
         <location filename="../parammodeler_dock.cpp" line="1171"/>
@@ -895,26 +883,10 @@ Direction preprocessing concerns the regression input; it does not confirm posit
         <translation>取消 3D 对齐</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1296"/>
-        <location filename="../parammodeler_dock.cpp" line="1304"/>
-        <source>Manual align</source>
-        <translation>手动对齐</translation>
-    </message>
-    <message>
-        <location filename="../parammodeler_dock.cpp" line="1296"/>
-        <source>QGIS map canvas is unavailable.</source>
-        <translation>QGIS 地图画布不可用。</translation>
-    </message>
-    <message>
         <location filename="../parammodeler_dock.cpp" line="1304"/>
         <location filename="../parammodeler_dock.cpp" line="2297"/>
         <source>Current model has no geometry data.</source>
         <translation>当前模型没有几何数据。</translation>
-    </message>
-    <message>
-        <location filename="../parammodeler_dock.cpp" line="1391"/>
-        <source>Pick 2D target...</source>
-        <translation>点选 2D 目标...</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.cpp" line="1583"/>
@@ -971,6 +943,11 @@ Direction preprocessing concerns the regression input; it does not confirm posit
         <source>Complete all</source>
         <translation>一键完成</translation>
     </message>
+    <message>
+        <location filename="../parammodeler_dock_estimation.cpp"/>
+        <source>Estimate and align</source>
+        <translation>估计并对齐</translation>
+    </message>
     <message><source>Stop</source><translation>终止</translation></message>
     <message><source>Stopping...</source><translation>正在终止…</translation></message>
     <message><source>Stopped. Completed steps are kept. You can retry or return to fine tuning.</source><translation>已终止。已完成的步骤予以保留，可重新执行或返回微调。</translation></message>
@@ -1025,6 +1002,11 @@ Z：[%7, %8]</translation>
         <location filename="../parammodeler_dock.cpp" line="3587"/>
         <source>No prediction returned.</source>
         <translation>未返回预测结果。</translation>
+    </message>
+    <message>
+        <location filename="../parammodeler_dock_estimation.cpp"/>
+        <source>Classification candidates</source>
+        <translation>分类候选</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.cpp" line="1814"/>
@@ -1125,8 +1107,8 @@ Parameters applied to main panel.</source>
         <location filename="../parammodeler_dock.cpp" line="866"/>
         <source>Basic workflow:
 1. Load an input point cloud.
-2. Use Classify and estimate parameters... or Complete all.
-3. Complete all loads the model and point cloud into 3D and applies automatic alignment.
+2. Open Classify and estimate parameters... and classify the point cloud. Choose a building type from the candidates.
+3. Use Estimate and align to load the model and point cloud into 3D and apply automatic alignment.
 4. Use Align in 3D for point picking, or Fit corner from three faces... for missing-corner cases.
 5. Fine-tune parameters, position and rotation in the main panel.
 6. Export model files or Current evaluation CSV from the Export menu.
@@ -1145,8 +1127,8 @@ Notes:
 - Three-face fitting moves the model only; it does not resize or rotate it.</source>
         <translation>基本流程：
 1. 加载输入点云。
-2. 使用“分类并估计参数...”或“一键完成”。
-3. “一键完成”会将模型与点云加载到 3D 场景，并执行自动对齐。
+2. 打开“分类并估计参数...”，对点云分类，然后从候选中选择建筑类型。
+3. 点击“估计并对齐”，将模型和点云加载到 3D 场景并自动对齐。
 4. 使用“3D 对齐”点选目标点；角点缺失时使用“三面拟合角点...”。
 5. 在主面板中微调参数、位置和旋转。
 6. 从“导出”菜单导出模型文件或当前评估 CSV。

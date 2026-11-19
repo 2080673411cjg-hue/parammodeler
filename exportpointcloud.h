@@ -41,14 +41,14 @@ public:
                                   DLPointCloudInfo *info = nullptr );
 
     // Export with photogrammetric occlusion baked in.
-    // Roof is fully kept; wall faces are removed to simulate single-viewpoint
-    // drone imagery (box: 1-2 adjacent faces, cylinder: 150°-210° arc).
-    // Output is plain xyz — no labels, occlusion is already applied.
+    // Keep samples visible from one oblique camera, using the model mesh as an occluder.
+    // Output is plain xyz, capped at pointCount without padding after occlusion.
     static bool exportOccludedTXT( const QString    &fileName,
                                     const QString    &primitiveType,
                                     ParamModelerDock *dock,
                                     int               pointCount = 2048,
-                                    DLPointCloudInfo *info = nullptr );
+                                    DLPointCloudInfo *info = nullptr,
+                                    int *writtenCount = nullptr );
 };
 
 #endif // EXPORTPOINTCLOUD_H

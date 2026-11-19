@@ -32,7 +32,7 @@ public:
     // ---- 锚点判定（锚点 / 生长原点 / 旋转轴三者绑定，二选一）----
     // true  = 左下角锚定（长方体类，含 LHouse / TwoGableHouses）：构建时原点即底面左下角，
     //         build() 不再做居中；长/宽沿 +X/+Y 单边生长，旋转绕左下角。
-    // false = 底面中心锚定（圆形类 / TriPrismPyramid）：build() 统一平移到 bbox 中心。
+    // false = 底面中心锚定（圆形类）：build() 统一平移到 bbox 中心。
     // 详见 scripts/grow-anchor-design.md（方案 B）。
     static bool usesCornerAnchor( const QString &primitiveType );
 
@@ -52,7 +52,6 @@ public:
     static MeshData buildAsymmetricGableHouse( ParamModelerDock *dock );
     static MeshData buildFourStageRoundTower( ParamModelerDock *dock );
     static MeshData buildTwoGableHouses( ParamModelerDock *dock );
-    static MeshData buildTriPrismPyramid( ParamModelerDock *dock );
 
     // ============================================================
     // 纯数据接口（供外部直接调用，不依赖 QGIS / Dock）
@@ -70,7 +69,6 @@ public:
     static MeshData buildAsymmetricGableHouse( const AsymmetricGableHouseParams &p );
     static MeshData buildFourStageRoundTower( const FourStageRoundTowerParams &p );
     static MeshData buildTwoGableHouses( const TwoGableHousesParams &p );
-    static MeshData buildTriPrismPyramid( const TriPrismPyramidParams &p );
 };
 
 #endif // BUILDMESH_H

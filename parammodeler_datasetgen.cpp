@@ -143,20 +143,18 @@ QJsonArray generateSplitSamples( const QString &prim,
     const QString fullPath = rootPath + QStringLiteral( "/" ) + relativePath;
 
     DLPointCloudInfo pcInfo;
-    if ( ExportPointCloud::exportOccludedTXT( fullPath, prim, dock, pointCount, &pcInfo ) )
+    int writtenCount = 0;
+    if ( ExportPointCloud::exportOccludedTXT( fullPath, prim, dock, pointCount, &pcInfo, &writtenCount ) )
     {
       QJsonObject item;
       item[QStringLiteral( "file" )]        = relativePath;
       item[QStringLiteral( "type" )]        = prim;
       item[QStringLiteral( "split" )]       = split;
-      item[QStringLiteral( "pointCount" )]  = pointCount;
+      item[QStringLiteral( "pointCount" )]  = writtenCount;
       item[QStringLiteral( "params" )]      = currentPrimitiveParamsObject( prim, dock );
       item[QStringLiteral( "pointCloudInfo" )] = pointCloudInfoToJson( pcInfo );
-      if ( prim != QStringLiteral( "TriPrismPyramid" ) )
-      {
-        item[QStringLiteral( "horizontalScaleBand" )] = scaleBand;
-        item[QStringLiteral( "scaleSamplingVersion" )] = QStringLiteral( "horizontal_strata_v1" );
-      }
+      item[QStringLiteral( "horizontalScaleBand" )] = scaleBand;
+      item[QStringLiteral( "scaleSamplingVersion" )] = QStringLiteral( "horizontal_strata_v2" );
       records.append( item );
       generated++;
     }
@@ -197,7 +195,7 @@ void generateFullDataset( ParamModelerDock *dock )
   for ( int i = 0; i < dock->ui->comboPrimitive->count(); ++i )
   {
     const QString prim = dock->ui->comboPrimitive->itemData( i ).toString();
-    if ( !prim.isEmpty() && !primitiveTypes.contains( prim ) && prim != QStringLiteral( "CylinderHemisphere" ) && prim != QStringLiteral( "TriPrismPyramid" ) )
+    if ( !prim.isEmpty() && !primitiveTypes.contains( prim ) && prim != QStringLiteral( "CylinderHemisphere" ) )
       primitiveTypes << prim;
   }
 
@@ -350,20 +348,18 @@ void generateFullDataset( ParamModelerDock *dock )
         const QString fullPath = rootDir.filePath( relativePath );
 
         DLPointCloudInfo pcInfo;
-        if ( ExportPointCloud::exportOccludedTXT( fullPath, prim, dock, pointCount, &pcInfo ) )
+        int writtenCount = 0;
+        if ( ExportPointCloud::exportOccludedTXT( fullPath, prim, dock, pointCount, &pcInfo, &writtenCount ) )
         {
           QJsonObject item;
           item[QStringLiteral( "file" )]        = relativePath;
           item[QStringLiteral( "type" )]        = prim;
           item[QStringLiteral( "split" )]       = split;
-          item[QStringLiteral( "pointCount" )]  = pointCount;
+          item[QStringLiteral( "pointCount" )]  = writtenCount;
           item[QStringLiteral( "params" )]      = currentPrimitiveParamsObject( prim, dock );
           item[QStringLiteral( "pointCloudInfo" )] = pointCloudInfoToJson( pcInfo );
-          if ( prim != QStringLiteral( "TriPrismPyramid" ) )
-          {
-            item[QStringLiteral( "horizontalScaleBand" )] = scaleBand;
-            item[QStringLiteral( "scaleSamplingVersion" )] = QStringLiteral( "horizontal_strata_v1" );
-          }
+          item[QStringLiteral( "horizontalScaleBand" )] = scaleBand;
+          item[QStringLiteral( "scaleSamplingVersion" )] = QStringLiteral( "horizontal_strata_v2" );
           metadataRecords.append( item );
           generated++;
         }
@@ -438,8 +434,7 @@ void completeSelectedPrimitiveDatasets( ParamModelerDock *dock )
   for ( int i = 0; i < dock->ui->comboPrimitive->count(); ++i )
   {
     const QString prim = dock->ui->comboPrimitive->itemData( i ).toString();
-    if ( prim.isEmpty() || prim == QStringLiteral( "CylinderHemisphere" ) ||
-         prim == QStringLiteral( "TriPrismPyramid" ) )
+    if ( prim.isEmpty() || prim == QStringLiteral( "CylinderHemisphere" ) )
       continue;
     auto *check = new QCheckBox( ParamModelerPrimitiveNames::display( prim ), &selection );
     check->setChecked( defaults.contains( prim ) );

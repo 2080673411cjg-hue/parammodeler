@@ -161,6 +161,8 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
                        val( QStringLiteral( "bottomWidth" ) ) * clamp01( val( QStringLiteral( "topWidthRatio" ) ) ) );
     else
       put( QStringLiteral( "topWidth" ), QStringLiteral( "tpTopWidth" ) );
+    put( QStringLiteral( "topPositionX" ), QStringLiteral( "tpTopPositionX" ) );
+    put( QStringLiteral( "topPositionY" ), QStringLiteral( "tpTopPositionY" ) );
     putWallRatio( QStringLiteral( "tpWallHeight" ), QStringLiteral( "tpRoofHeight" ) );
   }
   else if ( prim == QStringLiteral( "BarrelRoofHouse" ) )
@@ -233,6 +235,7 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
     putWallRatio( QStringLiteral( "aghWallHeight" ), QStringLiteral( "aghRoofHeight" ) );
     put( QStringLiteral( "ridgeLength" ), QStringLiteral( "aghRidgeLen" ) );
     put( QStringLiteral( "ridgeRatio" ), QStringLiteral( "aghRidgeRatio" ) );
+    put( QStringLiteral( "ridgePositionX" ), QStringLiteral( "aghRidgePositionX" ) );
   }
   else if ( prim == QStringLiteral( "CurvedRoofRoundHouse" ) )
   {
@@ -328,6 +331,11 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["bottomWidth"] = bottomWidth;
     params["topLengthRatio"] = bottomLength > 1e-6 ? dock->tpTopLength() / bottomLength : 0.6;
     params["topWidthRatio"] = bottomWidth > 1e-6 ? dock->tpTopWidth() / bottomWidth : 0.6;
+    if ( dock->tpTopPosition() != QPointF( 0.5, 0.5 ) )
+    {
+      params["topPositionX"] = dock->tpTopPosition().x();
+      params["topPositionY"] = dock->tpTopPosition().y();
+    }
     const double wallH = dock->tpWallHeight();
     const double roofH = dock->tpRoofHeight();
     const double totalH = wallH + roofH;
@@ -378,6 +386,8 @@ QJsonObject currentPrimitiveParamsObject( const QString &prim, const ParamModele
     params["wallRatio"] = totalH > 1e-6 ? wallH / totalH : 0.7;
     params["ridgeLength"] = dock->aghRidgeLength();
     params["ridgeRatio"] = dock->aghRidgeRatio();
+    if ( dock->aghRidgePositionX() != 0.5 )
+      params["ridgePositionX"] = dock->aghRidgePositionX();
   }
   else if ( prim == "CurvedRoofRoundHouse" )
   {

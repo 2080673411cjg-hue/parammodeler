@@ -1,5 +1,125 @@
 # ParamModeler 深度学习完整流程
 
+## v14 服务切换（2026-11-19）
+
+在 Ubuntu 的 `ptv3_train` 环境和 `/home/xubo/pointnet/ptv3_simple` 目录，把前台运行的旧服务按 `Ctrl+C` 停止，然后启动 v14 分类和 v13 参数估计。服务器已有 v14 权重和用于评估 v14 的 Python 脚本时，可直接使用现有 `ptv3_server.py`。
+
+```bash
+PTV3_CLS_LOG=logs/ptv3_cls_v14_actual_points PTV3_REG_SUFFIX=_v13_normals PTV3_TOWER_LOG=logs/ptv3_reg_curvedround_v13_normals PTV3_GABLED_LOG=logs/ptv3_reg_gableroof_v13_normals python -m uvicorn ptv3_server:app --host 0.0.0.0 --port 8008
+```
+
+在另一个终端执行 `curl -s http://127.0.0.1:8008/health`，检查 `cls_log` 以 `ptv3_cls_v14_actual_points` 结尾，`reg_suffix` 为 `_v13_normals`。重启 QGIS，估计窗口会显示前两名类型和分数。
+
+## v13服务切换（2026-11-18）
+
+插件分类与十三类回归默认统一使用v13，首次读取设置会迁移此前的分类、通用回归和曲面顶圆屋单独版本。本机已经具备全部十四份权重，`RelWithDebInfo`插件DLL已编译。
+
+Ubuntu已完成训练并保留v13权重时，在激活 `ptv3_train` 的终端运行下面这一行。8008端口是当前插件推理服务，此命令停止该服务后以明确的v13配置重新启动。服务脚本支持这些环境变量，现有Ubuntu版本也能使用。
+
+```bash
+cd /home/xubo/pointnet/ptv3_simple && mkdir -p logs && (fuser -k 8008/tcp || true) && nohup env PTV3_CLS_LOG=logs/ptv3_cls_v13 PTV3_REG_SUFFIX=_v13_normals PTV3_TOWER_LOG=logs/ptv3_reg_curvedround_v13_normals PTV3_GABLED_LOG=logs/ptv3_reg_gableroof_v13_normals python -m uvicorn ptv3_server:app --host 0.0.0.0 --port 8008 > logs/ptv3_server_v13.log 2>&1 < /dev/null &
+```
+
+```bash
+curl -s http://127.0.0.1:8008/health
+```
+
+确认 `cls_log` 以 `ptv3_cls_v13` 结尾、`reg_suffix` 为 `_v13_normals`，圆屋与双坡单独目录也使用v13。重启QGIS后，在路径设置中可核对分类目录、通用回归后缀和圆屋后缀。训练分析见 [v13报告](../evaluations/v13_training_review_20261118.md)。
+
+## 曲面顶圆屋v12接入（2026-11-10）
+
+插件对曲面顶圆屋默认选择 `_v12_tower_baseline_normals`，实际目录为 `ptv3_reg_curvedround_v12_tower_baseline_normals`。分类及其余类别继续使用原设置；通用回归后缀默认仍为 `_v10_normals`。
+
+重新编译插件后，在路径设置里核对“PTv3 曲面顶圆屋后缀”为 `_v12_tower_baseline_normals`，保存后下一次估计生效。要恢复旧版，单独把这项改为 `_v10_normals`；要让圆屋跟随通用版本，清空此项。设置会保存，其他类别不会使用圆屋后缀。本机目录选择与远程请求共用选定结果，缺少权重时会报错，不静默退回v10。
+
+本次不需要同步Python文件或重启Ubuntu服务；现有服务已经支持显式后缀，且原损失权重已在服务器上。`/health`显示的是服务默认目录，本次实际版本以预测响应的 `model_log_dir` 为准，应以 `/ptv3_reg_curvedround_v12_tower_baseline_normals` 结尾。该目录不同于未接入的 `v12_tower_profile` 实验。
+
+同一200份冻结v2增强测试点云，通过服务分别运行v10和v12原损失，共400次成功响应。八项参数MAE均下降，统一标准化参数误差降低21.7%，三段等权剖面距离降低22.6%，130/200份整体剖面距离更小；结果和逐样本记录在仓库 `evaluations/tower_v10_v12_same_set_20261109/`。这验证的是两套权重在当前合成测试集上的差异，不单独归因于某一处代码修改。
+
+## 圆屋随机缩放修复（2026-11-09）
+
+修复水平尺度分档时的输入框联动：先记录所有水平尺寸乘以同一系数后的目标值，再逐个写回，避免放大底座时檐口被最小值约束抬高，随后又对抬高后的值乘一次系数。采样仍采用原先的小、中、大三档，檐口外挑比例仍约5%～20%，不增加手动建模限制。
+
+重新编译插件后，只需重新生成并覆盖 `CurvedRoofRoundHouse` 的1600/200/200份数据，再用原参数增强。不要使用“追加”或“补齐”代替覆盖，旧样本不会自动修正。新生成记录的 `scaleSamplingVersion` 为 `horizontal_strata_v2`；核对完再同步增强目录中该类的train/val/test及完整的 `metadata/sample_params.json` 到Ubuntu，针对新点云重新准备PCL法向缓存。训练及服务Python脚本此次没有变化。
+
+下节v11记录的是修复前数据上的首次剖面对照；后续用新数据训练时应更换 `run_tag` 和输出日志名，保留两组一致的数据及训练设置。不要仅将旧metadata改为v2，也不要把旧权重报告当作新数据的直接对照。本次代码检查包括50,400次含联动限值的随机采样，以及使用真实Qt输入框、现有檐口/顶部半径绑定和生产缩放代码的6,000次连续采样；实际外径6.1～39.9米，比例只有输入精度带来的小量舍入差异，未生成训练文件。
+
+## 曲面顶圆屋剖面监督实验（2026-11-09）
+
+先只验证 `CurvedRoofRoundHouse`，保留现有八个尺寸参数、网络输出和v10部署。新增 `--tower_profile_loss_weight`，默认0；开启后，原损失加上该权重乘以剖面损失。首次实验可试0.2，这不是已验证的最佳权重，后续仅根据验证集调整。v11首次对照使用了旧圆屋数据；缩放修复后的数据准备要求见上节。
+
+剖面与插件 `BuildMesh::buildFourStageRoundTower` 一致。檐口取四个角点，曲面取17个等间隔参数位置，顶锥取起点和顶点。曲面公式为 `r(t) = eaveRadius*(1-t) + middleTopRadius*t`，`z(t) = baseHeight + middleHeight*t + 4*middleRise*t*(1-t)`；中点相对直线的抬高量恰为 `middleRise`。预测值不在损失内部截断，超界预测仍有梯度。
+
+每个剖面位置的半径、高度差，分别除以训练集对应坐标的总体标准差（下限1e-6），计算SmoothL1；先在每段内部平均，再将檐口、曲面、顶锥三段等权平均。统计量只来自训练标签，写入配置与权重，不读取验证/测试标签。原有参数监督和几何辅助头继续保留，最佳模型仍按验证集加权标准化参数MAE选择。
+
+训练历史增加剖面总损失、三段损失，以及验证集逐建筑三段等权平均距离的均值和P95。测试八参数圆屋模型时，无论是否启用新损失，均输出 `regression_profile_report_test.csv` 和 `regression_profile_errors_test.csv`；开启损失时另保存最佳轮的 `val` 报告。报告中的距离保留原尺寸单位，是同一参数位置处的二维剖面点距离，不是点云到模型的最近表面距离。前三段的P95对该段所有建筑的所有采样距离计算，`equal_segment_mean` 行的P95对逐建筑三段等权平均距离计算。
+
+首次v11对照复用了当时的增强数据及PCL法向缓存。若尚未同步剖面实验脚本，将本机训练目录的两个脚本同步到Ubuntu，Windows CMD运行：
+
+```cmd
+scp "E:\pointnet\ptv3_simple\main_reg.py" "E:\pointnet\ptv3_simple\train_ptv3_reg.py" xubo@100.70.215.84:/home/xubo/pointnet/ptv3_simple/
+```
+
+Ubuntu激活 `ptv3_train`，进入 `/home/xubo/pointnet/ptv3_simple`，按顺序运行基线和实验，避免同时占用GPU。两组除新损失权重外使用相同数据、种子和训练设置，分别保存，不覆盖v10：
+
+```bash
+nohup sh -c 'python -u train_ptv3_reg.py --classes CurvedRoofRoundHouse --data_root /home/xubo/pointnet/datasets_aug --run_tag v11_tower_baseline --epochs 100 --batch_size 4 --seed 42 --num_workers 2 --normal_backend pcl --normal_threads 4 --expected_split_counts 1600 200 200 && python -u train_ptv3_reg.py --classes CurvedRoofRoundHouse --data_root /home/xubo/pointnet/datasets_aug --run_tag v11_tower_profile --tower_profile_loss_weight 0.2 --epochs 100 --batch_size 4 --seed 42 --num_workers 2 --normal_backend pcl --normal_threads 4 --expected_split_counts 1600 200 200' > logs/ptv3_reg_tower_v11_compare_train.log 2>&1 &
+```
+
+两组完成后均自动测试，目录分别为 `logs/ptv3_reg_curvedround_v11_tower_baseline_normals`、`logs/ptv3_reg_curvedround_v11_tower_profile_normals`。查看进度：
+
+```bash
+tail -f /home/xubo/pointnet/ptv3_simple/logs/ptv3_reg_tower_v11_compare_train.log
+```
+
+重点比较顶部半径、隆起高度、顶锥高度、檐口厚度的参数MAE/R²和三段剖面误差，确认主尺寸没有明显退步；同一批样本在插件中复核形状。测试集只用于最终评价，不用来挑损失权重。此次本机仅完成公式、梯度、CPU替身训练及兼容性检查，尚无GPU训练提升结论。
+
+## 入选真实点云的保守清理（2026-11-06）
+
+`clean_real_clouds.py` 读取图册导出的人工入选清单，按ID去重并优先采用后导出的记录。当前两份累计清单合计19份：双坡顶10份、矩形平顶9份。输出在 `E:\pointnet\real_datasets\real_validation_clean_20261106`，浏览器打开 `index.html` 查看清理前后同坐标、同视角、同范围的对照。
+
+自动分离仅针对极小且远离有支持点群的分量：8近邻建图，连接参考半径取最近邻距离90%分位的4倍与稳健对角线2%的较大值；分量最多20点且不超过约0.5%样本点数，与所有有支持分量的距离须超过参考半径6倍。总分离量超过保守上限时暂停自动分离。所有较大分量均保留，不只保留最大分量。低邻域支持、分离小分量及高度1%/99%分位以外仅标记复核；这些点可能是真实屋脊、地面或稀疏墙面，仍保留在保守版中，不进行语义删墙或去地面。
+
+首次生成命令如下；输出目录必须是新的，重复执行请换输出名，避免覆盖人工清理结果：
+
+```cmd
+E:\mambaforge\envs\pointnet_train\python.exe "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\scripts\clean_real_clouds.py" --selections "E:\pointnet\real_datasets\双坡房屋2026-11-06.json" "E:\pointnet\real_datasets\矩形.json" --output E:\pointnet\real_datasets\real_validation_clean_20261106
+```
+
+图册红叉是自动分离点，橙色是仍保留的待复核点。目录分别保存 `original`、`cleaned`、`separated`、`review_points`，按类别及原编号命名；`manifest.json`、逐样本记录及原清单副本保存输入哈希、原点偏移、分离/保留复核行号、点数与跨度变化。坐标不再平移、旋转或缩放，分离点可按行号恢复。
+
+先在图册确认使用保守版、保留原版或需要继续手动清理，再导出确认版本清单。清理不等于证明地面、建筑完整高度或类别正确；本步骤不重训、不预测参数，也不依据预测好坏删点。
+
+## 真实点云试筛图册（2026-11-06）
+
+`screen_real_clouds.py` 配合 `real_cloud_gallery.html`，只读扫描编号XYZ/TXT，固定随机抽样、去除非有限及完全重复XYZ，在float64中先平移到局部坐标后再供推理使用，保持源单位与实际尺寸。额外特征列不当作法向；原文件不重写，不做增强、补洞或训练。输出保存来源路径、SHA256、偏移量、点数、源单位跨度、三视图及模型建议。
+
+已按seed=42从 `H:\333\PointClouds` 的47,078份文件中固定抽取200份，图册输出在 `E:\pointnet\real_datasets\pointclouds_review_200\index.html`。双击后可以按v10建议类别、点数提示及审核状态筛选，点击图片放大，分别填写人工确认类别与数据质量，再选入验证集并导出JSON清单。审核选择保存在当前浏览器；导出文件由浏览器保存，建议放回E盘图册目录。选择不是参数真值，不按预测是否好看自动筛选；侧墙缺失样本可验证屋顶，整体高度仍需独立依据。
+
+Windows CMD运行或续跑同一批样本（一行，使用已有NumPy/Matplotlib环境）：
+
+```cmd
+E:\mambaforge\envs\pointnet_train\python.exe "E:\QGIS_Source\QGIS-final-3_44_2\QGIS-final-3_44_2\src\plugins\parammodeler\scripts\screen_real_clouds.py" --input H:\333\PointClouds --output E:\pointnet\real_datasets\pointclouds_review_200 --count 200 --seed 42 --server http://100.70.215.84:8008
+```
+
+不传 `--server` 时仅生成可人工浏览的图册。已有输出固定抽样名单，成功的图像与分类按源文件哈希和实际模型目录复用；读取或分类失败保留错误并可重试。换抽样设置或更换同一路径下的权重时使用新输出目录，以免混用结果。网络中断后保留已完成结果，重跑续接。每个分类响应必须确认实际模型目录为v10，类别建议与人工标签分列。
+
+200份试筛沿用现有HTTP服务串行分类，服务逐份启动子进程，开销包含重复模型加载；此次耗时不能作为未来常驻模型批量筛选47,078份的速度。工具没有启动四万份全量推理，也不更改插件、服务、权重或训练清单。`run.log`记录本轮进度。
+
+## 真实点云尺度修复（2026-11-06）
+
+已修正 `main_reg.py` 单云预测的legacy辅助尺度转换。实际坐标输入按已提供的物理归一化尺度转换包围盒跨度，重新计算体积等辅助量；权重和训练定义继续沿用。明确使用physical辅助单位的L形权重保持原路径，归一化合成点云也无需重新处理。
+
+在Windows CMD同步这一份文件：
+
+```cmd
+scp "E:\pointnet\ptv3_simple\main_reg.py" xubo@100.70.215.84:/home/xubo/pointnet/ptv3_simple/
+```
+
+当前 `ptv3_server.py` 每次回归请求都启动新的 `main_reg.py` 子进程，复制后下一次预测即使用修复，无需重启该服务。保持v10配置，在插件重新加载 `E:\pointnet\real_datasets\processed\cambridge_1\cambridge_1_input.txt` 并重新执行参数估计，先关闭几何校正，比较修复前后的尺寸与叠加效果。本轮不更换模型、不重新训练或重编插件。
+
+本机已完成输入准备和CPU回归检查，Ubuntu修后GPU预测与QGIS叠加效果待同步后确认。健康检查仅显示模型路径，不能证明此次脚本修复已复制到服务器。
+
 ## v10 部署（2026-11-03）
 
 “一键完成”新增“终止”：插件取消当前 HTTP 请求，更新后的服务检测到该连接断开便停止对应推理子进程并清理临时输入，服务及其他请求保持运行。仅编译插件也能结束界面等待；同步本节的 `ptv3_server.py` 并重启后，服务器才能同时停止本次计算，无需重新传权重或训练。本机 Python 推理同样支持终止。场景加载等同步步骤在步骤结束后响应终止。

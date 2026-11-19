@@ -67,12 +67,12 @@ def load_classifier(args, device: torch.device):
 
 
 def classify_input(model, class_names: List[str], cls_args, input_path: Path,
-                   device: torch.device, topk: int) -> List[dict]:
-    points = cls_main.load_txt_points(input_path)
-    if cls_args.normalize_points:
-        points = cls_main.normalize_points(points)
-    normals = cls_main.estimate_normals(points) if cls_args.use_normals else None
-    points = cls_main.sample_points(points, cls_args.num_points, False, 0.0, False, normals)
+                   device: torch.device, topk: int, checkpoint: dict) -> List[dict]:
+    source_points = cls_main.load_txt_points(input_path)
+    points = cls_main.normalize_points(source_points) if cls_args.normalize_points else source_points
+    normals = cls_main.predict_normals(source_points, points, cls_args, checkpoint)
+    points = cls_main.sample_classification_points(points, cls_args.num_points, False, 0.0, False, normals,
+                                                   cls_main.checkpoint_sampling_mode(checkpoint))
     tensor = torch.from_numpy(points).unsqueeze(0).to(device).float()
     with torch.no_grad():
         prob = torch.softmax(model(tensor), dim=1)[0].detach().cpu().numpy()
@@ -251,7 +251,7 @@ def main():
 
     device = device_from_args(args)
     cls_model, cls_ckpt, class_names, cls_args = load_classifier(args, device)
-    topk = classify_input(cls_model, class_names, cls_args, input_path, device, args.topk)
+    topk = classify_input(cls_model, class_names, cls_args, input_path, device, args.topk, cls_ckpt)
     chosen = args.force_class or topk[0]["class"]
     regression = regress_input(args, chosen, input_path, device)
 

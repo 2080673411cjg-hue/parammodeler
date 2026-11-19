@@ -7,6 +7,7 @@ param(
     [switch]$WithSurfaces,
     [switch]$WithFit,
     [switch]$WithInference,
+    [switch]$WithModelConfig,
     [string[]]$SurfaceClouds = @(),
     [string]$ScreenshotDirectory
 )
@@ -46,7 +47,10 @@ if ($WithFit) {
 if ($WithInference) {
     $targets += 'test_inference_transport'
 }
-if ($WithPicking -or $WithWireframe -or $WithAlignment -or $WithHeightControl -or $WithSurfaces -or $WithFit -or $WithInference) {
+if ($WithModelConfig) {
+    $targets += 'test_ptv3_model_config'
+}
+if ($WithPicking -or $WithWireframe -or $WithAlignment -or $WithHeightControl -or $WithSurfaces -or $WithFit -or $WithInference -or $WithModelConfig) {
     $qt = 'E:/mambaforge/envs/qgis_dev/Library'
     $env:PATH = (Join-Path $qt 'bin') + ';' + $env:PATH
     $env:QT_QPA_PLATFORM_PLUGIN_PATH = Join-Path $qt 'plugins/platforms'
@@ -60,12 +64,36 @@ if ($WithPicking -or $WithWireframe -or $WithAlignment -or $WithHeightControl -o
         $arguments += '/I' + (Join-Path $qt 'include/qt/QtNetwork')
         $link += Join-Path $qt 'lib/Qt5Network_conda.lib'
     }
-    if ($WithHeightControl) {
+    if ($WithHeightControl -or $WithModelConfig) {
         $arguments += '/I' + (Join-Path $qt 'include/qt/QtWidgets')
         $link += Join-Path $qt 'lib/Qt5Widgets_conda.lib'
     }
 }
 try {
+    if ($WithModelConfig) {
+        # Compile the real settings and model selector with isolated Qt settings.
+        $routingText = [IO.File]::ReadAllText((Join-Path $root 'parammodeler_pointnet.cpp'))
+        $routingParts = @('#include "parammodeler_config.h"', '#include "parammodeler_primitive_names.h"', '#include <QtCore>')
+        foreach ($signature in @('struct PointNetRegressionConfig', 'QString normalizedPrimitiveType(', 'PointNetRegressionConfig regressionConfig(')) {
+            $start = $routingText.IndexOf($signature, [StringComparison]::Ordinal)
+            $position = $routingText.IndexOf('{', $start)
+            $depth = 1
+            while ($depth -gt 0) {
+                $position++
+                if ($routingText[$position] -eq '{') { $depth++ }
+                elseif ($routingText[$position] -eq '}') { $depth-- }
+            }
+            $body = $routingText.Substring($start, $position - $start + 1)
+            if ($signature.StartsWith('struct ')) { $body += ';' }
+            $routingParts += $body
+        }
+        $payload = [regex]::Match($routingText, '(?s)payload\.insert\( QStringLiteral\( "model_suffix" \).*?;').Value
+        if (!$payload) { throw 'Remote model_suffix insertion not found' }
+        $routingParts += 'QJsonObject modelPayload(const PointNetRegressionConfig &config) { QJsonObject payload; ' + $payload + ' return payload; }'
+        [IO.File]::WriteAllText((Join-Path $temp 'model_selection_generated.h'), ($routingParts -join "`n"), [Text.UTF8Encoding]::new($false))
+        [IO.File]::WriteAllText((Join-Path $temp 'QgsSettings.h'), '#include <QSettings>
+class QgsSettings : public QSettings { public: QgsSettings() : QSettings(QSettings::IniFormat, QSettings::UserScope, "ParamModelerTests", "ModelRouting") {} };', [Text.UTF8Encoding]::new($false))
+    }
     if ($WithInference) {
         # Exercise the actual transport functions without linking the QGIS dock.
         $transportText = [IO.File]::ReadAllText((Join-Path $root 'parammodeler_pointnet.cpp'))
@@ -130,11 +158,16 @@ try {
             $compileArgs = $arguments + @((Join-Path $root 'tests/test_inference_transport.cpp'), $transportUnit,
                                           ('/Fe:' + $exe), ('/Fo:' + $temp + '\')) + $link
         }
+        if ($target -eq 'test_ptv3_model_config') {
+            $compileArgs = $arguments + @(('/I' + $temp), ('/I' + $root), (Join-Path $root 'tests/test_ptv3_model_config.cpp'),
+                                          (Join-Path $root 'parammodeler_config.cpp'), ('/Fe:' + $exe), ('/Fo:' + $temp + '\')) + $link
+        }
         & (Join-Path $msvc.FullName 'bin/Hostx64/x64/cl.exe') @compileArgs
         if ($LASTEXITCODE -ne 0) { throw ($target + ' compilation failed') }
         if ($target -eq 'test_surface_classification') { & $exe @SurfaceClouds }
         elseif ($target -eq 'test_pick3d_overlay' -and $ScreenshotDirectory) { & $exe $ScreenshotDirectory }
         elseif ($target -eq 'test_inference_transport') { & $exe 'E:/mambaforge/envs/qgis_dev/python.exe' }
+        elseif ($target -eq 'test_ptv3_model_config' -and $ScreenshotDirectory) { & $exe $ScreenshotDirectory }
         else { & $exe }
         if ($LASTEXITCODE -ne 0) { throw ($target + ' failed') }
     }
@@ -155,6 +188,12 @@ try {
     }
     if ($WithInference) {
         foreach ($name in @('inference_transport.cpp', 'inference_transport.obj')) {
+            $file = Join-Path $temp $name
+            if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file }
+        }
+    }
+    if ($WithModelConfig) {
+        foreach ($name in @('model_selection_generated.h', 'QgsSettings.h', 'parammodeler_config.obj')) {
             $file = Join-Path $temp $name
             if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file }
         }

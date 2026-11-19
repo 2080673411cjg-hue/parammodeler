@@ -128,6 +128,17 @@ static void migratePtv3ModelDefaults()
     settings.setValue( suffixKey, QStringLiteral( "_v10_normals" ) );
     settings.setValue( v10MigrationKey, true );
   }
+
+  const QString v13MigrationKey = QStringLiteral( "parammodeler/ptv3ModelDefaultsV13" );
+  if ( !settings.value( v13MigrationKey, false ).toBool() )
+  {
+    const QString clsDir = ParamModelerConfig::pointnetBaseDir() +
+                           QStringLiteral( "ptv3_simple/logs/ptv3_cls_v13" );
+    settings.setValue( QStringLiteral( "parammodeler/ptv3ClassifyLogDir" ), clsDir );
+    settings.setValue( suffixKey, QStringLiteral( "_v13_normals" ) );
+    settings.setValue( QStringLiteral( "parammodeler/ptv3TowerRegressionSuffix" ), QStringLiteral( "_v13_normals" ) );
+    settings.setValue( v13MigrationKey, true );
+  }
 }
 
 // ------------------------------------------------------------------
@@ -236,15 +247,42 @@ QString pctRegressionSuffix()
 QString ptv3ClassifyLogDir()
 {
   migratePtv3ModelDefaults();
-  return setting( QStringLiteral( "parammodeler/ptv3ClassifyLogDir" ),
-                  pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v10" ) );
+  const QString key = QStringLiteral( "parammodeler/ptv3ClassifyLogDir" );
+  const QString logRoot = pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/" );
+  const QString defaultDir = logRoot + QStringLiteral( "ptv3_cls_v14_actual_points" );
+  const QString migrationKey = QStringLiteral( "parammodeler/ptv3ClassifyDefaultsV14" );
+  QgsSettings settings;
+  if ( !settings.value( migrationKey, false ).toBool() )
+  {
+    const QString dir = settings.value( key ).toString();
+    const QString oldDefault = logRoot + QStringLiteral( "ptv3_cls_v13" );
+    if ( dir.isEmpty() || QDir::cleanPath( QDir::fromNativeSeparators( dir ) )
+           .compare( QDir::cleanPath( oldDefault ), Qt::CaseInsensitive ) == 0 )
+      settings.setValue( key, defaultDir );
+    settings.setValue( migrationKey, true );
+  }
+  return setting( key, defaultDir );
 }
 
-QString ptv3RegressionSuffix()
+QString ptv3TowerRegressionSuffix()
 {
   migratePtv3ModelDefaults();
+  return QgsSettings().value( QStringLiteral( "parammodeler/ptv3TowerRegressionSuffix" ),
+                              QStringLiteral( "_v13_normals" ) ).toString().trimmed();
+}
+
+QString ptv3RegressionSuffix( const QString &primitiveType )
+{
+  migratePtv3ModelDefaults();
+  if ( primitiveType == QStringLiteral( "CurvedRoofRoundHouse" ) ||
+       primitiveType == QStringLiteral( "FourStageRoundTower" ) )
+  {
+    const QString suffix = ptv3TowerRegressionSuffix();
+    if ( !suffix.isEmpty() )
+      return suffix;
+  }
   return setting( QStringLiteral( "parammodeler/ptv3RegressionSuffix" ),
-                  QStringLiteral( "_v10_normals" ) );
+                  QStringLiteral( "_v13_normals" ) );
 }
 
 // ------------------------------------------------------------------
@@ -345,6 +383,7 @@ void showSettingsDialog( QWidget *parent )
   const QString curPctSuffix = pctRegressionSuffix();
   const QString curPtv3ClsLog = ptv3ClassifyLogDir();
   const QString curPtv3Suffix = ptv3RegressionSuffix();
+  const QString curPtv3TowerSuffix = ptv3TowerRegressionSuffix();
 
   // --- line edits ---
   auto *edtPython   = new QLineEdit( curPython, &dlg );
@@ -362,6 +401,9 @@ void showSettingsDialog( QWidget *parent )
   auto *edtPctSuffix = new QLineEdit( curPctSuffix, &dlg );
   auto *edtPtv3ClsLog = new QLineEdit( curPtv3ClsLog, &dlg );
   auto *edtPtv3Suffix = new QLineEdit( curPtv3Suffix, &dlg );
+  auto *edtPtv3TowerSuffix = new QLineEdit( curPtv3TowerSuffix, &dlg );
+  edtPtv3TowerSuffix->setObjectName( QStringLiteral( "ptv3TowerSuffixEdit" ) );
+  edtPtv3TowerSuffix->setPlaceholderText( QStringLiteral( "留空则跟随通用回归后缀" ) );
 
   auto makeBrowse = [&]( QLineEdit *edt, bool dirOnly ) {
     auto *btn = new QPushButton( QStringLiteral( "浏览..." ), &dlg );
@@ -427,9 +469,10 @@ void showSettingsDialog( QWidget *parent )
     hb->addWidget( edtPtv3ClsLog );
     hb->addWidget( makeBrowse( edtPtv3ClsLog, true ) );
     form->addRow( QStringLiteral( "PTv3 分类模型目录:" ), hb );
-    form->addRow( QStringLiteral( "PTv3 回归后缀:" ), edtPtv3Suffix );
+    form->addRow( QStringLiteral( "PTv3 通用回归后缀:" ), edtPtv3Suffix );
+    form->addRow( QStringLiteral( "PTv3 曲面顶圆屋后缀:" ), edtPtv3TowerSuffix );
     auto *ptv3Hint = new QLabel(
-      QStringLiteral( "  本机和远程回归均按 ptv3_reg_<类别短名><后缀> 选择模型；远程服务需支持 model_suffix。" ), &dlg );
+      QStringLiteral( "  曲面顶圆屋优先使用单独后缀，留空跟随通用后缀。本机和远程均按 ptv3_reg_<类别短名><后缀> 选择模型；远程服务需支持 model_suffix。" ), &dlg );
     ptv3Hint->setTextFormat( Qt::PlainText );
     ptv3Hint->setWordWrap( true );
     ptv3Hint->setStyleSheet( QStringLiteral( "color: #888; font-size: 11px;" ) );
@@ -451,8 +494,9 @@ void showSettingsDialog( QWidget *parent )
     edtDataset->setText(   QStringLiteral( "E:/pointnet/datasets_aug" ) );
     edtPctClsLog->setText( QStringLiteral( "E:/pointnet/pct_simple/logs/pct_cls_v4" ) );
     edtPctSuffix->setText( QStringLiteral( "_v4_normals" ) );
-    edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v10" ) );
-    edtPtv3Suffix->setText( QStringLiteral( "_v10_normals" ) );
+    edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v14_actual_points" ) );
+    edtPtv3Suffix->setText( QStringLiteral( "_v13_normals" ) );
+    edtPtv3TowerSuffix->setText( QStringLiteral( "_v13_normals" ) );
   } );
 
   auto *btnBox = new QHBoxLayout;
@@ -475,6 +519,7 @@ void showSettingsDialog( QWidget *parent )
     s.setValue( QStringLiteral( "parammodeler/pctRegressionSuffix" ),   edtPctSuffix->text() );
     s.setValue( QStringLiteral( "parammodeler/ptv3ClassifyLogDir" ),    edtPtv3ClsLog->text() );
     s.setValue( QStringLiteral( "parammodeler/ptv3RegressionSuffix" ),   edtPtv3Suffix->text() );
+    s.setValue( QStringLiteral( "parammodeler/ptv3TowerRegressionSuffix" ), edtPtv3TowerSuffix->text().trimmed() );
     dlg.accept();
   } );
   QObject::connect( btnCancel, &QPushButton::clicked, &dlg, &QDialog::reject );

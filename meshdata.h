@@ -90,6 +90,7 @@ struct PyramidRoofParams {
 struct TruncatedPyramidRoofParams {
     double bottomLength = 14.0, bottomWidth = 10.0, topLength = 8.0,
            topWidth = 6.0, wallHeight = 4.0, roofHeight = 3.0;
+    double topPositionX = 0.5, topPositionY = 0.5;
 };
 
 struct HalfCylinderRoofParams {
@@ -109,6 +110,7 @@ struct IndentedCuboidParams {
 struct AsymmetricGableHouseParams {
     double length = 12.0, width = 8.0, wallHeight = 4.0, roofHeight = 3.0,
            ridgeLength = 7.0, ridgeRatio = 0.5;
+    double ridgePositionX = 0.5;
 };
 
 struct FourStageRoundTowerParams {
@@ -120,10 +122,6 @@ struct FourStageRoundTowerParams {
 struct TwoGableHousesParams {
     double length1 = 14.0, length2 = 10.0, width = 8.0, wallHeight = 4.0,
            roofHeight = 3.0, angle = 180.0, ridgeRatio = 0.5;
-};
-
-struct TriPrismPyramidParams {
-    double leg = 8.0, baseSide = 6.0, totalHeight = 8.0, pyramidRatio = 0.4;
 };
 
 #endif // MESHDATA_H
