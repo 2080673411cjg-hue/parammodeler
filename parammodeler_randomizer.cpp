@@ -172,9 +172,10 @@ void randomizePrimitiveParams( ParamModelerDock *dock,
     // Apply one scale to all physical dimensions before spin-box rounding.
     const double scale = 0.5 + QRandomGenerator::global()->generateDouble() * 1.5;
     set( dock->ui->spinBoxFTBaseRadius, baseRadius * scale );
-    set( dock->ui->spinBoxFTBaseHeight, baseHeight * scale );
     set( dock->ui->spinBoxFTEaveRadius, eaveRadius * scale );
     set( dock->ui->spinBoxFTEaveThickness, eaveHeight * scale );
+    set( dock->ui->spinBoxFTBodyHeight,
+         std::round( baseHeight * scale * 100.0 ) / 100.0 - dock->ui->spinBoxFTEaveThickness->value() );
     set( dock->ui->spinBoxFTMiddleHeight, middleHeight * scale );
     set( dock->ui->spinBoxFTMiddleTopRadius, middleTopRadius * scale );
     set( dock->ui->spinBoxFTMiddleRise, middleRise * scale );

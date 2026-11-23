@@ -27,17 +27,19 @@ int main( int argc, char **argv )
   const QString commonKey = QStringLiteral( "parammodeler/ptv3RegressionSuffix" );
   const QString clsKey = QStringLiteral( "parammodeler/ptv3ClassifyLogDir" );
   const QString v14MigrationKey = QStringLiteral( "parammodeler/ptv3ClassifyDefaultsV14" );
+  const QString towerMigrationKey = QStringLiteral( "parammodeler/ptv3TowerDefaultsV14ClearHeight" );
   const QString v14Dir = ParamModelerConfig::pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v14_actual_points" );
   const QString v13Dir = ParamModelerConfig::pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v13" );
   const QString baseline = QStringLiteral( "_v13_normals" );
+  const QString towerDefault = QStringLiteral( "_v14_clear_height_normals" );
   check( ParamModelerConfig::ptv3RegressionSuffix() == baseline, "common default is v13" );
-  check( ParamModelerConfig::ptv3TowerRegressionSuffix() == baseline, "tower default is v13" );
+  check( ParamModelerConfig::ptv3TowerRegressionSuffix() == towerDefault, "tower defaults to direct cylinder-height regression" );
 
   for ( int i = 0; i < 13; ++i )
   {
     const auto &entry = ParamModelerPrimitiveNames::entries()[i];
     const QString name = QString::fromLatin1( entry.name );
-    const QString suffix = baseline;
+    const QString suffix = name == QStringLiteral( "CurvedRoofRoundHouse" ) ? towerDefault : baseline;
     for ( const QString &alias : { name, QString::fromLatin1( entry.legacy ) } )
     {
       const auto config = regressionConfig( PointNetBackend::PTv3, alias );
@@ -52,10 +54,11 @@ int main( int argc, char **argv )
   check( ParamModelerConfig::ptv3ClassifyLogDir() == v14Dir, "classification is v14" );
   settings.setValue( QStringLiteral( "parammodeler/ptv3ModelDefaultsV13" ), false );
   settings.setValue( v14MigrationKey, false );
+  settings.setValue( towerMigrationKey, false );
   settings.setValue( clsKey, QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v10" ) );
   settings.setValue( commonKey, QStringLiteral( "_v10_normals" ) );
   settings.setValue( towerKey, QStringLiteral( "_v12_tower_baseline_normals" ) );
-  check( ParamModelerConfig::ptv3TowerRegressionSuffix() == baseline, "old tower setting migrates on direct access" );
+  check( ParamModelerConfig::ptv3TowerRegressionSuffix() == towerDefault, "old tower setting migrates on direct access" );
   check( ParamModelerConfig::ptv3RegressionSuffix() == baseline, "old common setting migrates to v13" );
   check( ParamModelerConfig::ptv3ClassifyLogDir() == v14Dir, "old classifier migrates to v14" );
   settings.setValue( v14MigrationKey, false );
@@ -71,6 +74,13 @@ int main( int argc, char **argv )
   const QString customClsDir = QStringLiteral( "E:/pointnet/custom_classifier" );
   settings.setValue( clsKey, customClsDir );
   check( ParamModelerConfig::ptv3ClassifyLogDir() == customClsDir, "classifier migration preserves custom paths" );
+  settings.setValue( towerMigrationKey, false );
+  settings.setValue( towerKey, QStringLiteral( "_v12_tower_baseline_normals" ) );
+  check( ParamModelerConfig::ptv3TowerRegressionSuffix() == QStringLiteral( "_v12_tower_baseline_normals" ),
+         "tower migration preserves a custom checkpoint" );
+  settings.setValue( towerMigrationKey, false );
+  settings.setValue( towerKey, baseline );
+  check( ParamModelerConfig::ptv3TowerRegressionSuffix() == towerDefault, "saved tower v13 default migrates to the new model" );
   settings.setValue( towerKey, baseline );
   settings.setValue( commonKey, QStringLiteral( "_v9_normals" ) );
   check( ParamModelerConfig::ptv3RegressionSuffix( QStringLiteral( "CurvedRoofRoundHouse" ) ) == baseline,
@@ -114,13 +124,13 @@ int main( int argc, char **argv )
     auto *edit = dialog->findChild<QLineEdit *>( QStringLiteral( "ptv3TowerSuffixEdit" ) );
     for ( auto *button : dialog->findChildren<QPushButton *>() )
       if ( button->text() == QStringLiteral( "恢复默认值" ) ) button->click();
-    check( edit && edit->text() == baseline, "reset restores only the intended tower default" );
+    check( edit && edit->text() == towerDefault, "reset restores the new tower default" );
     dialog->reject();
   } );
   ParamModelerConfig::showSettingsDialog( nullptr );
   check( ParamModelerConfig::ptv3TowerRegressionSuffix().isEmpty(), "cancel does not save a reset" );
 
-  settings.setValue( towerKey, baseline );
+  settings.setValue( towerKey, towerDefault );
   const auto live = regressionConfig( PointNetBackend::PTv3, QStringLiteral( "CurvedRoofRoundHouse" ) );
   if ( argc > 1 )
   {

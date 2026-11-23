@@ -407,6 +407,7 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderLHeight, ui->spinBoxLHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderConeCylRadius, ui->spinBoxConeCylRadius, 100.0, 50.0 );
   bindSliderSpin( ui->sliderConeCylCylHeight, ui->spinBoxConeCylCylHeight, 100.0, 50.0 );
+  ui->spinBoxConeCylConeHeight->setDecimals( 6 );
   bindSliderSpin( ui->sliderConeCylConeHeight, ui->spinBoxConeCylConeHeight, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderGRLength, ui->spinBoxGRLength, 100, 50 );
   bindSliderSpin( ui->sliderGRWidth, ui->spinBoxGRWidth, 100, 50 );
@@ -454,12 +455,14 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderAGHRidgeOffset, ui->spinBoxAGHRidgeOffset, 100.0, 0.8, 0.2 );
   bindSliderSpin( ui->sliderCylHemiRadius, ui->spinBoxCylHemiRadius, 100, 50 );
   bindSliderSpin( ui->sliderCylHemiHeight, ui->spinBoxCylHemiHeight, 100, 50 );
+  ui->spinBoxCylHemiDomeHeight->setDecimals( 6 );
   bindSliderSpin( ui->sliderCylHemiDomeHeight, ui->spinBoxCylHemiDomeHeight, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderCylHemiBulge, ui->spinBoxCylHemiBulge, 100.0, 1.0 );
   bindSliderSpin( ui->sliderFTBaseRadius, ui->spinBoxFTBaseRadius, 100.0, 50.0 );
-  bindSliderSpin( ui->sliderFTBaseHeight, ui->spinBoxFTBaseHeight, 100.0, 50.0 );
+  bindSliderSpin( ui->sliderFTBodyHeight, ui->spinBoxFTBodyHeight, 1000.0, 50.0, 0.001 );
   bindSliderSpin( ui->sliderFTEaveRadius, ui->spinBoxFTEaveRadius, 1000.0, 60.0 );
-  bindSliderSpin( ui->sliderFTEaveThickness, ui->spinBoxFTEaveThickness, 1000.0, 50.0 );
+  bindSliderSpin( ui->sliderFTEaveThickness, ui->spinBoxFTEaveThickness, 1000.0, 50.0, 0.001 );
+  ui->sliderFTEaveThickness->setValue( qRound( ui->spinBoxFTEaveThickness->value() * 1000.0 ) );
   bindSliderSpin( ui->sliderFTMiddleHeight, ui->spinBoxFTMiddleHeight, 100.0, 50.0 );
   bindSliderSpin( ui->sliderFTMiddleTopRadius, ui->spinBoxFTMiddleTopRadius, 100.0, 60.0 );
   bindSliderSpin( ui->sliderFTMiddleRise, ui->spinBoxFTMiddleRise, 1000.0, 12.5 );
@@ -468,6 +471,7 @@ void ParamModelerDock::initUiControls()
   bindSliderSpin( ui->sliderTGLength2, ui->spinBoxTGLength2, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGWidth, ui->spinBoxTGWidth, 100.0, 50.0 );
   bindSliderSpin( ui->sliderTGHeightWall, ui->spinBoxTGHeightWall, 100.0, 50.0 );
+  ui->spinBoxTGRoofHeight->setDecimals( 6 );
   bindSliderSpin( ui->sliderTGRoofHeight, ui->spinBoxTGRoofHeight, 100.0, 0.90, 0.20 );
   bindSliderSpin( ui->sliderTGAngle, ui->spinBoxTGAngle, 10.0, 180.0, 135.0 );
   bindSliderSpin( ui->sliderTGRidgeRatio, ui->spinBoxTGRidgeRatio, 100.0, 0.8, 0.2 );
@@ -501,12 +505,12 @@ void ParamModelerDock::initUiControls()
     return !m_suspendHeightCompensation && !m_isUpdating &&
            ui->stackedWidgetParams->currentWidget() == ui->pageFourStageRoundTower;
   };
-  bindEaveDimension( ui->spinBoxFTBaseRadius, ui->spinBoxFTEaveRadius, ui->sliderFTEaveRadius,
-                     true, 60.0, ui->sliderFTBaseRadius, manualTowerEdit );
-  bindEaveDimension( ui->spinBoxFTBaseHeight, ui->spinBoxFTEaveThickness, ui->sliderFTEaveThickness,
-                     false, 50.0, ui->sliderFTBaseHeight, manualTowerEdit );
-  bindTowerTopRadius( ui->spinBoxFTEaveRadius, ui->spinBoxFTMiddleTopRadius, ui->sliderFTMiddleTopRadius,
-                      ui->sliderFTEaveRadius, manualTowerEdit );
+  ui->spinBoxFTBodyHeight->setKeyboardTracking( false );
+  ui->spinBoxFTEaveThickness->setKeyboardTracking( false );
+  bindTowerEaveRadius( ui->spinBoxFTBaseRadius, ui->sliderFTBaseRadius,
+                       ui->spinBoxFTEaveRadius, ui->sliderFTEaveRadius, manualTowerEdit );
+  bindTowerTopRadius( ui->spinBoxFTEaveRadius, ui->spinBoxFTMiddleTopRadius,
+                      ui->sliderFTMiddleTopRadius, ui->sliderFTEaveRadius, manualTowerEdit );
   bindTowerRise( ui->spinBoxFTMiddleHeight, ui->spinBoxFTMiddleRise, ui->sliderFTMiddleRise,
                  ui->sliderFTMiddleHeight, manualTowerEdit );
 
@@ -561,7 +565,6 @@ void ParamModelerDock::initUiControls()
   ui->labelAGHRidgeLength->setText( tr( "Ridge length:" ) );
   ui->labelAGHRidgeOffset->setText( tr( "Ridge ratio:" ) );
   ui->labelFTBaseRadius->setText( tr( "Base radius:" ) );
-  ui->labelFTBaseHeight->setText( tr( "Base height:" ) );
   ui->labelFTMiddleHeight->setText( tr( "Middle height:" ) );
   ui->labelFTMiddleTopRadius->setText( tr( "Middle top radius:" ) );
   ui->labelFTMiddleRise->setText( tr( "Middle rise (m):" ) );
@@ -644,7 +647,7 @@ void ParamModelerDock::initDimensionDirectionControls()
   add( ui->spinBoxICInnerHeight, ui->sliderICInnerHeight, tr( "recess rim" ), true );
   add( ui->spinBoxAGHHeightWall, ui->sliderAGHHeightWall, tr( "roof ridge" ) );
   add( ui->spinBoxCylHemiHeight, ui->sliderCylHemiHeight, tr( "dome apex" ) );
-  add( ui->spinBoxFTBaseHeight, ui->sliderFTBaseHeight, tr( "base section top" ) );
+  add( ui->spinBoxFTBodyHeight, ui->sliderFTBodyHeight, tr( "eaves and roof" ) );
   add( ui->spinBoxFTMiddleHeight, ui->sliderFTMiddleHeight, tr( "middle section top" ) );
   add( ui->spinBoxFTConeHeight, ui->sliderFTConeHeight, tr( "cone apex" ) );
   add( ui->spinBoxTGHeightWall, ui->sliderTGHeightWall, tr( "roof ridges" ) );
@@ -699,8 +702,8 @@ void ParamModelerDock::initConnections()
       tr( "Plugin usage" ),
       tr( "Basic workflow:\n"
           "1. Load an input point cloud.\n"
-          "2. Open Classify and estimate parameters... and classify the point cloud. Choose a building type from the candidates.\n"
-          "3. Use Estimate and align to load the model and point cloud into 3D and apply automatic alignment.\n"
+          "2. Open Model classification and parameter fitting and classify the point cloud. Choose a building type from the candidates.\n"
+          "3. Use Fit and align to load the model and point cloud into 3D and apply automatic alignment.\n"
           "4. Use Align in 3D for point picking, or Fit corner from three faces... for missing-corner cases.\n"
           "5. Fine-tune parameters, position and rotation in the main panel.\n"
           "6. Export model files or Current evaluation CSV from the Export menu.\n\n"
@@ -835,7 +838,7 @@ void ParamModelerDock::initConnections()
   connect( ui->sliderAGHRidgeLength, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderAGHRidgeOffset, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderFTBaseRadius, &QSlider::valueChanged, this, schedulePreview );
-  connect( ui->sliderFTBaseHeight, &QSlider::valueChanged, this, schedulePreview );
+  connect( ui->sliderFTBodyHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderFTMiddleHeight, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderFTMiddleTopRadius, &QSlider::valueChanged, this, schedulePreview );
   connect( ui->sliderFTMiddleRise, &QSlider::valueChanged, this, schedulePreview );
@@ -883,6 +886,7 @@ void ParamModelerDock::initPointNet()
   QAction *fitStatisticsAction = ui->menuLoad3D->addAction( tr( "Fit statistics and tolerance..." ) );
   connect( fitStatisticsAction, &QAction::triggered, this, &ParamModelerDock::showFitEvaluationDetails );
   connect( ui->btnFaceFit, &QPushButton::clicked, this, &ParamModelerDock::showFaceFitView );
+  ui->btnFaceFit->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/mActionScaleFeature.svg" ) ) );
 
   ui->widgetInversionPanel->setVisible( false );
   ui->widgetInversionPanel->setMinimumWidth( 0 );
@@ -891,10 +895,10 @@ void ParamModelerDock::initPointNet()
   ui->btnWorkflowEstimate->setCheckable( false );
   ui->btnWorkflowEstimate->setFlat( false );
   ui->btnWorkflowEstimate->setStyleSheet( QString() );
-  ui->btnWorkflowEstimate->setText( tr( "Classify and estimate parameters..." ) );
+  ui->btnWorkflowEstimate->setText( tr( "Model classification and parameter fitting" ) );
   ui->btnWorkflowEstimate->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/mIconPointCloudLayer.svg" ) ) );
-  ui->btnPointNetClassify->setText( tr( "Classify" ) );
-  ui->btnInverseParams->setText( tr( "Estimate parameters" ) );
+  ui->btnPointNetClassify->setText( tr( "Classify model" ) );
+  ui->btnInverseParams->setText( tr( "Fit parameters" ) );
   ui->labelPointCloudWorkflowTitle->setText( tr( "Point Cloud Tools" ) );
 
   // 线框模式复选框：微调参数时只显示模型边线，不遮挡点云

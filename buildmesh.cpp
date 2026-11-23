@@ -714,17 +714,6 @@ MeshData BuildMesh::buildFourStageRoundTower( const FourStageRoundTowerParams &p
         return pts;
     };
 
-    auto evalBezier = [&]( double t, double &r, double &z ) {
-        double P0x=roofR, P0y=baseH;
-        // Cubic representation of z(t) = baseH + roofH*t + 4*rise*t*(1-t).
-        double P1x=roofR-(roofR-capR)/3.0, P1y=baseH+roofH/3.0+4.0*rise/3.0;
-        double P2x=roofR-2.0*(roofR-capR)/3.0, P2y=baseH+2.0*roofH/3.0+4.0*rise/3.0;
-        double P3x=capR, P3y=baseH+roofH;
-        double u=1.0-t;
-        r=u*u*u*P0x+3*u*u*t*P1x+3*u*t*t*P2x+t*t*t*P3x;
-        z=u*u*u*P0y+3*u*u*t*P1y+3*u*t*t*P2y+t*t*t*P3y;
-    };
-
     auto connectRings = [&]( const QVector<QVector3D> &a, const QVector<QVector3D> &b ) {
         for ( int i=0; i<seg; i++ ) {
             int n=(i+1)%seg;
@@ -741,30 +730,53 @@ MeshData BuildMesh::buildFourStageRoundTower( const FourStageRoundTowerParams &p
         m.addTriangle(bc, botRing[n], botRing[i]);
     }
 
+    struct ProfilePoint
+    {
+        double radius;
+        double height;
+    };
+
+    // A-B-C-D-E 是外轮廓，C-P1-P2-D 是屋顶贝塞尔段。
+    const ProfilePoint bodyTop{ baseR, bodyTopZ };      // A
+    const ProfilePoint eaveBottom{ roofR, bodyTopZ };   // B
+    const ProfilePoint eaveTop{ roofR, baseH };         // C
+    const ProfilePoint coneBase{ capR, baseH + roofH }; // D
+    const ProfilePoint tip{ 0, baseH + roofH + coneH };  // E
+    const ProfilePoint roofControl1{ roofR - ( roofR - capR ) / 3.0,
+                                     baseH + roofH / 3.0 + 4.0 * rise / 3.0 };
+    const ProfilePoint roofControl2{ roofR - 2.0 * ( roofR - capR ) / 3.0,
+                                     baseH + 2.0 * roofH / 3.0 + 4.0 * rise / 3.0 };
+
+    QVector<ProfilePoint> profile{ bodyTop, eaveBottom, eaveTop };
+    for ( int layer = 1; layer < layers; ++layer )
+    {
+        const double t = layer / double( layers );
+        const double u = 1.0 - t;
+        profile.push_back( {
+            u*u*u*eaveTop.radius + 3*u*u*t*roofControl1.radius
+                + 3*u*t*t*roofControl2.radius + t*t*t*coneBase.radius,
+            u*u*u*eaveTop.height + 3*u*u*t*roofControl1.height
+                + 3*u*t*t*roofControl2.height + t*t*t*coneBase.height
+        } );
+    }
+    profile << coneBase << tip;
+
     // 圆柱段
-    QVector<QVector3D> bodyTopRing = makeRing(baseR, bodyTopZ);
-    connectRings(botRing, bodyTopRing);
+    const auto &first = profile.front();
+    QVector<QVector3D> prev = makeRing( first.radius, first.height );
+    connectRings( botRing, prev );
 
-    // 有厚度的外挑檐口
-    QVector<QVector3D> eaveInnerTopRing = makeRing(baseR, baseH);
-    QVector<QVector3D> eaveOuterBottomRing = makeRing(roofR, bodyTopZ);
-    QVector<QVector3D> eaveRing = makeRing(roofR, baseH);
-    connectRings(bodyTopRing, eaveOuterBottomRing);     // 檐口底面
-    connectRings(eaveOuterBottomRing, eaveRing);        // 檐口外侧竖面
-    connectRings(eaveInnerTopRing, eaveRing);           // 檐口顶面
-
-    // 低坡弧面屋顶
-    QVector<QVector3D> prev = eaveRing;
-    for ( int l=1; l<=layers; l++ ) {
-        double t=l/double(layers), r, z;
-        evalBezier(t, r, z);
-        QVector<QVector3D> cur = makeRing(r, z);
-        connectRings(prev, cur);
-        prev = cur;
+    // 依次旋转剖面采样点，连接相邻圆环。
+    for ( int i = 1; i < profile.size() - 1; ++i )
+    {
+        const auto &point = profile[i];
+        QVector<QVector3D> ring = makeRing( point.radius, point.height );
+        connectRings( prev, ring );
+        prev.swap( ring );
     }
 
-    // 顶部小尖锥
-    QVector3D apex(0, 0, baseH+roofH+coneH);
+    // 剖面的末点落在旋转轴上，顶锥用三角扇收口。
+    const QVector3D apex( 0, 0, profile.back().height );
     for ( int i=0; i<seg; i++ ) {
         int n=(i+1)%seg;
         m.addTriangle(prev[i], prev[n], apex);

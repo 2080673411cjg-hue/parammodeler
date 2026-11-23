@@ -269,6 +269,7 @@ private:
   QPointer<QLabel> m_fitDetailsLabel;
   QPointer<ParamModelerFaceFitView> m_faceFitView;
   QPointer<QComboBox> m_faceFitSelection;
+  QPointer<QComboBox> m_faceFitTowerLayer;
   QPointer<QDoubleSpinBox> m_faceFitBand;
   QPointer<QLabel> m_faceFitStatus;
 		

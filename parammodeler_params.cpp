@@ -186,7 +186,8 @@ double ParamModelerDock::cylHemiBulge() const { return ui->spinBoxCylHemiBulge->
 // ===== FourStageRoundTower =====
 
 double ParamModelerDock::ftBaseRadius() const { return ui->spinBoxFTBaseRadius->value(); }
-double ParamModelerDock::ftBaseHeight() const { return ui->spinBoxFTBaseHeight->value(); }
+// 建模与回归仍使用檐口上沿高度和外半径。
+double ParamModelerDock::ftBaseHeight() const { return ui->spinBoxFTBodyHeight->value() + ftEaveHeight(); }
 double ParamModelerDock::ftEaveRadius() const { return ui->spinBoxFTEaveRadius->value(); }
 double ParamModelerDock::ftEaveHeight() const { return ui->spinBoxFTEaveThickness->value(); }
 double ParamModelerDock::ftMiddleHeight() const { return ui->spinBoxFTMiddleHeight->value(); }

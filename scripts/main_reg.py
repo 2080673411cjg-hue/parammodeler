@@ -263,6 +263,8 @@ def load_metadata(metadata_path: Path) -> List[dict]:
 def target_value(params: dict, name: str):
     if name in params:
         return float(params[name])
+    if name == "cylinderHeight" and {"baseHeight", "eaveHeight"} <= params.keys():
+        return float(params["baseHeight"]) - float(params["eaveHeight"])
     outer_length = float(params.get("outerLength", 0.0))
     outer_width = float(params.get("outerWidth", 0.0))
     if name == "leftMarginRatio":
@@ -443,6 +445,8 @@ def prediction_params_for_plugin(class_name: str, targets: List[str], values: np
         put("geom_long_end_margin_ratio", "rightMarginRatio")
         put("geom_short_start_margin_ratio", "frontMarginRatio")
         put("geom_short_end_margin_ratio", "backMarginRatio")
+    elif class_name == "CurvedRoofRoundHouse" and {"cylinderHeight", "eaveHeight"} <= params.keys():
+        params["baseHeight"] = params["cylinderHeight"] + params["eaveHeight"]
     return params
 
 
@@ -1075,24 +1079,33 @@ def symmetry_standardized_mae_score(metrics, target_std, target_weights, permuta
 
 TOWER_PROFILE_TARGETS = ("baseRadius", "baseHeight", "middleHeight", "middleTopRadius",
                          "middleRise", "coneHeight", "eaveRadius", "eaveHeight")
+TOWER_CLEAR_HEIGHT_TARGETS = (*TOWER_PROFILE_TARGETS[:1], "cylinderHeight", *TOWER_PROFILE_TARGETS[2:])
 TOWER_PROFILE_VERSION = "tower_profile17_train_std_v1"
 TOWER_PROFILE_POINTS = {"eave": 4, "roof": 17, "cone": 2}
+
+
+def has_tower_profile_targets(targets):
+    return len(targets or ()) == 8 and set(targets) in (set(TOWER_PROFILE_TARGETS), set(TOWER_CLEAR_HEIGHT_TARGETS))
 
 
 def validate_tower_profile(class_name, targets, target_mode, weight):
     if not np.isfinite(weight) or weight < 0:
         raise ValueError("--tower_profile_loss_weight must be finite and non-negative")
     if weight > 0 and (canonical_class_name(class_name) != "CurvedRoofRoundHouse"
-                       or target_mode != "raw" or len(targets or []) != 8
-                       or set(targets or []) != set(TOWER_PROFILE_TARGETS)):
+                       or target_mode != "raw" or not has_tower_profile_targets(targets)):
         raise ValueError("Tower profile loss requires CurvedRoofRoundHouse with the eight raw physical targets")
 
 
 def tower_profile_points(values, targets):
     index = {name: i for i, name in enumerate(targets)}
-    base_r, base_h, roof_h, cap_r, rise, cone_h, eave_r, eave_h = (
-        values[:, index[name]] for name in TOWER_PROFILE_TARGETS)
-    body_top = base_h - eave_h
+    base_r, roof_h, cap_r, rise, cone_h, eave_r, eave_h = (
+        values[:, index[name]] for name in TOWER_PROFILE_TARGETS if name != "baseHeight")
+    if "cylinderHeight" in index:
+        body_top = values[:, index["cylinderHeight"]]
+        base_h = body_top + eave_h
+    else:
+        base_h = values[:, index["baseHeight"]]
+        body_top = base_h - eave_h
     eave = torch.stack((torch.stack((base_r, body_top), -1), torch.stack((eave_r, body_top), -1),
                         torch.stack((eave_r, base_h), -1), torch.stack((base_r, base_h), -1)), 1)
     t = torch.linspace(0, 1, 17, dtype=values.dtype, device=values.device).view(1, -1)
@@ -1787,7 +1800,7 @@ def test(args):
     save_predictions(output_dir, output_split, targets, metrics)
     save_regression_report(output_dir, output_split, class_name, targets, metrics)
     save_regression_errors(output_dir, output_split, class_name, targets, metrics)
-    if class_name == "CurvedRoofRoundHouse" and len(targets) == 8 and set(targets) == set(TOWER_PROFILE_TARGETS):
+    if class_name == "CurvedRoofRoundHouse" and has_tower_profile_targets(targets):
         save_tower_profile_report(output_dir, output_split, targets, metrics)
     if geometry_test or ckpt.get("lhouse_canonical", False):
         orientation_report.update(centered_geometry_errors(ds, targets, metrics))

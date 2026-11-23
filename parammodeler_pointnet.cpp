@@ -931,12 +931,25 @@ void PointNetRunner::applyToUI( ParamModelerDock *dock,
     set( "aghRidgeRatio",  dock->ui->spinBoxAGHRidgeOffset, dock->ui->sliderAGHRidgeOffset );
     if ( params.contains( QStringLiteral( "aghRidgeLen" ) ) )
       dock->m_aghRidgePositionX = std::clamp( params.value( QStringLiteral( "aghRidgePositionX" ), 0.5 ), 0.0, 1.0 );
-    set( "ftBaseR",       dock->ui->spinBoxFTBaseRadius,     dock->ui->sliderFTBaseRadius );
-    set( "ftBaseH",       dock->ui->spinBoxFTBaseHeight,     dock->ui->sliderFTBaseHeight );
-    set( "ftEaveRadius", dock->ui->spinBoxFTEaveRadius, dock->ui->sliderFTEaveRadius );
-    set( "ftEaveHeight", dock->ui->spinBoxFTEaveThickness, dock->ui->sliderFTEaveThickness );
+    if ( params.contains( "ftBaseR" ) || params.contains( "ftEaveRadius" ) )
+    {
+        const double outerRadius = params.value( "ftEaveRadius", dock->ftEaveRadius() );
+        const double topRadius = params.value( "ftMidTopR", dock->ftMiddleTopRadius() );
+        set( "ftBaseR", dock->ui->spinBoxFTBaseRadius, dock->ui->sliderFTBaseRadius );
+        dock->ui->spinBoxFTEaveRadius->setValue( outerRadius );
+        dock->ui->spinBoxFTMiddleTopRadius->setValue( topRadius );
+    }
+    else
+        set( "ftMidTopR", dock->ui->spinBoxFTMiddleTopRadius, dock->ui->sliderFTMiddleTopRadius );
+    if ( params.contains( "ftBaseH" ) || params.contains( "ftEaveHeight" ) )
+    {
+        const double eaveTop = params.value( "ftBaseH", dock->ftBaseHeight() );
+        const double thickness = params.value( "ftEaveHeight", dock->ftEaveHeight() );
+        auto *bodyHeight = dock->ui->spinBoxFTBodyHeight;
+        dock->ui->spinBoxFTEaveThickness->setValue( std::min( thickness, eaveTop - bodyHeight->minimum() ) );
+        bodyHeight->setValue( eaveTop - dock->ftEaveHeight() );
+    }
     set( "ftMidH",        dock->ui->spinBoxFTMiddleHeight,   dock->ui->sliderFTMiddleHeight );
-    set( "ftMidTopR",     dock->ui->spinBoxFTMiddleTopRadius,dock->ui->sliderFTMiddleTopRadius );
     set( "ftMidRise",     dock->ui->spinBoxFTMiddleRise,     dock->ui->sliderFTMiddleRise );
     set( "ftConeH",       dock->ui->spinBoxFTConeHeight,     dock->ui->sliderFTConeHeight );
     set( "tgLength1",      dock->ui->spinBoxTGLength1,     dock->ui->sliderTGLength1 );

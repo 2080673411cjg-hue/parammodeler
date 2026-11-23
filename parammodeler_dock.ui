@@ -312,7 +312,7 @@ QCheckBox#checkBoxWireframe {
            <item>
             <widget class="QPushButton" name="btnWorkflowEstimate">
              <property name="text">
-              <string>Classify and estimate parameters...</string>
+              <string>Model classification and parameter fitting</string>
              </property>
             </widget>
            </item>
@@ -371,7 +371,7 @@ QCheckBox#checkBoxWireframe {
              <item>
               <widget class="QPushButton" name="btnFaceFit">
                <property name="text">
-                <string>2D face fit...</string>
+                <string>2D face fit</string>
                </property>
               </widget>
              </item>
@@ -1993,6 +1993,7 @@ QCheckBox#checkBoxWireframe {
                  <item><widget class="QDoubleSpinBox" name="spinBoxFTEaveThickness">
                   <property name="decimals"><number>3</number></property>
                   <property name="maximum"><double>50.000000000000000</double></property>
+                  <property name="value"><double>0.400000000000000</double></property>
                  </widget></item>
                 </layout></item>
                 <item row="0" column="0">
@@ -2021,23 +2022,26 @@ QCheckBox#checkBoxWireframe {
                  </layout>
                 </item>
                 <item row="1" column="0">
-                 <widget class="QLabel" name="labelFTBaseHeight">
+                 <widget class="QLabel" name="labelFTBodyHeight">
                   <property name="text">
-                   <string>Base height:</string>
+                   <string>Clear cylinder height:</string>
                   </property>
                  </widget>
                 </item>
                 <item row="1" column="1">
-                 <layout class="QHBoxLayout" name="layoutFTBaseHeight">
+                 <layout class="QHBoxLayout" name="layoutFTBodyHeight">
                   <item>
-                   <widget class="QSlider" name="sliderFTBaseHeight">
+                   <widget class="QSlider" name="sliderFTBodyHeight">
                     <property name="orientation">
                      <enum>Qt::Horizontal</enum>
                     </property>
                    </widget>
                   </item>
                   <item>
-                   <widget class="QDoubleSpinBox" name="spinBoxFTBaseHeight">
+                   <widget class="QDoubleSpinBox" name="spinBoxFTBodyHeight">
+                    <property name="decimals">
+                     <number>3</number>
+                    </property>
                     <property name="singleStep">
                      <double>0.100000000000000</double>
                     </property>
@@ -2402,7 +2406,7 @@ QCheckBox#checkBoxWireframe {
                <string>QPushButton { text-align: left; font-weight: bold; padding: 4px; border-bottom: 1px solid #aaa; }</string>
               </property>
               <property name="text">
-                <string>Point Cloud Classification and Parameter Estimation</string>
+                <string>Model classification and parameter fitting</string>
               </property>
               <property name="checkable">
                <bool>false</bool>
@@ -2496,7 +2500,7 @@ QCheckBox#checkBoxWireframe {
                     <bool>false</bool>
                    </property>
                    <property name="text">
-                     <string>Classify</string>
+                     <string>Classify model</string>
                    </property>
                   </widget>
                  </item>
@@ -2506,7 +2510,7 @@ QCheckBox#checkBoxWireframe {
                     <bool>false</bool>
                    </property>
                    <property name="text">
-                     <string>Estimate parameters</string>
+                     <string>Fit parameters</string>
                    </property>
                   </widget>
                  </item>

@@ -266,46 +266,13 @@ int main( int argc, char **argv )
   middleHeight.setValue( 2 ); rise.setValue( .33 );
   suspended = false;
   check( rise.value() == .33 && riseSlider.value() == 330, "new prediction can set height before rise" );
-  QDoubleSpinBox radius, eaveRadius, baseHeight, eaveHeight;
-  QSlider radiusSlider, heightSlider, baseRadiusSlider, baseHeightSlider;
-  radius.setRange( 0, 50 );
-  baseHeight.setRange( 0, 50 );
-  eaveRadius.setDecimals( 3 );
-  eaveHeight.setDecimals( 3 );
-  bindEaveDimension( &radius, &eaveRadius, &radiusSlider, true, 60, &baseRadiusSlider, [] { return false; } );
-  bindEaveDimension( &baseHeight, &eaveHeight, &heightSlider, false, 50, &baseHeightSlider, [] { return false; } );
-  check( !eaveRadius.isEnabled() && !eaveHeight.isEnabled(), "eave sizes disabled without base" );
-  radius.setValue( 8 );
-  baseHeight.setValue( 2 );
-  check( eaveRadius.value() == 8.96 && eaveHeight.value() == 0.4, "eave defaults are physical dimensions" );
-  eaveRadius.setValue( 20 );
-  check( eaveRadius.value() == 20 && radiusSlider.maximum() == 60000, "manual eave radius is independent of sampling limits" );
-  eaveRadius.setValue( 7 );
-  check( eaveRadius.value() == 8.001, "eave radius must remain outside the base" );
-  eaveHeight.setValue( 0.05 );
-  check( eaveHeight.value() == 0.05, "thin manual eave remains valid" );
-  eaveHeight.setValue( 0.4 );
-  baseHeight.setValue( 3 );
-  check( eaveHeight.value() == 0.4, "base edit retains a valid absolute eave height" );
-  baseHeight.setValue( 20 );
-  check( eaveHeight.value() == 0.4 && eaveHeight.maximum() == 19.999, "tall base retains thin eave without height restriction" );
-  eaveHeight.setValue( 25 );
-  check( eaveHeight.value() == 19.999, "eave must leave a positive cylinder height" );
-  radius.setValue( 0 );
-  radius.setValue( 0.01 );
-  check( eaveRadius.minimum() == 0.011 && eaveRadius.maximum() == 60, "tiny base uses representable valid dimensions" );
-  radius.setValue( 0 );
-  check( !eaveRadius.isEnabled() && eaveRadius.value() == 0, "clearing base clears its eave dimension" );
-
-  QDoubleSpinBox manualBaseR, manualBaseH, manualEaveR, manualEaveH, manualTopR, manualMidH, manualRise;
-  QSlider manualBaseRSlider, manualBaseHSlider, manualEaveRSlider, manualEaveHSlider,
-          manualTopRSlider, manualMidHSlider, manualRiseSlider;
-  manualBaseR.setRange( 0, 50 ); manualBaseH.setRange( 0, 50 ); manualMidH.setRange( 0, 50 );
+  QDoubleSpinBox manualBaseR, manualEaveR, manualTopR, manualMidH, manualRise;
+  QSlider manualBaseRSlider, manualEaveRSlider, manualTopRSlider, manualMidHSlider, manualRiseSlider;
+  manualBaseR.setRange( 0, 50 ); manualMidH.setRange( 0, 50 );
   manualEaveR.setDecimals( 3 ); manualEaveR.setRange( 0, 60 );
-  manualEaveH.setDecimals( 3 ); manualEaveH.setRange( 0, 50 );
   manualTopR.setRange( 0, 60 ); manualRise.setDecimals( 3 ); manualRise.setRange( 0, 12.5 );
-  manualBaseR.setValue( 8 ); manualBaseH.setValue( 2 ); manualEaveR.setValue( 9.6 );
-  manualEaveH.setValue( .4 ); manualTopR.setValue( 1 ); manualMidH.setValue( 2 ); manualRise.setValue( .4 );
+  manualBaseR.setValue( 8 ); manualEaveR.setValue( 9.6 );
+  manualTopR.setValue( 1 ); manualMidH.setValue( 2 ); manualRise.setValue( .4 );
   auto bindScaled = []( QDoubleSpinBox *spin, QSlider *slider ) {
     const double units = std::pow( 10.0, spin->decimals() );
     slider->setRange( qRound( spin->minimum() * units ), qRound( spin->maximum() * units ) );
@@ -315,39 +282,30 @@ int main( int argc, char **argv )
       const QSignalBlocker blocker( slider ); slider->setValue( qRound( value * units ) );
     } );
   };
-  bindScaled( &manualBaseR, &manualBaseRSlider ); bindScaled( &manualBaseH, &manualBaseHSlider );
-  bindScaled( &manualEaveR, &manualEaveRSlider ); bindScaled( &manualEaveH, &manualEaveHSlider );
+  bindScaled( &manualBaseR, &manualBaseRSlider ); bindScaled( &manualEaveR, &manualEaveRSlider );
   bindScaled( &manualTopR, &manualTopRSlider ); bindScaled( &manualMidH, &manualMidHSlider );
   bindScaled( &manualRise, &manualRiseSlider );
   auto manualEdit = [&] { return !suspended; };
-  bindEaveDimension( &manualBaseR, &manualEaveR, &manualEaveRSlider, true, 60, &manualBaseRSlider, manualEdit );
-  bindEaveDimension( &manualBaseH, &manualEaveH, &manualEaveHSlider, false, 50, &manualBaseHSlider, manualEdit );
+  bindTowerEaveRadius( &manualBaseR, &manualBaseRSlider, &manualEaveR, &manualEaveRSlider, manualEdit );
   bindTowerTopRadius( &manualEaveR, &manualTopR, &manualTopRSlider, &manualEaveRSlider, manualEdit );
   bindTowerRise( &manualMidH, &manualRise, &manualRiseSlider, &manualMidHSlider, manualEdit );
   manualBaseRSlider.setValue( 900 );
-  check( manualEaveR.value() == 9.6 && manualEaveRSlider.value() == 9600
-         && manualEaveRSlider.minimum() == 0 && manualEaveRSlider.maximum() == 60000,
-         "base radius edit preserves eave value and slider position" );
+  check( manualBaseR.value() == 9 && manualEaveR.value() == 9.6 && manualEaveRSlider.value() == 9600,
+         "editing the cylinder keeps the outer eave fixed" );
   manualBaseRSlider.setValue( 1200 );
-  check( manualBaseR.value() == 9.59 && manualBaseRSlider.value() == 959 && manualEaveR.value() == 9.6,
-         "oversized base stops at eave instead of enlarging eave" );
+  check( manualBaseR.value() == 9.59 && manualEaveR.value() == 9.6, "the cylinder stops at the outer eave" );
   manualBaseRSlider.setValue( 800 );
-  check( manualEaveR.value() == 9.6 && manualEaveRSlider.value() == 9600,
-         "shrinking base does not leave an inflated eave" );
+  manualEaveRSlider.setValue( 8900 );
+  check( manualBaseR.value() == 8 && manualEaveR.value() == 8.9, "editing the outer eave keeps the cylinder fixed" );
+  manualEaveRSlider.setValue( 9600 );
   manualTopR.setValue( 9 );
   manualEaveRSlider.setValue( 8500 );
-  check( manualEaveR.value() == 9.001 && manualEaveRSlider.value() == 9001 && manualTopR.value() == 9,
-         "shrinking eave stops at top radius without changing top radius" );
-  check( manualTopRSlider.value() == 900 && manualTopRSlider.maximum() == 5999,
-         "top radius slider scale stays fixed" );
+  check( manualBaseR.value() == 8 && manualEaveR.value() == 9.001 && manualEaveRSlider.value() == 9001
+         && manualTopR.value() == 9, "the outer eave also stops at the roof top radius" );
   manualTopR.setValue( 1 );
   manualEaveRSlider.setValue( 0 );
-  manualEaveRSlider.setValue( 0 );
-  check( manualEaveR.value() == 8.001 && manualEaveRSlider.value() == 8001,
-         "repeated invalid eave drags cannot desynchronize slider" );
-  manualBaseHSlider.setValue( 20 );
-  check( manualBaseH.value() == .41 && manualEaveH.value() == .4 && manualEaveHSlider.value() == 400
-         && manualEaveHSlider.maximum() == 50000, "base height edit preserves eave thickness and scale" );
+  check( manualBaseR.value() == 8 && manualEaveR.value() == 8.001 && manualEaveRSlider.value() == 8001,
+         "the outer eave stays outside the cylinder" );
   auto *manualRow = new QHBoxLayout;
   layout->addLayout( manualRow );
   manualRow->addWidget( &manualMidH ); manualRow->addWidget( &manualMidHSlider );
@@ -363,10 +321,10 @@ int main( int argc, char **argv )
   check( std::abs( manualZ - .4 ) < 1e-9, "repeated rejected height edit does not drift translation" );
   suspended = true;
   manualBaseR.setValue( 15 ); manualEaveR.setValue( 17 ); manualTopR.setValue( 4 );
-  manualBaseH.setValue( 5 ); manualEaveH.setValue( .6 ); manualMidH.setValue( 1 ); manualRise.setValue( .15 );
+  manualMidH.setValue( 1 ); manualRise.setValue( .15 );
   suspended = false;
   check( manualBaseR.value() == 15 && manualEaveR.value() == 17 && manualTopR.value() == 4
-         && manualBaseH.value() == 5 && manualEaveH.value() == .6 && manualMidH.value() == 1 && manualRise.value() == .15,
+         && manualMidH.value() == 1 && manualRise.value() == .15,
          "prediction and randomization batches can replace all tower dimensions" );
   manualRise.setValue( 0 );
   manualMidH.setValue( 0 );

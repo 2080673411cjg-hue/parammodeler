@@ -57,26 +57,47 @@ Tolerance: %6 | N: %7</source><translation>初始 → 当前（场景坐标单�
     <message><source>Inside/outside unavailable: open mesh</source><translation>内外比例不可用：模型未封闭</translation></message>
     <message><source>Fit statistics and tolerance...</source><translation>拟合统计与容差...</translation></message>
     <message><source>Fit statistics</source><translation>拟合统计</translation></message>
-    <message><source>2D face fit...</source><translation>二维微调…</translation></message>
     <message><source>2D face fit</source><translation>二维微调</translation></message>
-    <message><source>Pick face in 3D</source><translation>在三维中选面</translation></message>
-    <message><source>Load a supported model and its point cloud in the local 3D view first.</source><translation>请先在局部三维视图中加载支持二维微调的模型及其点云。</translation></message>
-    <message><source>Click inside a model face. Press Esc to cancel.</source><translation>请点击模型面内部。按 Esc 取消。</translation></message>
-    <message><source>No face here. Click inside a wall or roof. Esc cancels.</source><translation>此处没有选中模型面。请点击墙面或屋面内部，按 Esc 取消。</translation></message>
     <message><source>Face:</source><translation>视图：</translation></message>
     <message><source>Top (X / Y)</source><translation>顶面（X / Y）</translation></message>
     <message><source>Length side (X / Z)</source><translation>长度侧面（X / Z）</translation></message>
     <message><source>Width side (Y / Z)</source><translation>宽度侧面（Y / Z）</translation></message>
+    <message><source>Radius layer</source><translation>半径分层</translation></message>
+    <message><source>Cylinder radius</source><translation>圆柱半径</translation></message>
+    <message><source>Eave outer radius</source><translation>檐口外半径</translation></message>
+    <message><source>Cone base radius</source><translation>顶锥底圈半径</translation></message>
+    <message><source>%L1 (scene units)</source><translation>%L1（场景单位）</translation></message>
+    <message><source>Drag or scroll on the orange handle to adjust this radius. The center stays fixed.</source><translation>拖橙色控制点或在其上滚动鼠标滚轮调整当前半径，圆心固定。</translation></message>
+    <message><source>Too few points in this height layer (%1).</source><translation>本层点云不足（%1 个点）。</translation></message>
     <message><source>Slice range (± scene units):</source><translation>切片取点范围（± 场景单位）：</translation></message>
     <message><source>Fit face outline</source><translation>缩放至边框</translation></message>
     <message><source>Undo last resize</source><translation>撤销上一步</translation></message>
     <message><source>Drag an edge or corner to resize, or scroll over it for small steps. Scroll over empty space to zoom.</source><translation>拖边或角点调整尺寸，悬停滚轮小步微调，空白处滚轮缩放。</translation></message>
-    <message><source>In side view, drag or scroll on the orange circle to adjust wall height with total height fixed.</source><translation>侧视图中，拖动檐口线上的橙色圆点或在圆点上滚轮，可调整墙高并保持总高不变。</translation></message>
-    <message><source>Drag or scroll on the orange frame to resize the roof platform and hold the opposite edge fixed.</source><translation>拖动屋顶平台的橙色内框，或在框上滚轮微调，所选边的对边保持固定。</translation></message>
-    <message><source>Drag or scroll at a ridge endpoint to move it and hold the other fixed, or on the ridge line to move it sideways.</source><translation>拖动屋脊端点或在端点上滚轮可移动该端点，另一端保持固定。在屋脊线中段操作可横移整条屋脊。</translation></message>
-    <message><source>Drag or scroll on an orange edge to adjust the L-shaped notch.</source><translation>拖动橙色边或在边上滚轮，可调整 L 形凹口。</translation></message>
-    <message><source>Drag or scroll on the orange frame to resize the recess with the opposite edge fixed.</source><translation>拖动内槽的橙色边框或用滚轮调整尺寸，对边保持固定。</translation></message>
-    <message><source>Drag or scroll on the orange circle to adjust recess depth.</source><translation>拖动橙色圆点或在圆点上滚轮，可调整内槽深度。</translation></message>
+    <message><source>Drag an orange handle or scroll over it to adjust a dimension. Scroll over empty space to zoom.</source><translation>拖动橙色控制点或在其上滚动鼠标滚轮来调整尺寸，空白处滚轮缩放。</translation></message>
+    <message><source>Orange moves. Purple stays fixed.</source><translation>橙色标记会移动，紫色标记保持固定。</translation></message>
+    <message><source>Dimension limit reached.</source><translation>已到尺寸调整范围。</translation></message>
+    <message><source>The fixed height limits this adjustment.</source><translation>已到固定高度允许的调整范围。</translation></message>
+    <message><source>The adjacent radius limits this adjustment.</source><translation>相邻圆环的半径限制了这一调整。</translation></message>
+    <message><source>The outer frame limits this adjustment.</source><translation>已到外框允许的调整范围。</translation></message>
+    <message><source>The fixed recess limits this adjustment.</source><translation>固定的凹槽限制了外框移动。</translation></message>
+    <message><source>The fixed roof platform limits this adjustment.</source><translation>固定的屋顶平台限制了外框移动。</translation></message>
+    <message><source>The fixed notch limits this adjustment.</source><translation>固定的凹边限制了外框移动。</translation></message>
+    <message><source>The fixed recess floor limits this adjustment.</source><translation>固定的槽底限制了高度调整。</translation></message>
+    <message><source>The fixed eaves limit this adjustment.</source><translation>固定的檐口限制了高度调整。</translation></message>
+    <message><source>Move this edge with the opposite edge fixed</source><translation>移动这条边，固定对边</translation></message>
+    <message><source>Roof height with eaves fixed</source><translation>固定檐口，调整屋顶高度</translation></message>
+    <message><source>Move lower eave edge with upper edge fixed</source><translation>固定檐口上沿，移动下沿</translation></message>
+    <message><source>Move cone base with tower apex fixed</source><translation>固定塔尖，移动顶锥底圈</translation></message>
+    <message><source>Move first end with second house fixed</source><translation>固定第二段，移动第一段外端</translation></message>
+    <message><source>Cylinder height at fixed total height</source><translation>圆柱高度（总高固定）</translation></message>
+    <message><source>Wall height at fixed total height</source><translation>墙体高度（总高固定）</translation></message>
+    <message><source>Drag the orange handle to adjust the eaves at fixed total height. Drag the top edge to adjust roof height at fixed eaves.</source><translation>拖檐口橙点时总高固定。拖顶部边时檐口固定，只调整屋顶高度。</translation></message>
+    <message><source>Drag a platform edge with its opposite edge fixed, or the center to move the platform. Hold Ctrl to pick the outer frame where edges overlap.</source><translation>拖平台边时固定对边，拖中心点可平移平台。内外边重合时，按住 Ctrl 可选外边。</translation></message>
+    <message><source>Drag an endpoint to resize the ridge or the ridge line to move it sideways. Shift-drag the line to slide it lengthwise.</source><translation>拖端点调整屋脊长度，拖屋脊线可横移。按住 Shift 拖屋脊线可沿长向平移。</translation></message>
+    <message><source>Drag or scroll on the orange ridge to move it sideways while both eaves stay fixed.</source><translation>拖橙色屋脊线或在其上滚轮可横移屋脊，两侧檐口保持固定。</translation></message>
+    <message><source>Drag an orange edge to adjust the notch. Resizing the outer frame keeps both inner edges fixed.</source><translation>拖橙色边调整凹口。拖外框时两条内凹边留在原位。</translation></message>
+    <message><source>Drag an inner edge to resize the recess or its center to move it. Hold Ctrl to pick the outer frame where edges overlap.</source><translation>拖内框边调整槽口尺寸，拖中心点可平移凹槽。内外边重合时，按住 Ctrl 可选外边。</translation></message>
+    <message><source>Drag the recess floor to change depth, or the top edge to adjust the rim with the floor fixed.</source><translation>拖槽底点可调深度。拖顶部边可升降槽口，槽底保持固定。</translation></message>
     <message><source>Resize exceeds the model translation range.</source><translation>此次调整超出模型的平移范围。</translation></message>
     <message><source>Load a supported model and its point cloud to fine-tune in 2D.</source><translation>请加载支持二维微调的模型及其点云。</translation></message>
     <message><source>Green within 3D fit tolerance, red outside. Face slice: %1 points.</source><translation>绿色在三维贴合容差内，红色超出容差。当前面共 %1 个点。</translation></message>
@@ -116,7 +137,8 @@ Regression model: %2
 Direction preprocessing: %3</source><translation>分类模型：%1
 参数回归模型：%2
 方向处理：%3</translation></message>
-    <message><source>Pending parameter estimation</source><translation>待参数估计</translation></message>
+    <message><source>Pending parameter fitting</source><translation>待参数拟合</translation></message>
+    <message><source>Parameter fitting</source><translation>参数拟合</translation></message>
     <message><source>Not returned</source><translation>未返回</translation></message>
     <message><source>Last result: %1</source><translation>最近识别结果：%1</translation></message>
     <message><source>The service did not report the actual model path. Update ptv3_server.py and restart the service to confirm its version.</source><translation>服务未返回实际权重路径。请更新 ptv3_server.py 并重启服务后确认版本。</translation></message>
@@ -519,10 +541,9 @@ Direction preprocessing concerns the regression input; it does not confirm posit
         <translation>底座半径：</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="1982"/>
-        <location filename="../parammodeler_dock.cpp" line="762"/>
-        <source>Base height:</source>
-        <translation>底座高度：</translation>
+        <location filename="../parammodeler_dock.ui" line="2028"/>
+        <source>Clear cylinder height:</source>
+        <translation>圆柱净高：</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.ui" line="2007"/>
@@ -572,9 +593,12 @@ Direction preprocessing concerns the regression input; it does not confirm posit
         <translation>QPushButton { text-align: left; font-weight: bold; padding: 4px; border-bottom: 1px solid #aaa; }</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.ui" line="2476"/>
-        <source>Point Cloud Classification and Parameter Estimation</source>
-        <translation>点云分类与参数估计</translation>
+        <location filename="../parammodeler_dock.ui" line="315"/>
+        <location filename="../parammodeler_dock.ui" line="2409"/>
+        <location filename="../parammodeler_dock.cpp" line="898"/>
+        <location filename="../parammodeler_dock_estimation.cpp"/>
+        <source>Model classification and parameter fitting</source>
+        <translation>模型分类与参数拟合</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.ui" line="2516"/>
@@ -616,15 +640,15 @@ Direction preprocessing concerns the regression input; it does not confirm posit
         <location filename="../parammodeler_dock.ui" line="2570"/>
         <location filename="../parammodeler_dock.cpp" line="1047"/>
         <location filename="../parammodeler_dock.cpp" line="1653"/>
-        <source>Classify</source>
-        <translation>分类</translation>
+        <source>Classify model</source>
+        <translation>模型分类</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.ui" line="2580"/>
         <location filename="../parammodeler_dock.cpp" line="1048"/>
         <location filename="../parammodeler_dock.cpp" line="1654"/>
-        <source>Estimate parameters</source>
-        <translation>估计参数</translation>
+        <source>Fit parameters</source>
+        <translation>拟合参数</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.ui" line="2605"/>
@@ -784,11 +808,6 @@ Direction preprocessing concerns the regression input; it does not confirm posit
         <translation>穹顶顶点</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="822"/>
-        <source>base section top</source>
-        <translation>底座顶面</translation>
-    </message>
-    <message>
         <location filename="../parammodeler_dock.cpp" line="823"/>
         <source>middle section top</source>
         <translation>中段顶面</translation>
@@ -797,12 +816,6 @@ Direction preprocessing concerns the regression input; it does not confirm posit
         <location filename="../parammodeler_dock.cpp" line="825"/>
         <source>roof ridges</source>
         <translation>屋脊</translation>
-    </message>
-    <message>
-        <location filename="../parammodeler_dock.ui" line="314"/>
-        <location filename="../parammodeler_dock.cpp" line="1045"/>
-        <source>Classify and estimate parameters...</source>
-        <translation>分类与参数估计...</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.ui" line="380"/>
@@ -889,19 +902,14 @@ Direction preprocessing concerns the regression input; it does not confirm posit
         <translation>当前模型没有几何数据。</translation>
     </message>
     <message>
-        <location filename="../parammodeler_dock.cpp" line="1583"/>
-        <source>Point cloud classification and parameter estimation</source>
-        <translation>点云分类与参数估计</translation>
-    </message>
-    <message>
         <location filename="../parammodeler_dock.cpp" line="1587"/>
         <source>1. Input point cloud</source>
         <translation>1. 输入点云</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.cpp" line="1594"/>
-        <source>2. Classification and parameter estimation</source>
-        <translation>2. 分类与参数估计</translation>
+        <source>2. Model classification and parameter fitting</source>
+        <translation>2. 模型分类与参数拟合</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.cpp" line="1597"/>
@@ -945,8 +953,8 @@ Direction preprocessing concerns the regression input; it does not confirm posit
     </message>
     <message>
         <location filename="../parammodeler_dock_estimation.cpp"/>
-        <source>Estimate and align</source>
-        <translation>估计并对齐</translation>
+        <source>Fit and align</source>
+        <translation>拟合并对齐</translation>
     </message>
     <message><source>Stop</source><translation>终止</translation></message>
     <message><source>Stopping...</source><translation>正在终止…</translation></message>
@@ -1009,6 +1017,10 @@ Z：[%7, %8]</translation>
         <translation>分类候选</translation>
     </message>
     <message>
+        <source>Using the first candidate in %1 s. Click a candidate to continue now.</source>
+        <translation>还有 %1 秒自动选用第一名。点击任一候选可立即继续。</translation>
+    </message>
+    <message>
         <location filename="../parammodeler_dock.cpp" line="1814"/>
         <source>Unsupported primitive: %1</source>
         <translation>不支持的基元类型：%1</translation>
@@ -1024,8 +1036,8 @@ Switched to corresponding primitive. You can estimate parameters and return to f
     </message>
     <message>
         <location filename="../parammodeler_dock.cpp" line="1834"/>
-        <source>Estimating parameters...</source>
-        <translation>正在估计参数...</translation>
+        <source>Fitting parameters...</source>
+        <translation>正在拟合参数…</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.cpp" line="1842"/>
@@ -1033,8 +1045,8 @@ Switched to corresponding primitive. You can estimate parameters and return to f
         <location filename="../parammodeler_dock.cpp" line="1852"/>
         <location filename="../parammodeler_dock.cpp" line="1853"/>
         <location filename="../parammodeler_dock.cpp" line="3625"/>
-        <source>Parameter estimation failed</source>
-        <translation>参数估计失败</translation>
+        <source>Parameter fitting failed</source>
+        <translation>参数拟合失败</translation>
     </message>
     <message>
         <location filename="../parammodeler_dock.cpp" line="1853"/>
@@ -1107,8 +1119,8 @@ Parameters applied to main panel.</source>
         <location filename="../parammodeler_dock.cpp" line="866"/>
         <source>Basic workflow:
 1. Load an input point cloud.
-2. Open Classify and estimate parameters... and classify the point cloud. Choose a building type from the candidates.
-3. Use Estimate and align to load the model and point cloud into 3D and apply automatic alignment.
+2. Open Model classification and parameter fitting and classify the point cloud. Choose a building type from the candidates.
+3. Use Fit and align to load the model and point cloud into 3D and apply automatic alignment.
 4. Use Align in 3D for point picking, or Fit corner from three faces... for missing-corner cases.
 5. Fine-tune parameters, position and rotation in the main panel.
 6. Export model files or Current evaluation CSV from the Export menu.
@@ -1127,8 +1139,8 @@ Notes:
 - Three-face fitting moves the model only; it does not resize or rotate it.</source>
         <translation>基本流程：
 1. 加载输入点云。
-2. 打开“分类并估计参数...”，对点云分类，然后从候选中选择建筑类型。
-3. 点击“估计并对齐”，将模型和点云加载到 3D 场景并自动对齐。
+2. 打开“模型分类与参数拟合”，对点云分类，然后从候选中选择建筑类型。
+3. 点击“拟合并对齐”，将模型和点云加载到 3D 场景并自动对齐。
 4. 使用“3D 对齐”点选目标点；角点缺失时使用“三面拟合角点...”。
 5. 在主面板中微调参数、位置和旋转。
 6. 从“导出”菜单导出模型文件或当前评估 CSV。

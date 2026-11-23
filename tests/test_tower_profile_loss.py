@@ -67,6 +67,30 @@ class TowerProfileTests(unittest.TestCase):
         for name in original:
             torch.testing.assert_close(original[name], reversed_parts[name])
 
+    def test_clear_height_uses_existing_labels_and_preserves_physical_profile(self):
+        targets = list(regression.TOWER_CLEAR_HEIGHT_TARGETS)
+        params = dict(zip(TARGETS, VALUES[0].tolist()))
+        row = regression.target_vector({"params": params}, targets)
+        self.assertAlmostEqual(float(row[targets.index("cylinderHeight")]), 1.6, places=6)
+        prediction = regression.prediction_params_for_plugin("CurvedRoofRoundHouse", targets, row)
+        self.assertAlmostEqual(prediction["baseHeight"], 2.0, places=6)
+        self.assertAlmostEqual(prediction["eaveRadius"], params["eaveRadius"], places=6)
+        new_parts = regression.tower_profile_points(torch.as_tensor(row[None], dtype=torch.float64), targets)
+        old_parts = regression.tower_profile_points(VALUES[:1], TARGETS)
+        for name in old_parts:
+            torch.testing.assert_close(new_parts[name], old_parts[name])
+
+    def test_clear_height_flag_replaces_only_the_tower_height_target(self):
+        recipe = next(r for r in runner.RECIPES if r[0] == "CurvedRoofRoundHouse")
+        args = SimpleNamespace(log_root="logs", run_tag="v14_clear_height", data_root="data", batch_size=4,
+                               seed=42, ptv3_repo=None, canonical_align=True, epochs=100, grid_size=.02,
+                               patch_size=128, flash=False, tower_clear_height=True)
+        _, train, test = runner.commands(args, recipe)
+        self.assertEqual(train[train.index("--targets") + 1:train.index("--target_weights")],
+                         list(regression.TOWER_CLEAR_HEIGHT_TARGETS))
+        self.assertIn("cylinderHeight=1.3", train)
+        self.assertNotIn("--targets", test)
+
     def test_identity_and_equal_segment_weighting(self):
         scale = statistics()
         loss, _ = regression.tower_profile_loss(VALUES, VALUES, TARGETS, scale)

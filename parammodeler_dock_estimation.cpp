@@ -16,6 +16,7 @@
 #include <QComboBox>
 #include <QDialog>
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
@@ -27,6 +28,7 @@
 #include <QSpinBox>
 #include <QTableWidget>
 #include <QTableWidgetItem>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <windows.h>
 
@@ -49,7 +51,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     }
   };
   EstimateDialog dialog( this );
-  dialog.setWindowTitle( tr( "Point cloud classification and parameter estimation" ) );
+  dialog.setWindowTitle( tr( "Model classification and parameter fitting" ) );
   dialog.resize( 560, 580 );
 
   auto *mainLayout = new QVBoxLayout( &dialog );
@@ -60,7 +62,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   inputInfo->setStyleSheet( QStringLiteral( "color: #555;" ) );
   auto *btnLoad = new QPushButton( tr( "Load point cloud" ), &dialog );
 
-  auto *processTitle = new QLabel( tr( "2. Classification and parameter estimation" ), &dialog );
+  auto *processTitle = new QLabel( tr( "2. Model classification and parameter fitting" ), &dialog );
   processTitle->setStyleSheet( QStringLiteral( "font-weight: bold; margin-top: 8px;" ) );
   auto *modelLayout = new QHBoxLayout();
   auto *modelLabel = new QLabel( tr( "Model:" ), &dialog );
@@ -76,9 +78,6 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   btnSettings->setToolTip( tr( "PointNet path settings" ) );
   btnSettings->setCursor( Qt::PointingHandCursor );
   btnSettings->setFlat( true );
-  connect( btnSettings, &QPushButton::clicked, &dialog, [&dialog]() {
-    ParamModelerConfig::showSettingsDialog( &dialog );
-  } );
   modelLayout->addWidget( btnSettings );
 
   modelLayout->addStretch();
@@ -121,7 +120,24 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   QRadioButton *candidateButtons[] = { new QRadioButton( candidatePanel ), new QRadioButton( candidatePanel ) };
   for ( auto *button : candidateButtons )
     candidateLayout->addWidget( button );
+  auto *candidateCountdown = new QLabel( candidatePanel );
+  candidateLayout->addWidget( candidateCountdown );
+  candidateCountdown->hide();
   candidatePanel->hide();
+  constexpr int candidateWaitMs = 3000;
+  QElapsedTimer candidateElapsed;
+  QTimer candidateTimer;
+  candidateTimer.setTimerType( Qt::PreciseTimer );
+  candidateTimer.setInterval( 100 );
+  const auto stopCandidateWait = [&] {
+    candidateTimer.stop();
+    candidateCountdown->hide();
+  };
+  connect( &dialog, &QDialog::finished, &dialog, stopCandidateWait );
+  connect( btnSettings, &QPushButton::clicked, &dialog, [&] {
+    stopCandidateWait();
+    ParamModelerConfig::showSettingsDialog( &dialog );
+  } );
 
   auto *modelInfo = new QLabel( &dialog );
   modelInfo->setTextFormat( Qt::PlainText );
@@ -141,8 +157,8 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   progressLayout->addWidget( btnStop );
 
   auto *buttonLayout = new QHBoxLayout();
-  auto *btnClassify = new QPushButton( tr( "Classify" ), &dialog );
-  auto *btnInverse = new QPushButton( tr( "Estimate parameters" ), &dialog );
+  auto *btnClassify = new QPushButton( tr( "Classify model" ), &dialog );
+  auto *btnInverse = new QPushButton( tr( "Fit parameters" ), &dialog );
   auto *btnComplete = new QPushButton( tr( "Complete all" ), &dialog );
   btnComplete->setObjectName( QStringLiteral( "btnCompleteEstimate" ) );
   auto *btnFinish = new QPushButton( tr( "Return to fine tuning" ), &dialog );
@@ -196,7 +212,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     btnClassify->setEnabled( !busy && inputReady );
     btnInverse->setEnabled( !busy && inputReady && !candidates.isEmpty() );
     btnComplete->setEnabled( !busy && inputReady );
-    btnComplete->setText( candidates.isEmpty() ? tr( "Complete all" ) : tr( "Estimate and align" ) );
+    btnComplete->setText( candidates.isEmpty() ? tr( "Complete all" ) : tr( "Fit and align" ) );
     btnFinish->setEnabled( !busy );
     btnStop->setVisible( busy );
     btnStop->setEnabled( busy && !cancelRequested );
@@ -219,6 +235,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   mainLayout->addWidget( table );
 
   const auto clearCandidates = [&]() {
+    stopCandidateWait();
     candidates.clear();
     candidatePanel->hide();
     classificationSummary.clear();
@@ -281,6 +298,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   pointCloudDialog.setFileMode( QFileDialog::ExistingFile );
   pointCloudDialog.setAcceptMode( QFileDialog::AcceptOpen );
   connect( btnLoad, &QPushButton::clicked, &dialog, [&]() {
+    stopCandidateWait();
     pointCloudDialog.setDirectory( lastInputDirectory );
     if ( pointCloudDialog.exec() != QDialog::Accepted )
       return;
@@ -330,21 +348,12 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       .arg( candidate.probability * 100.0, 0, 'f', 1 );
     resultLabel->setText( classificationSummary );
     modelInfo->setText( tr( "Classification model: %1\nRegression model: %2\nDirection preprocessing: %3" )
-      .arg( classificationModel, tr( "Pending parameter estimation" ), tr( "Pending parameter estimation" ) ) );
+      .arg( classificationModel, tr( "Pending parameter fitting" ), tr( "Pending parameter fitting" ) ) );
     modelInfo->setToolTip( classificationCheckpoint.isEmpty()
       ? tr( "The service did not report the actual model path. Update ptv3_server.py and restart the service to confirm its version." )
       : classificationCheckpoint );
     modelInfo->setVisible( true );
   };
-  for ( int i = 0; i < 2; ++i )
-  {
-    connect( candidateButtons[i], &QRadioButton::clicked, &dialog, [&, i] {
-      if ( i >= candidates.size() || candidates.at( i ).className == primitiveType() ) return;
-      clearEstimate();
-      selectCandidate( candidates.at( i ) );
-    } );
-  }
-
   const auto classify = [&]() -> bool {
     if ( m_inputDataPath.isEmpty() )
       return false;
@@ -407,7 +416,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       return false;
 
     clearEstimate();
-    resultLabel->setText( tr( "Estimating parameters..." ) );
+    resultLabel->setText( tr( "Fitting parameters..." ) );
     if ( !continueOperation() ) return false;
 
     const QString prim = this->primitiveType();
@@ -416,8 +425,8 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
 
     if ( !regression.errorMessage.isEmpty() )
     {
-      resultLabel->setText( tr( "Parameter estimation failed" ) );
-      QMessageBox::warning( &dialog, tr( "Parameter estimation failed" ), regression.errorMessage );
+      resultLabel->setText( tr( "Parameter fitting failed" ) );
+      QMessageBox::warning( &dialog, tr( "Parameter fitting failed" ), regression.errorMessage );
       return false;
     }
 
@@ -431,8 +440,8 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     if ( !continueOperation() ) return false;
     if ( params.isEmpty() )
     {
-      resultLabel->setText( tr( "Parameter estimation failed" ) );
-      QMessageBox::warning( &dialog, tr( "Parameter estimation failed" ), tr( "No parameters returned." ) );
+      resultLabel->setText( tr( "Parameter fitting failed" ) );
+      QMessageBox::warning( &dialog, tr( "Parameter fitting failed" ), tr( "No parameters returned." ) );
       return false;
     }
 
@@ -478,7 +487,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     if ( !regression.warningMessage.isEmpty() )
     {
       resultLabel->setText( resultLabel->text() + QLatin1Char( '\n' ) + regression.warningMessage );
-      QMessageBox::warning( &dialog, QStringLiteral( "参数估计" ), regression.warningMessage );
+      QMessageBox::warning( &dialog, tr( "Parameter fitting" ), regression.warningMessage );
     }
     return true;
   };
@@ -527,6 +536,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   };
   const auto run = [&]( const auto &operation ) -> bool {
     if ( dialog.busy || !inputReady ) return false;
+    stopCandidateWait();
     cancelRequested = false;
     setBusy( true );
     const bool ok = operation();
@@ -540,15 +550,54 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
       resultLabel->setText( tr( "Loading or alignment failed. You can retry or return to fine tuning." ) );
     return ok;
   };
+  const auto completeEstimate = [&] {
+    if ( run( [&] { return estimate() && loadAndAlign(); } ) ) dialog.accept();
+  };
+  const auto chooseCandidate = [&]( int index ) {
+    if ( dialog.busy || index >= candidates.size() ) return;
+    const bool complete = candidateTimer.isActive();
+    if ( complete && candidateElapsed.elapsed() >= candidateWaitMs ) index = 0;
+    stopCandidateWait();
+    candidateButtons[index]->setChecked( true );
+    if ( candidates.at( index ).className != primitiveType() )
+    {
+      clearEstimate();
+      selectCandidate( candidates.at( index ) );
+    }
+    if ( complete ) completeEstimate();
+  };
+  for ( int i = 0; i < 2; ++i )
+    connect( candidateButtons[i], &QRadioButton::clicked, &dialog, [&, i] { chooseCandidate( i ); } );
+  const auto showCountdown = [&]( qint64 remainingMs ) {
+    candidateCountdown->setText( tr( "Using the first candidate in %1 s. Click a candidate to continue now." )
+                                    .arg( ( remainingMs + 999 ) / 1000 ) );
+    candidateCountdown->show();
+  };
+  connect( &candidateTimer, &QTimer::timeout, &dialog, [&] {
+    const qint64 remainingMs = candidateWaitMs - candidateElapsed.elapsed();
+    if ( remainingMs <= 0 ) chooseCandidate( 0 );
+    else showCountdown( remainingMs );
+  } );
   connect( btnClassify, &QPushButton::clicked, &dialog, [&] { run( classify ); } );
   connect( btnInverse, &QPushButton::clicked, &dialog, [&] { run( estimate ); } );
   connect( btnComplete, &QPushButton::clicked, &dialog, [&] {
-    if ( candidates.isEmpty() && ( !run( classify ) || candidates.size() > 1 ) ) return;
-    if ( run( [&] { return estimate() && loadAndAlign(); } ) ) dialog.accept();
+    if ( candidates.isEmpty() )
+    {
+      if ( !run( classify ) ) return;
+      if ( candidates.size() > 1 )
+      {
+        showCountdown( candidateWaitMs );
+        candidateElapsed.start();
+        candidateTimer.start();
+        return;
+      }
+    }
+    completeEstimate();
   } );
 
   connect( btnFinish, &QPushButton::clicked, &dialog, [&]() {
     if ( dialog.busy ) return;
+    stopCandidateWait();
     if ( parametersApplied && !m_inputDataPath.isEmpty() )
     {
       const QMessageBox::StandardButton answer = QMessageBox::question(
@@ -673,7 +722,7 @@ void ParamModelerDock::onInverseParams()
   if ( !regression.errorMessage.isEmpty() )
   {
     ui->progressInversion->setVisible( false );
-    QMessageBox::warning( this, tr( "Parameter estimation failed" ), regression.errorMessage );
+    QMessageBox::warning( this, tr( "Parameter fitting failed" ), regression.errorMessage );
     return;
   }
   const auto frameParams = ParamModelerRegressionAxes::paramsInMetadataFrame(
@@ -685,7 +734,7 @@ void ParamModelerDock::onInverseParams()
   applyDataDrivenParamCorrections( prim, params );
 
   if ( !regression.warningMessage.isEmpty() )
-    QMessageBox::warning( this, QStringLiteral( "参数估计" ), regression.warningMessage );
+    QMessageBox::warning( this, tr( "Parameter fitting" ), regression.warningMessage );
 
   if ( !params.isEmpty() )
   {

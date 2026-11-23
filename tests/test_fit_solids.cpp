@@ -1,4 +1,5 @@
 #include "../buildmesh.h"
+#include "../parammodeler_face_fit_profiles.h"
 #include "../parammodeler_fit_metrics.h"
 #include <QElapsedTimer>
 #include <cassert>
@@ -57,11 +58,96 @@ int main()
   check( models[9].second, { 2, 2, 2 }, true );
   check( models[7].second, { 6, 4, 6 }, true );
   check( models[7].second, { 6, .1f, 7.9f }, false );
-  check( models[11].second, { 8.5f, 0, 2.05f }, true ); // Above the tower's internal eave face.
+  check( models[11].second, { 8.5f, 0, 2.05f }, true ); // Inside the tower, below the curved roof.
+  check( models[11].second, { 8.5f, 0, 2.0f }, true ); // The old internal eave ring is not a surface.
   TwoGableHousesParams bent;
   bent.angle = 150;
   check( BuildMesh::buildTwoGableHouses( bent ), { 18, 5, 2 }, true );
   check( BuildMesh::buildTwoGableHouses( bent ), { 2, 10, 2 }, false );
+
+  using namespace ParamModelerFaceFit;
+  const std::vector<std::tuple<int, QVector<double>, MeshData, std::array<int, 3>>> profiles {
+    { 1, { 4, 8 }, models[1].second, { 1, 3, 3 } },
+    { 3, { 4, 8, 5.0 / 8 }, models[3].second, { 1, 4, 4 } },
+    { 7, { 12, 8, 4 }, models[7].second, { 4, 3, 3 } },
+    { 8, { 4, 7, 5.0 / 7, .3 }, models[8].second, { 1, 5, 5 } },
+    { 11, { 8, 1.9, 8.96, .1, 2, 1, .2, 1.5 }, models[11].second, { 1, 8, 8 } },
+    { 12, { 14, 10, 8, 7, 4.0 / 7, 150, .5 }, BuildMesh::buildTwoGableHouses( bent ), { 6, 2, 2 } }
+  };
+  for ( const auto &[model, values, mesh, handleCounts] : profiles )
+  {
+    Eigen::AlignedBox3d bounds;
+    for ( const auto &v : mesh.vertices ) bounds.extend( ParamModelerFit::vector( v ) );
+    const auto type = profileType( QString::fromLatin1( models[model].first ) );
+    assert( type != ProfileType::None );
+    for ( int face = 0; face < 3; ++face )
+    {
+      const auto projection = projectProfile( type, values, mesh, face );
+      assert( !projection.outline.isEmpty() && projection.handles.size() == handleCounts[face] );
+      const QRectF outline = projection.outline.boundingRect();
+      assert( std::abs( outline.width() - bounds.sizes()[face == 2 ? 1 : 0] ) < 1e-5 );
+      assert( std::abs( outline.height() - bounds.sizes()[face == 0 ? 1 : 2] ) < 1e-5 );
+      for ( const auto &handle : projection.handles )
+      {
+        assert( handle.parameter >= 0 && handle.parameter < values.size() );
+        assert( std::abs( handle.changeForDrag( 0.25 * handle.tangent ) - 0.25 ) < 1e-8 );
+        assert( outline.adjusted( -1e-5, -1e-5, 1e-5, 1e-5 ).contains( handle.position ) );
+      }
+    }
+    std::cout << models[model].first << ": profile and handles verified in all three views" << std::endl;
+  }
+  const auto barrel = projectProfile( ProfileType::Barrel, { 12, 8, 4 }, models[7].second, 2 );
+
+  const QVector<double> towerValues{ 8, 4, 10, .5, 3, 2, .3, 2 };
+  for ( TowerParameter layer : { BodyRadius, EaveRadius, TopRadius } )
+  {
+    const auto projection = projectTowerRadius( towerValues, layer );
+    assert( projection.measuredRadius == towerValues[layer] && projection.handles.size() == 1 );
+    assert( projection.handles.front().parameter == layer && projection.handles.front().position == QPointF( towerValues[layer], 0 ) );
+    assert( projection.outline.boundingRect() == QRectF( -10, -10, 20, 20 ) );
+  }
+  QVector<QVector3D> towerCloud{ { 8, 0, 2 }, { 11, 0, 2 }, { 4, 0, 0 }, { 10, 0, 4.25 },
+                                { 9, 0, 4.9f }, { 2, 0, 7.5 }, { 2.5, 0, 7.9f }, { 1, 0, 8.6f } };
+  for ( auto &point : towerCloud ) point = pose.map( point );
+  const auto towerInverse = pose.inverted();
+  assert( ( sampleTowerRadius( towerValues, towerCloud, towerInverse, BodyRadius, .2 ) == QVector<int>{ 0, 1 } ) );
+  assert( ( sampleTowerRadius( towerValues, towerCloud, towerInverse, EaveRadius, .2 ) == QVector<int>{ 3 } ) );
+  assert( ( sampleTowerRadius( towerValues, towerCloud, towerInverse, EaveRadius, .5 ) == QVector<int>{ 3, 4 } ) );
+  assert( ( sampleTowerRadius( towerValues, towerCloud, towerInverse, TopRadius, .2 ) == QVector<int>{ 5 } ) );
+  auto movedRadius = towerValues;
+  movedRadius[BodyRadius] = 7;
+  assert( ( sampleTowerRadius( movedRadius, towerCloud, towerInverse, BodyRadius, .2 ) == QVector<int>{ 0, 1 } ) );
+
+  assert( barrel.outline.contains( { 4, -7 } ) && !barrel.outline.contains( { .1, -7.9 } ) );
+  assert( barrel.handles[1].parameter == 1 && !barrel.handles[1].movesMinimum );
+  assert( barrel.handles[2].parameter == 1 && barrel.handles[2].movesMinimum );
+  assert( barrel.handles[2].changeForDrag( { -1, 0 } ) == 1 );
+  assert( minimumSpanAroundFeature( 12, 2, 6, false ) == 8 );
+  assert( minimumSpanAroundFeature( 12, 2, 6, true ) == 10 );
+  for ( bool movesMinimum : { false, true } )
+  {
+    const auto [minimum, maximum] = spanRangeAtFixedFraction( 12, .25, .1, .8, movesMinimum );
+    for ( double next : { minimum, maximum } )
+    {
+      const double shift = movesMinimum ? 12 - next : 0;
+      const double fraction = ( 3 - shift ) / next;
+      assert( fraction >= .1 - 1e-8 && fraction <= .8 + 1e-8 );
+      assert( std::abs( shift + fraction * next - 3 ) < 1e-8 );
+    }
+  }
+  const auto angled = projectProfile( ProfileType::AngledGable, { 14, 10, 8, 7, 4.0 / 7, 150, .5 },
+                                      BuildMesh::buildTwoGableHouses( bent ), 0 );
+  assert( angled.outline.contains( { 18, -5 } ) && !angled.outline.contains( { 2, -10 } ) );
+  const auto &cylinder = models[1].second;
+  const QVector<QVector3D> topCloud { { 0, 0, 8 }, { 2, 0, 8 }, { 0, 0, 0 }, { 0, 0, 3 } };
+  assert( ( sampleProfile( cylinder, topCloud, identity, 0, -1, .1 ).indices == QVector<int>{ 0, 1 } ) );
+  const QVector<QVector3D> sideCloud { { 0, 4, 3 }, { 0, 4, 4 }, { 0, -4, 4 }, { 0, 1, 4 } };
+  const auto positiveSide = sampleProfile( cylinder, sideCloud, identity, 1, -1, .1 );
+  assert( ( positiveSide.side == 1 && positiveSide.indices == QVector<int>{ 0, 1 } ) );
+  const auto negativeSide = sampleProfile( cylinder, sideCloud, identity, 1, 0, .1 );
+  assert( ( negativeSide.side == 0 && negativeSide.indices == QVector<int>{ 2 } ) );
+  const auto fallback = sampleProfile( cylinder, { { 0, 3, 4 } }, identity, 1, -1, .1 );
+  assert( ( fallback.side == 1 && fallback.indices == QVector<int>{ 0 } ) );
 
   const auto occluded = []( const MeshData &mesh, const Eigen::Vector3d &camera, const Eigen::Vector3d &point ) {
     using ParamModelerFit::Triangle;

@@ -240,7 +240,11 @@ QMap<QString, double> pointNetParamsToUiParams( const QString &primitiveType,
   else if ( prim == QStringLiteral( "CurvedRoofRoundHouse" ) )
   {
     put( QStringLiteral( "baseRadius" ), QStringLiteral( "ftBaseR" ) );
-    put( QStringLiteral( "baseHeight" ), QStringLiteral( "ftBaseH" ) );
+    const bool hasClearHeight = has( QStringLiteral( "cylinderHeight" ) ) && has( QStringLiteral( "eaveHeight" ) );
+    if ( hasClearHeight )
+      uiParams.insert( QStringLiteral( "ftBaseH" ), val( QStringLiteral( "cylinderHeight" ) ) + val( QStringLiteral( "eaveHeight" ) ) );
+    else
+      put( QStringLiteral( "baseHeight" ), QStringLiteral( "ftBaseH" ) );
     put( QStringLiteral( "middleHeight" ), QStringLiteral( "ftMidH" ) );
     put( QStringLiteral( "middleTopRadius" ), QStringLiteral( "ftMidTopR" ) );
     put( QStringLiteral( "middleRise" ), QStringLiteral( "ftMidRise" ) );

@@ -59,8 +59,10 @@ class ScaleSamplingTests(unittest.TestCase):
 #include <iostream>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 using QString = std::string;
+using QPointF = std::pair<double, double>;
 template<class T> struct QVector : std::vector<T> {
   using std::vector<T>::vector;
   bool isEmpty() const { return this->empty(); }
@@ -98,7 +100,11 @@ public:
 struct Controls {
 """ + fields + r"""
 };
-struct Dock { Controls *ui; };
+struct Dock {
+  Controls *ui;
+  QPointF m_tpTopPosition;
+  double m_aghRidgePositionX = .5;
+};
 struct BuildMesh {
   static MeshData build(const QString &prim, Dock *dock) {
     auto &u = *dock->ui;
@@ -132,14 +138,14 @@ void require(bool condition, const QString &message) {
 int main() {
   Controls ui;
 """ + initialize + "\n  Dock storage{&ui};\n  Dock *dock = &storage;\n  std::vector<QDoubleSpinBox *> all{" + pointers + r"""};
-  // Match the automatic clamps in bindEaveDimension/bindTowerTopRadius.
-  // These callbacks still run while manual height compensation is suspended.
+  // The tower radii retain their geometric constraints during bulk sampling.
   ui.spinBoxFTEaveRadius->setMaximum(60);
   ui.spinBoxFTBaseRadius->changed = [&] {
     ui.spinBoxFTEaveRadius->setMinimum(ui.spinBoxFTBaseRadius->value() + .001);
   };
   ui.spinBoxFTEaveRadius->changed = [&] {
-    ui.spinBoxFTMiddleTopRadius->setMaximum(ui.spinBoxFTEaveRadius->value() - .01);
+    const double eaveRadius = ui.spinBoxFTEaveRadius->value();
+    ui.spinBoxFTMiddleTopRadius->setMaximum((std::ceil(eaveRadius * 100 - 1e-8) - 1) / 100);
   };
   struct Case { QString prim; std::vector<QDoubleSpinBox *> horizontal; };
   const std::vector<Case> cases{
@@ -162,9 +168,11 @@ int main() {
         const double span = std::max(mesh.vertices[1].x(), mesh.vertices[1].y());
         const int band = span < 15 ? 0 : span < 25 ? 1 : 2;
         if (c.prim == "CurvedRoofRoundHouse") {
-          const double ratio = ui.spinBoxFTEaveRadius->value() / ui.spinBoxFTBaseRadius->value();
+          const double baseRadius = ui.spinBoxFTBaseRadius->value();
+          const double eaveRadius = ui.spinBoxFTEaveRadius->value();
+          const double ratio = eaveRadius / baseRadius;
           require(ratio >= 1.045 && ratio <= 1.205, "tower eave ratio changed through linked controls");
-          require(ui.spinBoxFTMiddleTopRadius->value() < ui.spinBoxFTEaveRadius->value(),
+          require(ui.spinBoxFTMiddleTopRadius->value() < eaveRadius,
                   "tower top radius escaped the eave");
         }
         if (!c.horizontal.empty()) {

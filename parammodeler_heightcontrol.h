@@ -112,17 +112,50 @@ inline void bindRecessDepthLimit( QDoubleSpinBox *outerHeight, QDoubleSpinBox *d
   sync();
 }
 
-inline void bindTowerTopRadius( QDoubleSpinBox *eaveRadius, QDoubleSpinBox *radius, QSlider *slider,
-                                QSlider *eaveSlider, const std::function<bool()> &manualEdit )
+inline void bindTowerEaveRadius( QDoubleSpinBox *base, QSlider *baseSlider,
+                                 QDoubleSpinBox *eave, QSlider *eaveSlider,
+                                 const std::function<bool()> &manualEdit )
+{
+  base->setKeyboardTracking( false );
+  const double maximum = eave->maximum();
+  const double units = std::pow( 10.0, eave->decimals() );
+  const double step = 1.0 / units;
+  bindFixedDimensionSlider( eave, eaveSlider, maximum );
+  const auto sync = [base, eave, eaveSlider, maximum, units, step]() {
+    const QSignalBlocker blocker( eaveSlider );
+    const double minimum = base->value() + step;
+    const bool enabled = base->value() > 0 && minimum <= maximum;
+    const bool needsDefault = eave->value() <= 0;
+    eave->setRange( enabled ? minimum : 0.0, enabled ? maximum : 0.0 );
+    eave->setEnabled( enabled );
+    eaveSlider->setEnabled( enabled );
+    if ( enabled && needsDefault )
+      eave->setValue( base->value() * 1.12 );
+    eaveSlider->setValue( qRound( eave->value() * units ) );
+  };
+  QObject::connect( base, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), eave,
+    [base, baseSlider, eave, step, manualEdit, sync]( double ) {
+      if ( manualEdit() && eave->value() > 0 )
+        limitDimensionSourceEdit( base, baseSlider, 1.0 / std::pow( 10.0, base->decimals() ),
+                                  std::min( base->maximum(), eave->value() - step ) );
+      sync();
+    } );
+  sync();
+}
+
+inline void bindTowerTopRadius( QDoubleSpinBox *eave, QDoubleSpinBox *radius, QSlider *slider,
+                                QSlider *eaveSlider,
+                                const std::function<bool()> &manualEdit )
 {
   radius->setKeyboardTracking( false );
-  eaveRadius->setKeyboardTracking( false );
-  const double eaveMaximum = eaveSlider->maximum() / std::pow( 10.0, eaveRadius->decimals() );
+  eave->setKeyboardTracking( false );
+  const double eaveUnits = std::pow( 10.0, eave->decimals() );
+  const double eaveMaximum = eaveSlider->maximum() / eaveUnits;
   bindFixedDimensionSlider( radius, slider, eaveMaximum - 1.0 / std::pow( 10.0, radius->decimals() ) );
-  const auto sync = [eaveRadius, radius, slider]() {
+  const auto sync = [eave, radius, slider]() {
     const QSignalBlocker sliderBlocker( slider );
     const double units = std::pow( 10.0, radius->decimals() );
-    const double maximum = std::max( 0.0, std::ceil( eaveRadius->value() * units - 1e-8 ) - 1.0 ) / units;
+    const double maximum = std::max( 0.0, std::ceil( eave->value() * units - 1e-8 ) - 1.0 ) / units;
     const bool enabled = maximum >= 1.0 / units;
     const bool needsDefault = enabled && radius->maximum() == 0.0;
     radius->setRange( enabled ? 1.0 / units : 0.0, maximum );
@@ -131,11 +164,11 @@ inline void bindTowerTopRadius( QDoubleSpinBox *eaveRadius, QDoubleSpinBox *radi
     if ( needsDefault ) radius->setValue( std::min( 1.0, maximum ) );
     slider->setValue( qRound( radius->value() * units ) );
   };
-  QObject::connect( eaveRadius, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), radius,
-    [eaveRadius, eaveSlider, radius, manualEdit, sync]( double ) {
+  QObject::connect( eave, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), radius,
+    [eave, eaveSlider, radius, eaveUnits, manualEdit, sync]( double ) {
       if ( manualEdit() && radius->value() > 0.0 )
-        limitDimensionSourceEdit( eaveRadius, eaveSlider,
-          std::max( eaveRadius->minimum(), radius->value() + 1.0 / std::pow( 10.0, eaveRadius->decimals() ) ), eaveRadius->maximum() );
+        limitDimensionSourceEdit( eave, eaveSlider, std::max( eave->minimum(), radius->value() + 1.0 / eaveUnits ),
+                                  eave->maximum() );
       sync();
     } );
   sync();
@@ -163,43 +196,6 @@ inline void bindTowerRise( QDoubleSpinBox *height, QDoubleSpinBox *rise, QSlider
     [height, heightSlider, rise, manualEdit, sync]( double ) {
       if ( manualEdit() && rise->value() > 0.0 )
         limitDimensionSourceEdit( height, heightSlider, std::max( height->minimum(), rise->value() * 4.0 ), height->maximum() );
-      sync();
-    } );
-  sync();
-}
-
-inline void bindEaveDimension( QDoubleSpinBox *base, QDoubleSpinBox *size, QSlider *slider,
-                               bool outerRadius, double absoluteMax, QSlider *baseSlider,
-                               const std::function<bool()> &manualEdit )
-{
-  size->setKeyboardTracking( false );
-  base->setKeyboardTracking( false );
-  bindFixedDimensionSlider( size, slider, absoluteMax );
-  const auto sync = [base, size, slider, outerRadius, absoluteMax]() {
-    const QSignalBlocker sliderBlocker( slider );
-    const double units = std::pow( 10.0, size->decimals() );
-    const double step = 1.0 / units;
-    const double minimum = outerRadius ? std::ceil( ( base->value() + step ) * units - 1e-8 ) / units : step;
-    const double maximum = std::floor( ( outerRadius ? absoluteMax : std::min( base->value() - step, absoluteMax ) ) * units + 1e-8 ) / units;
-    const bool enabled = base->value() > 0.0 && minimum <= maximum;
-    const bool needsDefault = size->value() <= 0.0;
-    size->setEnabled( enabled );
-    slider->setEnabled( enabled );
-    size->setRange( enabled ? minimum : 0.0, enabled ? maximum : 0.0 );
-    if ( enabled && needsDefault )
-      size->setValue( outerRadius ? base->value() * 1.12 : std::min( base->value() * 0.20, 0.9 ) );
-    slider->setValue( qRound( size->value() * units ) );
-  };
-  QObject::connect( base, QOverload<double>::of( &QDoubleSpinBox::valueChanged ), size,
-    [base, baseSlider, size, outerRadius, manualEdit, sync]( double ) {
-      if ( manualEdit() && size->value() > 0.0 )
-      {
-        const double step = 1.0 / std::pow( 10.0, size->decimals() );
-        const double minimum = outerRadius ? std::max( base->minimum(), 1.0 / std::pow( 10.0, base->decimals() ) )
-                                          : std::max( base->minimum(), size->value() + step );
-        const double maximum = outerRadius ? std::min( base->maximum(), size->value() - step ) : base->maximum();
-        limitDimensionSourceEdit( base, baseSlider, minimum, maximum );
-      }
       sync();
     } );
   sync();

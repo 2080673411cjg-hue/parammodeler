@@ -69,6 +69,8 @@ class TranslationsTest(unittest.TestCase):
             self.assertEqual(dock.spinBoxGRRidgeRatio.maximum(), .8)
             self.assertEqual(dock.labelFTMiddleRise.text(), "中段隆起高度（米）：")
             self.assertEqual(dock.spinBoxFTMiddleRise.decimals(), 3)
+            self.assertEqual(dock.labelFTBodyHeight.text(), "圆柱净高：")
+            self.assertEqual(dock.labelFTEaveRadius.text(), "檐口外半径：")
             self.assertEqual([dock.comboPrimitive.itemText(i) for i in range(dock.comboPrimitive.count())], PRIMITIVES)
         finally:
             dock.close()

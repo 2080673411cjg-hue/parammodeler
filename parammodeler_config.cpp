@@ -24,6 +24,8 @@
 // helpers
 // ------------------------------------------------------------------
 
+static const QString ptv3TowerDefaultSuffix = QStringLiteral( "_v14_clear_height_normals" );
+
 static QString setting( const QString &key, const QString &defaultVal )
 {
   const QString v = QgsSettings().value( key ).toString();
@@ -138,6 +140,16 @@ static void migratePtv3ModelDefaults()
     settings.setValue( suffixKey, QStringLiteral( "_v13_normals" ) );
     settings.setValue( QStringLiteral( "parammodeler/ptv3TowerRegressionSuffix" ), QStringLiteral( "_v13_normals" ) );
     settings.setValue( v13MigrationKey, true );
+  }
+
+  const QString towerMigrationKey = QStringLiteral( "parammodeler/ptv3TowerDefaultsV14ClearHeight" );
+  if ( !settings.value( towerMigrationKey, false ).toBool() )
+  {
+    const QString towerKey = QStringLiteral( "parammodeler/ptv3TowerRegressionSuffix" );
+    const QString previous = settings.value( towerKey, QStringLiteral( "_v13_normals" ) ).toString().trimmed();
+    if ( previous == QStringLiteral( "_v13_normals" ) )
+      settings.setValue( towerKey, ptv3TowerDefaultSuffix );
+    settings.setValue( towerMigrationKey, true );
   }
 }
 
@@ -268,7 +280,7 @@ QString ptv3TowerRegressionSuffix()
 {
   migratePtv3ModelDefaults();
   return QgsSettings().value( QStringLiteral( "parammodeler/ptv3TowerRegressionSuffix" ),
-                              QStringLiteral( "_v13_normals" ) ).toString().trimmed();
+                              ptv3TowerDefaultSuffix ).toString().trimmed();
 }
 
 QString ptv3RegressionSuffix( const QString &primitiveType )
@@ -496,7 +508,7 @@ void showSettingsDialog( QWidget *parent )
     edtPctSuffix->setText( QStringLiteral( "_v4_normals" ) );
     edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v14_actual_points" ) );
     edtPtv3Suffix->setText( QStringLiteral( "_v13_normals" ) );
-    edtPtv3TowerSuffix->setText( QStringLiteral( "_v13_normals" ) );
+    edtPtv3TowerSuffix->setText( ptv3TowerDefaultSuffix );
   } );
 
   auto *btnBox = new QHBoxLayout;
