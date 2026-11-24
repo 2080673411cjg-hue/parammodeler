@@ -149,6 +149,70 @@ int main()
   const auto fallback = sampleProfile( cylinder, { { 0, 3, 4 } }, identity, 1, -1, .1 );
   assert( ( fallback.side == 1 && fallback.indices == QVector<int>{ 0 } ) );
 
+  {
+    QMatrix4x4 view3d, proj3d;
+    view3d.lookAt( QVector3D( -25, -28, 22 ), QVector3D( 5, 4, 3 ), QVector3D( 0, 0, 1 ) );
+    proj3d.perspective( 45.0f, 1.5f, 0.5f, 500.0f );
+    const QSize viewport3d( 1200, 800 );
+
+    struct Spec3D
+    {
+      int modelIndex;
+      std::array<double, 3> dims;
+      double wallFraction;
+      double ridgeFraction;
+      QSizeF roofTop;
+      QPointF roofTopPos;
+      QPointF notch;
+      double recessDepth;
+      QVector<double> profileParams;
+      int expectedCount;
+    };
+    const std::vector<Spec3D> specs3d {
+      { 0, { 10, 8, 5 }, 1.0, 0.5, {}, { 0.5, 0.5 }, {}, 0.0, {}, 6 },
+      { 1, {}, 1.0, 0.5, {}, { 0.5, 0.5 }, {}, 0.0, { 4, 8 }, 2 },
+      { 2, { 20, 10, 5 }, 1.0, 0.5, {}, { 0.5, 0.5 }, { 0.4, 0.5 }, 0.0, {}, 8 },
+      { 3, {}, 1.0, 0.5, {}, { 0.5, 0.5 }, {}, 0.0, { 4, 8, 5.0 / 8 }, 3 },
+      { 4, { 12, 8, 7 }, 4.0 / 7, 0.5, {}, { 0.5, 0.5 }, {}, 0.0, {}, 8 },
+      { 5, { 12, 8, 7 }, 4.0 / 7, 0.5, {}, { 0.5, 0.5 }, {}, 0.0, {}, 7 },
+      { 6, { 14, 10, 7 }, 4.0 / 7, 0.5, { 8, 6 }, { 0.5, 0.5 }, {}, 0.0, {}, 11 },
+      { 7, {}, 1.0, 0.5, {}, { 0.5, 0.5 }, {}, 0.0, { 12, 8, 4 }, 5 },
+      { 8, {}, 1.0, 0.5, {}, { 0.5, 0.5 }, {}, 0.0, { 4, 7, 5.0 / 7, 0.3 }, 4 },
+      { 9, { 15, 10, 6 }, 1.0, 0.5, { 6, 4 }, { 0.5, 0.5 }, {}, 3.0, {}, 11 },
+      { 10, { 12, 8, 7 }, 4.0 / 7, 0.5, { 7, 0 }, { 0.5, 0.5 }, {}, 0.0, {}, 10 },
+      { 11, {}, 1.0, 0.5, {}, { 0.5, 0.5 }, {}, 0.0, { 8, 1.9, 8.96, 0.1, 2, 1, 0.2, 1.5 }, 8 },
+      { 12, {}, 1.0, 0.5, {}, { 0.5, 0.5 }, {}, 0.0, { 14, 10, 8, 7, 4.0 / 7, 150, 0.5 }, 8 }
+    };
+    for ( const auto &spec : specs3d )
+    {
+      const QString prim = QString::fromLatin1( models[spec.modelIndex].first );
+      const MeshData &mesh = spec.modelIndex == 12 ? BuildMesh::buildTwoGableHouses( bent ) : models[spec.modelIndex].second;
+      Eigen::AlignedBox3d bounds;
+      for ( const auto &v : mesh.vertices ) bounds.extend( ParamModelerFit::vector( v ) );
+      bounds.extend( bounds.min() - Eigen::Vector3d::Constant( 1e-3 ) );
+      bounds.extend( bounds.max() + Eigen::Vector3d::Constant( 1e-3 ) );
+      const auto handles = buildHandles3D( prim, spec.dims, spec.wallFraction, spec.ridgeFraction,
+                                           spec.roofTop, spec.roofTopPos, spec.notch, spec.recessDepth,
+                                           spec.profileParams, 0.4 );
+      assert( handles.size() == spec.expectedCount );
+      for ( int idx = 0; idx < handles.size(); ++idx )
+      {
+        const auto &h = handles[idx];
+        assert( bounds.contains( ParamModelerFit::vector( h.position ) ) );
+        assert( h.tangent.length() > 1e-4f );
+        assert( !h.movingEdges.isEmpty() || !h.fixedEdges.isEmpty() );
+        QPointF screenPos, screenTangent;
+        double depth = 0;
+        assert( h.projectToScreen( identity, view3d, proj3d, viewport3d, screenPos, screenTangent, depth ) );
+        assert( depth > 0 && QPointF::dotProduct( screenTangent, screenTangent ) > 1e-2 );
+        assert( std::abs( Handle3D::changeForScreenDrag( 0.25 * screenTangent, screenTangent ) - 0.25 ) < 1e-6 );
+        const int picked = nearestHandle3D( handles, screenPos, identity, view3d, proj3d, viewport3d );
+        assert( picked >= 0 );
+      }
+      std::cout << models[spec.modelIndex].first << ": " << handles.size() << " 3D handles verified" << std::endl;
+    }
+  }
+
   const auto occluded = []( const MeshData &mesh, const Eigen::Vector3d &camera, const Eigen::Vector3d &point ) {
     using ParamModelerFit::Triangle;
     using ParamModelerFit::vector;

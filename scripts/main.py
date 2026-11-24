@@ -174,6 +174,8 @@ def build_model(args, num_classes: int) -> PTv3Classifier:
         enable_flash=args.ptv3_flash,
         dropout=args.ptv3_dropout,
         repo_path=args.ptv3_repo,
+        spatial_pyramid=bool(getattr(args, "spatial_pyramid", False)),
+        canonical_align=bool(getattr(args, "canonical_align", False) or getattr(args, "spatial_pyramid", False)),
     )
 
 
@@ -294,6 +296,8 @@ def save_config(log_dir: Path, args, class_names: List[str]) -> None:
             "flash": args.ptv3_flash,
             "dropout": args.ptv3_dropout,
             "repo": args.ptv3_repo,
+            "spatial_pyramid": bool(getattr(args, "spatial_pyramid", False)),
+            "canonical_align": bool(getattr(args, "canonical_align", False) or getattr(args, "spatial_pyramid", False)),
         },
         "train": {
             "amp": bool(getattr(args, "amp", False)),
@@ -305,6 +309,8 @@ def save_config(log_dir: Path, args, class_names: List[str]) -> None:
             "train_jitter_sigma": args.train_jitter_sigma,
             "random_rotate": args.random_rotate,
             "seed": args.seed,
+            "label_smoothing": args.label_smoothing,
+            "init_log_dir": getattr(args, "init_log_dir", None),
         },
     }
     (log_dir / "classification_config.json").write_text(
@@ -363,7 +369,23 @@ def train(args) -> None:
     train_loader = make_loader(train_set, args.batch_size, True, args.num_workers, device, args.seed)
     val_loader = make_loader(val_set, args.batch_size, False, args.num_workers, device,
                              args.seed + 1 if args.seed is not None else None)
+    if getattr(args, "init_log_dir", None):
+        init_dir = Path(args.init_log_dir)
+        if init_dir.resolve() == log_dir.resolve():
+            raise ValueError("--init_log_dir must differ from --log_dir")
+        init_ckpt = load_checkpoint(init_dir, torch.device("cpu"))
+        init_classes = [canonical_class_name(name) for name in init_ckpt.get("class_names", [])]
+        if init_classes != class_names:
+            raise ValueError(f"--init_log_dir class_names {init_classes} do not match dataset {class_names}")
+    else:
+        init_ckpt = None
+
     model = build_model(args, len(class_names)).to(device)
+    if init_ckpt is not None:
+        missing, unexpected = model.load_state_dict(init_ckpt["state_dict"], strict=False)
+        allowed_missing = {k for k in missing if k.startswith("pyramid_proj.")}
+        if unexpected or (set(missing) - allowed_missing):
+            raise RuntimeError(f"Incompatible init checkpoint: missing={missing}, unexpected={unexpected}")
     criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing)
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
@@ -380,6 +402,12 @@ def train(args) -> None:
     print(f"Point sampling: {args.sampling_mode} | point limit={args.num_points}", flush=True)
     print(f"Data loading: {data_loading_config(args)} | pin_memory={device.type == 'cuda'}", flush=True)
     print(f"Training precision: {'AMP float16' if amp_enabled else 'FP32'} | validation: FP32", flush=True)
+    if getattr(args, "init_log_dir", None):
+        print(f"Initial weights: {args.init_log_dir}", flush=True)
+    if getattr(args, "spatial_pyramid", False) or getattr(args, "canonical_align", False):
+        print(f"Spatial pyramid: {bool(getattr(args, 'spatial_pyramid', False))} | "
+              f"Canonical align: {bool(getattr(args, 'canonical_align', False) or getattr(args, 'spatial_pyramid', False))}",
+              flush=True)
 
     for epoch in range(1, args.epochs + 1):
         if device.type == "cuda":
@@ -449,6 +477,8 @@ def train(args) -> None:
                     "flash": args.ptv3_flash,
                     "dropout": args.ptv3_dropout,
                     "repo": args.ptv3_repo,
+                    "spatial_pyramid": bool(getattr(args, "spatial_pyramid", False)),
+                    "canonical_align": bool(getattr(args, "canonical_align", False) or getattr(args, "spatial_pyramid", False)),
                 },
                 "epoch": epoch,
                 "val_acc": val_acc,
@@ -483,6 +513,8 @@ def test(args) -> None:
     args.ptv3_patch_size = int(config.get("patch_size", args.ptv3_patch_size))
     args.ptv3_flash = bool(config.get("flash", args.ptv3_flash))
     args.ptv3_dropout = float(config.get("dropout", args.ptv3_dropout))
+    args.spatial_pyramid = bool(config.get("spatial_pyramid", getattr(args, "spatial_pyramid", False)))
+    args.canonical_align = bool(config.get("canonical_align", getattr(args, "canonical_align", False) or args.spatial_pyramid))
     if config.get("repo") and args.ptv3_repo is None:
         args.ptv3_repo = config.get("repo")
 
@@ -518,6 +550,8 @@ def predict(args) -> None:
     args.ptv3_patch_size = int(config.get("patch_size", args.ptv3_patch_size))
     args.ptv3_flash = bool(config.get("flash", args.ptv3_flash))
     args.ptv3_dropout = float(config.get("dropout", args.ptv3_dropout))
+    args.spatial_pyramid = bool(config.get("spatial_pyramid", getattr(args, "spatial_pyramid", False)))
+    args.canonical_align = bool(config.get("canonical_align", getattr(args, "canonical_align", False) or args.spatial_pyramid))
     if config.get("repo") and args.ptv3_repo is None:
         args.ptv3_repo = config.get("repo")
 
@@ -585,12 +619,19 @@ def parse_args():
     parser.add_argument("--ptv3_patch_size", type=int, default=128)
     parser.add_argument("--ptv3_flash", action="store_true")
     parser.add_argument("--ptv3_dropout", type=float, default=0.1)
+    parser.add_argument("--init_log_dir", help="Initialize training from best_model.pth in this directory.")
+    parser.add_argument("--spatial_pyramid", action=argparse.BooleanOptionalAction, default=False,
+                        help="Enable canonical XY alignment and 2x2 spatial pyramid residual pooling.")
+    parser.add_argument("--canonical_align", action=argparse.BooleanOptionalAction, default=False,
+                        help="Enable canonical XY alignment before PTv3 voxelization.")
     args = parser.parse_args()
 
     if args.mode == "predict" and not args.input:
         raise SystemExit("--input is required for predict mode")
     if args.amp and args.mode != "train":
         parser.error("--amp is for training only; validation/test/predict use FP32")
+    if args.init_log_dir and args.mode != "train":
+        parser.error("--init_log_dir is for training only")
     if args.epochs < 1 or args.batch_size < 1 or args.num_points < 1:
         parser.error("epochs/batch_size/num_points must be positive")
     if args.num_workers < 0:

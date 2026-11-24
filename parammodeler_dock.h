@@ -52,6 +52,7 @@ class QgsVectorLayer;
 class Qgs3DMapCanvas;
 class Qgs3DMapTool;
 class ParamModelerPick3D;
+class ParamModelerFineTune3DTool;
 class QMenu;                    // ← 新增这一行（推荐显式包含）
 
 namespace Ui {
@@ -64,6 +65,7 @@ class ParamModelerDock : public QDockWidget
   friend class ExportJSON;
   friend class ExportOBJ;
   friend class PointNetRunner;
+  friend class ParamModelerFineTune3DTool;
 
   friend void generateFullDataset( ParamModelerDock *dock );
   friend void generateSinglePrimitiveDataset( ParamModelerDock *dock );
@@ -328,6 +330,12 @@ private:
   QVector3D m_manualTranslate3DLocalAnchor;
   void stopManualTranslate3D();
   void startTranslate3D( bool fitCorner );
+
+  QPushButton *m_fineTune3DBtn = nullptr;
+  QPointer<ParamModelerFineTune3DTool> m_fineTune3DTool;
+  void toggleFineTune3D();
+  void stopFineTune3D();
+  void refreshFineTune3D();
 };
 
 #endif // PARAMMODELER_DOCK_H

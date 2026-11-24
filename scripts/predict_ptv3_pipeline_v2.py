@@ -57,6 +57,8 @@ def load_classifier(args, device: torch.device):
     cls_args.ptv3_patch_size = int(config.get("patch_size", cls_args.ptv3_patch_size))
     cls_args.ptv3_flash = bool(config.get("flash", cls_args.ptv3_flash))
     cls_args.ptv3_dropout = float(config.get("dropout", cls_args.ptv3_dropout))
+    cls_args.spatial_pyramid = bool(config.get("spatial_pyramid", False))
+    cls_args.canonical_align = bool(config.get("canonical_align", cls_args.spatial_pyramid))
     if config.get("repo") and cls_args.ptv3_repo is None:
         cls_args.ptv3_repo = config.get("repo")
 

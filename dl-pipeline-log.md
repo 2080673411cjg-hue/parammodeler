@@ -1,6 +1,23 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新 2026-11-23
+> 最后更新 2026-11-24
+
+### 未发布（2026-11-24） 三维视图直接微调、拖动防闪烁优化与 PTv3 v16 空间金字塔分类（Top-1 99.58%）
+
+- 三维视图直接操作模型（「三维微调」阶段 1 + 阶段 2）：
+  - 在 `parammodeler_face_fit_profiles.h` 中为全部十三类建筑基元定义三维控制点（`Handle3D`，共 91 个控制柄）、橙色活动边（`movingEdges`）、紫色固定锚定边（`fixedEdges`）、屏幕切向投影（`projectToScreen`）、屏幕拖拽反解（`changeForScreenDrag`）与屏幕最近邻拾取（`nearestHandle3D`），并通过独立测试 `tests/test_fit_solids.cpp` 全部校验。
+  - 在 `parammodeler_pick3d_overlay.h` 中新增 `verticesHandles3D` 与 `updateHandles3D`，在 QGIS 三维视图的置顶渲染通道上实时绘制空心橙色白边控制点圆环、橙色实线活动边和紫色虚线固定锚定边，并通过离屏 OpenGL 渲染测试 `tests/test_pick3d_overlay.cpp`。
+  - 在主面板「二维微调」旁新增可勾选的「三维微调」按钮（`m_fineTune3DBtn`）与 `ParamModelerFineTune3DTool`（`parammodeler_dock_alignment.cpp`）：支持左键拖动单侧伸缩（自动补偿 `tx, ty` 保持对侧紫色锚定边不动）、悬停滚轮微调、空白区域原生三维相机旋转/平移/缩放无缝切换，以及 `Ctrl+Z` 多步撤销与 `Esc` 退出；同步更新中英文翻译 `i18n/parammodeler_zh_CN.ts/.qm`。
+- 三维微调与预览刷新防闪烁优化：
+  - `parammodeler_scene3d.cpp` 中的 `ensureRealtimeAnchorLayer` 改为仅在 `ParamModeler_3D_Anchor` 图层不存在时创建一次，避免每次参数微调或拖拽刷新预览时反复删除重建图层及调用 `mapCanvas()->setLayers()` 导致 QGIS 三维场景卸载重挂点云图层。
+  - `ParamModelerFineTune3DTool` 在按住左键拖拽控制点期间暂停 `m_fitTimer` 触发的 `trigger3DUpdate()` 点云属性重建，在松开鼠标左键或滚动滚轮时立即更新拟合度指标与点云红绿着色，彻底消除拖动过程中的点云闪烁。
+- PTv3 v15 / v16 分类对比实验与空间金字塔池化升级：
+  - 对比实验（2,600 份合成测试点云，十三类各 200 份）：
+    - `ptv3_cls_v14_actual_points`（基线）：Top-1 为 `2547 / 2600`（`97.96%`，53 错分），Top-2 为 `2599 / 2600`（`99.96%`）；其中 `FlatRoofHouse <-> LShapedHouse` 互混 24 份，`GableRoofHouse <-> AngledGableHouse` 互混 23 份。
+    - `ptv3_cls_v15_control`（自 v14 以 `lr=5e-5` 续训 15 轮，`pair_loss_weight=0.0`）：Top-1 为 `2552 / 2600`（`98.15%`，48 错分），Top-2 为 `2597 / 2600`（`99.88%`）；`Flat <-> LShaped` 互混降至 19 份，`Gable <-> AngledGable` 互混 24 份。
+    - `ptv3_cls_v15_pair`（`pair_loss_weight=0.25`）：Top-1 为 `2548 / 2600`（`98.00%`，52 错分），Top-2 为 `2592 / 2600`（`99.69%`）；配对排斥损失虽压低竞争类 logit，但在边界样本上将正确类别挤出 Top-2。
+  - **PTv3 v16 端到端架构升级（`ptv3_cls_v16`）**：在 `model_ptv3.py` 的 `PTv3Classifier` 中内置水平最小面积外接框主轴摆正（`align_batch_xy`，同步旋转点坐标与法向量 `nx, ny`）及 2×2 象限空间金字塔残差池化（`pool_spatial_pyramid_features` + `pyramid_proj`），保持 6 通道输入不变，从头训练 100 轮（`--spatial_pyramid`）。
+  - **`ptv3_cls_v16` 测试集结果**：纯神经网络端到端直出 **Top-1 达 `2589 / 2600`（`99.58%`，仅 11 错分，较 v14 减少 79% 错误）**，**Top-2 达 `2598 / 2600`（`99.92%`）**；其中 `FlatRoofHouse <-> LShapedHouse` 互混从 24 份降至 **5 份**（`FlatRoofHouse` 达 `200 / 200 = 100%`），`GableRoofHouse <-> AngledGableHouse` 互混从 24 份降至 **2 份**（两类各自达 `199 / 200 = 99.50%`），十三类中共有 7 类达到 `100%` 零错分。`ptv3_server.py` 默认分类权重切换为 `logs/ptv3_cls_v16`。
 
 ### 未发布（2026-11-23） 双坡宽度侧面屋脊微调、旋转/转折剖面控制与圆屋净高接入
 

@@ -296,6 +296,7 @@ void ParamModelerDock::setPrimitiveType( const QString &name )
 ParamModelerDock::~ParamModelerDock()
 {
   resetFitEvaluation();
+  stopFineTune3D();
   stopManualTranslate3D();
   ParamModelerScene3D::clearRealtimePreviewMesh( mIface );
   m_modelLayer = nullptr;
@@ -887,6 +888,12 @@ void ParamModelerDock::initPointNet()
   connect( fitStatisticsAction, &QAction::triggered, this, &ParamModelerDock::showFitEvaluationDetails );
   connect( ui->btnFaceFit, &QPushButton::clicked, this, &ParamModelerDock::showFaceFitView );
   ui->btnFaceFit->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/mActionScaleFeature.svg" ) ) );
+  m_fineTune3DBtn = new QPushButton( tr( "3D fine-tune" ), this );
+  m_fineTune3DBtn->setCheckable( true );
+  m_fineTune3DBtn->setIcon( QgsApplication::getThemeIcon( QStringLiteral( "/mActionVertexTool.svg" ) ) );
+  m_fineTune3DBtn->setToolTip( tr( "Drag or scroll on 3D orange handles in the 3D view to adjust model dimensions. Press Ctrl+Z to undo or Esc to exit." ) );
+  ui->layoutAlignmentButtons->insertWidget( ui->layoutAlignmentButtons->indexOf( ui->btnFaceFit ) + 1, m_fineTune3DBtn );
+  connect( m_fineTune3DBtn, &QPushButton::clicked, this, &ParamModelerDock::toggleFineTune3D );
 
   ui->widgetInversionPanel->setVisible( false );
   ui->widgetInversionPanel->setMinimumWidth( 0 );
@@ -1585,6 +1592,7 @@ void ParamModelerDock::onUpdatePreview()
     anchorLocalPoint( m_manualAlign3DAnchorMode, mesh, m_manualTranslate3DLocalAnchor );
     m_manualTranslate3DTool->refreshMarkers();
   }
+  refreshFineTune3D();
 
   if ( m_realtimeModelLoaded )
   {

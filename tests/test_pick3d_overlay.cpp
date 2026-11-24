@@ -91,4 +91,47 @@ int main( int argc, char **argv )
               << " red=" << red << " white=" << white << " yellow=" << yellow
               << " cyan=" << cyan << " orange=" << orange << '\n';
   }
+  {
+    const QSize size( 800, 600 );
+    const QVector<QPointF> handles{ QPointF( 200, 300 ), QPointF( 400, 300 ), QPointF( 600, 300 ) };
+    const QVector<QPair<QPointF, QPointF>> movingEdges{ { QPointF( 200, 200 ), QPointF( 200, 400 ) } };
+    const QVector<QPair<QPointF, QPointF>> fixedEdges{ { QPointF( 600, 200 ), QPointF( 600, 400 ) } };
+    const auto vertices = ParamModelerPickOverlay::verticesHandles3D( size, handles, 0, movingEdges, fixedEdges );
+    QOpenGLFramebufferObject framebuffer( size, QOpenGLFramebufferObject::CombinedDepthStencil );
+    check( framebuffer.bind(), "handles3d framebuffer" );
+    gl->glViewport( 0, 0, size.width(), size.height() );
+    gl->glClearColor( 0.12f, 0.2f, 0.3f, 1 );
+    gl->glDepthMask( GL_TRUE );
+    gl->glClearDepthf( 0 );
+    gl->glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+    gl->glEnable( GL_DEPTH_TEST );
+    gl->glDepthFunc( GL_ALWAYS );
+    gl->glDepthMask( GL_FALSE );
+    QOpenGLVertexArrayObject vao;
+    check( vao.create(), "handles3d vertex array" );
+    vao.bind();
+    QOpenGLBuffer buffer;
+    check( buffer.create() && buffer.bind(), "handles3d vertex buffer" );
+    buffer.allocate( vertices.constData(), vertices.size() * sizeof( float ) );
+    check( shader.bind(), "handles3d shader bind" );
+    shader.enableAttributeArray( "vertexPosition" );
+    shader.enableAttributeArray( "vertexColor" );
+    shader.setAttributeBuffer( "vertexPosition", GL_FLOAT, 0, 3, 6 * sizeof( float ) );
+    shader.setAttributeBuffer( "vertexColor", GL_FLOAT, 3 * sizeof( float ), 3, 6 * sizeof( float ) );
+    gl->glDrawArrays( GL_TRIANGLES, 0, vertices.size() / 6 );
+    gl->glFinish();
+    check( gl->glGetError() == GL_NO_ERROR, "handles3d render" );
+    const QImage image = framebuffer.toImage();
+    int orange = 0, purple = 0, white = 0;
+    for ( int y = 0; y < image.height(); ++y )
+      for ( int x = 0; x < image.width(); ++x )
+      {
+        const QColor color = image.pixelColor( x, y );
+        if ( color.red() > 195 && color.green() > 90 && color.green() < 150 && color.blue() < 30 ) ++orange;
+        if ( color.red() > 100 && color.red() < 130 && color.green() > 45 && color.green() < 75 && color.blue() > 160 ) ++purple;
+        if ( color.red() > 230 && color.green() > 230 && color.blue() > 230 ) ++white;
+      }
+    check( orange > 100 && purple > 50 && white > 100, "visible 3D handles, orange moving edges and purple fixed edges" );
+    std::cout << "PASS: handles3d orange=" << orange << " purple=" << purple << " white=" << white << '\n';
+  }
 }

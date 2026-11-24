@@ -6,10 +6,13 @@
 #include "parammodeler_pcdloader.h"
 #include "parammodeler_pick3d.h"
 #include "parammodeler_pick3d_math.h"
+#include "parammodeler_pick3d_overlay.h"
 #include "parammodeler_scene3d.h"
 #include "parammodeler_fit_metrics.h"
 #include "parammodeler_face_fit_profiles.h"
 #include "qgsmessagelog.h"
+#include "qgsframegraph.h"
+#include "qgswindow3dengine.h"
 
 #include <qgisinterface.h>
 #include <qgsapplication.h>
@@ -28,6 +31,7 @@
 #include <QFormLayout>
 #include <QGraphicsView>
 #include <QGraphicsScene>
+#include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
 #include <QDir>
@@ -41,6 +45,7 @@
 #include <QScopedValueRollback>
 #include <QTemporaryFile>
 #include <QTextStream>
+#include <QTimer>
 #include <QToolButton>
 #include <QToolTip>
 #include <QVector3D>
@@ -440,6 +445,7 @@ void ParamModelerDock::startManualTranslate3D()
 
 void ParamModelerDock::startTranslate3D( bool fitCorner )
 {
+  stopFineTune3D();
   if ( m_manualTranslate3DTool )
   {
     stopManualTranslate3D();
@@ -2471,6 +2477,663 @@ void ParamModelerDock::showFaceFitView()
   dialog->show();
   view->setViewRotation( currentFaceFitTopRotation( mIface, this ) );
   updateFitEvaluation();
+}
+
+class ParamModelerFineTune3DTool : public QObject
+{
+public:
+  ParamModelerFineTune3DTool( ParamModelerDock *dock, Qgs3DMapCanvas *canvas )
+    : QObject( dock ), m_dock( dock ), m_canvas( canvas )
+  {
+    m_overlay = std::make_unique<ParamModelerPickOverlay>( m_canvas->engine()->frameGraph()->rubberBandsRootEntity() );
+    m_canvas->installEventFilter( this );
+    connect( m_canvas, &QObject::destroyed, this, [this] {
+      m_canvas.clear();
+      if ( m_dock ) m_dock->stopFineTune3D();
+    } );
+    auto *timer = new QTimer( this );
+    timer->setInterval( 40 );
+    connect( timer, &QTimer::timeout, this, &ParamModelerFineTune3DTool::refreshOverlay );
+    timer->start();
+    refreshOverlay();
+  }
+
+  ~ParamModelerFineTune3DTool() override
+  {
+    if ( m_canvas )
+    {
+      m_canvas->removeEventFilter( this );
+      if ( m_canvas->cameraController() )
+        m_canvas->cameraController()->setEnabled( true );
+      m_canvas->setCursor( Qt::OpenHandCursor );
+    }
+    QToolTip::hideText();
+    m_overlay.reset();
+  }
+
+  void refreshOverlay()
+  {
+    if ( !m_dock || !m_canvas || !m_canvas->scene() || !m_canvas->mapSettings() || !m_canvas->cameraController() )
+      return;
+    if ( !m_dock->m_realtimeModelLoaded )
+    {
+      m_overlay->updateHandles3D( m_canvas->size(), {}, -1 );
+      return;
+    }
+    const auto controls = faceFitControls( m_dock->primitiveType(), m_dock->ui );
+    const auto state = faceFitState( m_dock, m_dock->ui, controls );
+    syncUndoHistory( state );
+    const QMatrix4x4 modelToWorld = currentModelToWorld( state );
+    const auto *camera = m_canvas->cameraController()->camera();
+    if ( m_dragHandle < 0 )
+    {
+      const QVector3D localCam = modelToWorld.inverted().map( camera->position() );
+      m_azimuth = std::atan2( double( localCam.y() ), double( localCam.x() ) ) - std::acos( -1.0 ) * 0.5;
+    }
+    m_handles = ParamModelerFaceFit::buildHandles3D(
+      state.primitive, state.dimensions, state.wallFraction, state.ridgeFraction,
+      state.roofTop, state.roofTopPosition, state.notch, state.recessDepth,
+      state.profileParameters, m_azimuth );
+
+    const QSize viewport = m_canvas->size();
+    const QMatrix4x4 viewMat = camera->viewMatrix();
+    const QMatrix4x4 projMat = camera->projectionMatrix();
+
+    QVector<QPointF> centers;
+    centers.reserve( m_handles.size() );
+    int activeCenterIndex = -1;
+    const int activeHandle = m_dragHandle >= 0 ? m_dragHandle : m_hoverHandle;
+
+    for ( int i = 0; i < m_handles.size(); ++i )
+    {
+      QPointF screenPos, screenTangent;
+      double depth = 0;
+      if ( !m_handles[i].projectToScreen( modelToWorld, viewMat, projMat, viewport, screenPos, screenTangent, depth ) )
+        continue;
+      if ( i == activeHandle ) activeCenterIndex = centers.size();
+      centers.append( screenPos );
+    }
+
+    QVector<QPair<QPointF, QPointF>> movingSegs, fixedSegs;
+    const auto projectSegments = [&]( const QVector<ParamModelerFaceFit::Segment3D> &segments,
+                                      QVector<QPair<QPointF, QPointF>> &out ) {
+      for ( const auto &seg : segments )
+      {
+        QPointF a, b;
+        double da = 0, db = 0;
+        if ( ParamModelerPicking::project( modelToWorld.map( seg.start ), viewMat, projMat, viewport, a, da ) &&
+             ParamModelerPicking::project( modelToWorld.map( seg.end ), viewMat, projMat, viewport, b, db ) )
+          out.append( qMakePair( a, b ) );
+      }
+    };
+    if ( activeHandle >= 0 && activeHandle < m_handles.size() )
+    {
+      projectSegments( m_handles[activeHandle].movingEdges, movingSegs );
+      projectSegments( m_handles[activeHandle].fixedEdges, fixedSegs );
+    }
+    m_overlay->updateHandles3D( viewport, centers, activeCenterIndex, movingSegs, fixedSegs );
+  }
+
+protected:
+  bool eventFilter( QObject *watched, QEvent *event ) override
+  {
+    if ( watched != m_canvas || !m_dock || !m_canvas || !m_canvas->cameraController() )
+      return QObject::eventFilter( watched, event );
+
+    if ( event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress )
+    {
+      const auto *key = static_cast<QKeyEvent *>( event );
+      if ( key->key() == Qt::Key_Escape )
+      {
+        if ( event->type() == QEvent::KeyPress ) m_dock->stopFineTune3D();
+        event->accept();
+        return true;
+      }
+      if ( key->matches( QKeySequence::Undo ) )
+      {
+        if ( event->type() == QEvent::KeyPress ) undoLastResize();
+        event->accept();
+        return true;
+      }
+    }
+    else if ( event->type() == QEvent::Leave )
+    {
+      if ( m_dragHandle < 0 )
+      {
+        m_hoverHandle = -1;
+        m_canvas->cameraController()->setEnabled( true );
+        m_canvas->setCursor( Qt::OpenHandCursor );
+        QToolTip::hideText();
+        refreshOverlay();
+      }
+    }
+    else if ( event->type() == QEvent::Resize )
+    {
+      refreshOverlay();
+    }
+    else if ( event->type() == QEvent::MouseMove )
+    {
+      const auto *mouse = static_cast<QMouseEvent *>( event );
+      if ( m_dragHandle >= 0 )
+      {
+        m_canvas->cameraController()->setEnabled( false );
+        const QPointF drag = QPointF( mouse->pos() ) - m_dragStartScreen;
+        const double delta = ParamModelerFaceFit::Handle3D::changeForScreenDrag( drag, m_dragScreenTangent );
+        applyHandleDelta( m_dragBeforeState, m_dragHandleSpec, delta, 0, mouse->pos() );
+        event->accept();
+        return true;
+      }
+      if ( mouse->buttons() == Qt::NoButton )
+      {
+        const int hit = hitHandleAt( mouse->pos() );
+        if ( hit != m_hoverHandle )
+        {
+          m_hoverHandle = hit;
+          m_wheelDelta = 0;
+        }
+        if ( hit >= 0 && hit < m_handles.size() )
+        {
+          m_canvas->cameraController()->setEnabled( false );
+          m_canvas->setCursor( Qt::SizeAllCursor );
+          const QString label = QCoreApplication::translate( "ParamModelerDock", m_handles[hit].label );
+          const QString hint = m_dock->tr( "%1\nDrag or scroll wheel to adjust. Orange moves, purple stays fixed. Ctrl+Z to undo." ).arg( label );
+          QToolTip::showText( m_canvas->mapToGlobal( mouse->pos() + QPoint( 14, 14 ) ), hint );
+        }
+        else
+        {
+          m_canvas->cameraController()->setEnabled( true );
+          m_canvas->setCursor( Qt::OpenHandCursor );
+          QToolTip::hideText();
+        }
+        refreshOverlay();
+      }
+    }
+    else if ( event->type() == QEvent::MouseButtonPress )
+    {
+      const auto *mouse = static_cast<QMouseEvent *>( event );
+      if ( mouse->button() == Qt::LeftButton )
+      {
+        const int hit = hitHandleAt( mouse->pos() );
+        if ( hit >= 0 && hit < m_handles.size() )
+        {
+          const auto controls = faceFitControls( m_dock->primitiveType(), m_dock->ui );
+          m_dragBeforeState = faceFitState( m_dock, m_dock->ui, controls );
+          syncUndoHistory( m_dragBeforeState );
+          const QMatrix4x4 modelToWorld = currentModelToWorld( m_dragBeforeState );
+          const auto *camera = m_canvas->cameraController()->camera();
+          QPointF screenPos, screenTangent;
+          double depth = 0;
+          if ( m_handles[hit].projectToScreen( modelToWorld, camera->viewMatrix(), camera->projectionMatrix(),
+                                               m_canvas->size(), screenPos, screenTangent, depth ) )
+          {
+            m_dragHandle = hit;
+            m_hoverHandle = hit;
+            m_dragHandleSpec = m_handles[hit];
+            m_dragStartScreen = mouse->pos();
+            m_dragScreenTangent = screenTangent;
+            m_canvas->cameraController()->setEnabled( false );
+            m_canvas->setCursor( Qt::ClosedHandCursor );
+            refreshOverlay();
+            event->accept();
+            return true;
+          }
+        }
+      }
+    }
+    else if ( event->type() == QEvent::MouseButtonRelease )
+    {
+      const auto *mouse = static_cast<QMouseEvent *>( event );
+      if ( m_dragHandle >= 0 && mouse->button() == Qt::LeftButton )
+      {
+        const QPointF drag = QPointF( mouse->pos() ) - m_dragStartScreen;
+        const double delta = ParamModelerFaceFit::Handle3D::changeForScreenDrag( drag, m_dragScreenTangent );
+        applyHandleDelta( m_dragBeforeState, m_dragHandleSpec, delta, 0, mouse->pos() );
+        const auto controls = faceFitControls( m_dock->primitiveType(), m_dock->ui );
+        const auto applied = faceFitState( m_dock, m_dock->ui, controls );
+        recordUndo( m_dragBeforeState, applied );
+        m_dragHandle = -1;
+        m_hoverHandle = hitHandleAt( mouse->pos() );
+        m_canvas->cameraController()->setEnabled( m_hoverHandle < 0 );
+        m_canvas->setCursor( m_hoverHandle >= 0 ? Qt::SizeAllCursor : Qt::OpenHandCursor );
+        if ( m_dock->m_fitTimer ) m_dock->m_fitTimer->stop();
+        m_dock->updateFitEvaluation();
+        refreshOverlay();
+        event->accept();
+        return true;
+      }
+    }
+    else if ( event->type() == QEvent::Wheel )
+    {
+      const auto *wheel = static_cast<QWheelEvent *>( event );
+      if ( m_dragHandle >= 0 )
+      {
+        event->accept();
+        return true;
+      }
+      const QPoint pos = wheel->position().toPoint();
+      const int hit = m_hoverHandle >= 0 ? m_hoverHandle : hitHandleAt( pos );
+      if ( hit >= 0 && hit < m_handles.size() )
+      {
+        m_canvas->cameraController()->setEnabled( false );
+        m_wheelDelta += wheel->angleDelta().y();
+        const int steps = m_wheelDelta / 120;
+        m_wheelDelta %= 120;
+        if ( steps != 0 )
+        {
+          const auto controls = faceFitControls( m_dock->primitiveType(), m_dock->ui );
+          const auto before = faceFitState( m_dock, m_dock->ui, controls );
+          syncUndoHistory( before );
+          applyHandleDelta( before, m_handles[hit], 0.0, steps, pos );
+          const auto applied = faceFitState( m_dock, m_dock->ui, controls );
+          recordUndo( before, applied );
+        }
+        event->accept();
+        return true;
+      }
+      m_canvas->cameraController()->setEnabled( true );
+    }
+    return QObject::eventFilter( watched, event );
+  }
+
+private:
+  QMatrix4x4 currentModelToWorld( const FaceFitState &state ) const
+  {
+    QMatrix4x4 modelToWorld;
+    const QgsVector3D origin = m_canvas->mapSettings()->origin();
+    modelToWorld.translate( float( state.translation[0] - origin.x() ),
+                            float( state.translation[1] - origin.y() ),
+                            float( state.translation[2] - origin.z() ) );
+    modelToWorld.rotate( float( state.rotation[0] ), 1, 0, 0 );
+    modelToWorld.rotate( float( state.rotation[1] ), 0, 1, 0 );
+    modelToWorld.rotate( float( state.rotation[2] ), 0, 0, 1 );
+    return modelToWorld;
+  }
+
+  int hitHandleAt( const QPoint &pos )
+  {
+    if ( !m_dock || !m_canvas || !m_canvas->mapSettings() || !m_canvas->cameraController() || !m_dock->m_realtimeModelLoaded )
+      return -1;
+    const auto controls = faceFitControls( m_dock->primitiveType(), m_dock->ui );
+    const auto state = faceFitState( m_dock, m_dock->ui, controls );
+    const QMatrix4x4 modelToWorld = currentModelToWorld( state );
+    const auto *camera = m_canvas->cameraController()->camera();
+    return ParamModelerFaceFit::nearestHandle3D( m_handles, pos, modelToWorld, camera->viewMatrix(),
+                                                 camera->projectionMatrix(), m_canvas->size(), 11.0 );
+  }
+
+  void syncUndoHistory( const FaceFitState &current )
+  {
+    if ( !m_undoStack.isEmpty() && !( current == m_lastApplied ) )
+      m_undoStack.clear();
+  }
+
+  void recordUndo( const FaceFitState &before, const FaceFitState &after )
+  {
+    if ( before == after ) return;
+    syncUndoHistory( before );
+    m_undoStack.append( before );
+    m_lastApplied = after;
+  }
+
+  void applyStateToDock( const FaceFitState &state, const FaceFitControls &controls )
+  {
+    auto *ui = m_dock->ui;
+    const QScopedValueRollback<bool> suspend( m_dock->m_suspendHeightCompensation, true );
+    const QScopedValueRollback<bool> anchor( m_dock->m_anchorLockCompensating, true );
+    if ( !state.profileParameters.isEmpty() )
+    {
+      const auto parameters = faceFitProfileControls( profileType( state.primitive ), ui );
+      for ( int i = 0; i < parameters.size(); ++i )
+        parameters[i]->setValue( state.profileParameters[i] );
+      m_dock->setPoseTranslate( state.translation[0], state.translation[1], state.translation[2] );
+    }
+    else if ( controls[0] )
+    {
+      for ( int i = 0; i < 3; ++i )
+        controls[i]->setValue( state.dimensions[i] );
+      if ( auto *ratio = faceFitWallRatio( state.primitive, ui ) )
+        ratio->setValue( state.wallFraction );
+      if ( state.primitive == QLatin1String( "GableRoofHouse" ) )
+        ui->spinBoxGRRidgeRatio->setValue( state.ridgeFraction );
+      if ( state.primitive == QLatin1String( "FlatTopHipRoofHouse" ) )
+      {
+        ui->spinBoxTPRTopLength->setValue( state.roofTop.width() );
+        ui->spinBoxTPRTopWidth->setValue( state.roofTop.height() );
+        m_dock->m_tpTopPosition = state.roofTopPosition;
+      }
+      else if ( state.primitive == QLatin1String( "ShortRidgeHipRoofHouse" ) )
+      {
+        ui->spinBoxAGHRidgeLength->setValue( state.roofTop.width() );
+        ui->spinBoxAGHRidgeOffset->setValue( state.ridgeFraction );
+        m_dock->m_aghRidgePositionX = state.roofTopPosition.x();
+      }
+      else if ( state.primitive == QLatin1String( "LShapedHouse" ) )
+      {
+        ui->spinBoxLWingRatio->setValue( state.notch.x() );
+        ui->spinBoxLWingWidthRatio->setValue( state.notch.y() );
+      }
+      else if ( state.primitive == QLatin1String( "RecessedRoofHouse" ) )
+      {
+        ui->spinBoxICInnerLength->setValue( state.roofTop.width() );
+        ui->spinBoxICInnerWidth->setValue( state.roofTop.height() );
+        ui->spinBoxICOffsetX->setValue( state.roofTopPosition.x() );
+        ui->spinBoxICOffsetY->setValue( state.roofTopPosition.y() );
+        ui->spinBoxICInnerHeight->setValue( state.recessDepth );
+      }
+      m_dock->setPoseTranslate( state.translation[0], state.translation[1], state.translation[2] );
+    }
+    m_dock->retargetAnchorLockToCurrentPosition();
+    m_dock->onUpdatePreview();
+    if ( m_dragHandle >= 0 )
+    {
+      if ( m_dock->m_fitTimer ) m_dock->m_fitTimer->stop();
+    }
+    else
+    {
+      if ( m_dock->m_fitTimer ) m_dock->m_fitTimer->stop();
+      m_dock->updateFitEvaluation();
+    }
+    refreshOverlay();
+  }
+
+  void undoLastResize()
+  {
+    const auto controls = faceFitControls( m_dock->primitiveType(), m_dock->ui );
+    const auto current = faceFitState( m_dock, m_dock->ui, controls );
+    syncUndoHistory( current );
+    if ( m_undoStack.isEmpty() ) return;
+    const FaceFitState previous = m_undoStack.takeLast();
+    m_lastApplied = previous;
+    applyStateToDock( previous, controls );
+  }
+
+  void applyHandleDelta( const FaceFitState &before, const ParamModelerFaceFit::Handle3D &handle,
+                         double delta, int wheelSteps, const QPoint &cursorPos )
+  {
+    using namespace ParamModelerFaceFit;
+    auto *ui = m_dock->ui;
+    const auto controls = faceFitControls( before.primitive, ui );
+    FaceFitState after = before;
+    QVector3D originShift;
+    QString limit;
+    const auto noteLimit = [&limit, dock = m_dock]( double requested, double minVal, double maxVal, const QString &reason = {} ) {
+      if ( requested < minVal - 1e-8 || requested > maxVal + 1e-8 )
+        limit = reason.isEmpty() ? dock->tr( "Dimension limit reached." ) : reason;
+    };
+
+    if ( handle.kind == Handle3DKind::ProfileParameter )
+    {
+      const auto type = profileType( before.primitive );
+      const auto parameters = faceFitProfileControls( type, ui );
+      const int parameter = handle.parameter;
+      if ( parameter < 0 || parameter >= parameters.size() ) return;
+      const auto *spin = parameters[parameter];
+      double minimum = spin->minimum(), maximum = spin->maximum();
+      if ( minimum == 0 && !( ( type == ProfileType::Dome && parameter == 3 ) ||
+                              ( type == ProfileType::Tower && parameter == CurvedRise ) ) )
+        minimum = std::pow( 10.0, -spin->decimals() );
+      const auto &values = before.profileParameters;
+      int pairedHeight = -1;
+      if ( type == ProfileType::Tower )
+      {
+        const double eaveUnit = std::pow( 10.0, -parameters[EaveRadius]->decimals() );
+        if ( parameter == BodyRadius ) maximum = std::min( maximum, values[EaveRadius] - eaveUnit );
+        if ( parameter == EaveRadius ) minimum = std::max( minimum, std::max( values[BodyRadius], values[TopRadius] ) + eaveUnit );
+        if ( parameter == CurvedHeight ) minimum = std::max( minimum, 4.0 * values[CurvedRise] );
+        if ( parameter == BodyHeight ) pairedHeight = EaveThickness;
+        if ( parameter == CurvedHeight ) pairedHeight = ConeHeight;
+        if ( pairedHeight >= 0 )
+        {
+          const auto *paired = parameters[pairedHeight];
+          const double sum = values[parameter] + values[pairedHeight];
+          minimum = std::max( minimum, sum - paired->maximum() );
+          maximum = std::min( maximum, sum - std::max( paired->minimum(), std::pow( 10.0, -paired->decimals() ) ) );
+        }
+      }
+      const bool radial = type == ProfileType::Cylinder || type == ProfileType::Cone || type == ProfileType::Dome;
+      const int heightRatio = ( type == ProfileType::Cone || type == ProfileType::Dome ) && parameter == 1 ? 2 :
+                              type == ProfileType::AngledGable && parameter == 3 ? 4 : -1;
+      const double eaveHeight = heightRatio >= 0 ? values[parameter] * values[heightRatio] : 0;
+      if ( heightRatio >= 0 )
+      {
+        minimum = std::max( minimum, eaveHeight / parameters[heightRatio]->maximum() );
+        maximum = std::min( maximum, eaveHeight / parameters[heightRatio]->minimum() );
+      }
+      const double requested = values[parameter] + ( wheelSteps ? wheelSteps * spin->singleStep() : delta );
+      noteLimit( requested, minimum, maximum, ( pairedHeight >= 0 || heightRatio >= 0 ) ? m_dock->tr( "The fixed height limits this adjustment." ) : QString() );
+      const double next = boundedFaceFitValue( spin, requested, minimum, maximum );
+      const double change = next - values[parameter];
+      after.profileParameters[parameter] = next;
+      if ( pairedHeight >= 0 ) after.profileParameters[pairedHeight] = values[pairedHeight] - change;
+      if ( heightRatio >= 0 ) after.profileParameters[heightRatio] = eaveHeight / next;
+      if ( handle.movesMinimum )
+      {
+        if ( radial )
+          originShift[0] = ( handle.tangent.x() < 0 ? -1.0f : 1.0f ) * float( change );
+        else
+          originShift[parameter] = -float( change );
+      }
+    }
+    else if ( handle.kind == Handle3DKind::WallRatio )
+    {
+      auto *ratio = faceFitWallRatio( before.primitive, ui );
+      if ( !ratio || !controls[2] ) return;
+      const double total = before.dimensions[2];
+      const double requested = before.wallFraction + ( wheelSteps ? wheelSteps * controls[2]->singleStep() : delta ) / total;
+      noteLimit( requested, ratio->minimum(), ratio->maximum(), m_dock->tr( "The fixed height limits this adjustment." ) );
+      after.wallFraction = std::clamp( requested, ratio->minimum(), ratio->maximum() );
+    }
+    else if ( handle.kind == Handle3DKind::RecessDepth )
+    {
+      const auto *depth = ui->spinBoxICInnerHeight;
+      const double requested = before.recessDepth + ( wheelSteps ? wheelSteps * depth->singleStep() : delta );
+      noteLimit( requested, std::min( depth->singleStep(), depth->maximum() ), depth->maximum(), m_dock->tr( "The fixed height limits this adjustment." ) );
+      after.recessDepth = std::clamp( requested, std::min( depth->singleStep(), depth->maximum() ), depth->maximum() );
+    }
+    else if ( handle.kind == Handle3DKind::GableRidge )
+    {
+      const bool shortRidge = before.primitive == QLatin1String( "ShortRidgeHipRoofHouse" );
+      const auto *ridge = shortRidge ? ui->spinBoxAGHRidgeOffset : ui->spinBoxGRRidgeRatio;
+      const double span = before.dimensions[1];
+      const double requested = before.ridgeFraction + ( wheelSteps ? wheelSteps * controls[1]->singleStep() / span : delta );
+      noteLimit( requested, ridge->minimum(), ridge->maximum() );
+      after.ridgeFraction = boundedFaceFitValue( ridge, requested, ridge->minimum(), ridge->maximum() );
+    }
+    else if ( handle.kind == Handle3DKind::NotchX || handle.kind == Handle3DKind::NotchY )
+    {
+      const bool isX = handle.kind == Handle3DKind::NotchX;
+      const auto *ratio = isX ? ui->spinBoxLWingRatio : ui->spinBoxLWingWidthRatio;
+      const auto *span = isX ? controls[0] : controls[1];
+      const double current = isX ? before.notch.x() : before.notch.y();
+      const double requested = current + ( wheelSteps ? wheelSteps * span->singleStep() / before.dimensions[isX ? 0 : 1] : delta );
+      noteLimit( requested, ratio->minimum(), ratio->maximum() );
+      const double next = std::clamp( requested, ratio->minimum(), ratio->maximum() );
+      if ( isX ) after.notch.setX( next );
+      else after.notch.setY( next );
+    }
+    else if ( handle.kind == Handle3DKind::ShortRidgeEnd || handle.kind == Handle3DKind::PlatformX || handle.kind == Handle3DKind::PlatformY )
+    {
+      const bool isY = handle.kind == Handle3DKind::PlatformY;
+      const bool shortRidge = handle.kind == Handle3DKind::ShortRidgeEnd;
+      const bool recessed = before.primitive == QLatin1String( "RecessedRoofHouse" );
+      const auto *spin = shortRidge ? ui->spinBoxAGHRidgeLength :
+                         isY ? ( recessed ? ui->spinBoxICInnerWidth : ui->spinBoxTPRTopWidth ) :
+                               ( recessed ? ui->spinBoxICInnerLength : ui->spinBoxTPRTopLength );
+      const double size = isY ? before.roofTop.height() : before.roofTop.width();
+      const double footprint = before.dimensions[isY ? 1 : 0];
+      const double position = isY ? before.roofTopPosition.y() : before.roofTopPosition.x();
+      const double scale = std::pow( 10.0, spin->decimals() );
+      const double origin = ( footprint - size ) * position;
+      const double fixedEdge = handle.movesMinimum ? origin + size : origin;
+      const double maxSpan = std::min( spin->maximum(), handle.movesMinimum ? fixedEdge : footprint - fixedEdge );
+      const double minimum = std::ceil( std::max( spin->minimum(), spin->singleStep() ) * scale - 1e-8 ) / scale;
+      const double maximum = std::floor( maxSpan * scale + 1e-8 ) / scale;
+      const double requested = size + ( wheelSteps ? wheelSteps * spin->singleStep() : delta );
+      noteLimit( requested, minimum, maximum, m_dock->tr( "The outer frame limits this adjustment." ) );
+      if ( minimum <= maximum )
+      {
+        const double nextSize = std::clamp( std::round( requested * scale ) / scale, minimum, maximum );
+        if ( nextSize != size )
+        {
+          const double nextOrigin = handle.movesMinimum ? fixedEdge - nextSize : fixedEdge;
+          const double clearance = footprint - nextSize;
+          const double nextPos = clearance > 0 ? std::clamp( nextOrigin / clearance, 0.0, 1.0 ) : position;
+          if ( isY )
+          {
+            after.roofTop.setHeight( nextSize );
+            after.roofTopPosition.setY( nextPos );
+          }
+          else
+          {
+            after.roofTop.setWidth( nextSize );
+            after.roofTopPosition.setX( nextPos );
+          }
+        }
+      }
+    }
+    else if ( handle.kind == Handle3DKind::ExteriorAxis && controls[0] )
+    {
+      const int axis = handle.parameter;
+      const bool movesMinimum = handle.movesMinimum;
+      const bool lShaped = before.primitive == QLatin1String( "LShapedHouse" );
+      const bool recessed = before.primitive == QLatin1String( "RecessedRoofHouse" );
+      const bool lockInset = recessed || before.primitive == QLatin1String( "FlatTopHipRoofHouse" );
+      const auto *spin = controls[axis];
+      const double span = before.dimensions[axis];
+      const double requested = span + ( wheelSteps ? wheelSteps * spin->singleStep() : delta );
+      double minimum = spin->singleStep(), maximum = spin->maximum();
+      const double featureSize = axis == 0 ? before.roofTop.width() : before.roofTop.height();
+      double featureOffset = 0, fixedFraction = 0;
+      const QDoubleSpinBox *fractionSpin = nullptr;
+      if ( axis < 2 )
+      {
+        minimum = std::max( minimum, featureSize );
+        if ( lockInset )
+        {
+          const double position = axis == 0 ? before.roofTopPosition.x() : before.roofTopPosition.y();
+          featureOffset = ( span - featureSize ) * position;
+          minimum = std::max( minimum, minimumSpanAroundFeature( span, featureOffset, featureSize, movesMinimum ) );
+        }
+        if ( lShaped )
+        {
+          fixedFraction = axis == 0 ? 1 - before.notch.x() : before.notch.y();
+          fractionSpin = axis == 0 ? ui->spinBoxLWingRatio : ui->spinBoxLWingWidthRatio;
+        }
+      }
+      else if ( recessed )
+      {
+        const double depth = before.recessDepth;
+        const double floor = span - depth;
+        minimum = movesMinimum ? depth + minimum : floor + ui->spinBoxICInnerHeight->singleStep();
+      }
+      else if ( ( fractionSpin = faceFitWallRatio( before.primitive, ui ) ) )
+        fixedFraction = before.wallFraction;
+      if ( fractionSpin )
+      {
+        const bool reverseRatio = lShaped && axis == 0;
+        const double low = reverseRatio ? 1 - fractionSpin->maximum() : fractionSpin->minimum();
+        const double high = reverseRatio ? 1 - fractionSpin->minimum() : fractionSpin->maximum();
+        const auto range = spanRangeAtFixedFraction( span, fixedFraction, low, high, movesMinimum );
+        minimum = std::max( minimum, range.first );
+        maximum = std::min( maximum, range.second );
+      }
+      noteLimit( requested, std::max( minimum, spin->minimum() ), maximum );
+      const double next = boundedFaceFitValue( spin, requested, minimum, maximum );
+      if ( next != span )
+      {
+        const double shift = movesMinimum ? span - next : 0;
+        after.dimensions[axis] = next;
+        originShift[axis] = float( shift );
+        if ( axis < 2 && lockInset )
+        {
+          const double clearance = next - featureSize;
+          const double position = clearance > 0 ? std::clamp( ( featureOffset - shift ) / clearance, 0.0, 1.0 ) : 0.0;
+          if ( axis == 0 ) after.roofTopPosition.setX( position );
+          else after.roofTopPosition.setY( position );
+        }
+        if ( fractionSpin )
+        {
+          const double fraction = ( span * fixedFraction - shift ) / next;
+          if ( axis == 0 ) after.notch.setX( 1 - fraction );
+          else if ( axis == 1 ) after.notch.setY( fraction );
+          else after.wallFraction = fraction;
+        }
+        if ( axis == 2 && recessed && !movesMinimum )
+          after.recessDepth += next - span;
+      }
+    }
+
+    const QVector3D shift = modelRotationMatrix( m_dock ).mapVector( originShift );
+    const double tx = before.translation[0] + shift.x();
+    const double ty = before.translation[1] + shift.y();
+    const double tz = before.translation[2] + shift.z();
+    if ( tx < ui->spinBoxTX->minimum() || tx > ui->spinBoxTX->maximum() ||
+         ty < ui->spinBoxTY->minimum() || ty > ui->spinBoxTY->maximum() ||
+         tz < ui->spinBoxTZ->minimum() || tz > ui->spinBoxTZ->maximum() )
+    {
+      QToolTip::showText( m_canvas->mapToGlobal( cursorPos + QPoint( 14, 14 ) ),
+                          m_dock->tr( "Resize exceeds the model translation range." ) );
+      return;
+    }
+    after.translation = { tx, ty, tz };
+    if ( !limit.isEmpty() )
+      QToolTip::showText( m_canvas->mapToGlobal( cursorPos + QPoint( 14, 14 ) ), limit );
+    if ( !( before == after ) || !( faceFitState( m_dock, ui, controls ) == after ) )
+      applyStateToDock( after, controls );
+  }
+
+  QPointer<ParamModelerDock> m_dock;
+  QPointer<Qgs3DMapCanvas> m_canvas;
+  std::unique_ptr<ParamModelerPickOverlay> m_overlay;
+  QVector<ParamModelerFaceFit::Handle3D> m_handles;
+  int m_hoverHandle = -1;
+  int m_dragHandle = -1;
+  ParamModelerFaceFit::Handle3D m_dragHandleSpec;
+  QPointF m_dragStartScreen;
+  QPointF m_dragScreenTangent;
+  FaceFitState m_dragBeforeState{};
+  QVector<FaceFitState> m_undoStack;
+  FaceFitState m_lastApplied{};
+  int m_wheelDelta = 0;
+  double m_azimuth = 0.0;
+};
+
+void ParamModelerDock::stopFineTune3D()
+{
+  if ( m_fineTune3DTool )
+    delete m_fineTune3DTool.data();
+  m_fineTune3DTool.clear();
+  if ( m_fineTune3DBtn )
+    m_fineTune3DBtn->setChecked( false );
+}
+
+void ParamModelerDock::refreshFineTune3D()
+{
+  if ( m_fineTune3DTool )
+    m_fineTune3DTool->refreshOverlay();
+}
+
+void ParamModelerDock::toggleFineTune3D()
+{
+  if ( m_fineTune3DTool )
+  {
+    stopFineTune3D();
+    return;
+  }
+  stopManualTranslate3D();
+  if ( !m_realtimeModelLoaded )
+    onLoadToQGIS3D( false );
+  Qgs3DMapCanvas *canvas = faceFitCanvas( mIface );
+  if ( !m_realtimeModelLoaded || !canvas || !canvas->scene() || !canvas->mapSettings() || !canvas->cameraController() )
+  {
+    if ( m_fineTune3DBtn ) m_fineTune3DBtn->setChecked( false );
+    QMessageBox::warning( this, tr( "3D fine-tune" ), tr( "Load a model into a valid 3D view first." ) );
+    return;
+  }
+  m_fineTune3DTool = new ParamModelerFineTune3DTool( this, canvas );
+  if ( m_fineTune3DBtn ) m_fineTune3DBtn->setChecked( true );
+  updateFitEvaluation();
+  canvas->requestActivate();
 }
 
 void ParamModelerDock::updateFaceFitView( const QMatrix4x4 &pose, const QVector<bool> &surfaceFit )

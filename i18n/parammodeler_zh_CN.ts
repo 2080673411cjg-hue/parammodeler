@@ -58,6 +58,12 @@ Tolerance: %6 | N: %7</source><translation>初始 → 当前（场景坐标单�
     <message><source>Fit statistics and tolerance...</source><translation>拟合统计与容差...</translation></message>
     <message><source>Fit statistics</source><translation>拟合统计</translation></message>
     <message><source>2D face fit</source><translation>二维微调</translation></message>
+    <message><source>3D fine-tune</source><translation>三维微调</translation></message>
+    <message><source>Drag or scroll on 3D orange handles in the 3D view to adjust model dimensions. Press Ctrl+Z to undo or Esc to exit.</source><translation>在三维视图中拖动橙色控制点或在其上滚动鼠标滚轮来调整模型尺寸。按 Ctrl+Z 撤销，按 Esc 退出。</translation></message>
+    <message><source>%1
+Drag or scroll wheel to adjust. Orange moves, purple stays fixed. Ctrl+Z to undo.</source><translation>%1
+拖动或滚动鼠标滚轮调整。橙色移动，紫色固定。按 Ctrl+Z 撤销。</translation></message>
+    <message><source>Load a model into a valid 3D view first.</source><translation>请先将模型加载到有效的三维视图中。</translation></message>
     <message><source>Face:</source><translation>视图：</translation></message>
     <message><source>Top (X / Y)</source><translation>顶面（X / Y）</translation></message>
     <message><source>Length side (X / Z)</source><translation>长度侧面（X / Z）</translation></message>

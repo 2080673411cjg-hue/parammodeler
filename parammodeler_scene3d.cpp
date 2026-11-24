@@ -717,7 +717,11 @@ void ensureRealtimeAnchorLayer( QgisInterface *iface, const QgsRectangle &extent
   if ( extent.isNull() )
     return;
 
-  ParamModelerScene3D::removeLayerByName( REALTIME_ANCHOR_LAYER_NAME );
+  for ( QgsMapLayer *existing : QgsProject::instance()->mapLayers() )
+  {
+    if ( existing && existing->name() == REALTIME_ANCHOR_LAYER_NAME )
+      return;
+  }
 
   QgsVectorLayer *anchorLayer = new QgsVectorLayer( "PointZ?crs=EPSG:3857", REALTIME_ANCHOR_LAYER_NAME, "memory" );
   if ( !anchorLayer || !anchorLayer->isValid() )
