@@ -1,8 +1,23 @@
 # Deep Learning Pipeline 完整日志
 
-> 最后更新 2026-11-24
+> 最后更新 2026-11-26
 
-### 未发布（2026-11-24） 三维视图直接微调、拖动防闪烁优化与 PTv3 v16 空间金字塔分类（Top-1 99.58%）
+### v2.6.0（2026-11-26） 真实物理点云稳健尺度、悬空屋顶重建、三维微调与 PTv3 v16/v14 接入
+
+- 发布插件源码版本 `v2.6.0`（`parammodeler.cpp` 同步更新为 `Version 2.6.0`），汇总自 `v2.5.0` 以来的全部工作，包括此前已提交的三维微调/PTv3 v16 分类及本次新增的机载悬空屋顶重建、v14 回归与服务常驻推理、真实点云稳健包围盒与稳健尺度改造（阶段一）。
+- **真实物理点云稳健包围盒与稳健尺度改造（阶段一，免重训推理增强）**：
+  - 问题背景：真实物理坐标点云（`input_coordinates == "physical"`）边缘存在零星散射离群点时，`main_reg.py` 中旋转对齐后的 `np.ptp(points, axis=0)` 硬极值与 `normalize_points()` / C++ `pointCloudNormalizationScale()` 的硬最大半径会被单个飞点拉偏或整体缩水。
+  - Python 推理侧（`scripts/main_reg.py` 已同步至 `E:/pointnet/ptv3_simple/main_reg.py`）：新增 `robust_physical_xy_bounds()`、`robust_physical_bbox_span()`、`robust_physical_core_mask()`；当 `coordinates == "physical"` 且点数 $\ge 100$ 时，旋转对齐后的 `bbox` 改用 `0.5% ~ 99.5%` 分位数稳健 XY 跨度，`normalize_points(..., robust_physical=True)` 将 XY 裁剪至 `0.5% ~ 99.5%` 包络内后再计算质心与归一化半径，防止边缘飞点导致核心建筑点云缩水；合成归一化测试集及训练逻辑保持原样。
+  - C++ 插件侧（`parammodeler_pointnet.cpp`）：`preparePointCloudInput()` 记录 `isNormalized`，对真实物理点云在可选悬空过滤后通过 `robustBBoxFromPoints()` 计算传给后端的 `bboxSize`；`pointCloudNormalizationScale()` 在 `robustPhysical && size >= 100` 时采用 `0.5% ~ 99.5%` XY 裁剪核心点集计算稳健 `scale`。
+  - 验证：`tests/test_aux_units.py`（22 项，含新增离群飞点回归测试 `test_physical_input_with_outlier_uses_robust_bbox_and_scale`）、`tests/test_canonical_pipeline.py`（20 项）、`tests/test_ptv3_evaluation.py`（5 项）及 `scripts/check_plugin_syntax.ps1 parammodeler_pointnet.cpp` 全部通过。
+- **机载 LiDAR 悬空屋顶 Z-gap 检测与高度重建**：
+  - 新增 `parammodeler_suspended_roof.h` 及单元测试 `tests/test_suspended_roof.cpp`，识别 `DetachedBottomStrip`（剥离底部离散噪点）、`SuspendedRoofOnly`（保留屋顶上簇并基于地面提示或预测比例重建 `totalHeight` / `wallRatio` / `cylinderRatio` / `wallHeight`）与 `FlatKeepGround`（平顶保留地面参照）；接入 `parammodeler_pointnet.cpp` 与 `parammodeler_dlutils.cpp` 语义檐口对齐回退（`suspended-eave`）。
+- **PTv3 v16 分类与 v14 回归全类别接入及服务端常驻 GPU 推理**：
+  - `parammodeler_config.cpp`（同步更新 `tests/test_ptv3_model_config.cpp`）与 `scripts/ptv3_server.py` 将默认分类目录切换至 `ptv3_cls_v16`，全部十三类（含曲面顶圆屋）默认回归后缀统一切换至 `_v14_normals`，新增一次性迁移 `ptv3ClassifyDefaultsV16` 与 `ptv3ModelDefaultsV14`。
+  - `scripts/ptv3_server.py` 新增进程内常驻 GPU 模型缓存（`_CLS_CACHE` / `_REG_CACHE` + `_GPU_LOCK`），避免每次请求重复拉起 Python 子进程及加载权重，保留断连取消与 `/health` 版本核对；`scripts/model_ptv3.py` 与 `scripts/train_ptv3_reg.py` 接入 `spatial_pyramid`、`coupled_geom_loss_weight` 与 `net_canonical_align`。
+  - `parammodeler_dock_estimation.cpp` 默认关闭并隐藏实验性几何校正开关。
+
+### 2026-11-24（已纳入 v2.6.0） 三维视图直接微调、拖动防闪烁优化与 PTv3 v16 空间金字塔分类（Top-1 99.58%）
 
 - 三维视图直接操作模型（「三维微调」阶段 1 + 阶段 2）：
   - 在 `parammodeler_face_fit_profiles.h` 中为全部十三类建筑基元定义三维控制点（`Handle3D`，共 91 个控制柄）、橙色活动边（`movingEdges`）、紫色固定锚定边（`fixedEdges`）、屏幕切向投影（`projectToScreen`）、屏幕拖拽反解（`changeForScreenDrag`）与屏幕最近邻拾取（`nearestHandle3D`），并通过独立测试 `tests/test_fit_solids.cpp` 全部校验。

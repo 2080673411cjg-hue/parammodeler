@@ -26,14 +26,19 @@ int main( int argc, char **argv )
   const QString towerKey = QStringLiteral( "parammodeler/ptv3TowerRegressionSuffix" );
   const QString commonKey = QStringLiteral( "parammodeler/ptv3RegressionSuffix" );
   const QString clsKey = QStringLiteral( "parammodeler/ptv3ClassifyLogDir" );
-  const QString v14MigrationKey = QStringLiteral( "parammodeler/ptv3ClassifyDefaultsV14" );
+  const QString v14ClsMigrationKey = QStringLiteral( "parammodeler/ptv3ClassifyDefaultsV14" );
+  const QString v16ClsMigrationKey = QStringLiteral( "parammodeler/ptv3ClassifyDefaultsV16" );
   const QString towerMigrationKey = QStringLiteral( "parammodeler/ptv3TowerDefaultsV14ClearHeight" );
+  const QString v14RegMigrationKey = QStringLiteral( "parammodeler/ptv3ModelDefaultsV14" );
+  const QString v16Dir = ParamModelerConfig::pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v16" );
   const QString v14Dir = ParamModelerConfig::pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v14_actual_points" );
   const QString v13Dir = ParamModelerConfig::pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/ptv3_cls_v13" );
-  const QString baseline = QStringLiteral( "_v13_normals" );
-  const QString towerDefault = QStringLiteral( "_v14_clear_height_normals" );
-  check( ParamModelerConfig::ptv3RegressionSuffix() == baseline, "common default is v13" );
-  check( ParamModelerConfig::ptv3TowerRegressionSuffix() == towerDefault, "tower defaults to direct cylinder-height regression" );
+  const QString oldBaseline = QStringLiteral( "_v13_normals" );
+  const QString oldTowerDefault = QStringLiteral( "_v14_clear_height_normals" );
+  const QString baseline = QStringLiteral( "_v14_normals" );
+  const QString towerDefault = QStringLiteral( "_v14_normals" );
+  check( ParamModelerConfig::ptv3RegressionSuffix() == baseline, "common default is v14" );
+  check( ParamModelerConfig::ptv3TowerRegressionSuffix() == towerDefault, "tower default is v14" );
 
   for ( int i = 0; i < 13; ++i )
   {
@@ -51,39 +56,43 @@ int main( int argc, char **argv )
              "remote suffix matches the selected local checkpoint" );
     }
   }
-  check( ParamModelerConfig::ptv3ClassifyLogDir() == v14Dir, "classification is v14" );
+  check( ParamModelerConfig::ptv3ClassifyLogDir() == v16Dir, "classification is v16" );
   settings.setValue( QStringLiteral( "parammodeler/ptv3ModelDefaultsV13" ), false );
-  settings.setValue( v14MigrationKey, false );
+  settings.setValue( v14ClsMigrationKey, false );
+  settings.setValue( v16ClsMigrationKey, false );
   settings.setValue( towerMigrationKey, false );
+  settings.setValue( v14RegMigrationKey, false );
   settings.setValue( clsKey, QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v10" ) );
   settings.setValue( commonKey, QStringLiteral( "_v10_normals" ) );
   settings.setValue( towerKey, QStringLiteral( "_v12_tower_baseline_normals" ) );
   check( ParamModelerConfig::ptv3TowerRegressionSuffix() == towerDefault, "old tower setting migrates on direct access" );
-  check( ParamModelerConfig::ptv3RegressionSuffix() == baseline, "old common setting migrates to v13" );
-  check( ParamModelerConfig::ptv3ClassifyLogDir() == v14Dir, "old classifier migrates to v14" );
-  settings.setValue( v14MigrationKey, false );
-  const QString previousDir = v13Dir + QLatin1Char( '/' );
+  check( ParamModelerConfig::ptv3RegressionSuffix() == baseline, "old common setting migrates to v14" );
+  check( ParamModelerConfig::ptv3ClassifyLogDir() == v16Dir, "old classifier migrates to v16" );
+  settings.setValue( v16ClsMigrationKey, false );
+  const QString previousDir = v14Dir + QLatin1Char( '/' );
   settings.setValue( clsKey, previousDir );
   settings.setValue( towerKey, QStringLiteral( "_v12_tower_baseline_normals" ) );
-  check( ParamModelerConfig::ptv3ClassifyLogDir() == v14Dir, "saved v13 default migrates to v14" );
+  check( ParamModelerConfig::ptv3ClassifyLogDir() == v16Dir, "saved v14 default migrates to v16" );
   check( ParamModelerConfig::ptv3TowerRegressionSuffix() == QStringLiteral( "_v12_tower_baseline_normals" ),
          "classifier migration preserves a tower override" );
   settings.setValue( clsKey, v13Dir );
   check( ParamModelerConfig::ptv3ClassifyLogDir() == v13Dir, "classification may be switched back after migration" );
-  settings.setValue( v14MigrationKey, false );
+  settings.setValue( v16ClsMigrationKey, false );
   const QString customClsDir = QStringLiteral( "E:/pointnet/custom_classifier" );
   settings.setValue( clsKey, customClsDir );
   check( ParamModelerConfig::ptv3ClassifyLogDir() == customClsDir, "classifier migration preserves custom paths" );
-  settings.setValue( towerMigrationKey, false );
+  settings.setValue( v14RegMigrationKey, false );
   settings.setValue( towerKey, QStringLiteral( "_v12_tower_baseline_normals" ) );
   check( ParamModelerConfig::ptv3TowerRegressionSuffix() == QStringLiteral( "_v12_tower_baseline_normals" ),
-         "tower migration preserves a custom checkpoint" );
-  settings.setValue( towerMigrationKey, false );
-  settings.setValue( towerKey, baseline );
-  check( ParamModelerConfig::ptv3TowerRegressionSuffix() == towerDefault, "saved tower v13 default migrates to the new model" );
-  settings.setValue( towerKey, baseline );
+         "v14 migration preserves a custom tower checkpoint" );
+  settings.setValue( v14RegMigrationKey, false );
+  settings.setValue( commonKey, oldBaseline );
+  settings.setValue( towerKey, oldTowerDefault );
+  check( ParamModelerConfig::ptv3RegressionSuffix() == baseline, "saved v13 common default migrates to v14" );
+  check( ParamModelerConfig::ptv3TowerRegressionSuffix() == towerDefault, "saved v14 clear_height tower default migrates to v14" );
+  settings.setValue( towerKey, oldBaseline );
   settings.setValue( commonKey, QStringLiteral( "_v9_normals" ) );
-  check( ParamModelerConfig::ptv3RegressionSuffix( QStringLiteral( "CurvedRoofRoundHouse" ) ) == baseline,
+  check( ParamModelerConfig::ptv3RegressionSuffix( QStringLiteral( "CurvedRoofRoundHouse" ) ) == oldBaseline,
          "explicit tower selection is independent of the common suffix" );
   settings.setValue( towerKey, QString() );
   const auto inherited = regressionConfig( PointNetBackend::PTv3, QStringLiteral( "FourStageRoundTower" ) );
@@ -92,21 +101,21 @@ int main( int argc, char **argv )
   settings.setValue( towerKey, QStringLiteral( "_v10_normals" ) );
   check( regressionConfig( PointNetBackend::PTv3, QStringLiteral( "CurvedRoofRoundHouse" ) ).logDir.endsWith(
            QStringLiteral( "/ptv3_reg_curvedround_v10_normals" ) ), "explicitly restoring tower v10 works" );
-  settings.setValue( towerKey, baseline );
+  settings.setValue( towerKey, oldBaseline );
   const auto selected = regressionConfig( PointNetBackend::PTv3, QStringLiteral( "CurvedRoofRoundHouse" ) );
   settings.setValue( towerKey, QStringLiteral( "_manual_trial_normals" ) );
-  check( modelPayload( selected ).value( QStringLiteral( "model_suffix" ) ).toString() == baseline,
+  check( modelPayload( selected ).value( QStringLiteral( "model_suffix" ) ).toString() == oldBaseline,
          "an in-flight request retains its selected checkpoint" );
   check( regressionConfig( PointNetBackend::PTv3, QStringLiteral( "CurvedRoofRoundHouse" ) ).logDir.endsWith(
            QStringLiteral( "/ptv3_reg_curvedround_manual_trial_normals" ) ), "custom setting applies to the next selection without fallback" );
 
-  settings.setValue( towerKey, baseline );
+  settings.setValue( towerKey, oldBaseline );
   settings.setValue( commonKey, QStringLiteral( "_v10_normals" ) );
   QTimer::singleShot( 0, [&] {
     auto *dialog = qobject_cast<QDialog *>( QApplication::activeModalWidget() );
     check( dialog != nullptr, "actual settings dialog opened" );
     auto *edit = dialog->findChild<QLineEdit *>( QStringLiteral( "ptv3TowerSuffixEdit" ) );
-    check( edit && edit->text() == baseline && edit->isVisible(), "tower override is visible in the settings dialog" );
+    check( edit && edit->text() == oldBaseline && edit->isVisible(), "tower override is visible in the settings dialog" );
     if ( argc > 1 )
       check( dialog->grab().save( QDir( QString::fromLocal8Bit( argv[1] ) ).filePath( QStringLiteral( "model_settings.png" ) ) ), "settings preview saved" );
     edit->clear();

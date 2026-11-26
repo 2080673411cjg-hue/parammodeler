@@ -32,7 +32,7 @@
 static const QString sName = QObject::tr( "Parametric Modeler" );
 static const QString sDescription = QObject::tr( "Generate 3D building models from parameters" );
 static const QString sCategory = QObject::tr( "3D" );
-static const QString sPluginVersion = QStringLiteral( "Version 2.5.0" );
+static const QString sPluginVersion = QStringLiteral( "Version 2.6.0" );
 static const QgisPlugin::PluginType sPluginType = QgisPlugin::UI;
 static const QString sPluginIcon = QStringLiteral( ":/parammodeler/plugin_icon.png" );
 // ========================================================================

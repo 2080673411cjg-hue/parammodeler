@@ -261,6 +261,42 @@ class AuxiliaryUnitTests(unittest.TestCase):
             regression.test(args)
         self.assertEqual(constructor.call_args.kwargs["canonical_bbox_mode"], mode)
 
+    def test_physical_input_with_outlier_uses_robust_bbox_and_scale(self):
+        # Build a clean 20x10x5 box (250*4 = 1000 points) plus 1 extreme XY outlier.
+        base = np.array([[0, 0, 0], [20, 0, 5], [0, 10, 5], [20, 10, 5]], dtype=np.float32)
+        clean_pts = np.tile(base, (250, 1))
+        noisy_pts = np.vstack((clean_pts, [100.0, 100.0, 5.0])).astype(np.float32)
+
+        # Robust XY span ignores the single outlier, while normalized mode retains full extent.
+        robust_span = regression.robust_physical_bbox_span(noisy_pts)
+        np.testing.assert_allclose(robust_span, [20.0, 10.0, 5.0], atol=1e-4)
+
+        norm_clean = regression.normalize_points(clean_pts, robust_physical=True)
+        norm_noisy = regression.normalize_points(noisy_pts, robust_physical=True)
+        norm_unclamped = regression.normalize_points(noisy_pts, robust_physical=False)
+
+        # Clamped robust normalization keeps the core cloud span close to clean_pts,
+        # whereas unclamped normalization shrinks it dramatically because of the [100,100,5] outlier.
+        clean_x_span = float(np.ptp(norm_clean[:, 0]))
+        noisy_robust_x_span = float(np.ptp(norm_noisy[:-1, 0]))
+        noisy_raw_x_span = float(np.ptp(norm_unclamped[:-1, 0]))
+        self.assertGreater(noisy_robust_x_span, clean_x_span * 0.95)
+        self.assertLess(noisy_raw_x_span, clean_x_span * 0.25)
+
+        # Verify predict() applies robust bbox & normalization for physical coordinates
+        # and leaves legacy normalized coordinates untouched.
+        captured_phys, _ = self.predict(False, units="legacy", class_name="FlatRoofHouse")
+        captured_norm, _ = self.predict(True, units="legacy", class_name="FlatRoofHouse")
+        np.testing.assert_allclose(captured_phys["aux"], captured_norm["aux"], rtol=1e-5)
+
+        # Now test predict() with >=100 physical points and an XY outlier under legacy units.
+        self.add_outlier()
+        self.local = noisy_pts
+        self.physical = regression.rotate_points_z(self.local, 120) + [100, -50, 20]
+        captured_outlier, _ = self.predict(False, units="legacy", class_name="FlatRoofHouse")
+        # Legacy aux bbox_x / bbox_y / bbox_z are divided by self.scale (10.0) -> [2.0, 1.0, 0.5]
+        np.testing.assert_allclose(captured_outlier["aux"][:3], [2.0, 1.0, 0.5], atol=1e-3)
+
 
 if __name__ == "__main__":
     unittest.main()

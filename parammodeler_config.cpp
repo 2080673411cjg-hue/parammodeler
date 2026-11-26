@@ -24,7 +24,7 @@
 // helpers
 // ------------------------------------------------------------------
 
-static const QString ptv3TowerDefaultSuffix = QStringLiteral( "_v14_clear_height_normals" );
+static const QString ptv3TowerDefaultSuffix = QStringLiteral( "_v14_normals" );
 
 static QString setting( const QString &key, const QString &defaultVal )
 {
@@ -151,6 +151,22 @@ static void migratePtv3ModelDefaults()
       settings.setValue( towerKey, ptv3TowerDefaultSuffix );
     settings.setValue( towerMigrationKey, true );
   }
+
+  const QString v14MigrationKey = QStringLiteral( "parammodeler/ptv3ModelDefaultsV14" );
+  if ( !settings.value( v14MigrationKey, false ).toBool() )
+  {
+    const QString common = settings.value( suffixKey ).toString().trimmed();
+    if ( common.isEmpty() || common == QStringLiteral( "_v13_normals" ) )
+      settings.setValue( suffixKey, QStringLiteral( "_v14_normals" ) );
+
+    const QString towerKey = QStringLiteral( "parammodeler/ptv3TowerRegressionSuffix" );
+    const QString tower = settings.value( towerKey, QStringLiteral( "_v13_normals" ) ).toString().trimmed();
+    if ( tower == QStringLiteral( "_v13_normals" ) ||
+         tower == QStringLiteral( "_v14_clear_height_normals" ) )
+      settings.setValue( towerKey, ptv3TowerDefaultSuffix );
+
+    settings.setValue( v14MigrationKey, true );
+  }
 }
 
 // ------------------------------------------------------------------
@@ -261,15 +277,18 @@ QString ptv3ClassifyLogDir()
   migratePtv3ModelDefaults();
   const QString key = QStringLiteral( "parammodeler/ptv3ClassifyLogDir" );
   const QString logRoot = pointnetBaseDir() + QStringLiteral( "ptv3_simple/logs/" );
-  const QString defaultDir = logRoot + QStringLiteral( "ptv3_cls_v14_actual_points" );
-  const QString migrationKey = QStringLiteral( "parammodeler/ptv3ClassifyDefaultsV14" );
+  const QString defaultDir = logRoot + QStringLiteral( "ptv3_cls_v16" );
+  const QString migrationKey = QStringLiteral( "parammodeler/ptv3ClassifyDefaultsV16" );
   QgsSettings settings;
   if ( !settings.value( migrationKey, false ).toBool() )
   {
     const QString dir = settings.value( key ).toString();
-    const QString oldDefault = logRoot + QStringLiteral( "ptv3_cls_v13" );
-    if ( dir.isEmpty() || QDir::cleanPath( QDir::fromNativeSeparators( dir ) )
-           .compare( QDir::cleanPath( oldDefault ), Qt::CaseInsensitive ) == 0 )
+    const QString cleanDir = QDir::cleanPath( QDir::fromNativeSeparators( dir ) );
+    const QString oldV13Default = logRoot + QStringLiteral( "ptv3_cls_v13" );
+    const QString oldV14Default = logRoot + QStringLiteral( "ptv3_cls_v14_actual_points" );
+    if ( dir.isEmpty() ||
+         cleanDir.compare( QDir::cleanPath( oldV13Default ), Qt::CaseInsensitive ) == 0 ||
+         cleanDir.compare( QDir::cleanPath( oldV14Default ), Qt::CaseInsensitive ) == 0 )
       settings.setValue( key, defaultDir );
     settings.setValue( migrationKey, true );
   }
@@ -294,7 +313,7 @@ QString ptv3RegressionSuffix( const QString &primitiveType )
       return suffix;
   }
   return setting( QStringLiteral( "parammodeler/ptv3RegressionSuffix" ),
-                  QStringLiteral( "_v13_normals" ) );
+                  QStringLiteral( "_v14_normals" ) );
 }
 
 // ------------------------------------------------------------------
@@ -506,8 +525,8 @@ void showSettingsDialog( QWidget *parent )
     edtDataset->setText(   QStringLiteral( "E:/pointnet/datasets_aug" ) );
     edtPctClsLog->setText( QStringLiteral( "E:/pointnet/pct_simple/logs/pct_cls_v4" ) );
     edtPctSuffix->setText( QStringLiteral( "_v4_normals" ) );
-    edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v14_actual_points" ) );
-    edtPtv3Suffix->setText( QStringLiteral( "_v13_normals" ) );
+    edtPtv3ClsLog->setText( QStringLiteral( "E:/pointnet/ptv3_simple/logs/ptv3_cls_v16" ) );
+    edtPtv3Suffix->setText( QStringLiteral( "_v14_normals" ) );
     edtPtv3TowerSuffix->setText( ptv3TowerDefaultSuffix );
   } );
 

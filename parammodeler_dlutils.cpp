@@ -18,6 +18,7 @@
 #include "parammodeler_pcdtypes.h"
 #include "parammodeler_pick3d_math.h"
 #include "parammodeler_regression_axes.h"
+#include "parammodeler_suspended_roof.h"
 
 #include <QDir>
 #include <QFile>
@@ -1191,6 +1192,10 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
   if ( points.size() < 32 )
     return false;
 
+  const ParamModelerSuspendedRoof::Analysis suspended = ParamModelerSuspendedRoof::analyze( points, false );
+  if ( suspended.shouldStripBottom() )
+    points = ParamModelerSuspendedRoof::filterUpperCluster( points, suspended );
+
   const QVector<QVector3D> canonicalPoints = std::abs( rzDeg ) > 1e-9
     ? unrotatePointsAroundZ( points, rzDeg )
     : points;
@@ -1266,21 +1271,32 @@ bool semanticUpperPointCloudTarget( const QString &filePath,
   const bool halfCylinderRoof = primitiveType == QStringLiteral( "BarrelRoofHouse" );
   if ( gabled || shrinkingRoof || twoGableHouses || halfCylinderRoof )
   {
+    const double eaveSearchBaseZ = suspended.isSuspendedRoofOnly()
+      ? suspended.originalMinZ
+      : static_cast<double>( hardMin.z() );
+    const double eaveSearchHeight = suspended.isSuspendedRoofOnly()
+      ? ( suspended.originalMaxZ - suspended.originalMinZ )
+      : height;
     if ( hasHalfSection ) targetZ = sectionEave;
     const bool eaveFound = hasHalfSection || ( twoGableHouses
       ? ParamModelerAlignmentGeometry::firstGableEave( canonicalPoints, fpMin, fpMax,
-                                                       hardMin.z(), height, targetZ )
+                                                       eaveSearchBaseZ, eaveSearchHeight, targetZ )
       : halfCylinderRoof
         ? ParamModelerAlignmentGeometry::halfCylinderEave( canonicalPoints, fpMin, fpMax,
-                                                           hardMin.z(), height, targetZ )
+                                                           eaveSearchBaseZ, eaveSearchHeight, targetZ )
         : ParamModelerAlignmentGeometry::roofPlaneEave( canonicalPoints, fpMin, fpMax, gabled,
-                                                        hardMin.z(), height, targetZ ) );
+                                                        eaveSearchBaseZ, eaveSearchHeight, targetZ ) );
     if ( eaveFound )
     {
       detail = QStringLiteral( "%1/%2" )
                  .arg( halfCylinderRoof ? QStringLiteral( "arc-eave" )
                                        : ( twoGableHouses ? QStringLiteral( "wall-eave" ) : QStringLiteral( "plane-eave" ) ),
                        footprintSource );
+    }
+    else if ( suspended.isSuspendedRoofOnly() )
+    {
+      targetZ = suspended.eaveZ;
+      detail = QStringLiteral( "suspended-eave/%1" ).arg( footprintSource );
     }
     else
     {
@@ -1506,6 +1522,35 @@ static double applyRegularizedGeometryValue( QMap<QString, double> &uiParams,
   return correctedValue;
 }
 
+static double estimateRoundCylinderRadius( const QVector<QVector3D> &points,
+                                           double zMin,
+                                           double height,
+                                           double lowerBandRatio )
+{
+  if ( points.isEmpty() )
+    return 0.0;
+  QVector<QVector3D> band;
+  const double maxBandZ = zMin + std::max( 0.3, height * std::max( 0.15, lowerBandRatio ) );
+  band.reserve( points.size() );
+  for ( const QVector3D &p : points )
+    if ( static_cast<double>( p.z() ) <= maxBandZ )
+      band.append( p );
+  const QVector<QVector3D> &sample = band.size() >= 24 ? band : points;
+
+  QVector3D robustMin, robustMax;
+  robustBBoxFromPoints( sample, robustMin, robustMax );
+  const double cx = ( static_cast<double>( robustMin.x() ) + static_cast<double>( robustMax.x() ) ) * 0.5;
+  const double cy = ( static_cast<double>( robustMin.y() ) + static_cast<double>( robustMax.y() ) ) * 0.5;
+  QVector<double> radii;
+  radii.reserve( sample.size() );
+  for ( const QVector3D &p : sample )
+    radii.append( std::hypot( static_cast<double>( p.x() ) - cx,
+                              static_cast<double>( p.y() ) - cy ) );
+  std::sort( radii.begin(), radii.end() );
+  const int idx = std::max( 0, std::min( radii.size() - 1, static_cast<int>( std::floor( radii.size() * 0.90 ) ) ) );
+  return radii[idx];
+}
+
 void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitiveType,
                                                         QMap<QString, double> &uiParams ) const
 {
@@ -1515,14 +1560,6 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
   const QString prim = primitiveType == QStringLiteral( "CylinderHemisphere" )
                          ? QStringLiteral( "DomeRoofHouse" )
                          : primitiveType;
-  if ( prim != QStringLiteral( "FlatRoofHouse" ) &&
-       prim != QStringLiteral( "RoundFlatRoofHouse" ) &&
-       prim != QStringLiteral( "GableRoofHouse" ) &&
-       prim != QStringLiteral( "BarrelRoofHouse" ) &&
-       prim != QStringLiteral( "FlatTopHipRoofHouse" ) &&
-       prim != QStringLiteral( "LShapedHouse" ) &&
-       prim != QStringLiteral( "RecessedRoofHouse" ) )
-    return;
 
   QVector<QVector3D> points;
   if ( !loadRestoredPointsForGeometryCorrection( m_inputDataPath, points ) )
@@ -1539,6 +1576,8 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
     if ( std::isfinite( metadataRz ) )
       correctionRz = metadataRz;
   }
+  if ( !std::isfinite( correctionRz ) && uiParams.contains( QStringLiteral( "poseRotateZ" ) ) )
+    correctionRz = uiParams.value( QStringLiteral( "poseRotateZ" ) );
   const bool hasCorrectionRz = std::isfinite( correctionRz );
 
   const QVector<QVector3D> canonicalPoints = hasCorrectionRz
@@ -1580,18 +1619,7 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
 
   if ( prim == QStringLiteral( "RoundFlatRoofHouse" ) )
   {
-    QVector3D robustMin, robustMax;
-    robustBBoxFromPoints( canonicalPoints, robustMin, robustMax );
-    const double cx = ( static_cast<double>( robustMin.x() ) + static_cast<double>( robustMax.x() ) ) * 0.5;
-    const double cy = ( static_cast<double>( robustMin.y() ) + static_cast<double>( robustMax.y() ) ) * 0.5;
-    QVector<double> radii;
-    radii.reserve( canonicalPoints.size() );
-    for ( const QVector3D &p : canonicalPoints )
-      radii.append( std::hypot( static_cast<double>( p.x() ) - cx,
-                                static_cast<double>( p.y() ) - cy ) );
-    std::sort( radii.begin(), radii.end() );
-    const int idx = std::max( 0, std::min( radii.size() - 1, static_cast<int>( std::floor( radii.size() * 0.90 ) ) ) );
-    const double radius = radii[idx];
+    const double radius = estimateRoundCylinderRadius( canonicalPoints, hardMin.z(), height, 1.0 );
     const double correctedRadius = radius > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "radius" ), radius, strength ) : uiParams.value( QStringLiteral( "radius" ), radius );
     const double correctedHeight = applyRegularizedGeometryValue( uiParams, QStringLiteral( "cylHeight" ), height, strength );
     DEBUG_LOG( QString( "[ParamCorrection] Cylinder strength=%1 geoRadius=%2 geoHeight=%3 correctedRadius=%4 correctedHeight=%5 n=%6\n" )
@@ -1810,6 +1838,105 @@ void ParamModelerDock::applyDataDrivenParamCorrections( const QString &primitive
                  .arg( offsetY, 0, 'f', 3 )
                  .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
                  .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "PyramidalRoofHouse" ) )
+  {
+    const double length = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "prLength" ), fpLength, strength ) : uiParams.value( QStringLiteral( "prLength" ), fpLength );
+    const double width = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "prWidth" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "prWidth" ), fpWidth );
+    double wallRatio = qQNaN();
+    if ( estimateShrinkWallRatio( canonicalPoints, fpLength, fpWidth, hardMin.z(), height, wallRatio ) )
+    {
+      applyRegularizedGeometryValue( uiParams, QStringLiteral( "prWallHeight" ), height * wallRatio, strength );
+      applyRegularizedGeometryValue( uiParams, QStringLiteral( "prRoofHeight" ), height * ( 1.0 - wallRatio ), strength );
+    }
+    DEBUG_LOG( QString( "[ParamCorrection] PyramidalRoof source=%1 strength=%2 geo=(%3,%4,%5) corrected=(%6,%7) rz=%8\n" )
+                 .arg( fpSource ).arg( strength, 0, 'f', 2 )
+                 .arg( fpLength, 0, 'f', 3 ).arg( fpWidth, 0, 'f', 3 ).arg( height, 0, 'f', 3 )
+                 .arg( length, 0, 'f', 3 ).arg( width, 0, 'f', 3 )
+                 .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "ShortRidgeHipRoofHouse" ) )
+  {
+    const double length = fpLength > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "aghLength" ), fpLength, strength ) : uiParams.value( QStringLiteral( "aghLength" ), fpLength );
+    const double width = fpWidth > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "aghWidth" ), fpWidth, strength ) : uiParams.value( QStringLiteral( "aghWidth" ), fpWidth );
+    double wallRatio = qQNaN();
+    if ( estimateGabledWallRatioFromProfile( canonicalPoints, fpWidth, hardMin.z(), height, wallRatio ) )
+    {
+      applyRegularizedGeometryValue( uiParams, QStringLiteral( "aghWallHeight" ), height * wallRatio, strength );
+      applyRegularizedGeometryValue( uiParams, QStringLiteral( "aghRoofHeight" ), height * ( 1.0 - wallRatio ), strength );
+    }
+    if ( uiParams.contains( QStringLiteral( "aghRidgeLen" ) ) && length > 1e-6 )
+      uiParams[QStringLiteral( "aghRidgeLen" )] = std::min( uiParams[QStringLiteral( "aghRidgeLen" )], length );
+    DEBUG_LOG( QString( "[ParamCorrection] ShortRidgeHipRoof source=%1 strength=%2 geo=(%3,%4,%5) corrected=(%6,%7) rz=%8\n" )
+                 .arg( fpSource ).arg( strength, 0, 'f', 2 )
+                 .arg( fpLength, 0, 'f', 3 ).arg( fpWidth, 0, 'f', 3 ).arg( height, 0, 'f', 3 )
+                 .arg( length, 0, 'f', 3 ).arg( width, 0, 'f', 3 )
+                 .arg( hasCorrectionRz ? QString::number( correctionRz, 'f', 2 ) : QStringLiteral( "<none>" ) )
+                 .toStdWString().c_str() );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "ConicalRoofHouse" ) || prim == QStringLiteral( "DomeRoofHouse" ) )
+  {
+    const bool conical = ( prim == QStringLiteral( "ConicalRoofHouse" ) );
+    const QString rKey = conical ? QStringLiteral( "ccRadius" ) : QStringLiteral( "chRadius" );
+    const QString wKey = conical ? QStringLiteral( "ccCylHeight" ) : QStringLiteral( "chCylHeight" );
+    const QString tKey = conical ? QStringLiteral( "ccConeHeight" ) : QStringLiteral( "chDomeHeight" );
+    const double radius = estimateRoundCylinderRadius( canonicalPoints, hardMin.z(), height, 0.35 );
+    const double correctedRadius = radius > 1e-6 ? applyRegularizedGeometryValue( uiParams, rKey, radius, strength ) : uiParams.value( rKey, radius );
+    double wallRatio = qQNaN();
+    if ( estimateShrinkWallRatio( canonicalPoints, correctedRadius * 2.0, correctedRadius * 2.0, hardMin.z(), height, wallRatio ) )
+    {
+      applyRegularizedGeometryValue( uiParams, wKey, height * wallRatio, strength );
+      applyRegularizedGeometryValue( uiParams, tKey, height * ( 1.0 - wallRatio ), strength );
+    }
+    return;
+  }
+
+  if ( prim == QStringLiteral( "CurvedRoofRoundHouse" ) )
+  {
+    const double baseR = estimateRoundCylinderRadius( canonicalPoints, hardMin.z(), height, 0.25 );
+    const double correctedBaseR = baseR > 1e-6 ? applyRegularizedGeometryValue( uiParams, QStringLiteral( "ftBaseR" ), baseR, strength ) : uiParams.value( QStringLiteral( "ftBaseR" ), baseR );
+    const double nnBaseH = uiParams.value( QStringLiteral( "ftBaseH" ), 0.0 );
+    const double nnMidH = uiParams.value( QStringLiteral( "ftMidH" ), 0.0 );
+    const double nnConeH = uiParams.value( QStringLiteral( "ftConeH" ), 0.0 );
+    const double nnTotal = nnBaseH + nnMidH + nnConeH;
+    if ( nnTotal > 1e-6 )
+    {
+      const double targetTotal = regularizedGeometryValue( nnTotal, height, strength );
+      const double scaleH = std::max( 0.2, std::min( 5.0, targetTotal / nnTotal ) );
+      uiParams[QStringLiteral( "ftBaseH" )] = nnBaseH * scaleH;
+      uiParams[QStringLiteral( "ftMidH" )] = nnMidH * scaleH;
+      uiParams[QStringLiteral( "ftConeH" )] = nnConeH * scaleH;
+      if ( uiParams.contains( QStringLiteral( "ftEaveHeight" ) ) )
+        uiParams[QStringLiteral( "ftEaveHeight" )] = std::min( uiParams[QStringLiteral( "ftBaseH" )] * 0.9, uiParams[QStringLiteral( "ftEaveHeight" )] * scaleH );
+    }
+    if ( uiParams.contains( QStringLiteral( "ftEaveRadius" ) ) && correctedBaseR > 1e-6 )
+      uiParams[QStringLiteral( "ftEaveRadius" )] = std::max( uiParams[QStringLiteral( "ftEaveRadius" )], correctedBaseR * 1.02 );
+    if ( uiParams.contains( QStringLiteral( "ftMidTopR" ) ) && uiParams.contains( QStringLiteral( "ftEaveRadius" ) ) )
+      uiParams[QStringLiteral( "ftMidTopR" )] = std::min( uiParams[QStringLiteral( "ftMidTopR" )], uiParams[QStringLiteral( "ftEaveRadius" )] * 0.95 );
+    return;
+  }
+
+  if ( prim == QStringLiteral( "AngledGableHouse" ) )
+  {
+    // Bent footprint wings do not align to a single global AABB; preserve NN wing lengths/angle
+    // and regularize total elevation against the observed height span.
+    const double nnWall = uiParams.value( QStringLiteral( "tgWallHeight" ), 0.0 );
+    const double nnRoof = uiParams.value( QStringLiteral( "tgRoofHeight" ), 0.0 );
+    const double nnTotal = nnWall + nnRoof;
+    if ( nnTotal > 1e-6 )
+    {
+      const double targetTotal = regularizedGeometryValue( nnTotal, height, strength );
+      const double scaleH = std::max( 0.2, std::min( 5.0, targetTotal / nnTotal ) );
+      uiParams[QStringLiteral( "tgWallHeight" )] = nnWall * scaleH;
+      uiParams[QStringLiteral( "tgRoofHeight" )] = nnRoof * scaleH;
+    }
     return;
   }
 }

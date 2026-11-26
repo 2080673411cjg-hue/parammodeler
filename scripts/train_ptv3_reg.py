@@ -170,6 +170,15 @@ def commands(args, recipe):
         train += ["--truncated_scale_balanced"]
     if name == "CurvedRoofRoundHouse" and getattr(args, "tower_profile_loss_weight", 0.0) > 0:
         train += ["--tower_profile_loss_weight", str(args.tower_profile_loss_weight)]
+    if getattr(args, "spatial_pyramid", False):
+        train += ["--spatial_pyramid"]
+    if getattr(args, "coupled_geom_loss_weight", 0.0) > 0:
+        train += ["--coupled_geom_loss_weight", str(args.coupled_geom_loss_weight)]
+    if getattr(args, "net_canonical_align", False) and (
+        name == "AngledGableHouse"
+        or (name == "LShapedHouse" and not getattr(args, "lhouse_canonical", False))
+    ):
+        train += ["--net_canonical_align"]
     if args.flash:
         train += ["--ptv3_flash"]
     return log, train, common + ["--mode", "test", "--split", "test"]
@@ -217,6 +226,12 @@ def main():
                         help="Opt-in tower profile trial; select only CurvedRoofRoundHouse (default: 0).")
     parser.add_argument("--tower_clear_height", action="store_true",
                         help="Predict tower cylinder height directly from existing physical labels.")
+    parser.add_argument("--spatial_pyramid", action=argparse.BooleanOptionalAction, default=False,
+                        help="Enable 2x2 XY quadrant + 4 Z-height layer spatial pyramid residual pooling.")
+    parser.add_argument("--coupled_geom_loss_weight", type=float, default=0.0,
+                        help="Weight for differentiable coupled physical geometry node loss (default: 0).")
+    parser.add_argument("--net_canonical_align", action=argparse.BooleanOptionalAction, default=False,
+                        help="Enable internal XY minimum-area bounding box alignment for unaligned classes (LShapedHouse, AngledGableHouse).")
     parser.add_argument("--lhouse_robust_bbox", action="store_true",
                         help="Independent LHouse XY-quantile auxiliary-feature experiment; requires --lhouse_canonical.")
     parser.add_argument("--truncated_scale_balanced", action="store_true",

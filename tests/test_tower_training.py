@@ -112,10 +112,10 @@ class TowerTrainingTest(unittest.TestCase):
     def test_manual_sizes_outside_sampling_range_are_valid(self):
         self.validate({**self.params, "eaveRadius": 12, "eaveHeight": 1})
 
-    def test_unconfigured_server_uses_v13_default(self):
+    def test_unconfigured_server_uses_v14_default(self):
         with patch.object(server, "TOWER_LOG", ""):
             self.assertEqual(server.regression_log_dir("CurvedRoofRoundHouse").name,
-                             "ptv3_reg_curvedround_v13_normals")
+                             "ptv3_reg_curvedround_v14_normals")
 
     def test_only_tower_uses_override(self):
         with patch.object(server, "TOWER_LOG", "logs/ptv3_reg_fourstage_v4_eaves_normals"):
@@ -124,7 +124,7 @@ class TowerTrainingTest(unittest.TestCase):
             self.assertEqual(server.regression_log_dir("CurvedRoofRoundHouse", "_v3_normals"),
                              server.PTV3_DIR / "logs/ptv3_reg_fourstage_v3_normals")
             self.assertEqual(server.regression_log_dir("FlatRoofHouse").name,
-                             "ptv3_reg_flatroof_v13_normals")
+                             "ptv3_reg_flatroof_v14_normals")
             self.assertEqual(server.health()["tower_reg_log"], str(server.regression_log_dir("CurvedRoofRoundHouse")))
 
     def test_explicit_missing_override_does_not_fall_back(self):
@@ -227,7 +227,7 @@ class TowerTrainingTest(unittest.TestCase):
             command = run.call_args.args[0]
             self.assertEqual(command[command.index("--log_dir") + 1], str(expected))
             self.assertEqual(response["model_log_dir"], str(expected))
-        self.assertEqual(server.regression_log_dir("FlatRoofHouse").name, "ptv3_reg_flatroof_v13_normals")
+        self.assertEqual(server.regression_log_dir("FlatRoofHouse").name, "ptv3_reg_flatroof_v14_normals")
 
     def test_missing_v12_tower_baseline_does_not_silently_use_v10(self):
         with patch.object(Path, "is_file", return_value=False), \
@@ -247,20 +247,20 @@ class TowerTrainingTest(unittest.TestCase):
         self.assertEqual(configured.CLS_LOG, configured.PTV3_DIR / "logs/ptv3_cls_v6")
         self.assertEqual(configured.regression_log_dir("FlatRoofHouse").name, "ptv3_reg_cuboid_v3_normals")
 
-    def test_default_classifier_is_v14_and_regression_is_v13(self):
+    def test_default_classifier_is_v16_and_regression_is_v14(self):
         with patch.dict(sys.modules, {"fastapi": SimpleNamespace(FastAPI=AppStub, Request=object),
                                       "pydantic": SimpleNamespace(BaseModel=object)}), \
              patch.dict("os.environ", {}, clear=True):
             configured = load_script("ptv3_server")
-        self.assertEqual(configured.CLS_LOG, configured.PTV3_DIR / "logs/ptv3_cls_v14_actual_points")
+        self.assertEqual(configured.CLS_LOG, configured.PTV3_DIR / "logs/ptv3_cls_v16")
         self.assertEqual(configured.health()["cls_log"], str(configured.CLS_LOG))
-        self.assertEqual(configured.REG_SUFFIX, "_v13_normals")
+        self.assertEqual(configured.REG_SUFFIX, "_v14_normals")
         for old, new, _, slug, _ in PRIMITIVES:
             for alias in (old, new):
                 self.assertEqual(configured.regression_log_dir(alias).name,
-                                 f"ptv3_reg_{slug}_v13_normals")
+                                 f"ptv3_reg_{slug}_v14_normals")
 
-    def test_classifier_request_uses_v14_and_removes_temporary_input(self):
+    def test_classifier_request_uses_v16_and_removes_temporary_input(self):
         with patch.dict(sys.modules, {"fastapi": SimpleNamespace(FastAPI=AppStub, Request=object),
                                       "pydantic": SimpleNamespace(BaseModel=object)}), \
              patch.dict("os.environ", {}, clear=True):
@@ -273,7 +273,7 @@ class TowerTrainingTest(unittest.TestCase):
         self.assertEqual(response["model_log_dir"], str(configured.CLS_LOG))
         command = run.call_args.args[0]
         self.assertEqual(command[command.index("--log_dir") + 1],
-                         str(configured.PTV3_DIR / "logs/ptv3_cls_v14_actual_points"))
+                         str(configured.PTV3_DIR / "logs/ptv3_cls_v16"))
         self.assertEqual(command[command.index("--topk") + 1], "3")
         self.assertFalse(Path(command[command.index("--input") + 1]).exists())
 
@@ -292,12 +292,12 @@ class TowerTrainingTest(unittest.TestCase):
         self.assertFalse(response["ok"])
         self.assertNotIn("model_log_dir", response)
 
-    def test_blank_regression_suffix_uses_v13_default(self):
+    def test_blank_regression_suffix_uses_v14_default(self):
         with patch.dict(sys.modules, {"fastapi": SimpleNamespace(FastAPI=AppStub, Request=object),
                                       "pydantic": SimpleNamespace(BaseModel=object)}), \
              patch.dict("os.environ", {"PTV3_REG_SUFFIX": "  "}, clear=True):
             configured = load_script("ptv3_server")
-        self.assertEqual(configured.REG_SUFFIX, "_v13_normals")
+        self.assertEqual(configured.REG_SUFFIX, "_v14_normals")
 
     def test_v4_directory_name_keeps_canonical_training(self):
         args = SimpleNamespace(log_root="logs", run_tag="v4", data_root="data", batch_size=4,
@@ -385,7 +385,7 @@ class TowerTrainingTest(unittest.TestCase):
         suffix = "_axis_scale_trial_normals"
         expected = server.PTV3_DIR / "logs/ptv3_reg_lshaped_axis_scale_trial_normals"
         self.assertEqual(server.regression_log_dir("LShapedHouse", suffix), expected)
-        self.assertEqual(server.regression_log_dir("FlatRoofHouse").name, "ptv3_reg_flatroof_v13_normals")
+        self.assertEqual(server.regression_log_dir("FlatRoofHouse").name, "ptv3_reg_flatroof_v14_normals")
         request = SimpleNamespace(primitive_type="LShapedHouse", model_suffix=suffix, input_coordinates="normalized",
                                   points_text="0 0 0\n", num_points=2048,
                                   bbox_x=20, bbox_y=10, bbox_z=5, scale=12)
@@ -411,7 +411,7 @@ class TowerTrainingTest(unittest.TestCase):
         self.assertEqual(command[command.index("--log_dir") + 1], str(expected))
         self.assertEqual(command[command.index("--input_coordinates") + 1], "normalized")
         self.assertEqual(response["model_log_dir"], str(expected))
-        self.assertEqual(server.REG_SUFFIX, "_v13_normals")
+        self.assertEqual(server.REG_SUFFIX, "_v14_normals")
 
     def test_missing_lhouse_robust_checkpoint_does_not_fall_back(self):
         request = SimpleNamespace(primitive_type="LShapedHouse", model_suffix="_robust_bbox_trial_normals")
@@ -443,6 +443,146 @@ class TowerTrainingTest(unittest.TestCase):
                          "ptv3_reg_gabledroof_v3_normals")
         with self.assertRaisesRegex(ValueError, "Invalid model_suffix"):
             server.regression_log_dir("GableRoofHouse", "../../outside")
+
+    def test_in_process_classifier_cache_reuses_and_reloads_on_mtime_change(self):
+        import contextlib
+        import os
+        import numpy as np
+
+        cls_dir = self.root / "cls_v16"
+        cls_dir.mkdir()
+        ckpt_file = cls_dir / "best_model.pth"
+        ckpt_file.write_bytes(b"v1")
+        st0 = ckpt_file.stat()
+        os.utime(ckpt_file, ns=(st0.st_atime_ns, 1_000_000_000))
+
+        calls = {"load": 0}
+
+        class FakeTensor:
+            def __init__(self, arr):
+                self.arr = arr
+            def __getitem__(self, idx):
+                return FakeTensor(self.arr[idx])
+            def unsqueeze(self, _):
+                return self
+            def to(self, _):
+                return self
+            def float(self):
+                return self
+            def cpu(self):
+                return self
+            def numpy(self):
+                return self.arr
+
+        class FakeModel:
+            def to(self, _):
+                return self
+            def load_state_dict(self, _):
+                return self
+            def eval(self):
+                return self
+            def __call__(self, _):
+                return FakeTensor(np.array([[0.1, 0.9]], dtype=np.float32))
+
+        fake_torch = SimpleNamespace(
+            cuda=SimpleNamespace(is_available=lambda: False),
+            device=lambda x: x,
+            from_numpy=lambda arr: FakeTensor(arr),
+            no_grad=contextlib.nullcontext,
+            softmax=lambda tensor, dim=1: tensor,
+        )
+
+        def fake_load_checkpoint(log_dir, device):
+            calls["load"] += 1
+            return {
+                "class_names": ["FlatRoofHouse", "LShapedHouse"],
+                "state_dict": {},
+                "num_points": 4,
+                "normalize_points": True,
+                "use_normals": False,
+                "backbone_config": {"spatial_pyramid": True},
+            }
+
+        fake_main = SimpleNamespace(
+            load_checkpoint=fake_load_checkpoint,
+            canonical_class_name=lambda n: n,
+            build_model=lambda args, num_classes: FakeModel(),
+            load_txt_points=lambda p: np.zeros((4, 3), dtype=np.float32),
+            normalize_points=lambda pts: pts,
+            predict_normals=lambda s, p, a, c: None,
+            resolve_sampling_mode=lambda a, c: "actual_point_count",
+            sample_classification_points=lambda pts, *a, **k: pts,
+        )
+        req = SimpleNamespace(points_text="0 0 0\n1 0 0\n0 1 0\n0 0 1\n", num_points=4, topk=2)
+        with patch.object(server, "CLS_LOG", cls_dir), \
+             patch.dict(server._CLS_CACHE, {}, clear=True), \
+             patch.dict(sys.modules, {"torch": fake_torch, "main": fake_main}):
+            r1 = server.classify(req)
+            r2 = server.classify(req)
+            self.assertEqual(calls["load"], 1)
+            self.assertTrue(r1["ok"] and r2["ok"])
+            self.assertEqual(r1["result"][0]["class"], "LShapedHouse")
+            os.utime(ckpt_file, ns=(st0.st_atime_ns, 2_000_000_000))
+            r3 = server.classify(req)
+            self.assertTrue(r3["ok"])
+            self.assertEqual(calls["load"], 2)
+
+    def test_in_process_regression_cache_reuses_reloads_and_skips_metadata(self):
+        import os
+
+        reg_dir = self.root / "ptv3_reg_flatroof_v14_normals"
+        reg_dir.mkdir()
+        ckpt_file = reg_dir / "best_model.pth"
+        ckpt_file.write_bytes(b"v1")
+        st0 = ckpt_file.stat()
+        os.utime(ckpt_file, ns=(st0.st_atime_ns, 1_000_000_000))
+
+        calls = {"load": 0, "meta": 0}
+        fake_torch = SimpleNamespace(
+            cuda=SimpleNamespace(is_available=lambda: False),
+            device=lambda x: x,
+        )
+
+        def fake_load_checkpoint(log_dir, device, args):
+            calls["load"] += 1
+            return ("model", {"targets": ["length"]}, ["length"], None, None, None, None)
+
+        def fake_load_metadata(path):
+            calls["meta"] += 1
+            return []
+
+        def fake_predict(args):
+            print(json.dumps({"class": "FlatRoofHouse", "params": {"length": 12.5}}))
+
+        fake_main_reg = SimpleNamespace(
+            load_checkpoint=fake_load_checkpoint,
+            load_metadata=fake_load_metadata,
+            predict=fake_predict,
+        )
+        req = SimpleNamespace(
+            primitive_type="FlatRoofHouse",
+            model_suffix="_v14_normals",
+            points_text="0 0 0\n1 0 0\n",
+            num_points=2048,
+            bbox_x=10.0,
+            bbox_y=8.0,
+            bbox_z=5.0,
+            scale=12.0,
+            input_coordinates="physical",
+        )
+        with patch.object(server, "regression_log_dir", return_value=reg_dir), \
+             patch.dict(server._REG_CACHE, {}, clear=True), \
+             patch.dict(sys.modules, {"torch": fake_torch, "main_reg": fake_main_reg}):
+            r1 = server.regress(req)
+            r2 = server.regress(req)
+            self.assertEqual(calls["load"], 1)
+            self.assertEqual(calls["meta"], 0)
+            self.assertTrue(r1["ok"] and r2["ok"])
+            self.assertEqual(r1["result"]["params"]["length"], 12.5)
+            os.utime(ckpt_file, ns=(st0.st_atime_ns, 2_000_000_000))
+            r3 = server.regress(req)
+            self.assertTrue(r3["ok"])
+            self.assertEqual(calls["load"], 2)
 
 
 if __name__ == "__main__":

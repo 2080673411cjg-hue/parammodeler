@@ -3,6 +3,7 @@
 #include "parammodeler_config.h"
 #include "parammodeler_pcdloader.h"
 #include "parammodeler_dock.h"
+#include "parammodeler_suspended_roof.h"
 #include <QScopedValueRollback>
 #include "ui_parammodeler_dock.h"
 
@@ -26,6 +27,8 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+
+void robustBBoxFromPoints( const QVector<QVector3D> &points, QVector3D &outMin, QVector3D &outMax );
 
 namespace
 {
@@ -51,6 +54,8 @@ struct PreparedPointCloudInput
   PointCloud pointCloud;
   std::unique_ptr<QTemporaryFile> tempFile;
   QString errorMessage;
+  ParamModelerSuspendedRoof::Analysis suspendedRoof;
+  bool isNormalized = false;
 };
 
 const QString pythonExeForBackend( PointNetBackend backend )
@@ -419,7 +424,49 @@ PreparedPointCloudInput preparePointCloudInput( const QString &inputPath )
     return prepared;
   }
 
-  if ( isTextPointCloudFile( inputPath ) )
+  const QVector3D rawSpan = prepared.pointCloud.bboxMax - prepared.pointCloud.bboxMin;
+  const double maxDim = std::max( { static_cast<double>( rawSpan.x() ),
+                                    static_cast<double>( rawSpan.y() ),
+                                    static_cast<double>( rawSpan.z() ) } );
+  bool metaNormalized = false;
+  if ( isTextPointCloudFile( inputPath ) && !metadataRelativePathForPointCloud( inputPath ).isEmpty() )
+  {
+    QVector3D metaBBox;
+    double metaScale = 1.0;
+    metadataAuxForInput( inputPath, metaBBox, metaScale, metaNormalized );
+  }
+  const bool isNormalized = ( maxDim <= 3.5 ) || metaNormalized;
+  prepared.isNormalized = isNormalized;
+
+  prepared.suspendedRoof = ParamModelerSuspendedRoof::analyze( prepared.pointCloud.points, isNormalized );
+  if ( prepared.suspendedRoof.shouldStripBottom() )
+  {
+    prepared.pointCloud.points = ParamModelerSuspendedRoof::filterUpperCluster(
+      prepared.pointCloud.points, prepared.suspendedRoof );
+    QVector3D fMin = prepared.pointCloud.points.first();
+    QVector3D fMax = fMin;
+    for ( const QVector3D &p : prepared.pointCloud.points )
+    {
+      fMin.setX( std::min( fMin.x(), p.x() ) );
+      fMin.setY( std::min( fMin.y(), p.y() ) );
+      fMin.setZ( std::min( fMin.z(), p.z() ) );
+      fMax.setX( std::max( fMax.x(), p.x() ) );
+      fMax.setY( std::max( fMax.y(), p.y() ) );
+      fMax.setZ( std::max( fMax.z(), p.z() ) );
+    }
+    prepared.pointCloud.bboxMin = fMin;
+    prepared.pointCloud.bboxMax = fMax;
+  }
+
+  if ( !isNormalized )
+  {
+    QVector3D rMin, rMax;
+    robustBBoxFromPoints( prepared.pointCloud.points, rMin, rMax );
+    prepared.pointCloud.bboxMin = rMin;
+    prepared.pointCloud.bboxMax = rMax;
+  }
+
+  if ( isTextPointCloudFile( inputPath ) && !prepared.suspendedRoof.shouldStripBottom() )
   {
     prepared.pythonInputPath = inputPath;
     return prepared;
@@ -443,15 +490,47 @@ PreparedPointCloudInput preparePointCloudInput( const QString &inputPath )
   return prepared;
 }
 
-double pointCloudNormalizationScale( const QVector<QVector3D> &points )
+double pointCloudNormalizationScale( const QVector<QVector3D> &points, bool robustPhysical = false )
 {
   if ( points.isEmpty() )
     return 1.0;
 
+  const int n = points.size();
+  if ( robustPhysical && n >= 100 )
+  {
+    QVector<float> xs( n ), ys( n );
+    for ( int i = 0; i < n; ++i )
+    {
+      xs[i] = points[i].x();
+      ys[i] = points[i].y();
+    }
+    std::sort( xs.begin(), xs.end() );
+    std::sort( ys.begin(), ys.end() );
+    const int lo = static_cast<int>( std::floor( 0.005 * n ) );
+    const int hi = n - 1 - lo;
+    const float xLo = xs[lo];
+    const float xHi = xs[hi];
+    const float yLo = ys[lo];
+    const float yHi = ys[hi];
+
+    QVector3D center;
+    for ( const QVector3D &p : points )
+      center += QVector3D( std::clamp( p.x(), xLo, xHi ), std::clamp( p.y(), yLo, yHi ), p.z() );
+    center /= static_cast<float>( n );
+
+    double scale = 0.0;
+    for ( const QVector3D &p : points )
+    {
+      const QVector3D clamped( std::clamp( p.x(), xLo, xHi ), std::clamp( p.y(), yLo, yHi ), p.z() );
+      scale = std::max( scale, static_cast<double>( ( clamped - center ).length() ) );
+    }
+    return scale > 1e-9 ? scale : 1.0;
+  }
+
   QVector3D center;
   for ( const QVector3D &p : points )
     center += p;
-  center /= static_cast<float>( points.size() );
+  center /= static_cast<float>( n );
 
   double scale = 0.0;
   for ( const QVector3D &p : points )
@@ -694,10 +773,13 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
   }
 
   QVector3D bboxSize = prepared.pointCloud.bboxMax - prepared.pointCloud.bboxMin;
-  double scale = pointCloudNormalizationScale( prepared.pointCloud.points );
+  double scale = pointCloudNormalizationScale( prepared.pointCloud.points, !prepared.isNormalized );
   bool pointsNormalized = false;
-  metadataAuxForInput( inputTxt, bboxSize, scale, pointsNormalized );
-  pointsNormalized = pointsNormalized && isTextPointCloudFile( inputTxt );
+  if ( !prepared.suspendedRoof.shouldStripBottom() )
+  {
+    metadataAuxForInput( inputTxt, bboxSize, scale, pointsNormalized );
+    pointsNormalized = pointsNormalized && isTextPointCloudFile( inputTxt );
+  }
   const QString inputCoordinates = pointsNormalized ? QStringLiteral( "normalized" ) : QStringLiteral( "physical" );
 
   const QString remoteUrl = backend == PointNetBackend::PTv3
@@ -751,6 +833,9 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
       result.errorMessage = QStringLiteral( "%1 remote regression returned no parameters." ).arg( config.modelName );
     else
       result.errorMessage = towerRegressionSchemaError( config.className, result.params );
+    if ( result.errorMessage.isEmpty() )
+      ParamModelerSuspendedRoof::reconstructSuspendedRoofHeights(
+        config.className, prepared.suspendedRoof, result.params );
     return result;
   }
 
@@ -822,6 +907,10 @@ PointNetRegressionResult PointNetRunner::predictParams( const QString &inputTxt,
     result.errorMessage = QStringLiteral( "%1 regression returned no parameters." ).arg( config.modelName );
   else
     result.errorMessage = towerRegressionSchemaError( config.className, result.params );
+
+  if ( result.errorMessage.isEmpty() )
+    ParamModelerSuspendedRoof::reconstructSuspendedRoofHeights(
+      config.className, prepared.suspendedRoof, result.params );
 
   return result;
 }

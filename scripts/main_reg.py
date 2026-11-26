@@ -11,6 +11,7 @@ from primitive_names import canonical_class_name
 import argparse
 import csv
 import json
+import math
 import multiprocessing
 import os
 import random
@@ -64,8 +65,41 @@ def load_txt_points(path: Path) -> np.ndarray:
     return np.asarray(points, dtype=np.float32)
 
 
-def normalize_points(points: np.ndarray) -> np.ndarray:
-    points = points.astype(np.float32)
+def robust_physical_xy_bounds(points: np.ndarray, q_low: float = 0.005, q_high: float = 0.995) -> np.ndarray:
+    """Return [2, 2] XY bounds using quantile trimming when enough points are present."""
+    xy = np.asarray(points[:, :2], dtype=np.float32)
+    if len(xy) >= 100:
+        return np.quantile(xy, [q_low, q_high], axis=0).astype(np.float32)
+    return np.vstack((xy.min(axis=0), xy.max(axis=0))).astype(np.float32)
+
+
+def robust_physical_bbox_span(points: np.ndarray) -> np.ndarray:
+    """Return XYZ span with 0.5%-99.5% quantile trimming on XY for physical clouds."""
+    span = np.ptp(points, axis=0).astype(np.float32)
+    if len(points) >= 100:
+        bounds = robust_physical_xy_bounds(points)
+        span[:2] = bounds[1] - bounds[0]
+    return span
+
+
+def robust_physical_core_mask(points: np.ndarray) -> np.ndarray:
+    """Return a boolean mask selecting points inside the 0.5%-99.5% XY envelope."""
+    if len(points) < 100:
+        return np.ones((len(points),), dtype=bool)
+    bounds = robust_physical_xy_bounds(points)
+    mask = ((points[:, 0] >= bounds[0, 0]) & (points[:, 0] <= bounds[1, 0]) &
+            (points[:, 1] >= bounds[0, 1]) & (points[:, 1] <= bounds[1, 1]))
+    if int(mask.sum()) < 16:
+        return np.ones((len(points),), dtype=bool)
+    return mask
+
+
+def normalize_points(points: np.ndarray, robust_physical: bool = False) -> np.ndarray:
+    points = points.astype(np.float32, copy=True)
+    if robust_physical and len(points) >= 100:
+        bounds = robust_physical_xy_bounds(points)
+        points[:, 0] = np.clip(points[:, 0], bounds[0, 0], bounds[1, 0])
+        points[:, 1] = np.clip(points[:, 1], bounds[0, 1], bounds[1, 1])
     centroid = points.mean(axis=0, keepdims=True)
     points = points - centroid
     scale = np.linalg.norm(points, axis=1).max()
@@ -1297,6 +1331,7 @@ def save_config(log_dir, args, targets, mean, std, aux_names, aux_mean, aux_std,
         "circular_targets": circular_targets or [],
         "geom_aux_targets": getattr(args, "geom_aux_targets", []),
         "geom_loss_weight": getattr(args, "geom_loss_weight", 0.0),
+        "coupled_geom_loss_weight": getattr(args, "coupled_geom_loss_weight", 0.0),
         "lhouse_corner_loss_weight": getattr(args, "lhouse_corner_loss_weight", 0.0),
         "use_normals": getattr(args, 'use_normals', False),
         "normal_backend": getattr(args, "normal_backend", "numpy"),
@@ -1339,9 +1374,105 @@ def load_config(log_dir):
 # Training
 # ============================================================================
 
+def coupled_geometry_nodes(values, targets):
+    """Compute differentiable physical geometry nodes from primary targets."""
+    idx = {name: i for i, name in enumerate(targets)}
+    nodes = []
+    # 1) Eave height = totalHeight * wallRatio (or cylinderHeight = totalHeight * cylinderRatio)
+    h_name = "totalHeight" if "totalHeight" in idx else "geom_total_height" if "geom_total_height" in idx else None
+    if h_name is not None:
+        h = values[:, idx[h_name]]
+        if "wallRatio" in idx:
+            r = values[:, idx["wallRatio"]]
+            nodes.extend([h * r, h * (1.0 - r)])
+        if "cylinderRatio" in idx:
+            r = values[:, idx["cylinderRatio"]]
+            nodes.extend([h * r, h * (1.0 - r)])
+    # 2) Ridge Y offset = width * ridgeRatio
+    if "width" in idx and "ridgeRatio" in idx:
+        w = values[:, idx["width"]]
+        rr = values[:, idx["ridgeRatio"]]
+        nodes.extend([w * rr, w * (1.0 - rr)])
+    # 3) FlatTopHipRoofHouse top platform dimensions
+    if "geom_footprint_long" in idx and "geom_top_long_ratio" in idx:
+        nodes.append(values[:, idx["geom_footprint_long"]] * values[:, idx["geom_top_long_ratio"]])
+    if "geom_footprint_short" in idx and "geom_top_short_ratio" in idx:
+        nodes.append(values[:, idx["geom_footprint_short"]] * values[:, idx["geom_top_short_ratio"]])
+    # 4) LShapedHouse inner corner and remaining wing widths
+    if all(k in idx for k in ("outerLength", "outerWidth", "cutoutLengthRatio", "cutoutWidthRatio")):
+        L = values[:, idx["outerLength"]]
+        W = values[:, idx["outerWidth"]]
+        rl = values[:, idx["cutoutLengthRatio"]]
+        rw = values[:, idx["cutoutWidthRatio"]]
+        nodes.extend([L * (1.0 - rl), W * (1.0 - rw), L * rl, W * rw])
+    # 5) RecessedRoofHouse recess margins and floor height
+    if all(k in idx for k in ("geom_footprint_long", "geom_footprint_short", "geom_total_height", "innerHeight")):
+        L = values[:, idx["geom_footprint_long"]]
+        W = values[:, idx["geom_footprint_short"]]
+        H = values[:, idx["geom_total_height"]]
+        nodes.append(H - values[:, idx["innerHeight"]])
+        if "geom_long_start_margin_ratio" in idx and "geom_long_end_margin_ratio" in idx:
+            s = values[:, idx["geom_long_start_margin_ratio"]]
+            e = values[:, idx["geom_long_end_margin_ratio"]]
+            nodes.extend([L * s, L * e, L * (1.0 - s - e)])
+        if "geom_short_start_margin_ratio" in idx and "geom_short_end_margin_ratio" in idx:
+            s = values[:, idx["geom_short_start_margin_ratio"]]
+            e = values[:, idx["geom_short_end_margin_ratio"]]
+            nodes.extend([W * s, W * e, W * (1.0 - s - e)])
+    # 6) CurvedRoofRoundHouse cumulative heights and radial steps
+    if has_tower_profile_targets(targets):
+        base_r = values[:, idx["baseRadius"]]
+        eave_r = values[:, idx["eaveRadius"]]
+        top_r = values[:, idx["middleTopRadius"]]
+        eave_h = values[:, idx["eaveHeight"]]
+        mid_h = values[:, idx["middleHeight"]]
+        cone_h = values[:, idx["coneHeight"]]
+        base_h = (values[:, idx["cylinderHeight"]] + eave_h
+                  if "cylinderHeight" in idx else values[:, idx["baseHeight"]])
+        nodes.extend([base_h + mid_h, base_h + mid_h + cone_h, eave_r - base_r, eave_r - top_r])
+    # 7) AngledGableHouse bent wing tip coordinates (length1 + length2*cos(180-angle), length2*sin(180-angle))
+    if all(k in idx for k in ("length1", "length2", "angle")):
+        l1 = values[:, idx["length1"]]
+        l2 = values[:, idx["length2"]]
+        turn_rad = (180.0 - values[:, idx["angle"]]) * (torch.pi / 180.0)
+        nodes.extend([l1 + l2 * torch.cos(turn_rad), l2 * torch.sin(turn_rad), l1 + l2])
+    if not nodes:
+        return None
+    return torch.stack(nodes, dim=1)
+
+
+def compute_coupled_geometry_std(dataset, targets, aux_names, target_mode):
+    rows = []
+    for _, target, aux, _, _ in dataset.samples:
+        baseline = target_baseline_from_aux_values(targets, aux_names, aux, target_mode)
+        phys = invert_target_transform_values(target, baseline, target_mode)
+        rows.append(phys)
+    values = torch.as_tensor(np.stack(rows, axis=0), dtype=torch.float32)
+    nodes = coupled_geometry_nodes(values, targets)
+    if nodes is None:
+        return None
+    return nodes.std(dim=0, unbiased=False).clamp_min(1e-4)
+
+
+def coupled_geometry_loss(pred_phys, true_phys, targets, node_std, criterion):
+    if node_std is None:
+        return pred_phys.new_tensor(0.0)
+    pred_nodes = coupled_geometry_nodes(pred_phys, targets)
+    true_nodes = coupled_geometry_nodes(true_phys, targets)
+    if pred_nodes is None or true_nodes is None:
+        return pred_phys.new_tensor(0.0)
+    scale = node_std.view(1, -1).to(device=pred_phys.device, dtype=pred_phys.dtype)
+    return criterion((pred_nodes - true_nodes) / scale, torch.zeros_like(pred_nodes))
+
+
 def backbone_config(args):
     names = ("ptv3_grid_size", "ptv3_patch_size", "ptv3_flash", "ptv3_dropout")
-    return {name: getattr(args, name) for name in names if hasattr(args, name)}
+    cfg = {name: getattr(args, name) for name in names if hasattr(args, name)}
+    if getattr(args, "spatial_pyramid", False):
+        cfg["spatial_pyramid"] = True
+    if getattr(args, "net_canonical_align", False):
+        cfg["net_canonical_align"] = True
+    return cfg
 
 
 def build_model(target_dim, aux_dim, args, in_channels=3):
@@ -1350,6 +1481,8 @@ def build_model(target_dim, aux_dim, args, in_channels=3):
         grid_size=args.ptv3_grid_size, patch_size=args.ptv3_patch_size,
         enable_flash=args.ptv3_flash, dropout=args.ptv3_dropout,
         repo_path=args.ptv3_repo,
+        spatial_pyramid=bool(getattr(args, "spatial_pyramid", False)),
+        canonical_align=bool(getattr(args, "net_canonical_align", False)),
     )
 
 
@@ -1416,6 +1549,9 @@ def train(args):
     mean_np, std_np = compute_target_stats(train_ds)
     aux_mean_np, aux_std_np = compute_aux_stats(train_ds, len(aux_names))
     geom_mean_np, geom_std_np = compute_geometry_aux_stats(train_ds)
+    coupled_weight = float(getattr(args, "coupled_geom_loss_weight", 0.0))
+    coupled_std = (compute_coupled_geometry_std(train_ds, targets, aux_names, target_mode)
+                   if coupled_weight > 0 else None)
     profile_std = compute_tower_profile_std(train_ds, targets) if profile_weight > 0 else None
     save_config(log_dir, args, targets, mean_np, std_np, aux_names, aux_mean_np, aux_std_np,
                 args.circular_targets, tower_profile_std=profile_std)
@@ -1530,6 +1666,12 @@ def train(args):
                 if args.geom_aux_targets and args.geom_loss_weight > 0:
                     geom_loss = criterion(pred_geom_norm, geom_norm)
                     loss_total = loss_total + args.geom_loss_weight * geom_loss
+                if coupled_weight > 0 and coupled_std is not None:
+                    baseline = target_baseline_from_aux_tensor(targets, aux_names, aux, target_mode)
+                    phys_pred = invert_target_transform_tensor(decode_targets(pred_norm, mean, std), baseline, target_mode)
+                    phys_true = invert_target_transform_tensor(y, baseline, target_mode)
+                    loss_total = loss_total + coupled_weight * coupled_geometry_loss(
+                        phys_pred, phys_true, targets, coupled_std, criterion)
                 if profile_weight > 0:
                     profile_loss, profile_parts = tower_profile_loss(
                         decode_targets(pred_norm, mean, std), y, targets, profile_scales, args.smooth_l1_beta)
@@ -1661,7 +1803,8 @@ def load_checkpoint(log_dir, device, args):
         raise RuntimeError("This directory loads PTv3 checkpoints only. Use pct_simple for PCT weights.")
     args.circular_targets = list(ckpt.get("circular_targets", args.circular_targets))
     for name, value in ckpt.get("backbone_config", {}).items():
-        if name in backbone_config(args):
+        if name in ("ptv3_grid_size", "ptv3_patch_size", "ptv3_flash", "ptv3_dropout",
+                    "spatial_pyramid", "net_canonical_align"):
             setattr(args, name, value)
     if args.backbone == "ptv3" and device.type != "cuda":
         raise RuntimeError("PTv3 checkpoints require CUDA/spconv; CPU prediction is not supported.")
@@ -1881,14 +2024,16 @@ def predict(args):
                 raise SystemExit("Canonical orientation is uncertain for this cloud: "
                                  + orientation_info.get("reason", "unknown geometry"))
 
+    coordinates = getattr(args, "input_coordinates", None)
+    info = record.get("pointCloudInfo", {}) if record is not None else {}
+    if coordinates is None and record is not None:
+        coordinates = ("normalized" if info.get("normalization") ==
+                       "centered_by_mean_and_scaled_by_max_radius" else "physical")
+    use_robust_physical = (coordinates == "physical" and len(points) >= 100)
+
     if canonical_applied:
-        bbox = np.ptp(points, axis=0)
+        bbox = robust_physical_bbox_span(points) if use_robust_physical else np.ptp(points, axis=0)
         if aux_names:
-            coordinates = getattr(args, "input_coordinates", None)
-            info = record.get("pointCloudInfo", {}) if record is not None else {}
-            if coordinates is None and record is not None:
-                coordinates = ("normalized" if info.get("normalization") ==
-                               "centered_by_mean_and_scaled_by_max_radius" else "physical")
             scale = info.get("scale", getattr(args, "scale", None))
             if scale is None and "scale" in aux_names:
                 scale = float(aux[aux_names.index("scale")])
@@ -1903,7 +2048,7 @@ def predict(args):
         aux = aux_vector_for_bbox(aux, aux_names, bbox)
 
     if normalize:
-        points = normalize_points(points)
+        points = normalize_points(points, robust_physical=use_robust_physical)
     normals = predict_normals(source_points, points, args, ckpt,
                               -pose_rz_deg if canonical_applied else 0.0)
     points = sample_points(points, num_points, train=False, jitter_sigma=0.0, random_rotate=False, normals=normals)
@@ -2002,6 +2147,12 @@ def parse_args():
                         help="Optional geometry auxiliary regression targets, e.g. geom_footprint_long geom_total_height")
     parser.add_argument("--geom_loss_weight", type=float, default=0.0,
                         help="Weight for optional geometry auxiliary regression loss.")
+    parser.add_argument("--coupled_geom_loss_weight", type=float, default=0.0,
+                        help="Weight for differentiable coupled physical geometry node loss (eave, ridge, margins, wing tip).")
+    parser.add_argument("--spatial_pyramid", action=argparse.BooleanOptionalAction, default=False,
+                        help="Enable 2x2 XY quadrant + 4 Z-height layer spatial pyramid residual pooling.")
+    parser.add_argument("--net_canonical_align", action=argparse.BooleanOptionalAction, default=False,
+                        help="Enable internal XY minimum-area bounding box alignment before PTv3 voxelization.")
     parser.add_argument("--lhouse_corner_loss_weight", type=float, default=0.0,
                         help="Optional LHouse primary-output notch-position loss; 0 preserves the existing recipe.")
     parser.add_argument("--tower_profile_loss_weight", type=float, default=0.0,

@@ -216,21 +216,118 @@ def pool_spatial_pyramid_features(features, coords, batch, batch_size):
     return torch.stack(out_rows)
 
 
+def pool_regression_pyramid_features(features, coords, batch, batch_size):
+    """Pool 2x2 XY quadrants + 4 Z-height layers + 24D spatial/vertical geometry summary."""
+    feat_dim = features.shape[1]
+    out_rows = []
+    q_probs = torch.tensor([0.02, 0.98], device=features.device, dtype=features.dtype)
+    c_probs = torch.tensor([0.05, 0.95], device=features.device, dtype=features.dtype)
+    for index in range(batch_size):
+        mask = batch == index
+        cloud_feat = features[mask]
+        cloud_xyz = coords[mask]
+        n_vox = cloud_feat.shape[0]
+        if n_vox == 0:
+            raise RuntimeError(f"PTv3 encoder lost cloud {index}")
+        if n_vox >= 4:
+            qxyz = torch.quantile(cloud_xyz, q_probs, dim=0)
+            xyz_min, xyz_max = qxyz[0], qxyz[1]
+        else:
+            xyz_min, xyz_max = cloud_xyz.amin(dim=0), cloud_xyz.amax(dim=0)
+        span = (xyz_max - xyz_min).clamp_min(1e-6)
+        uvw = ((cloud_xyz - xyz_min) / span).clamp(0.0, 1.0)
+        u, v, w = uvw[:, 0], uvw[:, 1], uvw[:, 2]
+
+        # 1) 4 fixed XY quadrants (preserve directional order for canonical regression)
+        q_masks = [
+            (u >= 0.5) & (v >= 0.5),
+            (u < 0.5) & (v >= 0.5),
+            (u < 0.5) & (v < 0.5),
+            (u >= 0.5) & (v < 0.5),
+        ]
+        q_pooled = []
+        q_fracs = []
+        for m in q_masks:
+            cnt = int(m.sum().item())
+            q_fracs.append(cnt / float(n_vox))
+            if cnt > 0:
+                qf = cloud_feat[m]
+                q_pooled.append(torch.cat((qf.mean(dim=0), qf.amax(dim=0))))
+            else:
+                q_pooled.append(cloud_feat.new_zeros(2 * feat_dim))
+
+        # 2) 4 vertical Z-height slices [0..0.25, 0.25..0.5, 0.5..0.75, 0.75..1.0]
+        z_edges = (0.0, 0.25, 0.5, 0.75, 1.01)
+        z_pooled = []
+        z_fracs = []
+        z_radii = []
+        xy_c = uvw[:, :2] - 0.5
+        r_xy = torch.hypot(xy_c[:, 0], xy_c[:, 1])
+        for zi in range(4):
+            zm = (w >= z_edges[zi]) & (w < z_edges[zi + 1])
+            cnt = int(zm.sum().item())
+            z_fracs.append(cnt / float(n_vox))
+            if cnt > 0:
+                zf = cloud_feat[zm]
+                z_pooled.append(torch.cat((zf.mean(dim=0), zf.amax(dim=0))))
+                z_radii.append(r_xy[zm].amax())
+            else:
+                z_pooled.append(cloud_feat.new_zeros(2 * feat_dim))
+                z_radii.append(features.new_tensor(0.0))
+
+        # 3) 4 corner vacancy distances (for LShapedHouse / RecessedRoofHouse / AngledGableHouse)
+        k_idx = min(4, n_vox - 1)
+        c_dists = []
+        for cx in (0.0, 1.0):
+            for cy in (0.0, 1.0):
+                d = torch.hypot(u - cx, v - cy)
+                c_dists.append(torch.sort(d).values[k_idx])
+        c_dists_t = torch.stack(c_dists)
+
+        # 4) Cross-section center & height profile along u (4 slices)
+        u_edges = (0.0, 0.25, 0.5, 0.75, 1.01)
+        u_vcenters = []
+        u_ztops = []
+        for ui in range(4):
+            um = (u >= u_edges[ui]) & (u < u_edges[ui + 1])
+            if int(um.sum().item()) >= 3:
+                qv = torch.quantile(v[um], c_probs)
+                u_vcenters.append(0.5 * (qv[0] + qv[1]) - 0.5)
+                u_ztops.append(w[um].amax())
+            else:
+                u_vcenters.append(features.new_tensor(0.0))
+                u_ztops.append(features.new_tensor(0.5))
+
+        geom_24 = torch.cat((
+            c_dists_t,
+            features.new_tensor(q_fracs),
+            features.new_tensor(z_fracs),
+            torch.stack(z_radii),
+            torch.stack(u_vcenters),
+            torch.stack(u_ztops),
+        ))
+        out_rows.append(torch.cat((*q_pooled, *z_pooled, geom_24)))
+    return torch.stack(out_rows)
+
+
 class PTv3Regressor(nn.Module):
-    """Official five-stage PTv3 encoder + global mean/max pooling + parameter head.
+    """Official five-stage PTv3 encoder + global mean/max pooling (+ optional 3D spatial pyramid) + parameter head.
 
     cls_mode=True is upstream's encoder-only switch; no classification loss/head
     is added. Output layout matches main_reg: parameters then geometry auxiliaries.
     """
 
     def __init__(self, target_dim, aux_dim=0, in_channels=6, grid_size=0.02,
-                 patch_size=128, enable_flash=False, dropout=0.1, repo_path=None):
+                 patch_size=128, enable_flash=False, dropout=0.1, repo_path=None,
+                 spatial_pyramid=False, canonical_align=False):
         super().__init__()
         if grid_size <= 0 or patch_size < 1 or target_dim < 1 or not 0 <= dropout < 1:
             raise ValueError("Invalid PTv3 grid/patch/output/dropout configuration")
         self.grid_size = grid_size
         self.aux_dim = aux_dim
         self.in_channels = in_channels
+        self.spatial_pyramid = bool(spatial_pyramid)
+        self.canonical_align = bool(canonical_align)
         encoder = load_official_encoder(repo_path)
         self.encoder = encoder(
             in_channels=in_channels, cls_mode=True,
@@ -246,12 +343,33 @@ class PTv3Regressor(nn.Module):
             nn.Dropout(dropout), nn.Linear(512, 256), nn.LayerNorm(256),
             nn.GELU(), nn.Dropout(dropout), nn.Linear(256, target_dim),
         )
+        if self.spatial_pyramid:
+            out_proj = nn.Linear(256, 1024)
+            nn.init.zeros_(out_proj.weight)
+            nn.init.zeros_(out_proj.bias)
+            self.pyramid_proj = nn.Sequential(
+                nn.Linear(8 * 1024 + 24, 256),
+                nn.LayerNorm(256),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                out_proj,
+            )
+        else:
+            self.pyramid_proj = None
 
     def forward(self, points, aux=None):
         if points.ndim != 3 or points.shape[-1] != self.in_channels:
             raise ValueError(f"Expected [B, N, {self.in_channels}] points")
-        encoded = self.encoder(voxelize_batch(points, self.grid_size))
+        if self.canonical_align:
+            points = align_batch_xy(points)
+        voxels = voxelize_batch(points, self.grid_size)
+        encoded = self.encoder(voxels)
         features = pool_cloud_features(encoded.feat, encoded.batch, points.shape[0])
+        if self.spatial_pyramid and self.pyramid_proj is not None:
+            enc_coords = getattr(encoded, "coord", voxels["coord"])
+            pyramid_feat = pool_regression_pyramid_features(
+                encoded.feat, enc_coords, encoded.batch, points.shape[0])
+            features = features + self.pyramid_proj(pyramid_feat)
         if self.aux_dim:
             if aux is None or aux.shape != (points.shape[0], self.aux_dim):
                 raise ValueError(f"Expected auxiliary features [B, {self.aux_dim}]")

@@ -81,16 +81,19 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
   modelLayout->addWidget( btnSettings );
 
   modelLayout->addStretch();
+  m_geometryCorrectionEnabled = false;
   auto *chkGeometryCorrection = new QCheckBox( tr( "Enable geometry correction" ), &dialog );
   chkGeometryCorrection->setToolTip(
     tr( "Experimental: after model regression, blend supported parameters with geometry measured from the current point cloud." )
   );
   chkGeometryCorrection->setChecked( m_geometryCorrectionEnabled );
+  chkGeometryCorrection->setVisible( false );
   connect( chkGeometryCorrection, &QCheckBox::toggled, this, [this]( bool checked ) {
     m_geometryCorrectionEnabled = checked;
   } );
   auto *correctionStrengthLayout = new QHBoxLayout();
   auto *correctionStrengthLabel = new QLabel( tr( "Geometry correction strength:" ), &dialog );
+  correctionStrengthLabel->setVisible( false );
   auto *spinGeometryStrength = new QSpinBox( &dialog );
   spinGeometryStrength->setRange( 0, 100 );
   spinGeometryStrength->setSuffix( tr( "%" ) );
@@ -99,6 +102,7 @@ void ParamModelerDock::onOpenPointCloudEstimateDialog()
     tr( "0% keeps the model prediction; 100% uses the measured point-cloud geometry. Intermediate values blend both." )
   );
   spinGeometryStrength->setEnabled( m_geometryCorrectionEnabled );
+  spinGeometryStrength->setVisible( false );
   connect( spinGeometryStrength, QOverload<int>::of( &QSpinBox::valueChanged ), this, [this]( int value ) {
     m_geometryCorrectionStrength = qBound( 0.0, value / 100.0, 1.0 );
   } );
